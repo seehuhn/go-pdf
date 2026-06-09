@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/membudget"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // writeCloser wraps a bytes.Buffer to implement io.WriteCloser
@@ -206,7 +206,7 @@ func TestParamsValidate(t *testing.T) {
 			params: Params{
 				Colors:           1,
 				BitsPerComponent: 8,
-				Columns:          streamlimits.MaxImageWidth,
+				Columns:          limits.MaxImageWidth,
 				Predictor:        2,
 			},
 			expectError: false,
@@ -216,7 +216,7 @@ func TestParamsValidate(t *testing.T) {
 			params: Params{
 				Colors:           1,
 				BitsPerComponent: 8,
-				Columns:          streamlimits.MaxImageWidth + 1,
+				Columns:          limits.MaxImageWidth + 1,
 				Predictor:        2,
 			},
 			expectError: true,
@@ -278,7 +278,7 @@ func TestParamsValidate(t *testing.T) {
 			params: Params{
 				Colors:           33,
 				BitsPerComponent: 16,
-				Columns:          streamlimits.MaxImageWidth,
+				Columns:          limits.MaxImageWidth,
 				Predictor:        12,
 			},
 			expectError: true,
@@ -287,9 +287,9 @@ func TestParamsValidate(t *testing.T) {
 			// MaxImageChannels·16·MaxImageWidth bits = maxBytesPerRow exactly
 			name: "row size at cap boundary",
 			params: Params{
-				Colors:           streamlimits.MaxImageChannels,
+				Colors:           limits.MaxImageChannels,
 				BitsPerComponent: 16,
-				Columns:          streamlimits.MaxImageWidth,
+				Columns:          limits.MaxImageWidth,
 				Predictor:        12,
 			},
 			expectError: false,

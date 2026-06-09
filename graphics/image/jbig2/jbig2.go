@@ -28,7 +28,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/bitmap"
 	internaljbig2 "seehuhn.de/go/pdf/internal/filter/jbig2"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // JBIG2 segment types (ISO/IEC 14492, Annex D).
@@ -855,7 +855,7 @@ func (im *Image) Pixels() ([]byte, error) {
 		return nil, err
 	}
 
-	budget := membudget.New(streamlimits.StreamBudget(int64(len(data))))
+	budget := membudget.New(limits.StreamBudget(int64(len(data))))
 	bm, err := internaljbig2.Decode(globalsData, data, budget)
 	if err != nil {
 		return nil, err

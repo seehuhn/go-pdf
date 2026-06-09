@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // Space represents a PDF color space which can be embedded in a PDF file.
@@ -224,7 +224,7 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 		case pdf.String:
 			lookup = obj
 		case *pdf.Stream:
-			data, err := pdf.ReadAll(x.R, path, obj, streamlimits.MaxIndexedLookupBytes)
+			data, err := pdf.ReadAll(x.R, path, obj, limits.MaxIndexedLookupBytes)
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "lookup table"))
 				break
@@ -281,7 +281,7 @@ func ExtractSpace(x *pdf.Extractor, path *pdf.CycleCheck, desc pdf.Object, _ boo
 			d.SetError(pdf.Wrap(err, "colorant names"))
 			break
 		}
-		if len(colorantsArr) > streamlimits.MaxImageChannels {
+		if len(colorantsArr) > limits.MaxImageChannels {
 			d.SetError(&pdf.MalformedFileError{
 				Err: errors.New("DeviceN: too many colorants"),
 			})
@@ -397,7 +397,7 @@ func newDecoder(r pdf.Getter, path *pdf.CycleCheck, obj pdf.Object) *decoder {
 
 		case *pdf.Stream:
 			d.dict = y.Dict
-			body, err := pdf.ReadAll(r, path, y, streamlimits.MaxICCProfileBytes)
+			body, err := pdf.ReadAll(r, path, y, limits.MaxICCProfileBytes)
 			if err != nil {
 				d.SetError(err)
 				break

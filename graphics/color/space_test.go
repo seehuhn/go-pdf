@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // color.Space implements pdf.Embedder
@@ -230,12 +230,12 @@ func TestExtractSpaceMalformedSeparationDeviceN(t *testing.T) {
 
 // TestExtractDeviceNTooManyColorants verifies that ExtractSpace rejects
 // a /DeviceN color space whose colorant list exceeds
-// streamlimits.MaxImageChannels.  Without this cap, the scanner-level
+// limits.MaxImageChannels.  Without this cap, the scanner-level
 // maxArrayLen of 1<<20 entries would let a malicious PDF carry up to
 // ~1M colorant names and amplify the later per-channel float64
 // allocation in image decoding by ~64×.
 func TestExtractDeviceNTooManyColorants(t *testing.T) {
-	names := make(pdf.Array, streamlimits.MaxImageChannels+1)
+	names := make(pdf.Array, limits.MaxImageChannels+1)
 	for i := range names {
 		names[i] = pdf.Name(fmt.Sprintf("c%d", i))
 	}

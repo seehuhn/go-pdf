@@ -23,7 +23,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // PDF 2.0 sections: 9.9
@@ -102,7 +102,7 @@ func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, dictT
 				length.Length3 = length3
 			}
 
-			const limit = int64(streamlimits.MaxFontProgramBytes)
+			const limit = int64(limits.MaxFontProgramBytes)
 			n, err := io.Copy(w, io.LimitReader(body, limit+1))
 			if err != nil {
 				return err

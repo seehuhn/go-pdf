@@ -27,7 +27,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/membudget"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestDecodeRGB(t *testing.T) {
@@ -348,7 +348,7 @@ func TestDecodeProgressiveBudget(t *testing.T) {
 	// > 1 Mi progressive blocks (= 256 MiB at 256 B/block) which
 	// exceeds a MaxImageBytes-sized budget
 	payload := build(10000, 10000)
-	rc, err := Decode(bytes.NewReader(payload), nil, membudget.New(streamlimits.MaxImageBytes))
+	rc, err := Decode(bytes.NewReader(payload), nil, membudget.New(limits.MaxImageBytes))
 	if err == nil {
 		_, err = io.ReadAll(rc)
 		rc.Close()
@@ -359,7 +359,7 @@ func TestDecodeProgressiveBudget(t *testing.T) {
 }
 
 // TestDecodeOversizeSOF verifies that a JPEG declaring dimensions whose
-// product exceeds streamlimits.MaxImageBytes is rejected by the SOF
+// product exceeds limits.MaxImageBytes is rejected by the SOF
 // parser before any large allocation happens.
 func TestDecodeOversizeSOF(t *testing.T) {
 	// build a minimal SOI + SOF0 + EOI sequence claiming the given size

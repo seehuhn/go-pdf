@@ -23,7 +23,7 @@ import (
 	"math"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // PDF 2.0 sections: 7.10.2
@@ -265,7 +265,7 @@ func (f *Type0) validate() error {
 
 // sampleTableBytes computes the byte count of a Type 0 sample table
 // using overflow-safe arithmetic and rejects sizes above
-// [streamlimits.MaxSampleBytes].  All arguments are validated, so the
+// [limits.MaxSampleBytes].  All arguments are validated, so the
 // helper is safe to call on untrusted input.
 func sampleTableBytes(size []int, n, bitsPerSample int) (int, error) {
 	switch bitsPerSample {
@@ -292,7 +292,7 @@ func sampleTableBytes(size []int, n, bitsPerSample int) (int, error) {
 		return 0, errors.New("Type 0 function sample count overflow")
 	}
 	totalBytes := (totalBits + 7) / 8
-	if totalBytes > streamlimits.MaxSampleBytes {
+	if totalBytes > limits.MaxSampleBytes {
 		return 0, errors.New("Type 0 function sample table too large")
 	}
 	return totalBytes, nil

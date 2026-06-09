@@ -21,6 +21,7 @@ import (
 	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // PDF 2.0 sections: 7.9.6
@@ -52,12 +53,18 @@ func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 	if ref, ok := root.(pdf.Reference); ok {
 		seen[ref] = true
 	}
-	extractFromNode(r, node, seen, tree.Data)
+	extractFromNode(r, node, seen, tree.Data, 0)
 
 	return tree, nil
 }
 
-func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Name]pdf.Object) {
+func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Name]pdf.Object, depth int) {
+	// skip subtrees deeper than the cap; over-deep input is treated as
+	// malformed and silently truncated, leaving a partial map
+	if depth >= limits.MaxNameTreeDepth {
+		return
+	}
+
 	// leaf node with Names
 	if names, ok := node["Names"]; ok {
 		arr, err := pdf.GetArray(r, names)
@@ -94,7 +101,7 @@ func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, d
 			if err != nil {
 				continue
 			}
-			extractFromNode(r, childNode, seen, data)
+			extractFromNode(r, childNode, seen, data, depth+1)
 		}
 	}
 }

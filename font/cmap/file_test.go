@@ -32,7 +32,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 var _ pdf.Embedder = (*File)(nil)
@@ -664,7 +664,7 @@ func TestCMapTemplate(t *testing.T) {
 }
 
 // TestExtractCMapOversize verifies that a CMap stream larger than
-// streamlimits.MaxCMapBytes is rejected, blocking a decompression-bomb
+// limits.MaxCMapBytes is rejected, blocking a decompression-bomb
 // attack on CMap loading.
 func TestExtractCMapOversize(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
@@ -678,7 +678,7 @@ func TestExtractCMapOversize(t *testing.T) {
 		t.Fatal(err)
 	}
 	// write more than MaxCMapBytes of payload
-	body := make([]byte, streamlimits.MaxCMapBytes+1)
+	body := make([]byte, limits.MaxCMapBytes+1)
 	if _, err := stm.Write(body); err != nil {
 		t.Fatal(err)
 	}

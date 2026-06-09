@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // extractFontCIDType2 reads a Type 2 CIDFont dictionary from the PDF file.
@@ -151,7 +151,7 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		}
 
 	case *pdf.Stream:
-		cid2gidData, err := pdf.ReadAll(x.R, path, c2g, streamlimits.MaxCIDToGIDMapBytes)
+		cid2gidData, err := pdf.ReadAll(x.R, path, c2g, limits.MaxCIDToGIDMapBytes)
 		if err != nil {
 			return nil, err
 		}

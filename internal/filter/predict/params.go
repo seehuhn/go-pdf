@@ -20,16 +20,16 @@ import (
 	"errors"
 	"fmt"
 
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // maxBytesPerRow caps a predictor row at the worst-case legitimate
-// image row: an image at [streamlimits.MaxImageWidth] pixels with
-// [streamlimits.MaxImageChannels] components at 16 bpc.  Any image
+// image row: an image at [limits.MaxImageWidth] pixels with
+// [limits.MaxImageChannels] components at 16 bpc.  Any image
 // XObject the library accepts thus has a row that fits, and the
 // per-stream working memory the predict reader allocates is bounded
 // at ~4×maxBytesPerRow per layer in the filter chain.
-const maxBytesPerRow = streamlimits.MaxImageWidth * streamlimits.MaxImageChannels * 16 / 8
+const maxBytesPerRow = limits.MaxImageWidth * limits.MaxImageChannels * 16 / 8
 
 type Params struct {
 	// Colors is the number of color components per pixel.
@@ -86,7 +86,7 @@ func (p *Params) Validate() error {
 		return fmt.Errorf("invalid BitsPerComponent %d", p.BitsPerComponent)
 	}
 
-	if p.Columns < 1 || p.Columns > streamlimits.MaxImageWidth {
+	if p.Columns < 1 || p.Columns > limits.MaxImageWidth {
 		return fmt.Errorf("invalid Columns %d", p.Columns)
 	}
 

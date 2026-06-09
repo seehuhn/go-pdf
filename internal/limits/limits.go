@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package streamlimits collects size caps used by readers of decoded
-// PDF streams.  These caps defend against decompression bombs:
-// attacker-controlled streams whose decoded size is grossly
-// disproportionate to the input file size.
+// Package limits collects resource caps used by readers of untrusted
+// PDF files.  These caps defend against malicious inputs whose resource
+// use is grossly disproportionate to the input file size: decompression
+// bombs, allocation bombs, and unbounded recursion.
 //
 // Most constants cap the number of bytes a particular kind of decoded
 // stream may produce; a few cap a derived item count where the byte
-// size is not the limiting resource.
-package streamlimits
+// size is not the limiting resource, or a recursion depth where the
+// limiting resource is the Go call stack.
+package limits
 
 // ImageDataLimit returns an upper bound on the decoded byte count for an
 // image with the given parameters.  The bound is
@@ -259,4 +260,24 @@ const (
 	// are dropped wholesale rather than truncated, matching the
 	// all-or-nothing semantics of [MaxAlternates].
 	MaxAssociatedFiles = 64
+)
+
+const (
+	// MaxOutlineDepth caps the nesting depth of the document outline
+	// tree (PDF 32000-2 §12.3.3), stopping an adversarially deep
+	// /First chain before it exhausts the Go call stack.  A
+	// legitimately authored outline never approaches this; only a
+	// degenerate or malicious chain does.
+	MaxOutlineDepth = 256
+
+	// MaxNameTreeDepth caps the nesting depth of a name tree's /Kids
+	// chain (PDF 32000-2 §7.9.6), stopping an adversarially deep tree
+	// before it exhausts the Go call stack.  A balanced tree stays
+	// shallow even for millions of entries, so only a degenerate or
+	// malicious chain reaches this.
+	MaxNameTreeDepth = 256
+
+	// MaxNumberTreeDepth caps the nesting depth of a number tree's
+	// /Kids chain (PDF 32000-2 §7.9.7).  See [MaxNameTreeDepth].
+	MaxNumberTreeDepth = 256
 )

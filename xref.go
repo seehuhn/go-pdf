@@ -26,7 +26,7 @@ import (
 	"math/bits"
 	"strconv"
 
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func (r *Reader) findXRef(size int64) (int64, error) {
@@ -388,7 +388,7 @@ func checkXRefStreamDict(dict Dict, rawLen int64) ([]int, []*xRefSubSection, err
 
 	// reject entry counts disproportionate to the input size; decoding
 	// allocates one heap entry per declared object
-	maxEntries := min(int64(maxXRefSize), streamlimits.MaxXRefEntries(rawLen))
+	maxEntries := min(int64(maxXRefSize), limits.MaxXRefEntries(rawLen))
 	var total int64
 	for _, sec := range ss {
 		total += int64(sec.Size)

@@ -21,7 +21,7 @@ import (
 	"math"
 	"testing"
 
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestType0BitDepthExtraction(t *testing.T) {
@@ -449,8 +449,8 @@ func TestSampleTableBytes(t *testing.T) {
 
 		// overflow / too-large
 		{"sample count overflow", []int{1 << 30, 1 << 30, 1 << 30}, 1, 8, 0, true},
-		{"sample table at limit", []int{streamlimits.MaxSampleBytes}, 1, 8, streamlimits.MaxSampleBytes, false},
-		{"sample table over limit", []int{streamlimits.MaxSampleBytes + 1}, 1, 8, 0, true},
+		{"sample table at limit", []int{limits.MaxSampleBytes}, 1, 8, limits.MaxSampleBytes, false},
+		{"sample table over limit", []int{limits.MaxSampleBytes + 1}, 1, 8, 0, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

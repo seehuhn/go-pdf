@@ -22,11 +22,11 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // TestExtractStreamOversize verifies that a font program stream larger
-// than streamlimits.MaxFontProgramBytes is rejected during WriteTo,
+// than limits.MaxFontProgramBytes is rejected during WriteTo,
 // blocking a decompression-bomb attack on font embedding.
 func TestExtractStreamOversize(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
@@ -35,7 +35,7 @@ func TestExtractStreamOversize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := make([]byte, streamlimits.MaxFontProgramBytes+1)
+	body := make([]byte, limits.MaxFontProgramBytes+1)
 	if _, err := stm.Write(body); err != nil {
 		t.Fatal(err)
 	}

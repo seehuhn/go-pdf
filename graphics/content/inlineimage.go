@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // inlineFilterAbbreviations maps abbreviated inline image filter names
@@ -160,7 +160,7 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 	}
 
 	// per-decode working-memory budget, sized to the raw inline data
-	budget := membudget.New(streamlimits.StreamBudget(int64(len(data))))
+	budget := membudget.New(limits.StreamBudget(int64(len(data))))
 
 	// chain filters
 	var r io.Reader = bytes.NewReader(data)
@@ -224,21 +224,21 @@ func InlineImageColorSpace(dict pdf.Dict, res *Resources) color.Space {
 }
 
 // checkInlineImageDimensions rejects inline images whose W/H values exceed
-// [streamlimits.MaxImageWidth] or [streamlimits.MaxImageHeight], whose
-// pixel count exceeds [streamlimits.MaxImagePixels], whose declared pixel
-// data exceeds [streamlimits.MaxImageBytes], or whose decoded per-channel
-// float64 buffer exceeds [streamlimits.MaxImageDecodedFloat64Bytes].  These
+// [limits.MaxImageWidth] or [limits.MaxImageHeight], whose
+// pixel count exceeds [limits.MaxImagePixels], whose declared pixel
+// data exceeds [limits.MaxImageBytes], or whose decoded per-channel
+// float64 buffer exceeds [limits.MaxImageDecodedFloat64Bytes].  These
 // checks match the caps enforced for image XObjects.
 func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 	width := getInlineImageInt(dict, "W", "Width")
 	height := getInlineImageInt(dict, "H", "Height")
-	if width > streamlimits.MaxImageWidth {
+	if width > limits.MaxImageWidth {
 		return &pdf.MalformedFileError{Err: fmt.Errorf("inline image width %d exceeds limit", width)}
 	}
-	if height > streamlimits.MaxImageHeight {
+	if height > limits.MaxImageHeight {
 		return &pdf.MalformedFileError{Err: fmt.Errorf("inline image height %d exceeds limit", height)}
 	}
-	if streamlimits.ImagePixelsExceedLimit(width, height) {
+	if limits.ImagePixelsExceedLimit(width, height) {
 		return &pdf.MalformedFileError{Err: errors.New("inline image pixel count exceeds limit")}
 	}
 
@@ -252,12 +252,12 @@ func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 			channels = cs.Channels()
 		}
 	}
-	if streamlimits.ImageBytesExceedLimit(width, height, channels, bpc) {
+	if limits.ImageBytesExceedLimit(width, height, channels, bpc) {
 		return &pdf.MalformedFileError{Err: errors.New("inline image data exceeds size limit")}
 	}
 	// the encoded-bytes cap admits up to 64× expansion into the per-channel
 	// float64 buffer at bpc=1; cap the decoded form separately
-	if streamlimits.ImageDecodedFloat64ExceedsLimit(width, height, channels) {
+	if limits.ImageDecodedFloat64ExceedsLimit(width, height, channels) {
 		return &pdf.MalformedFileError{Err: errors.New("inline image decoded data exceeds size limit")}
 	}
 	return nil
@@ -270,27 +270,27 @@ func inlineImageSizeLimit(dict pdf.Dict, res *Resources) int64 {
 	width := getInlineImageInt(dict, "W", "Width")
 	height := getInlineImageInt(dict, "H", "Height")
 	if width <= 0 || height <= 0 {
-		return streamlimits.MaxImageBytes
+		return limits.MaxImageBytes
 	}
 
 	// image masks are always 1 bpc, 1 channel
 	if isImageMask(dict) {
-		return streamlimits.ImageDataLimit(width, height, 1, 1)
+		return limits.ImageDataLimit(width, height, 1, 1)
 	}
 
 	bpc := getInlineImageInt(dict, "BPC", "BitsPerComponent")
 	if bpc <= 0 {
-		return streamlimits.MaxImageBytes
+		return limits.MaxImageBytes
 	}
 	cs := InlineImageColorSpace(dict, res)
 	if cs == nil {
-		return streamlimits.MaxImageBytes
+		return limits.MaxImageBytes
 	}
 	channels := cs.Channels()
 	if channels <= 0 {
-		return streamlimits.MaxImageBytes
+		return limits.MaxImageBytes
 	}
-	return streamlimits.ImageDataLimit(width, height, channels, bpc)
+	return limits.ImageDataLimit(width, height, channels, bpc)
 }
 
 // isImageMask reports whether the dict describes an image mask.

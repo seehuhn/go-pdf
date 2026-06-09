@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/opaque"
 )
 
@@ -296,7 +296,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	if width <= 0 {
 		return nil, pdf.Errorf("invalid soft mask width %d", width)
 	}
-	if width > streamlimits.MaxImageWidth {
+	if width > limits.MaxImageWidth {
 		return nil, pdf.Errorf("soft mask width %d exceeds limit", width)
 	}
 
@@ -307,10 +307,10 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	if height <= 0 {
 		return nil, pdf.Errorf("invalid soft mask height %d", height)
 	}
-	if height > streamlimits.MaxImageHeight {
+	if height > limits.MaxImageHeight {
 		return nil, pdf.Errorf("soft mask height %d exceeds limit", height)
 	}
-	if streamlimits.ImagePixelsExceedLimit(int(width), int(height)) {
+	if limits.ImagePixelsExceedLimit(int(width), int(height)) {
 		return nil, pdf.Error("soft mask pixel count exceeds limit")
 	}
 
@@ -362,7 +362,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	// writer in (*Dict).check and defensively by renderers.
 	if matteArray, err := pdf.Optional(x.GetArray(path, dict["Matte"])); err != nil {
 		return nil, err
-	} else if matteArray != nil && len(matteArray) <= streamlimits.MaxImageChannels {
+	} else if matteArray != nil && len(matteArray) <= limits.MaxImageChannels {
 		softMask.Matte = make([]float64, len(matteArray))
 		for i, val := range matteArray {
 			if num, err := x.GetNumber(path, val); err != nil {

@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // a 4-byte code space that accepts every code, paired below with a CID/bf
@@ -33,7 +33,7 @@ var fullByteRange = charcode.CodeSpaceRange{
 }
 
 // TestFileAllBudget checks that File.All stops enumerating once it reaches
-// streamlimits.MaxCMapMappings, so a wide cidrange cannot drive an unbounded
+// limits.MaxCMapMappings, so a wide cidrange cannot drive an unbounded
 // loop or unbounded map growth.
 func TestFileAllBudget(t *testing.T) {
 	codec, err := charcode.NewCodec(fullByteRange)
@@ -49,7 +49,7 @@ func TestFileAllBudget(t *testing.T) {
 		},
 	}
 
-	limit := streamlimits.MaxCMapMappings
+	limit := limits.MaxCMapMappings
 	count := 0
 	for range f.All(codec) {
 		count++
@@ -113,7 +113,7 @@ func TestToUnicodeAllBudget(t *testing.T) {
 		},
 	}
 
-	limit := streamlimits.MaxCMapMappings
+	limit := limits.MaxCMapMappings
 	count := 0
 	for range tu.All(codec) {
 		count++

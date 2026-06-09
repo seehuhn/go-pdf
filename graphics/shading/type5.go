@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // PDF 2.0 sections: 8.7.4.3 8.7.4.5.6
@@ -269,7 +269,7 @@ func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	}
 
 	// Read stream data to extract vertices
-	data, err := pdf.ReadAll(x.R, path, stream, streamlimits.MaxShadingBytes)
+	data, err := pdf.ReadAll(x.R, path, stream, limits.MaxShadingBytes)
 	if err != nil {
 		return nil, err
 	}

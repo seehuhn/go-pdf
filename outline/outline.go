@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // PDF 2.0 sections: 12.3.3
@@ -113,7 +114,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Ou
 	}
 
 	firstRef, _ := rootDict["First"].(pdf.Reference)
-	items, err := readChildren(x, path, visited, firstRef)
+	items, err := readChildren(x, path, visited, firstRef, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Ou
 	return &Outline{Items: items}, nil
 }
 
-func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference) (*Item, pdf.Dict, error) {
+func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference, depth int) (*Item, pdf.Dict, error) {
 	path = &pdf.CycleCheck{Ref: ref, Parent: path}
 
 	dict, err := pdf.GetDict(x.R, ref)
@@ -171,7 +172,7 @@ func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]
 	}
 
 	firstRef, _ := dict["First"].(pdf.Reference)
-	children, err := readChildren(x, path, visited, firstRef)
+	children, err := readChildren(x, path, visited, firstRef, depth+1)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -180,7 +181,14 @@ func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]
 	return item, dict, nil
 }
 
-func readChildren(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference) ([]*Item, error) {
+func readChildren(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference, depth int) ([]*Item, error) {
+	// drop subtrees deeper than the cap; like a /First cycle, an
+	// adversarially deep chain is silently truncated, keeping the
+	// items read so far
+	if depth >= limits.MaxOutlineDepth {
+		return nil, nil
+	}
+
 	var res []*Item
 	for ref != 0 {
 		if visited[ref] {
@@ -188,7 +196,7 @@ func readChildren(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Refere
 		}
 		visited[ref] = true
 
-		item, dict, err := readItem(x, path, visited, ref)
+		item, dict, err := readItem(x, path, visited, ref, depth)
 		if err != nil {
 			return nil, err
 		}

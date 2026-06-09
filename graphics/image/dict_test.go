@@ -31,7 +31,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/optional"
@@ -859,7 +859,7 @@ func FuzzDictRoundTrip(f *testing.F) {
 
 // TestExtractDictDecodedFloat64Oversize verifies that an image dict
 // whose per-channel float64 decode buffer would exceed
-// streamlimits.MaxImageDecodedFloat64Bytes is rejected, even when the
+// limits.MaxImageDecodedFloat64Bytes is rejected, even when the
 // encoded-byte and pixel-count caps both pass.  At bpc=1 the float64
 // expansion ratio is 64×, so a CMYK image just under the pixel cap
 // passes ImageBytesExceedLimit (~64 MiB encoded) yet would allocate
@@ -893,7 +893,7 @@ func TestExtractDictDecodedFloat64Oversize(t *testing.T) {
 }
 
 // TestExtractDictTooManyAlternates verifies that when an image's
-// Alternates array exceeds streamlimits.MaxAlternates, every entry is
+// Alternates array exceeds limits.MaxAlternates, every entry is
 // silently dropped — not truncated.  An over-long Alternates list is a
 // strong signal of a malicious construction (the spec describes
 // Alternates as a small set of variants), so the safer choice is to
@@ -923,9 +923,9 @@ func TestExtractDictTooManyAlternates(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			n := streamlimits.MaxAlternates
+			n := limits.MaxAlternates
 			if kind == "over cap" {
-				n = streamlimits.MaxAlternates + 1
+				n = limits.MaxAlternates + 1
 			}
 			alts := make(pdf.Array, n)
 			for i := range alts {
@@ -998,9 +998,9 @@ func TestExtractMaskTooManyAlternates(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			n := streamlimits.MaxAlternates
+			n := limits.MaxAlternates
 			if kind == "over cap" {
-				n = streamlimits.MaxAlternates + 1
+				n = limits.MaxAlternates + 1
 			}
 			alts := make(pdf.Array, n)
 			for i := range alts {
@@ -1048,7 +1048,7 @@ func TestExtractMaskTooManyAlternates(t *testing.T) {
 }
 
 // TestExtractDictTooManyAssociatedFiles verifies that when an image's
-// AF (associated-files) array exceeds streamlimits.MaxAssociatedFiles,
+// AF (associated-files) array exceeds limits.MaxAssociatedFiles,
 // every entry is silently dropped — not truncated.  An over-long AF
 // list is a strong signal of a malicious construction; dropping the
 // list rather than capping it avoids silently presenting only a prefix.
@@ -1066,9 +1066,9 @@ func TestExtractDictTooManyAssociatedFiles(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			n := streamlimits.MaxAssociatedFiles
+			n := limits.MaxAssociatedFiles
 			if kind == "over cap" {
-				n = streamlimits.MaxAssociatedFiles + 1
+				n = limits.MaxAssociatedFiles + 1
 			}
 			afs := make(pdf.Array, n)
 			for i := range afs {
@@ -1130,9 +1130,9 @@ func TestExtractMaskTooManyAssociatedFiles(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			n := streamlimits.MaxAssociatedFiles
+			n := limits.MaxAssociatedFiles
 			if kind == "over cap" {
-				n = streamlimits.MaxAssociatedFiles + 1
+				n = limits.MaxAssociatedFiles + 1
 			}
 			afs := make(pdf.Array, n)
 			for i := range afs {
@@ -1282,10 +1282,10 @@ func TestExtractDictJPXMaskArray(t *testing.T) {
 }
 
 // TestExtractDictJPXMaskOverLength verifies that a colour-key /Mask
-// Array with more pairs than streamlimits.MaxImageChannels is dropped
+// Array with more pairs than limits.MaxImageChannels is dropped
 // rather than allocated.
 func TestExtractDictJPXMaskOverLength(t *testing.T) {
-	mask := make(pdf.Array, 2*streamlimits.MaxImageChannels+2)
+	mask := make(pdf.Array, 2*limits.MaxImageChannels+2)
 	for i := range mask {
 		mask[i] = pdf.Integer(0)
 	}
@@ -1487,7 +1487,7 @@ func TestDictRejectInvalidWriteCombinations(t *testing.T) {
 }
 
 // TestExtractDictJPXOversizePixels verifies that a JPXDecode image
-// whose pixel count exceeds streamlimits.MaxImagePixels is rejected
+// whose pixel count exceeds limits.MaxImagePixels is rejected
 // even though ColorSpace and BitsPerComponent are absent.  The
 // byte-count cap does not fire on its own for JPX (channels and bit
 // depth live in the JP2 codestream), so the pixel-count cap is the
@@ -1498,8 +1498,8 @@ func TestExtractDictJPXOversizePixels(t *testing.T) {
 	body, err := w.OpenStream(ref, pdf.Dict{
 		"Type":    pdf.Name("XObject"),
 		"Subtype": pdf.Name("Image"),
-		"Width":   pdf.Integer(streamlimits.MaxImageWidth),
-		"Height":  pdf.Integer(streamlimits.MaxImageHeight),
+		"Width":   pdf.Integer(limits.MaxImageWidth),
+		"Height":  pdf.Integer(limits.MaxImageHeight),
 		"Filter":  pdf.Name("JPXDecode"),
 	})
 	if err != nil {

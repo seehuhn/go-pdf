@@ -24,7 +24,7 @@ import (
 	"os"
 
 	"seehuhn.de/go/membudget"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // Getter represents a PDF file opened for reading.
@@ -269,7 +269,7 @@ func RawStreamReader(r Getter, x *Stream) (io.ReadCloser, error) {
 		return out, nil
 	case cryptDefault:
 		v := GetVersion(r)
-		budget := membudget.New(streamlimits.StreamBudget(x.length))
+		budget := membudget.New(limits.StreamBudget(x.length))
 		return x.crypt.Decode(v, out, budget)
 	case cryptUnsupportedCF:
 		return nil, errors.New(
@@ -391,7 +391,7 @@ func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.Rea
 	var out io.ReadCloser = io.NopCloser(src)
 
 	// per-decode working-memory budget, sized to the raw stream length
-	budget := membudget.New(streamlimits.StreamBudget(x.length))
+	budget := membudget.New(limits.StreamBudget(x.length))
 
 	// Skip the document-level decryption when the stream's filter chain
 	// declares its own per-stream Crypt filter at position 0.  Per PDF
@@ -612,7 +612,7 @@ func resolveJBIG2Globals(r Getter, path *CycleCheck, f *FilterJBIG2) error {
 	if !ok {
 		return nil
 	}
-	data, err := ReadAll(r, path, stream, streamlimits.MaxJBIG2GlobalsBytes)
+	data, err := ReadAll(r, path, stream, limits.MaxJBIG2GlobalsBytes)
 	if err != nil {
 		return fmt.Errorf("reading JBIG2Globals: %w", err)
 	}

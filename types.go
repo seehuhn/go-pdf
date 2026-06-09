@@ -966,7 +966,7 @@ func (x *Stream) AsPDF(opt OutputOptions) Native {
 // byte slice.  At most maxBytes are read; if the decoded stream is
 // longer the function returns a *MalformedFileError.  Callers must
 // pick maxBytes based on what is reasonable for the kind of stream
-// being read; see package streamlimits for shared values.
+// being read; see package limits for shared values.
 func ReadAll(r Getter, path *CycleCheck, s *Stream, maxBytes int64) ([]byte, error) {
 	in, err := DecodeStream(r, path, s, 0)
 	if err != nil {

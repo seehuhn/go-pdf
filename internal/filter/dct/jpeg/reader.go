@@ -54,7 +54,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/membudget"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // A FormatError reports that the input is not a valid JPEG.
@@ -418,10 +418,10 @@ func (d *decoder) processSOF(n int) error {
 	// Reject frames whose pixel count or decoded byte count would exceed
 	// the image caps, preventing makeImg and the wrapper buffer from
 	// requesting many GiB for a tiny attacker-supplied header.
-	if streamlimits.ImagePixelsExceedLimit(d.width, d.height) {
+	if limits.ImagePixelsExceedLimit(d.width, d.height) {
 		return FormatError("image dimensions exceed limit")
 	}
-	if streamlimits.ImageBytesExceedLimit(d.width, d.height, d.nComp, int(d.tmp[0])) {
+	if limits.ImageBytesExceedLimit(d.width, d.height, d.nComp, int(d.tmp[0])) {
 		return FormatError("image dimensions exceed limit")
 	}
 	if int(d.tmp[5]) != d.nComp {

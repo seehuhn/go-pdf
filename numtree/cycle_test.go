@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // TestKidsSelfCycle verifies that a number-tree node whose /Kids array
@@ -212,5 +213,72 @@ func TestKidsLongChainNoCycle(t *testing.T) {
 	}
 	if got != pdf.Name("seven") {
 		t.Errorf("FromFile.Lookup = %v, want seven", got)
+	}
+}
+
+// TestKidsDeepChainBounded guards against a stack-overflow DoS: a /Kids
+// chain of distinct nodes is acyclic, so the cycle guard never trips, yet
+// recursing one frame per level would exhaust the Go stack.  The depth cap
+// must turn this into graceful handling at every entry point rather than a
+// crash: a streaming lookup reports a malformed file, the enumeration paths
+// silently truncate the over-deep subtree.
+func TestKidsDeepChainBounded(t *testing.T) {
+	depth := limits.MaxNumberTreeDepth + 10
+
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	leafRef := w.Alloc()
+	leaf := pdf.Dict{
+		"Nums":   pdf.Array{pdf.Integer(7), pdf.Name("seven")},
+		"Limits": pdf.Array{pdf.Integer(7), pdf.Integer(7)},
+	}
+	if err := w.Put(leafRef, leaf); err != nil {
+		t.Fatal(err)
+	}
+
+	cur := leafRef
+	for range depth {
+		next := w.Alloc()
+		node := pdf.Dict{
+			"Kids":   pdf.Array{cur},
+			"Limits": pdf.Array{pdf.Integer(7), pdf.Integer(7)},
+		}
+		if err := w.Put(next, node); err != nil {
+			t.Fatal(err)
+		}
+		cur = next
+	}
+
+	// ExtractInMemory: must terminate; leaf beyond the cap is truncated away.
+	mem, err := ExtractInMemory(w, cur)
+	if err != nil {
+		t.Errorf("ExtractInMemory: unexpected error %v", err)
+	}
+	if mem != nil && len(mem.Data) != 0 {
+		t.Errorf("ExtractInMemory: got %d entries, want 0", len(mem.Data))
+	}
+
+	ff, err := ExtractFromFile(w, cur)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// FromFile.Lookup: must report a malformed file, not crash.
+	if _, err := ff.Lookup(pdf.Integer(7)); !pdf.IsMalformed(err) {
+		t.Errorf("FromFile.Lookup: err = %v, want malformed", err)
+	}
+
+	// FromFile.All: must terminate, yielding nothing past the cap.
+	count := 0
+	for range ff.All() {
+		count++
+	}
+	if count != 0 {
+		t.Errorf("FromFile.All: yielded %d entries, want 0", count)
+	}
+
+	// Size: must terminate.
+	if _, err := Size(w, cur); err != nil {
+		t.Errorf("Size: unexpected error %v", err)
 	}
 }

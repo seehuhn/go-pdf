@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/internal/filter/lzw"
 	"seehuhn.de/go/pdf/internal/filter/predict"
 	"seehuhn.de/go/pdf/internal/filter/runlength"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // Frequencies of filter types used in the PDF files on my system:
@@ -83,7 +83,7 @@ type Filter interface {
 	// Working-memory allocations made by the filter are charged against
 	// budget; an exhausted budget causes the decode to fail with
 	// [*MalformedFileError].  budget must be non-nil; size it with
-	// [streamlimits.StreamBudget].
+	// [limits.StreamBudget].
 	Decode(v Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error)
 }
 
@@ -745,12 +745,12 @@ func (f *FilterJBIG2) Decode(_ Version, r io.Reader, budget *membudget.Budget) (
 	// the two truncation causes after the read so the caller sees either
 	// a size-limit error or a budget-exhausted error, not a downstream
 	// parse failure on garbage.
-	limit := min(budget.Available(), int64(streamlimits.MaxJBIG2PageBytes)+1)
+	limit := min(budget.Available(), int64(limits.MaxJBIG2PageBytes)+1)
 	pageData, err := io.ReadAll(io.LimitReader(r, limit))
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(pageData)) > streamlimits.MaxJBIG2PageBytes {
+	if int64(len(pageData)) > limits.MaxJBIG2PageBytes {
 		return nil, &MalformedFileError{Err: errors.New("JBIG2 page data exceeds size limit")}
 	}
 	if int64(len(pageData)) == limit {

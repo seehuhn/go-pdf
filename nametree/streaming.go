@@ -17,9 +17,11 @@
 package nametree
 
 import (
+	"errors"
 	"iter"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // PDF 2.0 sections: 7.9.6
@@ -62,10 +64,14 @@ func (t *FromFile) Lookup(key pdf.Name) (pdf.Object, error) {
 	if ref, ok := t.root.(pdf.Reference); ok {
 		seen[ref] = true
 	}
-	return t.lookupInNode(node, seen, key)
+	return t.lookupInNode(node, seen, key, 0)
 }
 
-func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key pdf.Name) (pdf.Object, error) {
+func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key pdf.Name, depth int) (pdf.Object, error) {
+	if depth >= limits.MaxNameTreeDepth {
+		return nil, &pdf.MalformedFileError{Err: errors.New("name tree nesting depth exceeded")}
+	}
+
 	// leaf node with Names
 	if names, ok := node["Names"]; ok {
 		arr, err := pdf.GetArray(t.r, names)
@@ -127,7 +133,7 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 
 			// check if key is within this child's range
 			if string(key) >= string(minKey) && string(key) <= string(maxKey) {
-				return t.lookupInNode(childNode, seen, key)
+				return t.lookupInNode(childNode, seen, key, depth+1)
 			}
 		}
 	}
@@ -150,11 +156,17 @@ func (t *FromFile) All() iter.Seq2[pdf.Name, pdf.Object] {
 		if ref, ok := t.root.(pdf.Reference); ok {
 			seen[ref] = true
 		}
-		t.yieldFromNode(node, seen, yield)
+		t.yieldFromNode(node, seen, yield, 0)
 	}
 }
 
-func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yield func(pdf.Name, pdf.Object) bool) bool {
+func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yield func(pdf.Name, pdf.Object) bool, depth int) bool {
+	// skip subtrees deeper than the cap; over-deep input is treated as
+	// malformed and silently truncated, the iterator continues elsewhere
+	if depth >= limits.MaxNameTreeDepth {
+		return true
+	}
+
 	// check if this is a leaf node with Names
 	if names, ok := node["Names"]; ok {
 		arr, err := pdf.GetArray(t.r, names)
@@ -195,7 +207,7 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yie
 				continue
 			}
 
-			if !t.yieldFromNode(childNode, seen, yield) {
+			if !t.yieldFromNode(childNode, seen, yield, depth+1) {
 				return false
 			}
 		}

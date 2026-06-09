@@ -30,7 +30,7 @@ import (
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
@@ -95,7 +95,7 @@ type Dict struct {
 	// For JPXDecode images without an explicit ColorSpace, the channel
 	// count is determined by the JPEG 2000 codestream and only a
 	// length-only check is performed at read and write time:
-	// 1 ≤ len(MaskColors)/2 ≤ streamlimits.MaxImageChannels.
+	// 1 ≤ len(MaskColors)/2 ≤ limits.MaxImageChannels.
 	//
 	// Only one of MaskImage or MaskColors may be specified.
 	MaskColors []uint16
@@ -219,7 +219,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	if width <= 0 {
 		return nil, pdf.Errorf("invalid image width %d", width)
 	}
-	if width > streamlimits.MaxImageWidth {
+	if width > limits.MaxImageWidth {
 		return nil, pdf.Errorf("image width %d exceeds limit", width)
 	}
 
@@ -230,10 +230,10 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	if height <= 0 {
 		return nil, pdf.Errorf("invalid image height %d", height)
 	}
-	if height > streamlimits.MaxImageHeight {
+	if height > limits.MaxImageHeight {
 		return nil, pdf.Errorf("image height %d exceeds limit", height)
 	}
-	if streamlimits.ImagePixelsExceedLimit(int(width), int(height)) {
+	if limits.ImagePixelsExceedLimit(int(width), int(height)) {
 		return nil, pdf.Error("image pixel count exceeds limit")
 	}
 
@@ -283,14 +283,14 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// for honouring channel and bit-depth bounds from the JP2 codestream.
 	if img.ColorSpace != nil && img.BitsPerComponent > 0 {
 		channels := img.ColorSpace.Channels()
-		if streamlimits.ImageBytesExceedLimit(img.Width, img.Height,
+		if limits.ImageBytesExceedLimit(img.Width, img.Height,
 			channels, img.BitsPerComponent) {
 			return nil, pdf.Error("image data exceeds size limit")
 		}
 		// the encoded-bytes cap admits up to 64× expansion into the
 		// per-channel float64 buffer at bpc=1; cap the decoded form
 		// separately to bound decoder memory use
-		if streamlimits.ImageDecodedFloat64ExceedsLimit(img.Width, img.Height, channels) {
+		if limits.ImageDecodedFloat64ExceedsLimit(img.Width, img.Height, channels) {
 			return nil, pdf.Error("image decoded data exceeds size limit")
 		}
 	}
@@ -325,7 +325,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 			// JPX channel count lives in the codestream; bound the
 			// pair count instead of matching it exactly.
 			if len(maskObj) < 2 ||
-				len(maskObj) > 2*streamlimits.MaxImageChannels ||
+				len(maskObj) > 2*limits.MaxImageChannels ||
 				len(maskObj)%2 != 0 {
 				break
 			}
@@ -398,7 +398,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// MaxAlternates rather than silently truncate
 	if alts, err := pdf.Optional(x.GetArray(path, dict["Alternates"])); err != nil {
 		return nil, err
-	} else if len(alts) <= streamlimits.MaxAlternates {
+	} else if len(alts) <= limits.MaxAlternates {
 		for i, altObj := range alts {
 			alt, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractAlternate)
 			if err != nil {
@@ -485,7 +485,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// MaxAssociatedFiles rather than silently truncate
 	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
 		return nil, err
-	} else if afArray != nil && len(afArray) <= streamlimits.MaxAssociatedFiles {
+	} else if afArray != nil && len(afArray) <= limits.MaxAssociatedFiles {
 		img.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
 			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
@@ -862,7 +862,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 				}
 			} else {
 				if len(d.MaskColors) < 2 ||
-					len(d.MaskColors) > 2*streamlimits.MaxImageChannels ||
+					len(d.MaskColors) > 2*limits.MaxImageChannels ||
 					len(d.MaskColors)%2 != 0 {
 					return fmt.Errorf("invalid MaskColors length %d", len(d.MaskColors))
 				}
@@ -971,7 +971,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 						len(d.SMask.Matte), numChannels)
 				}
 			} else if len(d.SMask.Matte) < 1 ||
-				len(d.SMask.Matte) > streamlimits.MaxImageChannels {
+				len(d.SMask.Matte) > limits.MaxImageChannels {
 				return fmt.Errorf("invalid Matte length %d", len(d.SMask.Matte))
 			}
 		}

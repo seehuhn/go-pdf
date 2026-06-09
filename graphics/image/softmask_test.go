@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 var softMaskTests = []struct {
@@ -186,7 +186,7 @@ var softMaskTests = []struct {
 }
 
 // TestExtractSoftMaskMatteOversize verifies that when the Matte array
-// exceeds streamlimits.MaxImageChannels the whole Matte is dropped
+// exceeds limits.MaxImageChannels the whole Matte is dropped
 // silently.  Realistic Matte arrays carry one entry per parent-image
 // colorant; a matte that exceeds the channel cap can only come from a
 // malformed or hostile file and would otherwise allow up to ~8 MiB of
@@ -194,9 +194,9 @@ var softMaskTests = []struct {
 func TestExtractSoftMaskMatteOversize(t *testing.T) {
 	for _, kind := range []string{"under cap", "over cap"} {
 		t.Run(kind, func(t *testing.T) {
-			n := streamlimits.MaxImageChannels
+			n := limits.MaxImageChannels
 			if kind == "over cap" {
-				n = streamlimits.MaxImageChannels + 1
+				n = limits.MaxImageChannels + 1
 			}
 			matte := make(pdf.Array, n)
 			for i := range matte {

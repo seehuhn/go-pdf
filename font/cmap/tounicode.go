@@ -34,7 +34,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // ToUnicodeFile represents the contents of a ToUnicode CMap.
@@ -91,7 +91,7 @@ func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, err
 	}
 
-	body, err := pdf.ReadAll(x.R, path, stmObj, streamlimits.MaxCMapBytes)
+	body, err := pdf.ReadAll(x.R, path, stmObj, limits.MaxCMapBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +267,7 @@ func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, str
 	return func(yield func(charcode.Code, string) bool) {
 		// bound total enumeration so a wide range cannot spin or grow a
 		// consumer's map disproportionately to the input size
-		budget := streamlimits.MaxCMapMappings
+		budget := limits.MaxCMapMappings
 		for _, g := range chain {
 			for _, r := range g.Ranges {
 				if len(r.Values) == 0 {
@@ -357,7 +357,7 @@ func (tu *ToUnicodeFile) CodeForText(text string) ([]byte, bool) {
 	seen := make(map[string]struct{})
 
 	// bound the total work so a wide range cannot spin
-	budget := streamlimits.MaxCMapMappings
+	budget := limits.MaxCMapMappings
 	emit := func(code []byte, value string) bool {
 		if budget <= 0 {
 			return false

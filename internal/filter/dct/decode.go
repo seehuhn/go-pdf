@@ -21,7 +21,7 @@
 // time), so the filter is safe to use on attacker-supplied input
 // regardless of the surrounding image dictionary.  For progressive
 // JPEGs the per-component coefficient buffer is capped at
-// [streamlimits.MaxImageBytes] to bound amplification beyond the
+// [limits.MaxImageBytes] to bound amplification beyond the
 // existing pixel/byte caps; large progressive images are rejected at
 // the cap rather than causing memory exhaustion.
 //

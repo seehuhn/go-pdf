@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 type testCase struct {
@@ -452,4 +453,93 @@ func TestReadLoop(t *testing.T) {
 
 		r.Close()
 	}
+}
+
+// TestDeepFirstChainBounded guards against a stack-overflow DoS: a /First
+// chain of distinct items is acyclic, so the cycle guard never trips, yet
+// recursing one frame per level would exhaust the Go stack.  The depth cap
+// must silently truncate the over-deep subtree, like a cycle, keeping the
+// items above the cap.  A wide /Next sibling list, by contrast, is
+// iterative and must read in full.
+func TestDeepFirstChainBounded(t *testing.T) {
+	t.Run("deep First chain", func(t *testing.T) {
+		n := limits.MaxOutlineDepth + 10
+		r := buildOutline(t, n, func(i int, refs []pdf.Reference) pdf.Dict {
+			d := pdf.Dict{"Title": pdf.TextString("x")}
+			if i+1 < n {
+				d["First"] = refs[i+1]
+			}
+			return d
+		})
+		defer r.Close()
+
+		ol, err := Decode(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, false)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		depth := 0
+		for items := ol.Items; len(items) > 0; items = items[0].Children {
+			depth++
+		}
+		if depth != limits.MaxOutlineDepth {
+			t.Errorf("expected depth %d, got %d", limits.MaxOutlineDepth, depth)
+		}
+	})
+
+	t.Run("wide Next list", func(t *testing.T) {
+		n := 2*limits.MaxOutlineDepth + 50
+		r := buildOutline(t, n, func(i int, refs []pdf.Reference) pdf.Dict {
+			d := pdf.Dict{"Title": pdf.TextString("x")}
+			if i+1 < n {
+				d["Next"] = refs[i+1]
+			}
+			return d
+		})
+		defer r.Close()
+
+		ol, err := Decode(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, false)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(ol.Items) != n {
+			t.Errorf("expected %d items, got %d", n, len(ol.Items))
+		}
+	})
+}
+
+// buildOutline writes a PDF whose outline has n items, each built by item(i).
+// refs[i] is the reference of item i; the root's /First points at refs[0].
+func buildOutline(t *testing.T, n int, item func(i int, refs []pdf.Reference) pdf.Dict) *pdf.Reader {
+	t.Helper()
+
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	if err := memfile.AddBlankPage(w); err != nil {
+		t.Fatal(err)
+	}
+
+	refs := make([]pdf.Reference, n)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i := range refs {
+		if err := w.Put(refs[i], item(i, refs)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	refRoot := w.Alloc()
+	if err := w.Put(refRoot, pdf.Dict{"First": refs[0]}); err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Outlines = refRoot
+
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(bytes.NewReader(buf.Data), int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
 }

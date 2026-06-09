@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/opaque"
 )
 
@@ -95,7 +95,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, err
 	} else if width <= 0 {
 		return nil, pdf.Error("invalid thumbnail width")
-	} else if width > streamlimits.MaxImageWidth {
+	} else if width > limits.MaxImageWidth {
 		return nil, pdf.Errorf("thumbnail width %d exceeds limit", width)
 	}
 	thumb.Width = int(width)
@@ -106,11 +106,11 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		return nil, err
 	} else if height <= 0 {
 		return nil, pdf.Error("invalid thumbnail height")
-	} else if height > streamlimits.MaxImageHeight {
+	} else if height > limits.MaxImageHeight {
 		return nil, pdf.Errorf("thumbnail height %d exceeds limit", height)
 	}
 	thumb.Height = int(height)
-	if streamlimits.ImagePixelsExceedLimit(int(width), int(height)) {
+	if limits.ImagePixelsExceedLimit(int(width), int(height)) {
 		return nil, pdf.Error("thumbnail pixel count exceeds limit")
 	}
 
@@ -139,7 +139,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 
 	// the pixel-count cap still admits a multi-GiB per-channel float64
 	// buffer at 4 channels; cap the decoded form separately
-	if streamlimits.ImageDecodedFloat64ExceedsLimit(thumb.Width, thumb.Height, cs.Channels()) {
+	if limits.ImageDecodedFloat64ExceedsLimit(thumb.Width, thumb.Height, cs.Channels()) {
 		return nil, pdf.Error("thumbnail decoded data exceeds size limit")
 	}
 
@@ -162,7 +162,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 
 	thumb.Source = &thumbnailStreamData{
 		inner:    opaque.ExtractStream(x, stm),
-		maxBytes: streamlimits.ImageDataLimit(thumb.Width, thumb.Height, thumb.ColorSpace.Channels(), thumb.BitsPerComponent),
+		maxBytes: limits.ImageDataLimit(thumb.Width, thumb.Height, thumb.ColorSpace.Channels(), thumb.BitsPerComponent),
 	}
 
 	return thumb, nil

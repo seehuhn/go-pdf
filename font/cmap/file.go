@@ -34,7 +34,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
-	"seehuhn.de/go/pdf/internal/streamlimits"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // References:
@@ -111,7 +111,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*F
 			return nil, err
 		}
 
-		data, err := pdf.ReadAll(x.R, path, obj, streamlimits.MaxCMapBytes)
+		data, err := pdf.ReadAll(x.R, path, obj, limits.MaxCMapBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -376,7 +376,7 @@ func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
 	return func(yield func(charcode.Code, cid.CID) bool) {
 		// bound total enumeration so a wide range cannot spin or grow a
 		// consumer's map disproportionately to the input size
-		budget := streamlimits.MaxCMapMappings
+		budget := limits.MaxCMapMappings
 		for _, g := range chain {
 			for _, r := range g.CIDRanges {
 				for i, codeBytes := range codesInRange(r.First, r.Last) {
