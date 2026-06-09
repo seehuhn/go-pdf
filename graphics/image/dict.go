@@ -362,13 +362,16 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// ImageMask is true.  Skip extraction entirely in that case and
 	// leave img.Decode nil.
 	if img.ColorSpace != nil {
+		// honor a Decode array with at least 2*ncomp entries, ignoring any
+		// surplus; a shorter array falls back to the default
+		n := 2 * img.ColorSpace.Channels()
 		if decodeArray, err := pdf.Optional(x.GetArray(path, dict["Decode"])); err != nil {
 			return nil, err
-		} else if len(decodeArray) == 2*img.ColorSpace.Channels() {
-			decode := make([]float64, len(decodeArray))
+		} else if len(decodeArray) >= n {
+			decode := make([]float64, n)
 			valid := true
-			for i, val := range decodeArray {
-				num, err := x.GetNumber(path, val)
+			for i := range decode {
+				num, err := x.GetNumber(path, decodeArray[i])
 				if pdf.IsMalformed(err) {
 					valid = false
 					break

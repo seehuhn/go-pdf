@@ -223,8 +223,10 @@ func (d *Dict) Load() (*Data, error) {
 		return nil, errors.New("pattern color spaces are not valid for images")
 	}
 
+	// a Decode array shorter than 2*ncomp would make readSamples index out of
+	// range; fall back to the default, as the read path in ExtractDict does
 	decode := d.Decode
-	if decode == nil {
+	if len(decode) < 2*ncomp {
 		decode = DefaultDecode(cs, d.BitsPerComponent)
 	}
 

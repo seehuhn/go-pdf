@@ -294,6 +294,78 @@ func TestDataLoadDecode(t *testing.T) {
 	}
 }
 
+// TestDataLoadShortDecode checks that a malformed Decode array shorter than
+// 2*ncomp does not crash Load and is replaced by the default mapping.
+func TestDataLoadShortDecode(t *testing.T) {
+	dict := &Dict{
+		Width:            2,
+		Height:           2,
+		ColorSpace:       color.SpaceDeviceRGB, // needs len(Decode) == 6
+		BitsPerComponent: 8,
+		Decode:           []float64{0, 1}, // too short
+		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			_, err := w.Write([]byte{
+				255, 0, 0, 0, 255, 0,
+				0, 0, 255, 255, 255, 255,
+			})
+			return err
+		}},
+	}
+
+	loaded, err := dict.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the short Decode is discarded, so the default [0 1 0 1 0 1] applies
+	tests := []struct {
+		x, y int
+		want color.DeviceRGB
+	}{
+		{0, 0, color.DeviceRGB{1, 0, 0}},
+		{1, 0, color.DeviceRGB{0, 1, 0}},
+		{0, 1, color.DeviceRGB{0, 0, 1}},
+		{1, 1, color.DeviceRGB{1, 1, 1}},
+	}
+	for _, tc := range tests {
+		got, _ := color.Values(loaded.At(tc.x, tc.y).(color.Color))
+		want, _ := color.Values(tc.want)
+		if !floatsClose(got, want, 1e-9) {
+			t.Errorf("pixel (%d,%d): got %v, want %v", tc.x, tc.y, got, want)
+		}
+	}
+}
+
+// TestDataLoadLongDecode checks that a Decode array longer than 2*ncomp is
+// still honored, the surplus entries being ignored.
+func TestDataLoadLongDecode(t *testing.T) {
+	dict := &Dict{
+		Width:            2,
+		Height:           1,
+		ColorSpace:       color.SpaceDeviceGray,
+		BitsPerComponent: 8,
+		Decode:           []float64{1, 0, 9, 9}, // inverted, with surplus entries
+		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			_, err := w.Write([]byte{0, 255})
+			return err
+		}},
+	}
+
+	loaded, err := dict.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals0, _ := color.Values(loaded.At(0, 0).(color.Color))
+	if !floatsClose(vals0, []float64{1}, 1e-9) {
+		t.Errorf("pixel (0,0): got %v, want 1", vals0[0])
+	}
+	vals1, _ := color.Values(loaded.At(1, 0).(color.Color))
+	if !floatsClose(vals1, []float64{0}, 1e-9) {
+		t.Errorf("pixel (1,0): got %v, want 0", vals1[0])
+	}
+}
+
 func TestDataLoadRoundTrip(t *testing.T) {
 	// create an image, encode it via FromImage, then Load it back
 	src := image.NewNRGBA(image.Rect(0, 0, 4, 4))

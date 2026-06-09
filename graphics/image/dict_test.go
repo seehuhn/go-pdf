@@ -1339,6 +1339,66 @@ func TestExtractDictJPXDecodeIgnored(t *testing.T) {
 	}
 }
 
+// TestExtractDictDecodeLength checks how ExtractDict normalizes the Decode
+// array length: a short array falls back to the default, while surplus entries
+// beyond 2*ncomp are dropped so the stored array round-trips on write.
+func TestExtractDictDecodeLength(t *testing.T) {
+	rgbDefault := DefaultDecode(color.SpaceDeviceRGB, 8) // [0 1 0 1 0 1]
+	tests := []struct {
+		name   string
+		decode pdf.Array
+		want   []float64
+	}{
+		{"exact", pdf.Array{pdf.Number(0), pdf.Number(1), pdf.Number(0), pdf.Number(1), pdf.Number(0), pdf.Number(1)}, []float64{0, 1, 0, 1, 0, 1}},
+		{"short", pdf.Array{pdf.Number(0), pdf.Number(1)}, rgbDefault},
+		{"long", pdf.Array{pdf.Number(1), pdf.Number(0), pdf.Number(1), pdf.Number(0), pdf.Number(1), pdf.Number(0), pdf.Number(9), pdf.Number(9)}, []float64{1, 0, 1, 0, 1, 0}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			img := extractRGBImageWithDecode(t, tc.decode)
+			if diff := cmp.Diff(tc.want, img.Decode); diff != "" {
+				t.Errorf("Decode (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// extractRGBImageWithDecode writes a 2x2 DeviceRGB image XObject carrying the
+// given /Decode array, then re-extracts it.
+func extractRGBImageWithDecode(t *testing.T, decode pdf.Array) *Dict {
+	t.Helper()
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	ref := w.Alloc()
+	dict := pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(2),
+		"Height":           pdf.Integer(2),
+		"ColorSpace":       pdf.Name("DeviceRGB"),
+		"BitsPerComponent": pdf.Integer(8),
+		"Decode":           decode,
+	}
+	body, err := w.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := body.Write(make([]byte, 2*2*3)); err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(w)
+	img, err := ExtractDict(x, nil, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return img
+}
+
 // TestDictJPXRoundTrip verifies that a JPX-no-ColorSpace Dict survives
 // Embed → ExtractDict.
 func TestDictJPXRoundTrip(t *testing.T) {
