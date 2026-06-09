@@ -55,19 +55,28 @@ var testCases = []testCase{
 	{"FitBH", &FitBH{Page: Target(pdf.Reference(10)), Top: 600}},
 	{"FitBV", &FitBV{Page: Target(pdf.Reference(10)), Left: 50}},
 	{"Named", &Named{Name: pdf.String("Chapter6")}},
+
+	// structure destination: the page target is a structure element ID
+	// (byte string) rather than a page reference
+	{"struct ID target", &XYZ{Page: Target(pdf.String("node42")), Left: 100, Top: 200, Zoom: 1}},
 }
 
 // testRoundTrip encodes a destination, decodes it back, and verifies the result
 // matches the original using cmp.Diff.
-func testRoundTrip(t *testing.T, d Destination) {
+func testRoundTrip(t *testing.T, version pdf.Version, d Destination) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// encode
 	obj, err := d.Encode(rm)
 	if err != nil {
+		// reading is permissive about versions, so an object read from a
+		// file may be unwritable at that file's version; that is not a failure
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
 		t.Fatalf("encode failed: %v", err)
 	}
 
@@ -455,7 +464,7 @@ func TestNamedEmptyName(t *testing.T) {
 func TestRoundTrip(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			testRoundTrip(t, tc.Dest)
+			testRoundTrip(t, pdf.V1_7, tc.Dest)
 		})
 	}
 }
@@ -473,7 +482,7 @@ func TestDecodeRoundTrip(t *testing.T) {
 			}
 
 			// round-trip
-			testRoundTrip(t, dest)
+			testRoundTrip(t, pdf.V1_7, dest)
 		})
 	}
 }
@@ -599,6 +608,6 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		// round-trip test
-		testRoundTrip(t, dest)
+		testRoundTrip(t, pdf.GetVersion(r), dest)
 	})
 }

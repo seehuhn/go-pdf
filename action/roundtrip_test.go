@@ -55,6 +55,10 @@ var actionTestCases = []pdf.Action{
 	// GoTo
 	&GoTo{Dest: &destination.Fit{Page: pdf.Reference(1)}},
 	&GoTo{Dest: &destination.XYZ{Page: pdf.Reference(5), Left: 100, Top: 200, Zoom: 1.5}},
+	&GoTo{
+		Dest: &destination.Fit{Page: pdf.Reference(1)},
+		SD:   &destination.Fit{Page: pdf.Reference(9)},
+	},
 
 	// GoToR
 	&GoToR{
@@ -74,7 +78,12 @@ var actionTestCases = []pdf.Action{
 	&GoToR{
 		F:  &file.Specification{FileName: "other.pdf", AFRelationship: "Unspecified"},
 		D:  &destination.Fit{Page: pdf.Integer(0)},
-		SD: pdf.Array{pdf.Integer(0), pdf.Name("Fit")},
+		SD: &destination.Fit{Page: pdf.Integer(0)},
+	},
+	&GoToR{
+		F:  &file.Specification{FileName: "other.pdf", AFRelationship: "Unspecified"},
+		D:  &destination.Fit{Page: pdf.Integer(0)},
+		SD: &destination.XYZ{Page: pdf.String("node42"), Left: 10, Top: 20, Zoom: 1},
 	},
 
 	// GoToE

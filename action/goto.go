@@ -29,6 +29,11 @@ type GoTo struct {
 	// Dest is the destination to jump to.
 	Dest destination.Destination
 
+	// SD (PDF 2.0) is the structure destination to jump to.
+	// When present it takes precedence over Dest; Dest remains the
+	// page-based fallback for readers that do not support it.
+	SD destination.Destination
+
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
 }
@@ -56,6 +61,17 @@ func (a *GoTo) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Type"] = pdf.Name("Action")
 	}
 
+	if a.SD != nil {
+		if err := pdf.CheckVersion(rm.Out, "GoTo action SD entry", pdf.V2_0); err != nil {
+			return nil, err
+		}
+		sdObj, err := a.SD.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["SD"] = sdObj
+	}
+
 	if next, err := a.Next.Encode(rm); err != nil {
 		return nil, err
 	} else if next != nil {
@@ -74,6 +90,14 @@ func decodeGoTo(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (pdf.Acti
 		return nil, err
 	}
 
+	var sd destination.Destination
+	if dict["SD"] != nil {
+		sd, err = pdf.ExtractorGetOptional(x, path, dict["SD"], destination.Decode)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
@@ -81,6 +105,7 @@ func decodeGoTo(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (pdf.Acti
 
 	return &GoTo{
 		Dest: dest,
+		SD:   sd,
 		Next: next,
 	}, nil
 }

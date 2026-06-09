@@ -60,6 +60,10 @@ var Unset = math.NaN()
 // The object can be an array (explicit destination), a name/string (named destination),
 // or a dictionary with a D entry.
 //
+// For the dictionary form, only the D entry is returned; a PDF 2.0 SD
+// (structure destination) entry is ignored. D is the page-based fallback, so
+// the navigable destination is preserved.
+//
 // Always invoke this via [pdf.ExtractorGet] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Destination, error) {
@@ -132,10 +136,22 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Des
 		if len(arr) < 6 {
 			return nil, pdf.Error("FitR destination requires 6 elements")
 		}
-		left, _ := pdf.Optional(x.GetNumber(path, arr[2]))
-		bottom, _ := pdf.Optional(x.GetNumber(path, arr[3]))
-		right, _ := pdf.Optional(x.GetNumber(path, arr[4]))
-		top, _ := pdf.Optional(x.GetNumber(path, arr[5]))
+		left, err := pdf.Optional(x.GetNumber(path, arr[2]))
+		if err != nil {
+			return nil, err
+		}
+		bottom, err := pdf.Optional(x.GetNumber(path, arr[3]))
+		if err != nil {
+			return nil, err
+		}
+		right, err := pdf.Optional(x.GetNumber(path, arr[4]))
+		if err != nil {
+			return nil, err
+		}
+		top, err := pdf.Optional(x.GetNumber(path, arr[5]))
+		if err != nil {
+			return nil, err
+		}
 		if left >= right || bottom >= top {
 			// Invalid rectangle, fall back to Fit
 			return &Fit{Page: page}, nil
@@ -404,10 +420,14 @@ type Named struct {
 func (d *Named) DestinationType() Type { return TypeNamed }
 
 func (d *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	// the string form of a named destination, looked up in the Names/Dests
+	// name tree, requires PDF 1.2
+	if err := pdf.CheckVersion(rm.Out, "named destination", pdf.V1_2); err != nil {
+		return nil, err
+	}
 	if len(d.Name) == 0 {
 		return nil, pdf.Error("named destination must have a non-empty name")
 	}
-	// Always use pdf.String (modern PDF 1.2+ format)
 	return d.Name, nil
 }
 

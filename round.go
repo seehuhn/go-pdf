@@ -21,8 +21,8 @@ import (
 )
 
 // Round rounds the float64 value x to the specified number of digits. This
-// should be used for all coordinates and dimensions before they are written to
-// a PDF file.
+// should be used for all computed coordinates and dimensions before they are
+// written to a PDF file.
 func Round(x float64, digits int) float64 {
 	// Thanks, Alexander Ertli:
 	// https://groups.google.com/g/golang-nuts/c/UfynqG8K1n0/m/PqyZfANPAgAJ

@@ -36,8 +36,10 @@ type GoToR struct {
 	D destination.Destination
 
 	// SD (PDF 2.0) is the structure destination to jump to.
-	// If present, should take precedence over D.
-	SD pdf.Array
+	// If present, it takes precedence over D, which remains the page-based
+	// fallback. The destination's page target is a byte-string structure
+	// element ID in the remote document.
+	SD destination.Destination
 
 	// NewWindow specifies how the target document should be displayed.
 	NewWindow NewWindowMode
@@ -85,7 +87,11 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "GoToR action SD entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		dict["SD"] = a.SD
+		sdObj, err := a.SD.Encode(rm)
+		if err != nil {
+			return nil, err
+		}
+		dict["SD"] = sdObj
 	}
 
 	if a.NewWindow != NewWindowDefault {
@@ -124,7 +130,13 @@ func decodeGoToR(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToR,
 		return nil, pdf.Error("GoToR action missing D entry")
 	}
 
-	sd, _ := x.GetArray(path, dict["SD"])
+	var sd destination.Destination
+	if dict["SD"] != nil {
+		sd, err = pdf.ExtractorGetOptional(x, path, dict["SD"], destination.Decode)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {

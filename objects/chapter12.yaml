@@ -146,11 +146,13 @@ types:
     introduced: '1.1'
     possibleValues:
     - fn:Eval(fn:InNameTree(trailer::Catalog::Names::Dests))
-  - goName:
+  - goName: SD
+    goType: destination.Destination
     pdfKey: SD
     pdfType: array
     required: false
     introduced: '2.0'
+    purpose: SD (PDF 2.0) is the structure destination, taking precedence over D.
   goPackage: action
   goRepr: struct
   specSection: 12.6.2 12.6.4.2
@@ -487,7 +489,7 @@ types:
     pdfType: array
     required: false
     introduced: '2.0'
-    goType: pdf.Array
+    goType: destination.Destination
     purpose: 'SD (PDF 2.0) is the structure destination to jump to.
 
       If present, should take precedence over D.'
