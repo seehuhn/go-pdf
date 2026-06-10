@@ -578,6 +578,12 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte) (*stdSecHandler, error
 	// it is present and valid.
 	V := enc["V"].(Integer)
 
+	// V=5 (256-bit AES) requires R=6 and vice versa; any other pairing
+	// has no defined key-derivation algorithm.
+	if (V == 5) != (R == 6) {
+		return nil, &MalformedFileError{Err: errors.New("inconsistent Encrypt.V/R")}
+	}
+
 	O, ok := enc["O"].(String)
 	O = tryCrop(O, ouLength)
 	if !ok || len(O) != ouLength {

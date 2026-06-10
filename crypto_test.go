@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -613,5 +614,92 @@ func TestAuthEmbed(t *testing.T) {
 	_, err = r.Get(ref, true)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// encDictForR builds an encryption dictionary with correctly-sized entries
+// for the given revision, so that the V/R consistency check is exercised
+// independently of the other field validations.
+func encDictForR(V, R int) Dict {
+	ouLen := 32
+	if R == 6 {
+		ouLen = 48
+	}
+	enc := Dict{
+		"V": Integer(V),
+		"R": Integer(R),
+		"O": String(make([]byte, ouLen)),
+		"U": String(make([]byte, ouLen)),
+		"P": Integer(-4),
+	}
+	if R == 6 {
+		enc["OE"] = String(make([]byte, 32))
+		enc["UE"] = String(make([]byte, 32))
+		enc["Perms"] = String(make([]byte, 16))
+	}
+	return enc
+}
+
+func TestMalformedVR(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+
+	// inconsistent V/R combinations must be rejected, never panic
+	bad := []struct{ V, R, keyBytes int }{
+		{5, 4, 32}, // 256-bit key on the MD5 path
+		{5, 3, 32},
+		{5, 2, 32},
+		{4, 6, 16}, // R=6 without V=5
+	}
+	for _, test := range bad {
+		enc := encDictForR(test.V, test.R)
+		_, err := openStdSecHandler(enc, test.keyBytes, id)
+		if _, ok := err.(*MalformedFileError); !ok {
+			t.Errorf("V=%d R=%d: expected MalformedFileError, got %v",
+				test.V, test.R, err)
+		}
+	}
+
+	// valid combinations must still construct
+	good := []struct{ V, R, keyBytes int }{
+		{4, 4, 16},
+		{5, 6, 32},
+	}
+	for _, test := range good {
+		enc := encDictForR(test.V, test.R)
+		if _, err := openStdSecHandler(enc, test.keyBytes, id); err != nil {
+			t.Errorf("V=%d R=%d: unexpected error: %v", test.V, test.R, err)
+		}
+	}
+}
+
+// TestOpenMalformedVR checks that opening a crafted /V 5 /R 4 file returns an
+// error instead of panicking in the standard security handler.
+func TestOpenMalformedVR(t *testing.T) {
+	h32 := "<" + strings.Repeat("00", 32) + ">"
+	id := "<" + strings.Repeat("00", 16) + ">"
+	var b bytes.Buffer
+	b.WriteString("%PDF-1.7\n")
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		"<< /Filter /Standard /V 5 /R 4 /Length 256 /O " + h32 +
+			" /U " + h32 + " /P -4 >>",
+	}
+	offs := make([]int, len(objs)+1)
+	for i, body := range objs {
+		offs[i+1] = b.Len()
+		fmt.Fprintf(&b, "%d 0 obj\n%s\nendobj\n", i+1, body)
+	}
+	x := b.Len()
+	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(objs)+1)
+	for i := 1; i <= len(objs); i++ {
+		fmt.Fprintf(&b, "%010d 00000 n \n", offs[i])
+	}
+	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R /Encrypt 3 0 R "+
+		"/ID [%s %s] >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, id, id, x)
+	data := b.Bytes()
+
+	if _, err := NewReader(bytes.NewReader(data), int64(len(data)), nil); err == nil {
+		t.Error("expected an error opening a /V 5 /R 4 file, got nil")
 	}
 }
