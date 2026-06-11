@@ -27,9 +27,9 @@ import (
 func TestBuilderResolveBeforeEncode(t *testing.T) {
 	form := &InteractiveForm{}
 	root := form.NewField("request")
-	sender := root.NewField("sender")
-	name := sender.NewField("name")
-	first := name.NewTextField("first")
+	sender := NewField(root, "sender")
+	name := NewField(sender, "name")
+	first := NewTextField(name, "first")
 
 	if got := first.FullyQualifiedName(); got != "request.sender.name.first" {
 		t.Errorf("FullyQualifiedName = %q, want %q", got, "request.sender.name.first")
@@ -39,14 +39,13 @@ func TestBuilderResolveBeforeEncode(t *testing.T) {
 	}
 }
 
-// a child of a typed parent inherits the parent's type and flags; this exercises
-// the self back-pointer, which must reach the outer *FieldBtn rather than its
-// embedded *FieldCommon
+// a child of a typed parent inherits the parent's type and flags; the parent
+// link must reach the concrete *FieldBtn rather than its embedded *FieldCommon
 func TestBuilderTypedParentInheritance(t *testing.T) {
 	form := &InteractiveForm{}
 	btn := form.NewButtonField("color")
 	btn.Ff = optional.New(FieldRadio)
-	sub := btn.NewField("option1")
+	sub := NewField(btn, "option1")
 
 	if got := ResolvedFT(sub); got != "Btn" {
 		t.Errorf("ResolvedFT = %q, want %q", got, "Btn")
@@ -56,20 +55,26 @@ func TestBuilderTypedParentInheritance(t *testing.T) {
 	}
 }
 
-// calling a builder method on a field assembled from a raw struct literal is a
-// programming error and panics
-func TestBuilderPanicOnLiteral(t *testing.T) {
-	assertPanics(t, "NewTextField on literal", func() {
-		(&FieldCommon{}).NewTextField("x")
-	})
+// the builder functions work on fields assembled from raw struct literals
+func TestBuilderOnLiteralParent(t *testing.T) {
+	btn := &FieldBtn{FieldCommon: FieldCommon{T: "color"}}
+	sub := NewField(btn, "option1")
+
+	if got := ResolvedFT(sub); got != "Btn" {
+		t.Errorf("ResolvedFT = %q, want %q", got, "Btn")
+	}
+	if len(btn.Kids) != 1 || btn.Kids[0] != Node(sub) {
+		t.Error("child was not added to the parent's Kids")
+	}
 }
 
-func assertPanics(t *testing.T, name string, f func()) {
-	t.Helper()
-	defer func() {
-		if recover() == nil {
-			t.Errorf("%s: expected panic, got none", name)
-		}
-	}()
-	f()
+// a nil parent yields a detached field, usable as a root field
+func TestBuilderDetached(t *testing.T) {
+	f := NewTextField(nil, "surname")
+	if f.FieldParent() != nil {
+		t.Error("detached field has a parent")
+	}
+	if got := f.FullyQualifiedName(); got != "surname" {
+		t.Errorf("FullyQualifiedName = %q, want %q", got, "surname")
+	}
 }

@@ -52,6 +52,10 @@ const (
 var (
 	paper = color.DeviceRGB{0.992, 0.988, 0.973} // --paper
 	ink   = color.DeviceRGB{0.102, 0.094, 0.078} // --ink
+
+	// options shared by the list box and combo box demos: the five font
+	// families of the 14 standard PDF fonts
+	fontOpts = []string{"Courier", "Helvetica", "Times", "Symbol", "ZapfDingbats"}
 )
 
 func main() {
@@ -78,6 +82,7 @@ type demo struct {
 	ft       pdf.Name
 	ff       acroform.FieldFlags
 	mkCA     string // ZapfDingbats on-glyph for toggles, caption for push buttons
+	align    pdf.TextAlign
 	value    string
 	onName   pdf.Name
 	opts     []string
@@ -126,14 +131,15 @@ func createDocument(filename string) error {
 		{label: "Check box (check)", width: 16, height: 16, ft: "Btn", mkCA: "4", onName: "Yes", value: "Yes"},
 		{label: "Check box (cross)", width: 16, height: 16, ft: "Btn", mkCA: "8", onName: "Yes", value: "Yes"},
 		{label: "Check box (star)", width: 16, height: 16, ft: "Btn", mkCA: "H", onName: "Yes", value: "Yes"},
-		{label: "Radio button", width: 16, height: 16, ft: "Btn", ff: acroform.FieldRadio, mkCA: "l", onName: "A", value: "A"},
+		{label: "Radio button", width: 16, height: 16, ft: "Btn", ff: acroform.FieldRadio, mkCA: "l", opts: []string{"A", "B", "C"}, value: "A"},
 		{label: "Text, single line", width: 150, height: 20, ft: "Tx", value: "Ada Lovelace"},
-		{label: "Text, right aligned", width: 150, height: 20, ft: "Tx", value: "1843", style: "S"},
+		{label: "Text, right aligned", width: 150, height: 20, ft: "Tx", align: pdf.TextAlignRight, value: "1843", style: "S"},
 		{label: "Text, multiline", width: 150, height: 52, ft: "Tx", ff: acroform.FieldMultiline, value: "Notes on the analytical engine and its capacity for computation."},
 		{label: "Text, comb", width: 150, height: 22, ft: "Tx", ff: acroform.FieldComb, value: "AB1234", maxLen: 6},
+		{label: "Text, comb (centred)", width: 150, height: 22, ft: "Tx", ff: acroform.FieldComb, align: pdf.TextAlignCenter, value: "AB", maxLen: 6},
 		{label: "Text, password", width: 150, height: 20, ft: "Tx", ff: acroform.FieldPassword, value: "secret"},
-		{label: "List box", width: 150, height: 72, ft: "Ch", opts: []string{"Times New Roman", "Helvetica", "Source Serif 4", "JetBrains Mono", "Palatino"}, sel: []int{2}},
-		{label: "Combo box", width: 150, height: 22, ft: "Ch", ff: acroform.FieldCombo, opts: []string{"Helvetica"}, value: "Helvetica"},
+		{label: "List box", width: 150, height: 72, ft: "Ch", opts: fontOpts, sel: []int{2}, value: fontOpts[2]},
+		{label: "Combo box", width: 150, height: 22, ft: "Ch", ff: acroform.FieldCombo, opts: fontOpts, value: fontOpts[2]},
 		{label: "Signature (unsigned)", width: 150, height: 44, ft: "Sig"},
 		{label: "Border: dashed", width: 120, height: 22, ft: "Tx", style: "D"},
 		{label: "Border: beveled", width: 120, height: 22, ft: "Tx", style: "B"},
@@ -185,49 +191,69 @@ func (wr *writer) addRow(d demo) error {
 }
 
 func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
-	rect := pdf.Rectangle{LLx: x, LLy: y, URx: x + d.width, URy: y + d.height}
-
-	mk := &appearance.Characteristics{Rotation: d.rot}
-	if !d.noChrome {
-		mk.BackgroundColor = paper
-		mk.BorderColor = ink
-	}
-	if d.mkCA != "" {
-		mk.Caption = d.mkCA
-	}
-
-	bs := &annotation.BorderStyle{Width: 1, SingleUse: true}
-	if d.style != "" {
-		bs.Style = d.style
-	}
-	if d.style == "D" {
-		bs.DashArray = []float64{3, 2}
-	}
-
 	wr.nextID++
 	f := wr.makeField(d)
 
-	// the widget is a child of the field and an annotation on the page; a
-	// terminal field with this single widget is written as one merged object,
-	// shared between the form's field list and the page's annotation list. The
-	// form is stored (see createDocument) before the page is closed, so the
-	// merge is in place when the page writes the widget.
-	w := annotation.AddWidget(f, rect)
-	w.Common.Flags = annotation.FlagPrint
-	w.MK = mk
-	w.BorderStyle = bs
-
-	isToggle := d.ft == "Btn" && d.ff&acroform.FieldPushbutton == 0
-	if genAP {
-		// derives the field context from w.Parent and selects a toggle's on appearance
-		if err := wr.style.AddAppearance(w); err != nil {
-			return err
+	// a radio button field shows one widget per option, side by side; every
+	// other field has a single widget
+	onStates := []pdf.Name{d.onName}
+	if d.ft == "Btn" && d.ff&acroform.FieldRadio != 0 {
+		onStates = onStates[:0]
+		for _, o := range d.opts {
+			onStates = append(onStates, pdf.Name(o))
 		}
-	} else if isToggle {
-		w.AppearanceState = d.onName // show the on appearance
 	}
 
-	wr.page.Page.Annots = append(wr.page.Page.Annots, w)
+	const widgetGap = 8.0
+	for i, onState := range onStates {
+		xi := x + float64(i)*(d.width+widgetGap)
+		rect := pdf.Rectangle{LLx: xi, LLy: y, URx: xi + d.width, URy: y + d.height}
+
+		mk := &appearance.Characteristics{Rotation: d.rot}
+		if !d.noChrome {
+			mk.BackgroundColor = paper
+			mk.BorderColor = ink
+		}
+		if d.mkCA != "" {
+			mk.Caption = d.mkCA
+		}
+
+		bs := &annotation.BorderStyle{Width: 1, SingleUse: true}
+		if d.style != "" {
+			bs.Style = d.style
+		}
+		if d.style == "D" {
+			bs.DashArray = []float64{3, 2}
+		}
+
+		// the widget is a child of the field and an annotation on the page; a
+		// terminal field with a single widget is written as one merged object,
+		// shared between the form's field list and the page's annotation list.
+		// The form is stored (see createDocument) before the page is closed, so
+		// the merge is in place when the page writes the widget.
+		widget := annotation.AddWidget(f, rect)
+		widget.Common.Flags = annotation.FlagPrint
+		widget.MK = mk
+		widget.BorderStyle = bs
+
+		isToggle := d.ft == "Btn" && d.ff&acroform.FieldPushbutton == 0
+		if genAP {
+			// derives the field context from w.Parent and selects the toggle
+			// appearance matching the field value
+			if err := wr.style.AddAppearance(widget); err != nil {
+				return err
+			}
+		} else if isToggle {
+			// show the appearance matching the field value
+			if onState == pdf.Name(d.value) {
+				widget.AppearanceState = onState
+			} else {
+				widget.AppearanceState = "Off"
+			}
+		}
+
+		wr.page.Page.Annots = append(wr.page.Page.Annots, widget)
+	}
 	return nil
 }
 
@@ -235,11 +261,6 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 // is added separately by the caller.
 func (wr *writer) makeField(d demo) acroform.Field {
 	name := fmt.Sprintf("f%d", wr.nextID)
-
-	align := pdf.TextAlignLeft
-	if d.label == "Text, right aligned" {
-		align = pdf.TextAlignRight
-	}
 
 	var f acroform.Field
 	switch d.ft {
@@ -249,8 +270,8 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		btn := wr.form.NewButtonField(name)
 		if d.ff&acroform.FieldPushbutton == 0 {
 			btn.V = pdf.Name(d.value)
-			if d.ff&acroform.FieldRadio != 0 && d.onName != "" {
-				btn.Opt = []string{string(d.onName)}
+			if d.ff&acroform.FieldRadio != 0 {
+				btn.Opt = d.opts
 			}
 		}
 		f = btn
@@ -258,7 +279,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 	case "Tx":
 		tx := wr.form.NewTextField(name)
 		tx.DefaultAppearance = defaultDA
-		tx.Align = align
+		tx.Align = d.align
 		tx.MaxLen = d.maxLen
 		if d.value != "" {
 			tx.V = pdf.TextString(d.value)
@@ -268,7 +289,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 	case "Ch":
 		ch := wr.form.NewChoiceField(name)
 		ch.DefaultAppearance = defaultDA
-		ch.Align = align
+		ch.Align = d.align
 		ch.Selected = d.sel
 		for _, o := range d.opts {
 			ch.Opt = append(ch.Opt, acroform.ChoiceOption{Display: o, Export: o})

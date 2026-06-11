@@ -47,9 +47,9 @@ func TestBuilderMultiWidgetRoundTrip(t *testing.T) {
 func TestBuilderTreeRoundTrip(t *testing.T) {
 	form := &acroform.InteractiveForm{}
 	root := form.NewField("request")
-	text := root.NewTextField("text")
+	text := acroform.NewTextField(root, "text")
 	text.V = pdf.String("hello")
-	root.NewButtonField("flag")
+	acroform.NewButtonField(root, "flag")
 
 	formRoundTripTest(t, pdf.V1_7, form)
 }

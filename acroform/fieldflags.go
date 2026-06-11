@@ -16,6 +16,8 @@
 
 package acroform
 
+import "seehuhn.de/go/pdf"
+
 // FieldFlags is a set of flags describing characteristics of a form field.
 //
 // This type holds the flags common to all field types. Flags specific to a
@@ -58,8 +60,8 @@ const (
 	FieldDoNotScroll FieldFlags = 1 << 23
 
 	// FieldComb lays the text out into [FieldTx.MaxLen] equally spaced cells.
-	// It applies only when MaxLen is present and Multiline, Password, and
-	// FileSelect are all clear.
+	// It may be set only if MaxLen is set and the Multiline, Password, and
+	// FileSelect flags are all clear.
 	FieldComb FieldFlags = 1 << 24
 )
 
@@ -115,3 +117,34 @@ const FieldDoNotSpellCheck FieldFlags = 1 << 22
 // FieldRichText indicates that the text field's value is a rich text string.
 // It applies to text fields ([FieldTx]).
 const FieldRichText FieldFlags = 1 << 25
+
+// flagVersions lists the minimum PDF version of each field flag introduced
+// after the form fields themselves; unlisted flags carry no extra version
+// requirement. FieldRichText and FieldRadiosInUnison share a bit and a
+// version, so one entry covers both.
+var flagVersions = []struct {
+	flag FieldFlags
+	name string
+	v    pdf.Version
+}{
+	{FieldFileSelect, "FileSelect", pdf.V1_4},
+	{FieldMultiSelect, "MultiSelect", pdf.V1_4},
+	{FieldDoNotSpellCheck, "DoNotSpellCheck", pdf.V1_4},
+	{FieldDoNotScroll, "DoNotScroll", pdf.V1_4},
+	{FieldComb, "Comb", pdf.V1_5},
+	{FieldRichText, "RichText/RadiosInUnison", pdf.V1_5},
+	{FieldCommitOnSelChange, "CommitOnSelChange", pdf.V1_5},
+}
+
+// checkFlagVersions verifies that every flag set in ff is allowed in the
+// output version.
+func checkFlagVersions(w *pdf.Writer, ff FieldFlags) error {
+	for _, fv := range flagVersions {
+		if ff&fv.flag != 0 {
+			if err := pdf.CheckVersion(w, "field "+fv.name+" flag", fv.v); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}

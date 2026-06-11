@@ -25,15 +25,22 @@ import (
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/internal/formhooks"
 	"seehuhn.de/go/pdf/optional"
 )
 
-// Field reads a field dictionary from a PDF file and returns the matching
+// newField returns an empty concrete field for the given field type, using
+// the factory that package acroform registers in the formhooks package.
+func newField(fieldType pdf.Name) acroform.Field {
+	return formhooks.NewField(fieldType).(acroform.Field)
+}
+
+// field reads a field dictionary from a PDF file and returns the matching
 // concrete [acroform.Field] type.
 //
 // Always invoke this via [pdf.ExtractorGet] so that indirect references are
 // resolved and cycle detection covers the field hierarchy.
-func Field(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (acroform.Field, error) {
+func field(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (acroform.Field, error) {
 	dict, err := x.GetDict(path, obj)
 	if err != nil {
 		return nil, err
@@ -49,7 +56,7 @@ func Field(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (acro
 		return f, err
 	}
 
-	f := acroform.NewField(fieldTypeOf(x, path, dict))
+	f := newField(fieldTypeOf(x, path, dict))
 	if err := decodeFieldCommonEntries(x, path, dict, f); err != nil {
 		return nil, err
 	}
@@ -72,16 +79,39 @@ func isValidFieldType(name pdf.Name) bool {
 	}
 }
 
-// fieldTypeOf reads a field dictionary's own field type. An unrecognised or
-// absent type yields the empty name, leaving the field typeless (a bare
-// [acroform.FieldCommon]) so that it stays writable. The type is inheritable; an
-// inherited type is not resolved here (use [acroform.ResolvedFT] for the
-// effective type).
+// fieldTypeOf reads a field dictionary's effective field type. The type is
+// inheritable: a field without its own /FT takes the type of the nearest
+// ancestor (via /Parent) that sets one, so that the field's type-specific
+// entries are preserved. An unrecognised or absent type yields the empty name,
+// leaving the field typeless (a bare [acroform.FieldCommon]) so that it stays
+// writable.
 func fieldTypeOf(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) pdf.Name {
-	if name, _ := pdf.Optional(x.GetName(path, dict["FT"])); isValidFieldType(name) {
+	if name, _ := pdf.Optional(x.GetName(path, fieldInherited(x.R, dict, "FT"))); isValidFieldType(name) {
 		return name
 	}
 	return ""
+}
+
+// fieldInherited returns the value of an inheritable field attribute: the
+// dictionary's own value for key, or the value of the nearest ancestor (via
+// /Parent links) that sets one. The result may be an indirect reference.
+func fieldInherited(r pdf.Getter, dict pdf.Dict, key pdf.Name) pdf.Object {
+	visited := map[pdf.Reference]bool{}
+	for {
+		if obj, ok := dict[key]; ok {
+			return obj
+		}
+		ref, ok := dict["Parent"].(pdf.Reference)
+		if !ok || visited[ref] {
+			return nil
+		}
+		visited[ref] = true
+		parent, err := pdf.GetDict(r, ref)
+		if err != nil || parent == nil {
+			return nil
+		}
+		dict = parent
+	}
 }
 
 // decodeFieldCommonEntries reads the entries common to all field types (the name
@@ -149,6 +179,26 @@ func decodeFieldTypeEntries(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dic
 		} else if ml > 0 {
 			f.MaxLen = int(ml)
 		}
+		// the Comb flag may be set only with a MaxLen (both inheritable) and
+		// with the Multiline, Password and FileSelect flags clear; clear an
+		// invalid Comb flag, and materialise an inherited MaxLen, so that the
+		// decoded field can always be written back
+		ff, ok := f.Ff.Get()
+		if !ok {
+			i, _ := pdf.Optional(pdf.GetInteger(x.R, fieldInherited(x.R, dict, "Ff")))
+			ff = acroform.FieldFlags(uint32(i))
+		}
+		if ff&acroform.FieldComb != 0 {
+			if f.MaxLen == 0 {
+				if i, _ := pdf.Optional(pdf.GetInteger(x.R, fieldInherited(x.R, dict, "MaxLen"))); i > 0 {
+					f.MaxLen = int(i)
+				}
+			}
+			conflict := ff & (acroform.FieldMultiline | acroform.FieldPassword | acroform.FieldFileSelect)
+			if f.MaxLen == 0 || conflict != 0 {
+				f.Ff = optional.New(ff &^ acroform.FieldComb)
+			}
+		}
 	case *acroform.FieldChoice:
 		if err := decodeVariableText(x, path, dict, &f.VariableText); err != nil {
 			return err
@@ -200,12 +250,12 @@ func decodeFieldTypeEntries(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dic
 	case *acroform.FieldSig:
 		f.V = dict["V"]
 		f.DV = dict["DV"]
-		if lock, err := pdf.ExtractorGetOptional(x, path, dict["Lock"], acroform.ExtractSigFieldLock); err != nil {
+		if lock, err := pdf.ExtractorGetOptional(x, path, dict["Lock"], sigFieldLock); err != nil {
 			return err
 		} else {
 			f.Lock = lock
 		}
-		if sv, err := pdf.ExtractorGetOptional(x, path, dict["SV"], acroform.ExtractSigSeedValue); err != nil {
+		if sv, err := pdf.ExtractorGetOptional(x, path, dict["SV"], sigSeedValue); err != nil {
 			return err
 		} else {
 			f.SV = sv
@@ -300,7 +350,7 @@ func choiceOptionString(x *pdf.Extractor, obj pdf.Object) (string, bool) {
 // field tree share one widget object. It builds both halves directly from the
 // dictionary — never resolving ref recursively — so there is no self-cycle.
 func decodeMergedField(x *pdf.Extractor, path *pdf.CycleCheck, ref pdf.Reference, dict pdf.Dict) (acroform.Field, *annotation.Widget, error) {
-	f := acroform.NewField(fieldTypeOf(x, path, dict))
+	f := newField(fieldTypeOf(x, path, dict))
 	if err := decodeFieldCommonEntries(x, path, dict, f); err != nil {
 		return nil, nil, err
 	}
@@ -343,9 +393,8 @@ func isMergedFieldDict(dict pdf.Dict) bool {
 }
 
 // decodeKids reads the /Kids of a field, decoding each child as a widget
-// annotation or a sub-field and appending it to the parent's
-// [acroform.FieldCommon.Kids]. It then links the children to the parent via
-// [acroform.LinkKids].
+// annotation or a sub-field, appending it to the parent's
+// [acroform.FieldCommon.Kids] and setting the child's parent link.
 func decodeKids(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, parent acroform.Field) error {
 	c := parent.GetFieldCommon()
 
@@ -385,22 +434,22 @@ func decodeKids(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, parent ac
 				return err
 			}
 			if w, ok := a.(*annotation.Widget); ok && w != nil {
+				w.Parent = parent
 				c.Kids = append(c.Kids, w)
 				continue
 			}
 		}
 
-		child, err := pdf.Optional(pdf.ExtractorGet(x, path, ref, Field))
+		child, err := pdf.Optional(pdf.ExtractorGet(x, path, ref, field))
 		if err != nil {
 			return err
 		}
 		if child != nil {
+			child.GetFieldCommon().Parent = parent
 			c.Kids = append(c.Kids, child)
 		}
 	}
 
-	// wire each child's parent link (sub-fields and widgets alike)
-	acroform.LinkKids(parent)
 	return nil
 }
 

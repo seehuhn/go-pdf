@@ -114,7 +114,7 @@ func createDocument(filename string) error {
 			Border:   &annotation.Border{Width: 1, SingleUse: true},
 		},
 		Action:    &action.URI{URI: "https://www.example.com/"},
-		Highlight: annotation.LinkHighlightInvert,
+		Highlight: annotation.HighlightInvert,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -195,7 +195,7 @@ func createDocument(filename string) error {
 				Color:    w.LinkCol,
 			},
 			Action:      &action.URI{URI: "https://www.example.com/"},
-			Highlight:   annotation.LinkHighlightInvert,
+			Highlight:   annotation.HighlightInvert,
 			BorderStyle: bs,
 		}
 		err = w.addAnnotationPair(a)
@@ -471,7 +471,7 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 			Flags:    annotation.FlagPrint,
 		},
 		Action:      &action.URI{URI: url},
-		Highlight:   annotation.LinkHighlightInvert,
+		Highlight:   annotation.HighlightInvert,
 		BorderStyle: bs,
 	}
 

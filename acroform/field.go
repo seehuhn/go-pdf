@@ -36,8 +36,9 @@ type Node interface {
 	// never called — its reference is the widget's.
 	pdf.Encoder
 
-	// IsFieldNode is a marker method that has no effect.
-	IsFieldNode()
+	// FieldParent returns the form field this node is a child of, or nil if
+	// the node is not linked to a parent field.
+	FieldParent() Field
 }
 
 // Field is a single field in a PDF interactive form.
@@ -48,13 +49,13 @@ type Node interface {
 // dictionary; this merging is applied automatically and is transparent to the
 // Go representation, where the widget is always a child in [FieldCommon.Kids].
 //
-// Fields are not written individually; they are written, with the whole subtree
-// rooted at each, by [InteractiveForm.Encode] when the form is stored.
+// Fields are not written individually; they are written, with the whole
+// subtree rooted at each, by [InteractiveForm.Encode] when the form is stored.
 //
 // Each terminal field has a concrete type matching its field type: [FieldTx]
 // (text), [FieldBtn] (button), [FieldChoice] (choice), and [FieldSig]
-// (signature). A field with no field type of its own — a non-terminal field, or
-// one whose type is inherited — is represented by a *[FieldCommon].
+// (signature). A field with no field type of its own — a non-terminal field,
+// or one whose type is inherited — is represented by a [*FieldCommon].
 //
 // Several attributes (the field type, Ff, V, DV) are inheritable: a field that
 // does not specify them takes the value from its nearest ancestor that does.
@@ -105,21 +106,18 @@ type FieldCommon struct {
 	// field/widget dictionary; the merge is applied automatically on write.
 	Kids []Node
 
-	// parent points to the field's parent in the hierarchy, for inheritance
-	// and name resolution. It is set by the builder methods, when the field is
-	// decoded as a child, or at encode time, and is not written to the PDF file.
-	parent Field
-
-	// self is the concrete Field value that embeds this FieldCommon (for
-	// example the outer *FieldBtn). A method promoted onto the embedded
-	// *FieldCommon cannot otherwise reach its outer struct; the builder methods
-	// use self to link a new child to the correct typed parent. It is set when
-	// the field is created, by a builder or by decoding.
-	self Field
+	// Parent points to the field's parent in the hierarchy, for inheritance
+	// and name resolution. It is nil for a root field. The builder functions
+	// and decoding set it; when assembling a field's Kids by hand, set it on
+	// each sub-field child.
+	//
+	// This corresponds to the /Parent entry.
+	Parent Field
 }
 
-// IsFieldNode implements the [Node] interface.
-func (*FieldCommon) IsFieldNode() {}
+// FieldParent implements the [Node] interface; it returns
+// [FieldCommon.Parent].
+func (c *FieldCommon) FieldParent() Field { return c.Parent }
 
 // GetFieldCommon implements the [Field] interface.
 func (c *FieldCommon) GetFieldCommon() *FieldCommon { return c }
@@ -145,47 +143,27 @@ var (
 	_ Node  = (*FieldCommon)(nil)
 )
 
-// NewField returns an empty concrete field for the given field type, one of
+// newField returns an empty concrete field for the given field type, one of
 // "Tx", "Ch", "Btn", or "Sig". A field with no recognised type is represented by
 // a bare [FieldCommon]. A button field's variant (check box / radio / push) is
 // not fixed here; it is derived on demand from the effective flags (see
 // [FieldBtn.Variant]).
 //
-// This is the factory used when decoding; to build a field tree, use the
-// builder methods on [InteractiveForm] and [FieldCommon] instead.
-func NewField(ft pdf.Name) Field {
-	var f Field
+// This is the factory used when decoding, reached through the formhooks
+// package; field trees are otherwise built with the builder functions and the
+// methods on [InteractiveForm].
+func newField(ft pdf.Name) Field {
 	switch ft {
 	case "Tx":
-		f = &FieldTx{}
+		return &FieldTx{}
 	case "Ch":
-		f = &FieldChoice{}
+		return &FieldChoice{}
 	case "Sig":
-		f = &FieldSig{}
+		return &FieldSig{}
 	case "Btn":
-		f = &FieldBtn{}
+		return &FieldBtn{}
 	default:
-		f = &FieldCommon{}
-	}
-	f.GetFieldCommon().self = f
-	return f
-}
-
-// LinkKids sets the parent link on every child of f, so that inheritance (see
-// [ResolvedFT]) and fully qualified name resolution (see
-// [FieldCommon.FullyQualifiedName]) work. A sub-field child's parent pointer is
-// set to f; a widget child's [Widget.Parent] is set to f.
-//
-// The builder methods and decoding wire these links automatically. Call LinkKids
-// after assembling a field's [FieldCommon.Kids] by hand, so that the resolution
-// helpers return correct results before the field is encoded.
-func LinkKids(f Field) {
-	for _, kid := range f.GetFieldCommon().Kids {
-		if k, ok := kid.(Field); ok {
-			k.GetFieldCommon().parent = f
-		} else if s, ok := kid.(interface{ SetFieldParent(Field) }); ok {
-			s.SetFieldParent(f)
-		}
+		return &FieldCommon{}
 	}
 }
 
@@ -196,25 +174,28 @@ func LinkKids(f Field) {
 // reference for widget kids). It implements [Field.Encode]; the form, not the
 // caller, drives this through [InteractiveForm.Encode].
 //
-// Widget annotations are not written here: each is linked to this field via
-// [Widget.Parent] and written later, when the page listing it is written. The
-// ordering contract (store the form before closing pages) ensures the link is in
-// place by then.
+// Widget annotations are not written here: each is written later, when the
+// page listing it is written, and then folds in its field's entries using its
+// parent link. The ordering contract (store the form before closing pages)
+// ensures the link is still in place by then.
+//
+// Encoding never modifies the tree: it fails with an error if a child's
+// parent link does not point back to f.
 func encodeField(rm *pdf.ResourceManager, f Field) (pdf.Native, error) {
-	dict, err := FieldEntries(rm, f)
+	dict, err := fieldEntries(rm, f)
 	if err != nil {
 		return nil, err
 	}
 	c := f.GetFieldCommon()
-	if c.parent != nil {
-		dict["Parent"] = rm.GetReference(c.parent)
+	if c.Parent != nil {
+		dict["Parent"] = rm.GetReference(c.Parent)
 	}
-
-	// establish the hierarchy for built trees before writing kid references
-	LinkKids(f)
 
 	var kidRefs pdf.Array
 	for _, kid := range c.Kids {
+		if kid.FieldParent() != f {
+			return nil, errors.New("field kid with missing or wrong Parent link")
+		}
 		if k, ok := kid.(Field); ok {
 			kidRef, err := fieldRef(rm, k)
 			if err != nil {
@@ -241,8 +222,8 @@ func fieldRef(rm *pdf.ResourceManager, f Field) (pdf.Reference, error) {
 	widgets, hasSubfield := classifyKids(f.GetFieldCommon().Kids)
 	if !hasSubfield && len(widgets) == 1 {
 		w := widgets[0]
-		if s, ok := w.(interface{ SetFieldParent(Field) }); ok {
-			s.SetFieldParent(f)
+		if w.FieldParent() != f {
+			return 0, errors.New("widget with missing or wrong Parent link")
 		}
 		return rm.GetReference(w), nil
 	}
@@ -262,9 +243,11 @@ func classifyKids(kids []Node) (widgets []Node, hasSubfield bool) {
 	return widgets, hasSubfield
 }
 
-// FieldEntries builds the field-level dictionary entries (FT, T, the flags, AA,
-// and the type-specific entries), excluding /Parent and /Kids.
-func FieldEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
+// fieldEntries builds the field-level dictionary entries (FT, T, the flags, AA,
+// and the type-specific entries), excluding /Parent and /Kids. The annotation
+// package reaches it through the formhooks package, to fold a terminal field's
+// entries into the field's single widget annotation.
+func fieldEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "interactive form field", pdf.V1_2); err != nil {
 		return nil, err
 	}
@@ -294,6 +277,9 @@ func FieldEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 		dict["TM"] = pdf.TextString(c.TM)
 	}
 	if ff, ok := c.Ff.Get(); ok {
+		if err := checkFlagVersions(rm.Out, ff); err != nil {
+			return nil, err
+		}
 		dict["Ff"] = pdf.Integer(uint32(ff))
 	}
 	if c.AA != nil {
@@ -319,10 +305,11 @@ func FieldEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 // the field itself does not specify one.
 //
 // The resolution walks the field's ancestors, so the parent links must be in
-// place: they are established by the builder methods, by decoding, or at encode
-// time. The same applies to [ResolvedFf], [ResolvedV], and [ResolvedDV].
+// place: the builder functions and decoding set them; set [FieldCommon.Parent]
+// yourself when assembling a tree by hand. The same applies to [ResolvedFf],
+// [ResolvedV], and [ResolvedDV].
 func ResolvedFT(f Field) pdf.Name {
-	for n := f; n != nil; n = ParentOf(n) {
+	for n := f; n != nil; n = n.FieldParent() {
 		if ft := n.FieldType(); ft != "" {
 			return ft
 		}
@@ -333,7 +320,7 @@ func ResolvedFT(f Field) pdf.Name {
 // ResolvedFf returns the field's effective flags, inherited from an ancestor
 // if the field itself does not specify them.
 func ResolvedFf(f Field) FieldFlags {
-	for n := f; n != nil; n = ParentOf(n) {
+	for n := f; n != nil; n = n.FieldParent() {
 		if ff, ok := n.GetFieldCommon().Ff.Get(); ok {
 			return ff
 		}
@@ -344,7 +331,7 @@ func ResolvedFf(f Field) FieldFlags {
 // ResolvedV returns the field's effective value, inherited from an ancestor if
 // the field itself does not specify one.
 func ResolvedV(f Field) pdf.Object {
-	for n := f; n != nil; n = ParentOf(n) {
+	for n := f; n != nil; n = n.FieldParent() {
 		if v := n.ownValue(); v != nil {
 			return v
 		}
@@ -355,7 +342,7 @@ func ResolvedV(f Field) pdf.Object {
 // ResolvedDV returns the field's effective default value, inherited from an
 // ancestor if the field itself does not specify one.
 func ResolvedDV(f Field) pdf.Object {
-	for n := f; n != nil; n = ParentOf(n) {
+	for n := f; n != nil; n = n.FieldParent() {
 		if dv := n.ownDefaultValue(); dv != nil {
 			return dv
 		}
@@ -363,11 +350,16 @@ func ResolvedDV(f Field) pdf.Object {
 	return nil
 }
 
-// ParentOf returns the field's parent in the hierarchy, or nil for a root field.
-// The parent links are established by the builder methods, by decoding, or at
-// encode time (see [LinkKids]).
-func ParentOf(f Field) Field {
-	return f.GetFieldCommon().parent
+// ResolvedMaxLen returns a text field's effective maximum text length,
+// inherited from an ancestor if the field itself does not set one. A value of
+// zero indicates that no maximum is set.
+func ResolvedMaxLen(f Field) int {
+	for n := f; n != nil; n = n.FieldParent() {
+		if x, ok := n.(*FieldTx); ok && x.MaxLen > 0 {
+			return x.MaxLen
+		}
+	}
+	return 0
 }
 
 // FullyQualifiedName returns the field's fully qualified name, formed by
@@ -375,17 +367,18 @@ func ParentOf(f Field) Field {
 // Ancestors without a partial name are skipped.
 //
 // The name walks the field's ancestors, so the parent links must be in place:
-// they are established by the builder methods, by decoding, or at encode time.
+// the builder functions and decoding set them; set [FieldCommon.Parent]
+// yourself when assembling a tree by hand.
 func (c *FieldCommon) FullyQualifiedName() string {
 	var parts []string
 	for n := c; n != nil; {
 		if n.T != "" {
 			parts = append(parts, n.T)
 		}
-		if n.parent == nil {
+		if n.Parent == nil {
 			break
 		}
-		n = n.parent.GetFieldCommon()
+		n = n.Parent.GetFieldCommon()
 	}
 	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
 		parts[i], parts[j] = parts[j], parts[i]

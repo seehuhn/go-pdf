@@ -139,7 +139,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: annotation.Common{
 					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 30},
 				},
-				Highlight: annotation.LinkHighlightInvert,
+				Highlight: annotation.HighlightInvert,
 			},
 		},
 		{
@@ -149,7 +149,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 40},
 					Contents: "Link description",
 				},
-				Highlight:  annotation.LinkHighlightOutline,
+				Highlight:  annotation.HighlightOutline,
 				QuadPoints: []vec.Vec2{{X: 10, Y: 10}, {X: 190, Y: 10}, {X: 190, Y: 30}, {X: 10, Y: 30}}, // Rectangle quad
 			},
 		},
@@ -163,7 +163,7 @@ var testCases = map[pdf.Name][]testCase{
 						DashArray: []float64{5.0, 3.0},
 					},
 				},
-				Highlight: annotation.LinkHighlightPush,
+				Highlight: annotation.HighlightPush,
 			},
 		},
 		{
@@ -173,7 +173,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 30},
 				},
 				Action:    &action.URI{URI: "https://example.com"},
-				Highlight: annotation.LinkHighlightInvert,
+				Highlight: annotation.HighlightInvert,
 			},
 		},
 		{
@@ -183,7 +183,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 30},
 				},
 				Destination: &destination.Named{Name: pdf.String("chapter1")},
-				Highlight:   annotation.LinkHighlightInvert,
+				Highlight:   annotation.HighlightInvert,
 			},
 		},
 	},
@@ -1358,7 +1358,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 300, URy: 130},
 					Contents: "Text input field",
 				},
-				Highlight: "I", // Default highlighting mode
+				Highlight: annotation.HighlightInvert,
 			},
 		},
 		{
@@ -1368,7 +1368,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 200, LLy: 200, URx: 350, URy: 240},
 					Name: "button-001",
 				},
-				Highlight: "P", // Push highlighting
+				Highlight: annotation.HighlightPush,
 			},
 		},
 		{
@@ -1378,7 +1378,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 80},
 					Contents: "Button with custom appearance",
 				},
-				Highlight: "O", // Outline highlighting
+				Highlight: annotation.HighlightOutline,
 				MK: &appearance.Characteristics{
 					BorderColor:     color.DeviceGray(0),
 					BackgroundColor: color.DeviceRGB{1, 1, 0},
@@ -1394,7 +1394,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:  pdf.Rectangle{LLx: 300, LLy: 300, URx: 500, URy: 340},
 					Color: color.DeviceCMYK{0.1, 0.2, 0.3, 0.4},
 				},
-				Highlight: "I", // Default highlighting
+				Highlight: annotation.HighlightInvert,
 				Action:    &action.URI{URI: "https://example.com/widget-activate"},
 				AA:        &triggers.Annotation{Up: &action.URI{URI: "https://example.com/widget-up"}},
 			},
@@ -1406,7 +1406,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 150, LLy: 150, URx: 400, URy: 190},
 					Contents: "Field with custom border",
 				},
-				Highlight: "N", // No highlighting
+				Highlight: annotation.HighlightNone,
 				BorderStyle: &annotation.BorderStyle{
 					Width: 2,
 					Style: "S",
@@ -1422,7 +1422,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 250, LLy: 250, URx: 450, URy: 290},
 					Name: "child-widget-001",
 				},
-				Highlight: "T", // Toggle highlighting (same as Push)
+				Highlight: annotation.HighlightOutline,
 			},
 		},
 		{
@@ -1433,7 +1433,7 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Complete widget annotation",
 					Color:    color.DeviceRGB{0.8, 0.9, 1.0},
 				},
-				Highlight: "P", // Push highlighting
+				Highlight: annotation.HighlightPush,
 				MK: &appearance.Characteristics{
 					Rotation:     180,
 					BorderColor:  color.DeviceRGB{0.25, 0.5, 0.75},
@@ -1458,7 +1458,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: annotation.Common{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 30},
 				},
-				Highlight: "I", // Default value
+				Highlight: annotation.HighlightInvert,
 			},
 		},
 	},

@@ -24,31 +24,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/extract"
 )
 
-// decodeFieldRefs decodes an array of field references (the /Fields or /CO entry)
-// into the matching fields. The same extractor resolves both, so a reference
-// shared between the two yields the same field value.
-func decodeFieldRefs(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]acroform.Field, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
-	if err != nil {
-		return nil, err
-	}
-	var fields []acroform.Field
-	for _, el := range arr {
-		ref, ok := el.(pdf.Reference)
-		if !ok {
-			continue
-		}
-		fld, err := pdf.Optional(pdf.ExtractorGet(x, path, ref, Field))
-		if err != nil {
-			return nil, err
-		}
-		if fld != nil {
-			fields = append(fields, fld)
-		}
-	}
-	return fields, nil
-}
-
 // Form reads an interactive form dictionary from a PDF file. The obj argument
 // should be the value of the AcroForm entry in the document catalog. It returns
 // nil if obj is nil.
@@ -121,4 +96,29 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 	form.XFA = dict["XFA"]
 
 	return form, nil
+}
+
+// decodeFieldRefs decodes an array of field references (the /Fields or /CO entry)
+// into the matching fields. The same extractor resolves both, so a reference
+// shared between the two yields the same field value.
+func decodeFieldRefs(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]acroform.Field, error) {
+	arr, err := pdf.Optional(x.GetArray(path, obj))
+	if err != nil {
+		return nil, err
+	}
+	var fields []acroform.Field
+	for _, el := range arr {
+		ref, ok := el.(pdf.Reference)
+		if !ok {
+			continue
+		}
+		fld, err := pdf.Optional(pdf.ExtractorGet(x, path, ref, field))
+		if err != nil {
+			return nil, err
+		}
+		if fld != nil {
+			fields = append(fields, fld)
+		}
+	}
+	return fields, nil
 }

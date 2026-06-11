@@ -38,7 +38,7 @@
 //   - [Ink]: freehand drawing or handwritten paths
 //   - [Line]: straight line with optional start and end decorations
 //   - [Polygon]: closed polygonal path
-//   - [Polyline]: open polygonal path with optional start and end decorations
+//   - [PolyLine]: open polygonal path with optional start and end decorations
 //   - [Projection]: (PDF 2.0) dimensional measurements and callouts from 3D models
 //   - [Redact]: mark content for removal and specify replacement text
 //   - [Sound]: (deprecated in PDF 2.0) a voice note

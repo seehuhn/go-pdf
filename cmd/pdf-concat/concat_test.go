@@ -34,12 +34,8 @@ func makeFormPDF(t *testing.T, path, fieldName string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := &annotation.Widget{
-		Common: annotation.Common{Rect: pdf.Rectangle{LLx: 100, LLy: 700, URx: 300, URy: 720}},
-	}
-	f := &acroform.FieldTx{
-		FieldCommon: acroform.FieldCommon{T: fieldName, Kids: []acroform.Node{w}},
-	}
+	f := acroform.NewTextField(nil, fieldName)
+	w := annotation.AddWidget(f, pdf.Rectangle{LLx: 100, LLy: 700, URx: 300, URy: 720})
 	page.Page.Annots = append(page.Page.Annots, w)
 	form := &acroform.InteractiveForm{Fields: []acroform.Field{f}}
 	formRef, err := page.RM.Store(form)

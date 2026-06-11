@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/formhooks"
 	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -247,8 +248,8 @@ var fieldTestCases = []struct {
 			FieldCommon: acroform.FieldCommon{
 				T: "address",
 				Kids: []acroform.Node{
-					&acroform.FieldCommon{T: "street"},
-					&acroform.FieldCommon{T: "zip"},
+					&acroform.FieldTx{FieldCommon: acroform.FieldCommon{T: "street"}},
+					&acroform.FieldTx{FieldCommon: acroform.FieldCommon{T: "zip"}},
 				},
 			},
 		},
@@ -319,10 +320,6 @@ var fieldTestCases = []struct {
 
 func fieldCmpOptions() []cmp.Option {
 	return []cmp.Option{
-		cmpopts.IgnoreUnexported(acroform.FieldCommon{}),
-		// Widget.Parent is transient encode-time state, set while a merged field
-		// is written; a decoded tree-owned widget has it nil
-		cmpopts.IgnoreFields(annotation.Widget{}, "Parent"),
 		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
 		// form.Equal handles nil-vs-empty and resource differences
@@ -339,7 +336,22 @@ func fieldCmpOptions() []cmp.Option {
 // form encode path (which names each root field the same way the form would),
 // then writes its widget annotations as their pages would, so a field can be
 // round-tripped on its own. It returns the reference naming f.
+// linkTree wires the parent links of a hand-assembled test fixture,
+// recursively, standing in for the wiring the builder functions do.
+func linkTree(f acroform.Field) {
+	for _, kid := range f.GetFieldCommon().Kids {
+		switch k := kid.(type) {
+		case acroform.Field:
+			k.GetFieldCommon().Parent = f
+			linkTree(k)
+		case *annotation.Widget:
+			k.Parent = f
+		}
+	}
+}
+
 func storeFieldTree(rm *pdf.ResourceManager, f acroform.Field) (pdf.Reference, error) {
+	linkTree(f)
 	form := &acroform.InteractiveForm{Fields: []acroform.Field{f}}
 	obj, err := form.Encode(rm)
 	if err != nil {
@@ -419,7 +431,7 @@ func fieldRoundTripTest(t *testing.T, version pdf.Version, want acroform.Field) 
 	defer r.Close()
 
 	x := pdf.NewExtractor(r)
-	got, err := pdf.ExtractorGet(x, nil, r.GetMeta().Trailer["Quir:E"], Field)
+	got, err := pdf.ExtractorGet(x, nil, r.GetMeta().Trailer["Quir:E"], field)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -475,7 +487,7 @@ func FuzzFieldRoundTrip(f *testing.F) {
 		defer r.Close()
 
 		x := pdf.NewExtractor(r)
-		field, err := pdf.ExtractorGet(x, nil, r.GetMeta().Trailer["Quir:E"], Field)
+		field, err := pdf.ExtractorGet(x, nil, r.GetMeta().Trailer["Quir:E"], field)
 		if err != nil {
 			t.Skip("malformed field")
 		}
@@ -526,7 +538,7 @@ func TestFieldExplicitZeroFlagsRoundTrip(t *testing.T) {
 	defer r.Close()
 
 	x := pdf.NewExtractor(r)
-	got, err := pdf.ExtractorGet(x, nil, r.GetMeta().Trailer["Quir:E"], Field)
+	got, err := pdf.ExtractorGet(x, nil, r.GetMeta().Trailer["Quir:E"], field)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -534,11 +546,11 @@ func TestFieldExplicitZeroFlagsRoundTrip(t *testing.T) {
 	if len(kids) != 1 {
 		t.Fatalf("expected one kid, got %d", len(kids))
 	}
-	child, ok := kids[0].(*acroform.FieldCommon)
+	child, ok := kids[0].(acroform.Field)
 	if !ok {
-		t.Fatalf("expected a *acroform.FieldCommon kid, got %T", kids[0])
+		t.Fatalf("expected a field kid, got %T", kids[0])
 	}
-	if _, set := child.Ff.Get(); !set {
+	if _, set := child.GetFieldCommon().Ff.Get(); !set {
 		t.Error("child Ff lost its explicit-present status after round trip")
 	}
 	if rff := acroform.ResolvedFf(child); rff != 0 {
@@ -550,7 +562,7 @@ func TestDecodeFieldNil(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
-	field, err := Field(x, nil, nil, false)
+	field, err := field(x, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -573,7 +585,7 @@ func TestDecodeFieldKidsSelfCycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	field, err := pdf.ExtractorGet(x, nil, ref, Field)
+	field, err := pdf.ExtractorGet(x, nil, ref, field)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -598,7 +610,7 @@ func TestDecodeFieldKidsMutualCycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	field, err := pdf.ExtractorGet(x, nil, refA, Field)
+	field, err := pdf.ExtractorGet(x, nil, refA, field)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -644,7 +656,7 @@ func TestDecodeFieldNameStripsPeriod(t *testing.T) {
 	defer r.Close()
 
 	x := pdf.NewExtractor(r)
-	field, err := pdf.ExtractorGet(x, nil, ref, Field)
+	field, err := pdf.ExtractorGet(x, nil, ref, field)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -654,7 +666,7 @@ func TestDecodeFieldNameStripsPeriod(t *testing.T) {
 
 	// the snapped name must re-encode without error
 	rm := pdf.NewResourceManager(w)
-	if _, err := acroform.FieldEntries(rm, field); err != nil {
+	if _, err := formhooks.FieldEntries(rm, field); err != nil {
 		t.Errorf("re-encode of snapped name failed: %v", err)
 	}
 }
@@ -713,7 +725,7 @@ func TestDecodeFieldAnonymousSubField(t *testing.T) {
 	defer r.Close()
 
 	x := pdf.NewExtractor(r)
-	field, err := pdf.ExtractorGet(x, nil, parent, Field)
+	field, err := pdf.ExtractorGet(x, nil, parent, field)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -758,7 +770,7 @@ func TestDecodeFieldKidsDeepChainBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	field, err := pdf.ExtractorGet(x, nil, refs[0], Field)
+	field, err := pdf.ExtractorGet(x, nil, refs[0], field)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -802,7 +814,7 @@ func TestDecodeFieldKidsWide(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	field, err := pdf.ExtractorGet(x, nil, rootRef, Field)
+	field, err := pdf.ExtractorGet(x, nil, rootRef, field)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -834,7 +846,7 @@ func TestDecodeChoiceOptSkipsNonStrings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	field, err := pdf.ExtractorGet(x, nil, ref, Field)
+	field, err := pdf.ExtractorGet(x, nil, ref, field)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -849,5 +861,193 @@ func TestDecodeChoiceOptSkipsNonStrings(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, ch.Opt); diff != "" {
 		t.Errorf("Opt mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// the Comb flag may be set only with a MaxLen and with the Multiline, Password
+// and FileSelect flags clear; decoding clears an invalid Comb flag so that the
+// field can always be written back.
+func TestDecodeCombSnap(t *testing.T) {
+	tests := []struct {
+		name       string
+		dict       pdf.Dict
+		wantComb   bool
+		wantMaxLen int
+	}{
+		{
+			name: "valid comb",
+			dict: pdf.Dict{
+				"FT":     pdf.Name("Tx"),
+				"T":      pdf.String("x"),
+				"Ff":     pdf.Integer(acroform.FieldComb),
+				"MaxLen": pdf.Integer(6),
+			},
+			wantComb:   true,
+			wantMaxLen: 6,
+		},
+		{
+			name: "zero MaxLen",
+			dict: pdf.Dict{
+				"FT":     pdf.Name("Tx"),
+				"T":      pdf.String("x"),
+				"Ff":     pdf.Integer(acroform.FieldComb),
+				"MaxLen": pdf.Integer(0),
+			},
+			wantComb: false,
+		},
+		{
+			name: "missing MaxLen",
+			dict: pdf.Dict{
+				"FT": pdf.Name("Tx"),
+				"T":  pdf.String("x"),
+				"Ff": pdf.Integer(acroform.FieldComb),
+			},
+			wantComb: false,
+		},
+		{
+			name: "conflicting Multiline",
+			dict: pdf.Dict{
+				"FT":     pdf.Name("Tx"),
+				"T":      pdf.String("x"),
+				"Ff":     pdf.Integer(acroform.FieldComb | acroform.FieldMultiline),
+				"MaxLen": pdf.Integer(6),
+			},
+			wantComb:   false,
+			wantMaxLen: 6,
+		},
+		{
+			name: "conflicting Password",
+			dict: pdf.Dict{
+				"FT":     pdf.Name("Tx"),
+				"T":      pdf.String("x"),
+				"Ff":     pdf.Integer(acroform.FieldComb | acroform.FieldPassword),
+				"MaxLen": pdf.Integer(6),
+			},
+			wantComb:   false,
+			wantMaxLen: 6,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			x := pdf.NewExtractor(w)
+			ref := w.Alloc()
+			if err := w.Put(ref, tc.dict); err != nil {
+				t.Fatal(err)
+			}
+
+			field, err := pdf.ExtractorGet(x, nil, ref, field)
+			if err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
+			tx, ok := field.(*acroform.FieldTx)
+			if !ok {
+				t.Fatalf("expected *acroform.FieldTx, got %T", field)
+			}
+
+			if got := acroform.ResolvedFf(tx)&acroform.FieldComb != 0; got != tc.wantComb {
+				t.Errorf("Comb flag = %t, want %t", got, tc.wantComb)
+			}
+			if tx.MaxLen != tc.wantMaxLen {
+				t.Errorf("MaxLen = %d, want %d", tx.MaxLen, tc.wantMaxLen)
+			}
+			if origFf, _ := pdf.GetInteger(w, tc.dict["Ff"]); acroform.ResolvedFf(tx)&^acroform.FieldComb != acroform.FieldFlags(origFf)&^acroform.FieldComb {
+				t.Error("flags other than Comb were changed")
+			}
+
+			// every decoded field must be writable
+			rm := pdf.NewResourceManager(w)
+			if _, err := formhooks.FieldEntries(rm, tx); err != nil {
+				t.Errorf("decoded field cannot be written back: %v", err)
+			}
+		})
+	}
+}
+
+// MaxLen is inheritable: a comb field whose MaxLen sits on an ancestor adopts
+// the inherited value on decode, keeping the field self-contained.
+func TestDecodeCombInheritedMaxLen(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	parentRef := w.Alloc()
+	kidRef := w.Alloc()
+	err := w.Put(parentRef, pdf.Dict{
+		"FT":     pdf.Name("Tx"),
+		"T":      pdf.String("p"),
+		"MaxLen": pdf.Integer(8),
+		"Kids":   pdf.Array{kidRef},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(kidRef, pdf.Dict{
+		"T":      pdf.String("c"),
+		"Ff":     pdf.Integer(acroform.FieldComb),
+		"Parent": parentRef,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	field, err := pdf.ExtractorGet(x, nil, parentRef, field)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	kids := field.GetFieldCommon().Kids
+	if len(kids) != 1 {
+		t.Fatalf("expected one kid, got %d", len(kids))
+	}
+	kid, ok := kids[0].(*acroform.FieldTx)
+	if !ok {
+		t.Fatalf("expected a *acroform.FieldTx kid, got %T", kids[0])
+	}
+	if acroform.ResolvedFf(kid)&acroform.FieldComb == 0 {
+		t.Error("Comb flag was cleared despite inherited MaxLen")
+	}
+	if kid.MaxLen != 8 {
+		t.Errorf("kid MaxLen = %d, want 8 (inherited)", kid.MaxLen)
+	}
+}
+
+// the field type is inheritable: a sub-field without its own /FT decodes as
+// the inherited concrete type, so its type-specific entries are preserved.
+func TestDecodeFieldInheritedType(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	parentRef := w.Alloc()
+	kidRef := w.Alloc()
+	err := w.Put(parentRef, pdf.Dict{
+		"FT":   pdf.Name("Tx"),
+		"T":    pdf.String("p"),
+		"Kids": pdf.Array{kidRef},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(kidRef, pdf.Dict{
+		"T":      pdf.String("c"),
+		"V":      pdf.String("hello"),
+		"Parent": parentRef,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	field, err := pdf.ExtractorGet(x, nil, parentRef, field)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	kids := field.GetFieldCommon().Kids
+	if len(kids) != 1 {
+		t.Fatalf("expected one kid, got %d", len(kids))
+	}
+	kid, ok := kids[0].(*acroform.FieldTx)
+	if !ok {
+		t.Fatalf("expected a *acroform.FieldTx kid, got %T", kids[0])
+	}
+	if v, ok := kid.V.(pdf.String); !ok || string(v) != "hello" {
+		t.Errorf("kid V = %v, want \"hello\"", kid.V)
 	}
 }

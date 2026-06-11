@@ -63,50 +63,6 @@ type SigFieldLock struct {
 
 var _ pdf.Embedder = (*SigFieldLock)(nil)
 
-// ExtractSigFieldLock reads a signature field lock dictionary from a PDF file.
-func ExtractSigFieldLock(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*SigFieldLock, error) {
-	dict, err := x.GetDict(path, obj)
-	if err != nil {
-		return nil, err
-	} else if dict == nil {
-		return nil, pdf.Error("missing signature field lock dictionary")
-	}
-
-	lock := &SigFieldLock{}
-
-	// Action; snap an unrecognised value to a safe default so the result stays
-	// writable
-	action, err := pdf.Optional(x.GetName(path, dict["Action"]))
-	if err != nil {
-		return nil, err
-	}
-	switch SigFieldLockAction(action) {
-	case SigFieldLockInclude:
-		lock.Action = SigFieldLockInclude
-	case SigFieldLockExclude:
-		lock.Action = SigFieldLockExclude
-	default:
-		lock.Action = SigFieldLockAll
-	}
-
-	// Fields applies only to Include / Exclude
-	if lock.Action != SigFieldLockAll {
-		if fields, err := readTextStringArray(x, path, dict["Fields"]); err != nil {
-			return nil, err
-		} else {
-			lock.Fields = fields
-		}
-	}
-
-	if p, err := pdf.Optional(x.GetInteger(path, dict["P"])); err != nil {
-		return nil, err
-	} else if p >= 1 && p <= 3 {
-		lock.P = int(p)
-	}
-
-	return lock, nil
-}
-
 // Embed writes the signature field lock dictionary to the PDF file and returns a
 // reference to it.
 //

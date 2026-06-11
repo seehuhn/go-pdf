@@ -3804,7 +3804,7 @@ types:
     required: false
     introduced: '1.0'
   - goName: Highlight
-    goType: LinkHighlight
+    goType: Highlight
     pdfKey: H
     pdfType: name
     required: false
@@ -5151,7 +5151,7 @@ types:
   pdfType: Annot
   pdfRepr: dict
   introduced: '1.2'
-  specTable: Table 166
+  specTable: Table 191
   fields:
   - goName:
     pdfKey: Type
@@ -5182,8 +5182,9 @@ types:
     - O
     - P
     - T
-    goType: pdf.Name
+    goType: Highlight
     purpose: highlighting mode used when the annotation's active area is clicked
+    notes: '"T" is normalised to "P" on read'
   - goName: MK
     pdfKey: MK
     pdfType: dictionary
@@ -5201,7 +5202,7 @@ types:
     pdfKey: A
     pdfType: dictionary
     required: false
-    introduced: '1.2'
+    introduced: '1.1'
     refTypes:
     - ActionGoTo
     - ActionGoToR
@@ -5317,7 +5318,7 @@ types:
     notes: Adobe Extension Level 3 for PaperMetaData
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2 12.5.6.19
   fileDependent: true
   writeMethod: (*Widget).Encode
   embeds:
@@ -5789,7 +5790,6 @@ types:
   specTable: Table 226
   fileDependent: true
   writeMethod: (*FieldCommon).Encode
-  readFunc: decode.Field
   fields:
   - goName: FT
     pdfKey: FT
@@ -5912,7 +5912,6 @@ types:
   specSection: 12.7.5.2.2 12.7.5.2.3 12.7.5.2.4
   specTable: Table 226 and Table 229 and Table 230
   fileDependent: true
-  readFunc: decode.Field
   writeMethod: (*FieldBtn).Encode
   embeds:
   - Field
@@ -5958,7 +5957,6 @@ types:
   specSection: 12.7.5.4
   specTable: Table 226 and Table 234
   fileDependent: true
-  readFunc: decode.Field
   writeMethod: (*FieldChoice).Encode
   embeds:
   - Field
@@ -6058,7 +6056,6 @@ types:
   specSection: 12.7.5.5
   specTable: Table 226 and Table 235
   fileDependent: true
-  readFunc: decode.Field
   writeMethod: (*FieldSig).Encode
   embeds:
   - Field
@@ -6118,7 +6115,6 @@ types:
   specSection: 12.7.5.3
   specTable: Table 226 and Table 228 and Table 231
   fileDependent: true
-  readFunc: decode.Field
   writeMethod: (*FieldTx).Encode
   embeds:
   - Field
@@ -7246,7 +7242,6 @@ types:
   specSection: 12.7.5.5
   specTable: Table 238
   fileDependent: false
-  readFunc: acroform.ExtractSigCertSeedValue
   writeMethod: (*SigCertSeedValue).Embed
   fields:
   - goName:
@@ -7359,7 +7354,6 @@ types:
   specSection: 12.7.5.5
   specTable: Table 236
   fileDependent: false
-  readFunc: acroform.ExtractSigFieldLock
   writeMethod: (*SigFieldLock).Embed
   fields:
   - goName:
@@ -7407,7 +7401,6 @@ types:
   specSection: 12.7.5.5
   specTable: Table 237
   fileDependent: false
-  readFunc: acroform.ExtractSigSeedValue
   writeMethod: (*SigSeedValue).Embed
   fields:
   - goName:

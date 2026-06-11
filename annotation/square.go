@@ -27,9 +27,9 @@ import (
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.8
 
-// Square represents an annotation that displays a rectangle on the page. When
-// opened, the annotation displays a pop-up window containing the text of the
-// associated note:
+// Square represents an annotation that displays a rectangle (!) on the page.
+// When opened, the annotation displays a pop-up window containing the text of
+// the associated note:
 //
 //   - The location of the rectangle is given by the Common.Rect field and
 //     optionally modified by the Margin field.

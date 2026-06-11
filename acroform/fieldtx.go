@@ -41,8 +41,9 @@ type FieldTx struct {
 	DV pdf.Object
 
 	// MaxLen is the maximum length of the field's text in characters. A value
-	// of zero indicates that no maximum is set. It is required when the
-	// [FieldComb] flag is set.
+	// of zero indicates that no maximum is set. The entry is inheritable; a
+	// field with the [FieldComb] flag set must have a MaxLen, either of its
+	// own or inherited from an ancestor.
 	//
 	// This corresponds to the /MaxLen entry.
 	MaxLen int
@@ -71,10 +72,15 @@ func (f *FieldTx) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if f.DV != nil {
 		dict["DV"] = f.DV
 	}
-	// the Comb flag lays text out into MaxLen cells, so MaxLen is required when
-	// it is set (the flag is inheritable; MaxLen is not)
-	if ResolvedFf(f)&FieldComb != 0 && f.MaxLen <= 0 {
-		return errors.New("text field with Comb flag requires MaxLen")
+	// the Comb flag requires a MaxLen (both are inheritable) and may not be
+	// combined with the Multiline, Password or FileSelect flags
+	if ff := ResolvedFf(f); ff&FieldComb != 0 {
+		if ff&(FieldMultiline|FieldPassword|FieldFileSelect) != 0 {
+			return errors.New("Comb flag conflicts with Multiline, Password or FileSelect")
+		}
+		if ResolvedMaxLen(f) <= 0 {
+			return errors.New("text field with Comb flag requires MaxLen")
+		}
 	}
 	if f.MaxLen > 0 {
 		dict["MaxLen"] = pdf.Integer(f.MaxLen)

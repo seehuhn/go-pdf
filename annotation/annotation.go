@@ -20,36 +20,15 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Annotation types used in PDF files on my laptop, sorted by frequency:
-//   4405388 "Link"
-//     41318 "Widget"
-//      1463 "Text"
-//       948 "FileAttachment"
-//       530 "Caret"
-//       287 "Highlight"
-//       186 "Popup"
-//       132 "Screen"
-//       117 "Line"
-//       108 "FreeText"
-//        53 "Underline"
-//        49 "RichMedia"
-//        49 "Stamp"
-//        38 "Square"
-//        27 "Movie"
-//        23 "Circle"
-//        20 "Squiggly"
-//        13 "StrikeOut"
-//        10 "Ink"
-//        10 "PolyLine"
-//         8 "Polygon"
-//         2 "3D"
-
 // Annotation represents a PDF annotation.
+//
+// Use [seehuhn.de/go/pdf/annotation/decode.Annotation] to decode annotations
+// from a PDF file.
 type Annotation interface {
 	pdf.Encoder
 
-	// AnnotationType returns the type of the annotation, e.g. "Text", "Link",
-	// "Widget", etc.
+	// AnnotationType returns the type of the annotation as defined in the PDF
+	// specification, e.g. "Text", "Link" or "Widget".
 	AnnotationType() pdf.Name
 
 	// GetCommon returns the common annotation fields.

@@ -160,3 +160,18 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Com
 
 	return nil
 }
+
+// decodeHighlight reads an annotation's /H entry, supplying the default for
+// a missing entry and normalising the deprecated "T" (toggle) mode to
+// [annotation.HighlightPush].
+func decodeHighlight(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) annotation.Highlight {
+	h, _ := x.GetName(path, obj)
+	switch h {
+	case "":
+		return annotation.HighlightInvert
+	case "T":
+		return annotation.HighlightPush
+	default:
+		return annotation.Highlight(h)
+	}
+}

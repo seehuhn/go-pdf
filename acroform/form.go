@@ -28,6 +28,9 @@ import (
 
 // InteractiveForm represents a document's interactive form, referenced from
 // the AcroForm entry in the document catalog.
+//
+// Use [seehuhn.de/go/pdf/annotation/decode.Form] to decode an interactive form
+// from a PDF file.
 type InteractiveForm struct {
 	// Fields are the document's root fields, those with no ancestors in the
 	// field hierarchy. Encoding the form writes each field, and the whole
@@ -132,6 +135,9 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// can call it again to obtain the same references
 	fields := make(pdf.Array, 0, len(f.Fields))
 	for _, fld := range f.Fields {
+		if fld.FieldParent() != nil {
+			return nil, errors.New("root field with a Parent link")
+		}
 		ref, err := fieldRef(rm, fld)
 		if err != nil {
 			return nil, err

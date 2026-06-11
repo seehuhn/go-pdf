@@ -119,7 +119,13 @@ func drawBeveledBorder(b *builder.Builder, rect pdf.Rectangle, borderWidth float
 	if !raised {
 		bottomRight, topLeft = light, dark
 	}
+	drawBevelBands(b, rect, borderWidth, topLeft, bottomRight)
+}
 
+// drawBevelBands fills the two mitred 3-D border bands of the given width
+// inside rect, the top-left band in topLeft and the bottom-right band in
+// bottomRight.
+func drawBevelBands(b *builder.Builder, rect pdf.Rectangle, borderWidth float64, topLeft, bottomRight color.Color) {
 	// bottom and right band
 	b.SetFillColor(bottomRight)
 	b.MoveTo(pdf.Round(rect.LLx, 2), pdf.Round(rect.LLy, 2))

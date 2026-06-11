@@ -300,7 +300,7 @@ func addToggleLink(page *document.Page, x, y, size float64, ref pdf.Native) {
 		Action: &action.SetOCGState{
 			State: pdf.Array{pdf.Name("Toggle"), ref},
 		},
-		Highlight: annotation.LinkHighlightNone,
+		Highlight: annotation.HighlightNone,
 	}
 	page.Page.Annots = append(page.Page.Annots, link)
 }

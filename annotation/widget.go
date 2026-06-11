@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/internal/formhooks"
 )
 
 // PDF 2.0 sections: 12.5.2 12.5.6.19
@@ -36,16 +37,15 @@ import (
 type Widget struct {
 	Common
 
-	// Highlight (optional) is the annotation's highlighting mode, the visual effect
-	// that is used when the mouse button is pressed or held down inside
-	// its active area. Valid values:
-	// - "N" (None): No highlighting
-	// - "I" (Invert): Invert the colors used to display the contents
-	// - "O" (Outline): Stroke the colors used to display the annotation border
-	// - "P" (Push): Display the annotation's down appearance
-	// - "T" (Toggle): Same as P (which is preferred)
-	// An empty value selects the Invert mode ("I").
-	Highlight pdf.Name
+	// Highlight is the annotation's highlighting mode.
+	// A highlighting mode other than [HighlightPush] overrides any down
+	// appearance defined for the annotation.
+	//
+	// When writing annotations, an empty name can be used as a shorthand
+	// for [HighlightInvert].
+	//
+	// This corresponds to the /H entry in the PDF annotation dictionary.
+	Highlight Highlight
 
 	// MK (optional) is an appearance characteristics dictionary that is
 	// used in constructing a dynamic appearance stream specifying the
@@ -71,17 +71,8 @@ type Widget struct {
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
 
-	// Parent (optional) is the form field this widget belongs to, or nil if the
-	// widget is not part of an interactive form. It is the back-edge of the
-	// field/widget hierarchy: the field's [acroform.FieldCommon.Kids] holds this
-	// widget, and this widget's Parent holds that field. It is set when the field
-	// tree is decoded (page decoding triggers this automatically) and is used on
-	// encode to write the widget's /Parent entry and, for a single-widget field
-	// merged into this widget, to fold in the field's own dictionary entries.
-	//
-	// Because it forms a cycle with [acroform.FieldCommon.Kids], round-trip
-	// comparisons must ignore it; the field tree is the authoritative
-	// representation.
+	// Parent (optional) is the form field this widget belongs to, or nil if
+	// the widget is not part of an interactive form.
 	Parent acroform.Field
 }
 
@@ -96,14 +87,9 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
-// IsFieldNode marks a widget annotation as a possible child in an AcroForm
-// field hierarchy, satisfying the acroform.Node interface.
-func (w *Widget) IsFieldNode() {}
-
-// SetFieldParent links this widget to the form field f as its parent. It is the
-// back-edge of the field/widget hierarchy (see [Widget.Parent]) and is set by
-// the field tree on encode and decode.
-func (w *Widget) SetFieldParent(f acroform.Field) { w.Parent = f }
+// FieldParent implements the acroform.Node interface; it returns
+// [Widget.Parent], the form field this widget is a child of.
+func (w *Widget) FieldParent() acroform.Field { return w.Parent }
 
 // AddWidget adds a widget annotation for the terminal field f at the given
 // rectangle and returns it. A terminal field may have several widgets, one per
@@ -112,7 +98,7 @@ func (w *Widget) SetFieldParent(f acroform.Field) { w.Parent = f }
 func AddWidget(f acroform.Field, rect pdf.Rectangle) *Widget {
 	w := &Widget{
 		Common:    Common{Rect: rect},
-		Highlight: "I",
+		Highlight: HighlightInvert,
 	}
 	w.Parent = f
 	c := f.GetFieldCommon()
@@ -138,10 +124,9 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Add widget-specific fields
-	// H (optional) - only write if not the default value "I"
-	if w.Highlight != "" && w.Highlight != "I" {
-		dict["H"] = w.Highlight
+	// H (optional)
+	if err := w.Highlight.encodeEntry(rm, dict, "widget annotation H entry"); err != nil {
+		return nil, err
 	}
 
 	// MK (optional)
@@ -225,7 +210,7 @@ func foldFieldIntoWidget(rm *pdf.ResourceManager, w *Widget, dict pdf.Dict) (pdf
 	}
 
 	// the single widget of a terminal field: fold the field's entries in
-	entries, err := acroform.FieldEntries(rm, f)
+	entries, err := formhooks.FieldEntries(rm, f)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +225,7 @@ func foldFieldIntoWidget(rm *pdf.ResourceManager, w *Widget, dict pdf.Dict) (pdf
 		}
 		dict[k] = v
 	}
-	if p := acroform.ParentOf(f); p != nil {
+	if p := f.FieldParent(); p != nil {
 		dict["Parent"] = rm.GetReference(p)
 	}
 	return dict, nil

@@ -14,22 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package oc
+package acroform
 
-// OrderItem represents an item in the Order array of an optional content
-// configuration dictionary. It is either a [*Group] or an [*OrderGroup].
-type OrderItem interface {
-	orderItem()
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/formhooks"
+)
+
+// register the field plumbing used by the annotation and annotation/decode
+// packages, so that it need not be part of the public API
+func init() {
+	formhooks.NewField = func(fieldType pdf.Name) any {
+		return newField(fieldType)
+	}
+	formhooks.FieldEntries = func(rm *pdf.ResourceManager, field any) (pdf.Dict, error) {
+		return fieldEntries(rm, field.(Field))
+	}
 }
-
-// OrderGroup represents a labeled nested array in the Order hierarchy.
-type OrderGroup struct {
-	// Label (optional) is a non-selectable text label for this sub-group.
-	Label string
-
-	// Children contains the nested groups and sub-groups.
-	Children []OrderItem
-}
-
-func (*Group) orderItem()      {}
-func (*OrderGroup) orderItem() {}

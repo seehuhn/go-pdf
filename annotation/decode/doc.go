@@ -23,12 +23,12 @@
 // Keeping the readers in a separate package lets them depend on both type
 // packages without an import cycle.
 //
-// There are three entry points, each to be invoked through [pdf.ExtractorGet]
+// There are two entry points, each to be invoked through [pdf.ExtractorGet]
 // so that indirect references are resolved and reference cycles are detected:
 //
 //   - [Annotation] reads any annotation, dispatching on its subtype.
-//   - [Field] reads a form field, returning the matching concrete type.
-//   - [Form] reads the document's interactive form dictionary.
+//   - [Form] reads the document's interactive form dictionary, including its
+//     field tree.
 //
 // The per-type decoders are unexported and reached through [Annotation]; this
 // keeps a single entry point that handles the merged field/widget case

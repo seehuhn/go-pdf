@@ -120,73 +120,6 @@ type SigCertSeedValue struct {
 
 var _ pdf.Embedder = (*SigCertSeedValue)(nil)
 
-// ExtractSigCertSeedValue reads a certificate seed value dictionary from a PDF
-// file.
-func ExtractSigCertSeedValue(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*SigCertSeedValue, error) {
-	dict, err := x.GetDict(path, obj)
-	if err != nil {
-		return nil, err
-	} else if dict == nil {
-		return nil, pdf.Error("missing certificate seed value dictionary")
-	}
-
-	cert := &SigCertSeedValue{SingleUse: isDirect}
-
-	if ff, err := pdf.Optional(x.GetInteger(path, dict["Ff"])); err != nil {
-		return nil, err
-	} else {
-		cert.Flags = SigCertSeedValueFlags(uint32(ff))
-	}
-
-	if cert.Subject, err = readByteStringArray(x, path, dict["Subject"]); err != nil {
-		return nil, err
-	}
-	if cert.Issuer, err = readByteStringArray(x, path, dict["Issuer"]); err != nil {
-		return nil, err
-	}
-	if cert.OID, err = readByteStringArray(x, path, dict["OID"]); err != nil {
-		return nil, err
-	}
-	if cert.SubjectDN, err = readSubjectDN(x, path, dict["SubjectDN"]); err != nil {
-		return nil, err
-	}
-	if cert.KeyUsage, err = readASCIIStringArray(x, path, dict["KeyUsage"]); err != nil {
-		return nil, err
-	}
-
-	if url, err := pdf.Optional(x.GetString(path, dict["URL"])); err != nil {
-		return nil, err
-	} else {
-		cert.URL = string(url)
-	}
-	if urlType, err := pdf.Optional(x.GetName(path, dict["URLType"])); err != nil {
-		return nil, err
-	} else {
-		cert.URLType = urlType
-	}
-
-	if oid, err := pdf.Optional(x.GetString(path, dict["SignaturePolicyOID"])); err != nil {
-		return nil, err
-	} else {
-		cert.SignaturePolicyOID = string(oid)
-	}
-	if hash, err := pdf.Optional(x.GetString(path, dict["SignaturePolicyHashValue"])); err != nil {
-		return nil, err
-	} else if len(hash) > 0 {
-		cert.SignaturePolicyHashValue = []byte(hash)
-	}
-	if alg, err := pdf.Optional(x.GetName(path, dict["SignaturePolicyHashAlgorithm"])); err != nil {
-		return nil, err
-	} else {
-		cert.SignaturePolicyHashAlgorithm = alg
-	}
-	if cert.SignaturePolicyCommitmentType, err = readASCIIStringArray(x, path, dict["SignaturePolicyCommitmentType"]); err != nil {
-		return nil, err
-	}
-
-	return cert, nil
-}
-
 // Embed writes the certificate seed value dictionary to the PDF file.
 //
 // This implements the [pdf.Embedder] interface.
@@ -264,34 +197,6 @@ func (c *SigCertSeedValue) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	return ref, nil
-}
-
-// readSubjectDN reads the /SubjectDN array of attribute dictionaries.
-func readSubjectDN(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]map[pdf.Name]string, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]map[pdf.Name]string, 0, len(arr))
-	for _, el := range arr {
-		d, err := pdf.Optional(x.GetDict(path, el))
-		if err != nil {
-			return nil, err
-		}
-		if len(d) == 0 {
-			continue
-		}
-		attrs := make(map[pdf.Name]string, len(d))
-		for k, v := range d {
-			if s, err := pdf.Optional(pdf.GetTextString(x.R, v)); err != nil {
-				return nil, err
-			} else {
-				attrs[k] = string(s)
-			}
-		}
-		out = append(out, attrs)
-	}
-	return out, nil
 }
 
 // writeSubjectDN encodes the /SubjectDN array of attribute dictionaries.

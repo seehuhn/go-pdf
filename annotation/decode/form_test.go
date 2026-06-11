@@ -91,6 +91,10 @@ var formTestCases = []struct {
 func formRoundTripTest(t *testing.T, version pdf.Version, want *acroform.InteractiveForm) {
 	t.Helper()
 
+	for _, root := range want.Fields {
+		linkTree(root)
+	}
+
 	w, buf := memfile.NewPDFWriter(version, nil)
 
 	if err := memfile.AddBlankPage(w); err != nil {

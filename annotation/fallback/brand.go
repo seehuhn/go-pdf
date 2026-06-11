@@ -27,6 +27,10 @@ var (
 	quireInk  = color.DeviceRGB{0.102, 0.094, 0.078} // --ink   #1a1814
 	quireInk2 = color.DeviceRGB{0.227, 0.216, 0.184} // --ink-2 #3a372f
 	quireInk3 = color.DeviceRGB{0.427, 0.408, 0.345} // --ink-3 #6d6858
+	quireInk4 = color.DeviceRGB{0.612, 0.588, 0.518} // --ink-4 #9c9684
+
+	// bevel highlight (the design system uses pure white here)
+	quireWhite = color.DeviceRGB{1, 1, 1}
 
 	// slate (cool neutrals — app chrome on warm paper)
 	quireSlate1 = color.DeviceRGB{0.961, 0.961, 0.969} // --slate-1 #f5f5f7

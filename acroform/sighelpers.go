@@ -18,9 +18,8 @@ package acroform
 
 import "seehuhn.de/go/pdf"
 
-// shared array read/write helpers for the signature lock and seed value
-// dictionaries. each writer omits the key for an empty slice; each reader skips
-// malformed elements.
+// shared array write helpers for the signature lock and seed value
+// dictionaries. each writer omits the key for an empty slice.
 
 func writeNameArray(dict pdf.Dict, key pdf.Name, vals []pdf.Name) {
 	if len(vals) == 0 {
@@ -31,22 +30,6 @@ func writeNameArray(dict pdf.Dict, key pdf.Name, vals []pdf.Name) {
 		arr[i] = v
 	}
 	dict[key] = arr
-}
-
-func readNameArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]pdf.Name, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]pdf.Name, 0, len(arr))
-	for _, el := range arr {
-		if name, err := pdf.Optional(x.GetName(path, el)); err != nil {
-			return nil, err
-		} else if name != "" {
-			out = append(out, name)
-		}
-	}
-	return out, nil
 }
 
 func writeTextStringArray(dict pdf.Dict, key pdf.Name, vals []string) {
@@ -60,22 +43,6 @@ func writeTextStringArray(dict pdf.Dict, key pdf.Name, vals []string) {
 	dict[key] = arr
 }
 
-func readTextStringArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]string, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]string, 0, len(arr))
-	for _, el := range arr {
-		if s, err := pdf.Optional(pdf.GetTextString(x.R, el)); err != nil {
-			return nil, err
-		} else {
-			out = append(out, string(s))
-		}
-	}
-	return out, nil
-}
-
 func writeASCIIStringArray(dict pdf.Dict, key pdf.Name, vals []string) {
 	if len(vals) == 0 {
 		return
@@ -87,22 +54,6 @@ func writeASCIIStringArray(dict pdf.Dict, key pdf.Name, vals []string) {
 	dict[key] = arr
 }
 
-func readASCIIStringArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]string, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]string, 0, len(arr))
-	for _, el := range arr {
-		if s, err := pdf.Optional(x.GetString(path, el)); err != nil {
-			return nil, err
-		} else {
-			out = append(out, string(s))
-		}
-	}
-	return out, nil
-}
-
 func writeByteStringArray(dict pdf.Dict, key pdf.Name, vals [][]byte) {
 	if len(vals) == 0 {
 		return
@@ -112,20 +63,4 @@ func writeByteStringArray(dict pdf.Dict, key pdf.Name, vals [][]byte) {
 		arr[i] = pdf.String(b)
 	}
 	dict[key] = arr
-}
-
-func readByteStringArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([][]byte, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([][]byte, 0, len(arr))
-	for _, el := range arr {
-		if s, err := pdf.Optional(x.GetString(path, el)); err != nil {
-			return nil, err
-		} else {
-			out = append(out, []byte(s))
-		}
-	}
-	return out, nil
 }

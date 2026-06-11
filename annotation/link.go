@@ -53,10 +53,10 @@ type Link struct {
 	// Highlight is the annotation's highlighting mode.
 	//
 	// When writing annotations, an empty name can be used as a shorthand
-	// [LinkHighlightInvert].
+	// for [HighlightInvert].
 	//
 	// This corresponds to the /H entry in the PDF annotation dictionary.
-	Highlight LinkHighlight
+	Highlight Highlight
 
 	// QuadPoints (optional) specifies the coordinates of quadrilaterals that
 	// comprise the region where the link should be activated. Each
@@ -131,13 +131,8 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Dest"] = encoded
 	}
 
-	if l.Highlight != "" {
-		if err := pdf.CheckVersion(rm.Out, "link annotation H entry", pdf.V1_2); err != nil {
-			return nil, err
-		}
-		if l.Highlight != LinkHighlightInvert {
-			dict["H"] = pdf.Name(l.Highlight)
-		}
+	if err := l.Highlight.encodeEntry(rm, dict, "link annotation H entry"); err != nil {
+		return nil, err
 	}
 
 	if l.Backup != 0 {
@@ -173,15 +168,3 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	return dict, nil
 }
-
-// LinkHighlight represents a highlighting mode for a link annotation.
-// The valid names are provided as constants.
-type LinkHighlight pdf.Name
-
-// Valid values for the [LinkHighlight] type.
-const (
-	LinkHighlightNone    LinkHighlight = "N" // no highlighting
-	LinkHighlightInvert  LinkHighlight = "I" // invert the annotation rectangle
-	LinkHighlightOutline LinkHighlight = "O" // invert the border
-	LinkHighlightPush    LinkHighlight = "P" // push-down effect
-)

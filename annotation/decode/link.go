@@ -48,11 +48,7 @@ func decodeLink(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotat
 		link.Destination = dest
 	}
 
-	if h, _ := x.GetName(path, dict["H"]); h != "" {
-		link.Highlight = annotation.LinkHighlight(h)
-	} else {
-		link.Highlight = annotation.LinkHighlightInvert // default value
-	}
+	link.Highlight = decodeHighlight(x, path, dict["H"])
 
 	if pa, ok := dict["PA"].(pdf.Reference); ok {
 		link.Backup = pa

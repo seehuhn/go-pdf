@@ -23,13 +23,15 @@
 // (choice), or [FieldSig] (signature) for a terminal field with its own type,
 // or a [FieldCommon] for a non-terminal field or one whose type is inherited.
 //
-// Build a field tree with the builder methods on [InteractiveForm] and
-// [FieldCommon], which wire the parent links automatically. A terminal field's
+// Build a field tree with the builder methods on [InteractiveForm] for root
+// fields and the [NewField] family of functions for sub-fields; both wire the
+// parent links automatically. A terminal field's
 // on-page appearance is a widget annotation, "seehuhn.de/go/pdf/annotation".Widget;
 // add one with that package's AddWidget function. After assembling a field's
-// children by hand (rather than with the builders), call [LinkKids] so that the
-// inheritance helpers (see [ResolvedFT]) and [FieldCommon.FullyQualifiedName]
-// resolve correctly.
+// children by hand (rather than with the builders), set each child's parent
+// link ([FieldCommon.Parent], or the Parent field of a widget child) so that
+// the inheritance helpers (see [ResolvedFT]) and
+// [FieldCommon.FullyQualifiedName] resolve correctly.
 //
 // Forms and fields are read with the "seehuhn.de/go/pdf/annotation/decode"
 // package.

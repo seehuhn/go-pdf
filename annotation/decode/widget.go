@@ -28,7 +28,6 @@ import (
 // entries that pertain to a widget annotation, not to a form field). It never
 // sets Parent: the field tree owns that linkage.
 func decodeWidgetBody(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Widget, error) {
-	r := x.R
 	widget := &annotation.Widget{}
 
 	// Extract common annotation fields
@@ -36,13 +35,8 @@ func decodeWidgetBody(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*a
 		return nil, err
 	}
 
-	// Extract widget-specific fields
-	// H (optional) - default to "I" if not specified
-	if h, err := pdf.GetName(r, dict["H"]); err == nil && h != "" {
-		widget.Highlight = h
-	} else {
-		widget.Highlight = "I" // PDF default value
-	}
+	// H (optional)
+	widget.Highlight = decodeHighlight(x, path, dict["H"])
 
 	// MK (optional)
 	if mk, err := pdf.ExtractorGetOptional(x, path, dict["MK"], appearance.ExtractCharacteristics); err != nil {

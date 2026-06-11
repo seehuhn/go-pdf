@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -97,7 +98,7 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	switch x := f.(type) {
 	case *acroform.FieldTx:
 		p.Value = valueText(acroform.ResolvedV(f))
-		p.MaxLen = x.MaxLen
+		p.MaxLen = acroform.ResolvedMaxLen(f)
 	case *acroform.FieldChoice:
 		p.Options = make([]string, len(x.Opt))
 		for i, o := range x.Opt {
@@ -160,7 +161,7 @@ func buttonValue(f acroform.Field) pdf.Name {
 // from an ancestor if the field itself does not set one (the Opt entry is
 // inheritable).
 func resolvedOpt(f acroform.Field) []string {
-	for n := f; n != nil; n = acroform.ParentOf(n) {
+	for n := f; n != nil; n = n.FieldParent() {
 		if x, ok := n.(*acroform.FieldBtn); ok && len(x.Opt) > 0 {
 			return x.Opt
 		}
@@ -339,13 +340,19 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 		b.LineTo(width, lw/2)
 		b.Stroke()
 	case "B", "I": // beveled (raised) or inset (sunken)
-		// the 3-D shading is derived from the field's surface (background)
-		// colour; fall back to the border colour when there is no background
-		surface := mk.BackgroundColor
-		if surface == nil {
-			surface = mk.BorderColor
+		// a border-colour outline with the 3-D bands inside it; the band
+		// shades are fixed (white highlight, ink-4 shadow), light from the
+		// top left for a raised border, from the bottom right for a sunken one
+		topLeft, bottomRight := quireWhite, quireInk4
+		if style == "I" {
+			topLeft, bottomRight = bottomRight, topLeft
 		}
-		drawBeveledBorder(b, pdf.Rectangle{URx: width, URy: height}, lw, surface, style == "B")
+		inner := pdf.Rectangle{LLx: lw, LLy: lw, URx: width - lw, URy: height - lw}
+		drawBevelBands(b, inner, lw, topLeft, bottomRight)
+		b.SetLineWidth(lw)
+		b.SetStrokeColor(mk.BorderColor)
+		b.Rectangle(lw/2, lw/2, width-lw, height-lw)
+		b.Stroke()
 	default: // "S" solid, "D" dashed
 		b.SetLineWidth(lw)
 		b.SetStrokeColor(mk.BorderColor)
@@ -559,38 +566,56 @@ func (s *Style) drawMultiline(b *builder.Builder, width, height, lw, pad float64
 }
 
 // drawComb lays the value out into MaxLen equal cells separated by hairline
-// rules, one character per cell.
+// rules, one character per cell. A value shorter than MaxLen occupies the
+// left, middle or right cells, following the field's justification.
 func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *widgetField) {
 	n := fld.MaxLen
-	if n <= 0 {
-		return
-	}
 	cellW := (width - 2*lw) / float64(n)
 
 	b.SetLineWidth(0.6)
-	b.SetStrokeColor(quireInk3)
+	b.SetStrokeColor(quireInk)
 	for i := 1; i < n; i++ {
-		x := lw + cellW*float64(i)
-		b.MoveTo(x, lw)
-		b.LineTo(x, height-lw)
-		b.Stroke()
+		x := pdf.Round(lw+cellW*float64(i), 2)
+		b.MoveTo(x, pdf.Round(lw, 2))
+		b.LineTo(x, pdf.Round(height-lw, 2))
+	}
+	b.Stroke()
+
+	runes := []rune(fld.Value)
+	k := min(len(runes), n)
+	if k == 0 {
+		return
+	}
+	start := 0
+	switch fld.Align {
+	case pdf.TextAlignCenter:
+		start = (n - k) / 2
+	case pdf.TextAlignRight:
+		start = n - k
 	}
 
 	size, col := parseDA(fld.DefaultAppearance)
 	if size == 0 {
 		size = autoSize(height - 2*lw)
 	}
-	baseline := height/2 - size*0.33
-	runes := []rune(fld.Value)
-	for i := 0; i < n && i < len(runes); i++ {
-		cellLeft := lw + cellW*float64(i)
-		b.TextBegin()
-		b.TextSetFont(s.ContentFont, size)
-		b.SetFillColor(col)
-		b.TextFirstLine(cellLeft, baseline)
+	baseline := pdf.Round(height/2-size*0.33, 2)
+	b.TextBegin()
+	b.TextSetFont(s.ContentFont, size)
+	b.SetFillColor(col)
+	prev := 0.0
+	for i := range k {
+		// cell positions rounded individually, so the relative moves do
+		// not accumulate rounding drift
+		x := pdf.Round(lw+cellW*float64(start+i), 2)
+		if i == 0 {
+			b.TextFirstLine(x, baseline)
+		} else {
+			b.TextFirstLine(pdf.Round(x-prev, 2), 0)
+		}
+		prev = x
 		b.TextShowAligned(string(runes[i]), cellW, 0.5)
-		b.TextEnd()
 	}
+	b.TextEnd()
 }
 
 // drawChoiceField draws a list box or, when the combo flag is set, a combo box.
@@ -616,7 +641,7 @@ func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fl
 	divX := width - chevronW
 
 	b.SetLineWidth(0.6)
-	b.SetStrokeColor(quireInk3)
+	b.SetStrokeColor(quireInk)
 	b.MoveTo(divX, lw)
 	b.LineTo(divX, height-lw)
 	b.Stroke()
@@ -624,12 +649,16 @@ func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fl
 	cx := divX + chevronW/2
 	cy := height / 2
 	d := min(chevronW, height) * 0.18
-	b.SetLineWidth(1)
-	b.SetStrokeColor(quireInk2)
+	b.PushGraphicsState()
+	b.SetLineWidth(1.2)
+	b.SetLineCap(graphics.LineCapRound)
+	b.SetLineJoin(graphics.LineJoinRound)
+	b.SetStrokeColor(quireInk)
 	b.MoveTo(cx-d, cy+d/2)
 	b.LineTo(cx, cy-d/2)
 	b.LineTo(cx+d, cy+d/2)
 	b.Stroke()
+	b.PopGraphicsState()
 
 	if fld.Value != "" {
 		size, col := parseDA(fld.DefaultAppearance)
