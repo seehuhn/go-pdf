@@ -46,29 +46,6 @@ func (p *Popup) AnnotationType() pdf.Name {
 	return "Popup"
 }
 
-func decodePopup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Popup, error) {
-	r := x.R
-	popup := &Popup{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &popup.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract popup-specific fields
-	// Parent (optional)
-	if parent, ok := dict["Parent"].(pdf.Reference); ok {
-		popup.Parent = parent
-	}
-
-	// Open (optional)
-	if open, err := pdf.GetBoolean(r, dict["Open"]); err == nil {
-		popup.Open = bool(open)
-	}
-
-	return popup, nil
-}
-
 func (p *Popup) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "popup annotation", pdf.V1_3); err != nil {
 		return nil, err

@@ -26,6 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/decode"
 	"seehuhn.de/go/pdf/cmd/internal/buildinfo"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -113,7 +114,7 @@ func processFile(fname string) error {
 		for _, obj := range annotsArray {
 			ref, _ := obj.(pdf.Reference)
 
-			a, err := pdf.ExtractorGet(x, nil, obj, annotation.Decode)
+			a, err := pdf.ExtractorGet(x, nil, obj, decode.Annotation)
 			if err != nil {
 				continue
 			}

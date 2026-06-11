@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/decode"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -771,7 +772,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 			if !ok {
 				continue
 			}
-			annot, err := pdf.ExtractorGet(x, path, item, annotation.Decode)
+			annot, err := pdf.ExtractorGet(x, path, item, decode.Annotation)
 			if err != nil {
 				// permissive: skip invalid annotations
 				continue
@@ -808,7 +809,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 		// malformed form must not break page decoding.
 		if hasWidget {
 			if m := x.R.GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
-				_, _ = pdf.ExtractorGetExclusive(x, nil, m.Catalog.AcroForm, annotation.DecodeInteractiveForm)
+				_, _ = pdf.ExtractorGetExclusive(x, nil, m.Catalog.AcroForm, decode.Form)
 			}
 		}
 	}

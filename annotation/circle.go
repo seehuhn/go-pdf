@@ -92,59 +92,6 @@ func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }
 
-func decodeCircle(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Circle, error) {
-	r := x.R
-	circle := &Circle{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &circle.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &circle.Markup); err != nil {
-		return nil, err
-	}
-
-	// Extract circle-specific fields
-	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
-		return nil, err
-	} else {
-		circle.BorderStyle = bs
-		if bs != nil {
-			// per PDF spec, Border is ignored when BS is present
-			circle.Common.Border = nil
-		}
-
-		// BE (optional)
-		if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], ExtractBorderEffect); err != nil {
-			return nil, err
-		} else {
-			circle.BorderEffect = be
-		}
-	}
-
-	// IC (optional)
-	if ic, err := pdf.Optional(colorenc.Extract(r, dict["IC"])); err != nil {
-		return nil, err
-	} else {
-		circle.FillColor = ic
-	}
-
-	// RD (optional)
-	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		for i := range rd {
-			rd[i] = max(rd[i], 0)
-		}
-		if rd[0]+rd[2] < circle.Rect.Dx() && rd[1]+rd[3] < circle.Rect.Dy() {
-			circle.Margin = rd
-		}
-	}
-
-	return circle, nil
-}
-
 func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Circle"),

@@ -59,54 +59,6 @@ func (m *Movie) AnnotationType() pdf.Name {
 	return "Movie"
 }
 
-func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Movie, error) {
-	r := x.R
-	annot := &Movie{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &annot.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// T (optional)
-	if t, err := pdf.Optional(pdf.GetTextString(r, dict["T"])); err != nil {
-		return nil, err
-	} else if t != "" {
-		annot.Title = string(t)
-	}
-
-	// Movie (required)
-	if m, err := pdf.ExtractorGetOptional(x, path, dict["Movie"], movie.Extract); err != nil {
-		return nil, err
-	} else {
-		annot.Movie = m
-	}
-
-	// A (optional) — bool, dict, or absent (PDF default true)
-	if aObj, ok := dict["A"]; ok {
-		resolved, _ := pdf.Resolve(r, aObj)
-		switch v := resolved.(type) {
-		case pdf.Boolean:
-			if bool(v) {
-				annot.Activation = movie.DefaultActivation
-			}
-			// false → leave Activation nil (do not play)
-		default:
-			if act, err := pdf.ExtractorGetOptional(x, path, aObj, movie.ExtractActivation); err != nil {
-				return nil, err
-			} else if act != nil {
-				annot.Activation = act
-			} else {
-				annot.Activation = movie.DefaultActivation
-			}
-		}
-	} else {
-		annot.Activation = movie.DefaultActivation
-	}
-
-	return annot, nil
-}
-
 func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if m.Movie == nil {
 		return nil, errors.New("movie annotation must have a Movie")

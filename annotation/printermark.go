@@ -44,24 +44,6 @@ func (p *PrinterMark) AnnotationType() pdf.Name {
 	return "PrinterMark"
 }
 
-func decodePrinterMark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*PrinterMark, error) {
-	r := x.R
-	printerMark := &PrinterMark{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &printerMark.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract printer's mark-specific fields
-	// MN (optional)
-	if mn, err := pdf.GetName(r, dict["MN"]); err == nil && mn != "" {
-		printerMark.MN = mn
-	}
-
-	return printerMark, nil
-}
-
 func (p *PrinterMark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "printer's mark annotation", pdf.V1_4); err != nil {
 		return nil, err

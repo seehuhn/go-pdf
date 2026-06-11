@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/decode"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -585,7 +586,7 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 			if len(p2.Annots) != 1 {
 				t.Fatalf("got %d annotations, want 1", len(p2.Annots))
 			}
-			a, err := pdf.ExtractorGet(x, nil, annotRef, annotation.Decode)
+			a, err := pdf.ExtractorGet(x, nil, annotRef, decode.Annotation)
 			if err != nil {
 				t.Fatalf("failed to get annotation by reference: %v", err)
 			}
@@ -696,7 +697,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 	type hasMarkup interface {
 		GetMarkup() *annotation.Markup
 	}
-	reply, err := pdf.ExtractorGet(x, nil, replyRef, annotation.Decode)
+	reply, err := pdf.ExtractorGet(x, nil, replyRef, decode.Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -705,7 +706,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 			t.Errorf("on-page reply: InReplyTo = %v, want %v", irt, textRef)
 		}
 	}
-	orphan, err := pdf.ExtractorGet(x, nil, orphanRef, annotation.Decode)
+	orphan, err := pdf.ExtractorGet(x, nil, orphanRef, decode.Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}

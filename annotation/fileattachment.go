@@ -55,41 +55,6 @@ func (f *FileAttachment) AnnotationType() pdf.Name {
 	return "FileAttachment"
 }
 
-func decodeFileAttachment(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*FileAttachment, error) {
-	r := x.R
-	fileAttachment := &FileAttachment{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &fileAttachment.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &fileAttachment.Markup); err != nil {
-		return nil, err
-	}
-
-	// Extract file attachment-specific fields
-	// FS (required)
-	if fs, err := pdf.ExtractorGetOptional(x, path, dict["FS"], file.ExtractSpecification); err != nil {
-		return nil, err
-	} else if fs == nil {
-		return nil, pdf.Error("file attachment annotation requires FS entry")
-	} else {
-		fileAttachment.FS = fs
-	}
-
-	if icon, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
-		return nil, err
-	} else if icon != "" {
-		fileAttachment.Icon = FileAttachmentIcon(icon)
-	} else {
-		fileAttachment.Icon = FileAttachmentIconPushPin
-	}
-
-	return fileAttachment, nil
-}
-
 func (f *FileAttachment) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "file attachment annotation", pdf.V1_3); err != nil {
 		return nil, err

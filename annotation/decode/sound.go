@@ -1,0 +1,54 @@
+// seehuhn.de/go/pdf - a library for reading and writing PDF files
+// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+package decode
+
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/sound"
+)
+
+func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Sound, error) {
+	r := x.R
+	a := &annotation.Sound{}
+
+	// Extract common annotation fields
+	if err := decodeCommon(x, path, &a.Common, dict); err != nil {
+		return nil, err
+	}
+
+	// Extract markup annotation fields
+	if err := decodeMarkup(x, path, dict, &a.Markup); err != nil {
+		return nil, err
+	}
+
+	// Sound (required)
+	s, err := pdf.ExtractorGet(x, path, dict["Sound"], sound.Extract)
+	if err != nil {
+		return nil, err
+	}
+	a.Sound = s
+
+	// Name (optional) - default to "Speaker" if not specified
+	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
+		a.Icon = annotation.SoundIcon(name)
+	} else {
+		a.Icon = annotation.SoundIconSpeaker
+	}
+
+	return a, nil
+}

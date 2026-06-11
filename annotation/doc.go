@@ -22,7 +22,8 @@
 // annotation as an indirect object to the PDF, and add its reference to the
 // page dictionary's "Annots" array. When reading, annotations for a page can
 // be found in the "Annots" entry of the page dictionary and can be decoded
-// using the [Decode] function.
+// using the Annotation function in the "seehuhn.de/go/pdf/annotation/decode"
+// package.
 //
 // There are several classes of annotations. Markup annotations correspond to
 // comments and other markings a reviewer or editor might add to a manuscript.
@@ -57,7 +58,8 @@
 //   - [Popup]: the pop-up window for text associated with markup annotations
 //   - [RichMedia]: (PDF 2.0) embed rich media content including Flash and video
 //   - [Screen]: define a page region for playing media clips
-//   - [Widget]: an interactive form field
+//   - [Widget]: the on-page appearance of an interactive form field (see the
+//     "seehuhn.de/go/pdf/acroform" package)
 //
 // Finally, the PDF specification defines a few annotations to support
 // document preparation and production workflows:

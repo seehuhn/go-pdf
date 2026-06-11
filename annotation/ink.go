@@ -63,65 +63,6 @@ func (i *Ink) AnnotationType() pdf.Name {
 	return "Ink"
 }
 
-func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Ink, error) {
-	r := x.R
-	ink := &Ink{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &ink.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &ink.Markup); err != nil {
-		return nil, err
-	}
-
-	// InkList (required)
-	inkList, err := x.GetArray(path, dict["InkList"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "InkList")
-	}
-	if len(inkList) == 0 {
-		return nil, pdf.Error("ink annotation requires InkList")
-	}
-	paths := make([][]vec.Vec2, len(inkList))
-	for i, pathEntry := range inkList {
-		coords, err := pdf.Optional(pdf.GetFloatArray(r, pathEntry))
-		if err != nil {
-			return nil, err
-		}
-		// pair consecutive floats; silently drop an odd trailing coordinate
-		n := len(coords) / 2
-		pts := make([]vec.Vec2, n)
-		for j := range n {
-			pts[j] = vec.Vec2{X: coords[2*j], Y: coords[2*j+1]}
-		}
-		paths[i] = pts
-	}
-	ink.InkList = paths
-
-	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
-		return nil, err
-	} else {
-		ink.BorderStyle = bs
-		if bs != nil {
-			// per PDF spec, Border is ignored when BS is present
-			ink.Common.Border = nil
-		}
-	}
-
-	// Path (optional; PDF 2.0)
-	if p, err := decodePath(x, path, dict["Path"]); err != nil {
-		return nil, err
-	} else {
-		ink.Path = p
-	}
-
-	return ink, nil
-}
-
 func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
 		return nil, err

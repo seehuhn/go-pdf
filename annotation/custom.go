@@ -46,54 +46,6 @@ func (c *Custom) AnnotationType() pdf.Name {
 	return c.Type
 }
 
-func decodeCustom(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Custom, error) {
-	r := x.R
-	subtype, err := pdf.GetName(r, dict["Subtype"])
-	if err != nil {
-		return nil, err
-	} else if subtype == "" {
-		return nil, pdf.Error("missing annotation subtype")
-	}
-
-	c := &Custom{
-		Type: subtype,
-		Data: dict,
-	}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &c.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Remove the entries for c.Common from the Data dict.
-	all := []pdf.Name{
-		"Type",
-		"Subtype",
-		"Rect",
-		"Contents",
-		"P",
-		"NM",
-		"M",
-		"F",
-		"AP",
-		"AS",
-		"Border",
-		"C",
-		"StructParent",
-		"OC",
-		"AF",
-		"ca",
-		"CA",
-		"BM",
-		"Lang",
-	}
-	for _, key := range all {
-		delete(c.Data, key)
-	}
-
-	return c, nil
-}
-
 func (c *Custom) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if c.Type == "" {
 		return nil, errors.New("missing annotation subtype")

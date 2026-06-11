@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
+	"strings"
 	"sync"
 
 	"seehuhn.de/go/pdf/internal/limits"
@@ -266,8 +268,31 @@ func (rm *ResourceManager) Close() error {
 		}
 	}
 
+	// every reference handed out by GetReference must eventually be written by
+	// Store; a leftover reservation is a reference to an object that was never
+	// written, i.e. a dangling reference in the output file
+	if len(rm.reserved) > 0 {
+		return fmt.Errorf("reference reserved but never written: %s", reservedTypeList(rm.reserved))
+	}
+
 	rm.isClosed = true
 	return nil
+}
+
+// reservedTypeList returns the distinct Go types of the encoders still holding
+// a reserved-but-unwritten reference, sorted for a deterministic message.
+func reservedTypeList(reserved map[any]bool) string {
+	seen := make(map[string]bool)
+	var names []string
+	for enc := range reserved {
+		name := fmt.Sprintf("%T", enc)
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 // ErrCycle reports that a chain of indirect references loops back on itself.

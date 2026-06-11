@@ -150,7 +150,9 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 	case *annotation.Screen:
 		normal = s.addScreenAppearance(a)
 	case *annotation.Widget:
-		normal = s.addWidgetAppearance(a)
+		// widgets build their own appearance dictionary (check boxes and radio
+		// buttons need an on/off map, not a single normal stream)
+		return s.addWidgetAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
 	}

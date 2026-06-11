@@ -35,22 +35,6 @@ func (p *Projection) AnnotationType() pdf.Name {
 	return "Projection"
 }
 
-func decodeProjection(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Projection, error) {
-	projection := &Projection{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &projection.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &projection.Markup); err != nil {
-		return nil, err
-	}
-
-	return projection, nil
-}
-
 func (p *Projection) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "projection annotation", pdf.V2_0); err != nil {
 		return nil, err

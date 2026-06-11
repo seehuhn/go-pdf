@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/document"
 )
@@ -36,11 +37,11 @@ func makeFormPDF(t *testing.T, path, fieldName string) {
 	w := &annotation.Widget{
 		Common: annotation.Common{Rect: pdf.Rectangle{LLx: 100, LLy: 700, URx: 300, URy: 720}},
 	}
-	f := &annotation.FieldTx{
-		FieldCommon: annotation.FieldCommon{T: fieldName, Kids: []annotation.Node{w}},
+	f := &acroform.FieldTx{
+		FieldCommon: acroform.FieldCommon{T: fieldName, Kids: []acroform.Node{w}},
 	}
 	page.Page.Annots = append(page.Page.Annots, w)
-	form := &annotation.InteractiveForm{Fields: []annotation.Field{f}}
+	form := &acroform.InteractiveForm{Fields: []acroform.Field{f}}
 	formRef, err := page.RM.Store(form)
 	if err != nil {
 		t.Fatal(err)

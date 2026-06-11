@@ -171,64 +171,6 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 	return nil
 }
 
-// decodeMarkup extracts fields common to all markup annotations from a PDF dictionary.
-func decodeMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, markup *Markup) error {
-	// T (optional)
-	if t, err := pdf.Optional(pdf.GetTextString(x.R, dict["T"])); err != nil {
-		return err
-	} else {
-		markup.User = string(t)
-	}
-
-	// Popup (optional)
-	if popup, ok := dict["Popup"].(pdf.Reference); ok {
-		markup.Popup = popup
-	}
-
-	// RC (optional)
-	if rc := dict["RC"]; rc != nil {
-		markup.RC = rc
-	}
-
-	// CreationDate (optional)
-	if creationDate, err := pdf.Optional(pdf.GetDate(x.R, dict["CreationDate"])); err != nil {
-		return err
-	} else if !creationDate.IsZero() {
-		markup.CreationDate = time.Time(creationDate)
-	}
-
-	// IRT (optional)
-	if irt, ok := dict["IRT"].(pdf.Reference); ok {
-		markup.InReplyTo = irt
-	}
-
-	// Subj (optional)
-	if subj, err := pdf.Optional(pdf.GetTextString(x.R, dict["Subj"])); err != nil {
-		return err
-	} else {
-		markup.Subject = string(subj)
-	}
-
-	// RT (optional)
-	if rt, err := pdf.Optional(x.GetName(path, dict["RT"])); err != nil {
-		return err
-	} else {
-		markup.RT = rt
-	}
-
-	// IT (optional; per spec, IT equal to Subtype means no explicit intent)
-	if it, err := pdf.Optional(x.GetName(path, dict["IT"])); err != nil {
-		return err
-	} else if it != dict["Subtype"] {
-		markup.Intent = it
-	}
-
-	// ExData (optional)
-	markup.ExData = dict["ExData"]
-
-	return nil
-}
-
 func (m *Markup) isMarkup() {}
 
 // isMarkup returns true if a is a markup annotation.

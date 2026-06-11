@@ -43,27 +43,6 @@ func (r *RichMedia) AnnotationType() pdf.Name {
 	return "RichMedia"
 }
 
-func decodeRichMedia(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*RichMedia, error) {
-	richMedia := &RichMedia{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &richMedia.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// RichMediaContent (required)
-	if content, ok := dict["RichMediaContent"].(pdf.Reference); ok {
-		richMedia.RichMediaContent = content
-	}
-
-	// RichMediaSettings (optional)
-	if settings, ok := dict["RichMediaSettings"].(pdf.Reference); ok {
-		richMedia.RichMediaSettings = settings
-	}
-
-	return richMedia, nil
-}
-
 func (r *RichMedia) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "rich media annotation", pdf.V2_0); err != nil {
 		return nil, err

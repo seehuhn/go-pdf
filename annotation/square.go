@@ -93,59 +93,6 @@ func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }
 
-func decodeSquare(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Square, error) {
-	r := x.R
-	square := &Square{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &square.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &square.Markup); err != nil {
-		return nil, err
-	}
-
-	// Extract square-specific fields
-	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
-		return nil, err
-	} else {
-		square.BorderStyle = bs
-		if bs != nil {
-			// per PDF spec, Border is ignored when BS is present
-			square.Common.Border = nil
-		}
-
-		// BE (optional)
-		if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], ExtractBorderEffect); err != nil {
-			return nil, err
-		} else {
-			square.BorderEffect = be
-		}
-	}
-
-	// IC (optional)
-	if ic, err := pdf.Optional(colorenc.Extract(r, dict["IC"])); err != nil {
-		return nil, err
-	} else {
-		square.FillColor = ic
-	}
-
-	// RD (optional)
-	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
-		for i := range rd {
-			rd[i] = max(rd[i], 0)
-		}
-		if rd[0]+rd[2] < square.Rect.Dx() && rd[1]+rd[3] < square.Rect.Dy() {
-			square.Margin = rd
-		}
-	}
-
-	return square, nil
-}
-
 func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "square annotations", pdf.V1_3); err != nil {
 		return nil, err

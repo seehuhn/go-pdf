@@ -5272,7 +5272,7 @@ types:
     - type: FieldSig
       since: '1.3'
     - Field
-    goType: pdf.Reference
+    goType: acroform.Field
     purpose: 'Parent (required if this widget annotation is one of multiple children
 
       in a field; optional otherwise) is an indirect reference to the widget
@@ -5780,8 +5780,8 @@ types:
     - 3DMeasureRD3
 - name: Field
   purpose: interactive form field properties common to all field types
-  goType: annotation.FieldCommon
-  goPackage: annotation
+  goType: acroform.FieldCommon
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
@@ -5789,7 +5789,7 @@ types:
   specTable: Table 226
   fileDependent: true
   writeMethod: (*FieldCommon).Encode
-  readFunc: annotation.DecodeField
+  readFunc: decode.Field
   fields:
   - goName: FT
     pdfKey: FT
@@ -5821,7 +5821,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.2'
-    goType: '[]annotation.Node'
+    goType: '[]acroform.Node'
     refTypes:
     - type: Field
       collection: array
@@ -5848,7 +5848,7 @@ types:
     pdfType: bitmask
     required: false
     introduced: '1.2'
-    goType: optional.UInt
+    goType: optional.Value[acroform.FieldFlags]
     goPresenceTracking: true
     inheritable: true
   - goName: AA
@@ -5861,8 +5861,8 @@ types:
     - AddActionFormField
 - name: VariableText
   purpose: variable-text attributes shared by terminal field types (DA/Q/DS/RV)
-  goType: annotation.VariableText
-  goPackage: annotation
+  goType: acroform.VariableText
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
@@ -5904,15 +5904,15 @@ types:
     - Stream
 - name: FieldBtn
   purpose: button form field (check box, radio button, or push button)
-  goType: annotation.FieldBtn
-  goPackage: annotation
+  goType: acroform.FieldBtn
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
-  specSection: 12.7.4.2.2
+  specSection: 12.7.5.2.2 12.7.5.2.3 12.7.5.2.4
   specTable: Table 226 and Table 229 and Table 230
   fileDependent: true
-  readFunc: annotation.DecodeField
+  readFunc: decode.Field
   writeMethod: (*FieldBtn).Encode
   embeds:
   - Field
@@ -5950,15 +5950,15 @@ types:
     inheritable: true
 - name: FieldChoice
   purpose: choice (list or combo box) form field
-  goType: annotation.FieldChoice
-  goPackage: annotation
+  goType: acroform.FieldChoice
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
-  specSection: 12.7.4.4
+  specSection: 12.7.5.4
   specTable: Table 226 and Table 234
   fileDependent: true
-  readFunc: annotation.DecodeField
+  readFunc: decode.Field
   writeMethod: (*FieldChoice).Encode
   embeds:
   - Field
@@ -5978,7 +5978,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.2'
-    goType: '[]annotation.ChoiceOption'
+    goType: '[]acroform.ChoiceOption'
     inheritable: true
     notes: Table 234
   - goName: TopIndex
@@ -6050,19 +6050,18 @@ types:
     - '1.2'
 - name: FieldSig
   purpose: digital signature form field
-  goType: annotation.FieldSig
-  goPackage: annotation
+  goType: acroform.FieldSig
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.3'
-  specSection: 12.7.4.5
-  specTable: Table 226 and Table 228 and Table 235
+  specSection: 12.7.5.5
+  specTable: Table 226 and Table 235
   fileDependent: true
-  readFunc: annotation.DecodeField
+  readFunc: decode.Field
   writeMethod: (*FieldSig).Encode
   embeds:
   - Field
-  - VariableText
   fields:
   - goName:
     pdfKey: FT
@@ -6111,15 +6110,15 @@ types:
     - SigSeedValue
 - name: FieldTx
   purpose: text input form field
-  goType: annotation.FieldTx
-  goPackage: annotation
+  goType: acroform.FieldTx
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
-  specSection: 12.7.4.3
+  specSection: 12.7.5.3
   specTable: Table 226 and Table 228 and Table 231
   fileDependent: true
-  readFunc: annotation.DecodeField
+  readFunc: decode.Field
   writeMethod: (*FieldTx).Encode
   embeds:
   - Field
@@ -6280,8 +6279,8 @@ types:
   specSection: 12.7.8.3.2
 - name: InteractiveForm
   purpose: document-wide interactive form properties
-  goType: annotation.InteractiveForm
-  goPackage: annotation
+  goType: acroform.InteractiveForm
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.2'
@@ -6289,7 +6288,7 @@ types:
   specTable: Table 224
   fileDependent: true
   writeMethod: (*InteractiveForm).Encode
-  readFunc: annotation.DecodeInteractiveForm
+  readFunc: decode.Form
   fields:
   - goName: Fields
     pdfKey: Fields
@@ -7239,15 +7238,15 @@ types:
   writeMethod: (*Viewport).Embed
 - name: SigCertSeedValue
   purpose: "certificate requirements for a signature field"
-  goType: annotation.SigCertSeedValue
-  goPackage: annotation
+  goType: acroform.SigCertSeedValue
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.5'
   specSection: 12.7.5.5
   specTable: Table 238
   fileDependent: false
-  readFunc: annotation.ExtractSigCertSeedValue
+  readFunc: acroform.ExtractSigCertSeedValue
   writeMethod: (*SigCertSeedValue).Embed
   fields:
   - goName:
@@ -7265,7 +7264,7 @@ types:
     required: false
     default: '0'
     introduced: '1.5'
-    goType: annotation.SigCertSeedValueFlags
+    goType: acroform.SigCertSeedValueFlags
   - goName: Subject
     pdfKey: Subject
     pdfType: array
@@ -7352,15 +7351,15 @@ types:
     notes: controls direct vs indirect embedding; not a PDF entry
 - name: SigFieldLock
   purpose: "fields to lock when a signature field is signed"
-  goType: annotation.SigFieldLock
-  goPackage: annotation
+  goType: acroform.SigFieldLock
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.5'
   specSection: 12.7.5.5
   specTable: Table 236
   fileDependent: false
-  readFunc: annotation.ExtractSigFieldLock
+  readFunc: acroform.ExtractSigFieldLock
   writeMethod: (*SigFieldLock).Embed
   fields:
   - goName:
@@ -7377,7 +7376,7 @@ types:
     pdfType: name
     required: true
     introduced: '1.5'
-    goType: annotation.SigFieldLockAction
+    goType: acroform.SigFieldLockAction
     possibleValues:
     - All
     - Include
@@ -7400,15 +7399,15 @@ types:
     - '3'
 - name: SigSeedValue
   purpose: "seed values for a signature form field"
-  goType: annotation.SigSeedValue
-  goPackage: annotation
+  goType: acroform.SigSeedValue
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.5'
   specSection: 12.7.5.5
   specTable: Table 237
   fileDependent: false
-  readFunc: annotation.ExtractSigSeedValue
+  readFunc: acroform.ExtractSigSeedValue
   writeMethod: (*SigSeedValue).Embed
   fields:
   - goName:
@@ -7426,7 +7425,7 @@ types:
     required: false
     default: '0'
     introduced: '1.5'
-    goType: annotation.SigSeedValueFlags
+    goType: acroform.SigSeedValueFlags
   - goName: Filter
     pdfKey: Filter
     pdfType: name
@@ -7513,8 +7512,8 @@ types:
     goType: string
 - name: SigSeedValueTimeStamp
   purpose: "time stamp dictionary"
-  goType: annotation.SigSeedValueTimeStamp
-  goPackage: annotation
+  goType: acroform.SigSeedValueTimeStamp
+  goPackage: acroform
   goRepr: struct
   pdfRepr: dict
   introduced: '1.6'

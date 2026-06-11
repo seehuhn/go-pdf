@@ -60,37 +60,6 @@ func (s *Sound) AnnotationType() pdf.Name {
 	return "Sound"
 }
 
-func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Sound, error) {
-	r := x.R
-	a := &Sound{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &a.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &a.Markup); err != nil {
-		return nil, err
-	}
-
-	// Sound (required)
-	s, err := pdf.ExtractorGet(x, path, dict["Sound"], sound.Extract)
-	if err != nil {
-		return nil, err
-	}
-	a.Sound = s
-
-	// Name (optional) - default to "Speaker" if not specified
-	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
-		a.Icon = SoundIcon(name)
-	} else {
-		a.Icon = SoundIconSpeaker
-	}
-
-	return a, nil
-}
-
 func (s *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "sound annotation", pdf.V1_2); err != nil {
 		return nil, err

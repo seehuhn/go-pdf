@@ -18,7 +18,6 @@ package annotation
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation/appearance"
 )
@@ -62,46 +61,6 @@ var _ Annotation = (*Screen)(nil)
 // This implements the [Annotation] interface.
 func (s *Screen) AnnotationType() pdf.Name {
 	return "Screen"
-}
-
-func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Screen, error) {
-	screen := &Screen{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &screen.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract screen-specific fields
-	// T (optional)
-	if t, err := pdf.Optional(pdf.GetTextString(x.R, dict["T"])); err != nil {
-		return nil, err
-	} else {
-		screen.Title = string(t)
-	}
-
-	// MK (optional)
-	if mk, err := pdf.ExtractorGetOptional(x, path, dict["MK"], appearance.ExtractCharacteristics); err != nil {
-		return nil, err
-	} else {
-		screen.MK = mk
-	}
-
-	// A (optional)
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode); err != nil {
-		return nil, err
-	} else {
-		screen.Action = act
-	}
-
-	// AA (optional)
-	if aa, err := pdf.ExtractorGetOptional(x, path, dict["AA"], triggers.DecodeAnnotation); err != nil {
-		return nil, err
-	} else {
-		screen.AA = aa
-	}
-
-	return screen, nil
 }
 
 func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {

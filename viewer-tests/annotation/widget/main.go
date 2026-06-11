@@ -27,6 +27,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/annotation/fallback"
@@ -63,7 +64,7 @@ func main() {
 type writer struct {
 	page   *document.Page
 	style  *fallback.Style
-	form   *annotation.InteractiveForm
+	form   *acroform.InteractiveForm
 	label  font.Layouter
 	yPos   float64
 	nextID int
@@ -75,7 +76,7 @@ type demo struct {
 	width    float64
 	height   float64
 	ft       pdf.Name
-	ff       annotation.FieldFlags
+	ff       acroform.FieldFlags
 	mkCA     string // ZapfDingbats on-glyph for toggles, caption for push buttons
 	value    string
 	onName   pdf.Name
@@ -103,7 +104,7 @@ func createDocument(filename string) error {
 	wr := &writer{
 		page:  page,
 		style: style,
-		form: &annotation.InteractiveForm{
+		form: &acroform.InteractiveForm{
 			DefaultResources:  &content.Resources{Font: map[pdf.Name]font.Instance{"Helv": H}},
 			DefaultAppearance: defaultDA,
 		},
@@ -121,18 +122,18 @@ func createDocument(filename string) error {
 	wr.yPos -= 22
 
 	demos := []demo{
-		{label: "Push button", width: 120, height: 26, ft: "Btn", ff: annotation.FieldPushbutton, mkCA: "Submit"},
+		{label: "Push button", width: 120, height: 26, ft: "Btn", ff: acroform.FieldPushbutton, mkCA: "Submit"},
 		{label: "Check box (check)", width: 16, height: 16, ft: "Btn", mkCA: "4", onName: "Yes", value: "Yes"},
 		{label: "Check box (cross)", width: 16, height: 16, ft: "Btn", mkCA: "8", onName: "Yes", value: "Yes"},
 		{label: "Check box (star)", width: 16, height: 16, ft: "Btn", mkCA: "H", onName: "Yes", value: "Yes"},
-		{label: "Radio button", width: 16, height: 16, ft: "Btn", ff: annotation.FieldRadio, mkCA: "l", onName: "A", value: "A"},
+		{label: "Radio button", width: 16, height: 16, ft: "Btn", ff: acroform.FieldRadio, mkCA: "l", onName: "A", value: "A"},
 		{label: "Text, single line", width: 150, height: 20, ft: "Tx", value: "Ada Lovelace"},
 		{label: "Text, right aligned", width: 150, height: 20, ft: "Tx", value: "1843", style: "S"},
-		{label: "Text, multiline", width: 150, height: 52, ft: "Tx", ff: annotation.FieldMultiline, value: "Notes on the analytical engine and its capacity for computation."},
-		{label: "Text, comb", width: 150, height: 22, ft: "Tx", ff: annotation.FieldComb, value: "AB1234", maxLen: 6},
-		{label: "Text, password", width: 150, height: 20, ft: "Tx", ff: annotation.FieldPassword, value: "secret"},
+		{label: "Text, multiline", width: 150, height: 52, ft: "Tx", ff: acroform.FieldMultiline, value: "Notes on the analytical engine and its capacity for computation."},
+		{label: "Text, comb", width: 150, height: 22, ft: "Tx", ff: acroform.FieldComb, value: "AB1234", maxLen: 6},
+		{label: "Text, password", width: 150, height: 20, ft: "Tx", ff: acroform.FieldPassword, value: "secret"},
 		{label: "List box", width: 150, height: 72, ft: "Ch", opts: []string{"Times New Roman", "Helvetica", "Source Serif 4", "JetBrains Mono", "Palatino"}, sel: []int{2}},
-		{label: "Combo box", width: 150, height: 22, ft: "Ch", ff: annotation.FieldCombo, opts: []string{"Helvetica"}, value: "Helvetica"},
+		{label: "Combo box", width: 150, height: 22, ft: "Ch", ff: acroform.FieldCombo, opts: []string{"Helvetica"}, value: "Helvetica"},
 		{label: "Signature (unsigned)", width: 150, height: 44, ft: "Sig"},
 		{label: "Border: dashed", width: 120, height: 22, ft: "Tx", style: "D"},
 		{label: "Border: beveled", width: 120, height: 22, ft: "Tx", style: "B"},
@@ -211,15 +212,15 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 	// shared between the form's field list and the page's annotation list. The
 	// form is stored (see createDocument) before the page is closed, so the
 	// merge is in place when the page writes the widget.
-	w := f.GetFieldCommon().AddWidget(rect)
+	w := annotation.AddWidget(f, rect)
 	w.Common.Flags = annotation.FlagPrint
 	w.MK = mk
 	w.BorderStyle = bs
 
-	isToggle := d.ft == "Btn" && d.ff&annotation.FieldPushbutton == 0
+	isToggle := d.ft == "Btn" && d.ff&acroform.FieldPushbutton == 0
 	if genAP {
-		// the appearance generator also selects a toggle's on appearance
-		if err := addAppearances(wr.style, f); err != nil {
+		// derives the field context from w.Parent and selects a toggle's on appearance
+		if err := wr.style.AddAppearance(w); err != nil {
 			return err
 		}
 	} else if isToggle {
@@ -232,7 +233,7 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 
 // makeField builds the typed form field for d as a root of wr.form. Its widget
 // is added separately by the caller.
-func (wr *writer) makeField(d demo) annotation.Field {
+func (wr *writer) makeField(d demo) acroform.Field {
 	name := fmt.Sprintf("f%d", wr.nextID)
 
 	align := pdf.TextAlignLeft
@@ -240,15 +241,15 @@ func (wr *writer) makeField(d demo) annotation.Field {
 		align = pdf.TextAlignRight
 	}
 
-	var f annotation.Field
+	var f acroform.Field
 	switch d.ft {
 	case "Btn":
 		// a push button retains no value; check boxes and radio buttons carry
 		// the on-state name in V, and radio buttons name their widgets in Opt
 		btn := wr.form.NewButtonField(name)
-		if d.ff&annotation.FieldPushbutton == 0 {
+		if d.ff&acroform.FieldPushbutton == 0 {
 			btn.V = pdf.Name(d.value)
-			if d.ff&annotation.FieldRadio != 0 && d.onName != "" {
+			if d.ff&acroform.FieldRadio != 0 && d.onName != "" {
 				btn.Opt = []string{string(d.onName)}
 			}
 		}
@@ -270,7 +271,7 @@ func (wr *writer) makeField(d demo) annotation.Field {
 		ch.Align = align
 		ch.Selected = d.sel
 		for _, o := range d.opts {
-			ch.Opt = append(ch.Opt, annotation.ChoiceOption{Display: o, Export: o})
+			ch.Opt = append(ch.Opt, acroform.ChoiceOption{Display: o, Export: o})
 		}
 		if d.value != "" {
 			ch.V = pdf.TextString(d.value)
@@ -282,126 +283,7 @@ func (wr *writer) makeField(d demo) annotation.Field {
 	}
 
 	if d.ff != 0 {
-		f.GetFieldCommon().Ff = optional.NewUInt(uint(d.ff))
+		f.GetFieldCommon().Ff = optional.New(d.ff)
 	}
 	return f
-}
-
-// addAppearances generates fallback appearance streams for every widget
-// annotation in the field tree rooted at f, storing them in each widget's
-// appearance dictionary. The field type, flags, value, and variable-text
-// attributes determine what each widget draws.
-func addAppearances(style *fallback.Style, f annotation.Field) error {
-	params := widgetParams(f)
-	on := buttonValue(f)
-
-	widgetIndex := 0
-	for _, kid := range f.GetFieldCommon().Kids {
-		switch k := kid.(type) {
-		case annotation.Field:
-			if err := addAppearances(style, k); err != nil {
-				return err
-			}
-		case *annotation.Widget:
-			if err := addWidgetAppearance(style, params, on, f, k, widgetIndex); err != nil {
-				return err
-			}
-			widgetIndex++
-		}
-	}
-	return nil
-}
-
-func addWidgetAppearance(style *fallback.Style, params fallback.WidgetField, on pdf.Name, f annotation.Field, w *annotation.Widget, index int) error {
-	p := params
-	p.OnState = onStateFor(f, index)
-	if err := style.AddWidgetAppearance(w, &p); err != nil {
-		return err
-	}
-	// select the on appearance when this widget's on-state is the field value
-	if p.OnState != "" && on == p.OnState {
-		w.AppearanceState = p.OnState
-	}
-	return nil
-}
-
-// widgetParams builds the field context shared by all of a field's widgets.
-func widgetParams(f annotation.Field) fallback.WidgetField {
-	p := fallback.WidgetField{
-		FieldType: annotation.ResolvedFT(f),
-		Flags:     uint32(annotation.ResolvedFf(f)),
-	}
-	if vt, ok := f.(interface {
-		GetVariableText() *annotation.VariableText
-	}); ok {
-		v := vt.GetVariableText()
-		p.DefaultAppearance = v.DefaultAppearance
-		p.Align = v.Align
-	}
-	switch x := f.(type) {
-	case *annotation.FieldTx:
-		p.Value = asText(annotation.ResolvedV(f))
-		p.MaxLen = x.MaxLen
-	case *annotation.FieldChoice:
-		p.Options = make([]string, len(x.Opt))
-		for i, o := range x.Opt {
-			p.Options[i] = o.Display
-		}
-		p.Selected = x.Selected
-		p.TopIndex = x.TopIndex
-		p.Value = choiceDisplay(x)
-	}
-	return p
-}
-
-// onStateFor returns the on-state name of the index-th widget of a check box or
-// radio button field, or the empty string for other field types.
-func onStateFor(f annotation.Field, index int) pdf.Name {
-	if annotation.ResolvedFT(f) != "Btn" || annotation.ResolvedFf(f)&annotation.FieldPushbutton != 0 {
-		return ""
-	}
-	if x, ok := f.(*annotation.FieldBtn); ok {
-		if index < len(x.Opt) {
-			return pdf.Name(x.Opt[index])
-		}
-		// a single check box may name its on-state via the field value
-		if x.Variant() == annotation.ButtonCheckbox && x.V != "" && x.V != "Off" {
-			return x.V
-		}
-	}
-	return "On"
-}
-
-// buttonValue returns a check box or radio button field's value name. A push
-// button retains no value, so its V is empty.
-func buttonValue(f annotation.Field) pdf.Name {
-	if x, ok := f.(*annotation.FieldBtn); ok {
-		return x.V
-	}
-	return ""
-}
-
-// choiceDisplay returns the display text of a choice field's current selection.
-func choiceDisplay(x *annotation.FieldChoice) string {
-	if len(x.Selected) > 0 {
-		i := x.Selected[0]
-		if i >= 0 && i < len(x.Opt) {
-			return x.Opt[i].Display
-		}
-	}
-	return asText(x.V)
-}
-
-// asText renders a stored field value as display text.
-func asText(obj pdf.Object) string {
-	switch v := obj.(type) {
-	case pdf.String:
-		return string(v.AsTextString())
-	case pdf.TextString:
-		return string(v)
-	case pdf.Name:
-		return string(v)
-	default:
-		return ""
-	}
 }

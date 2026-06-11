@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/decode"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	pdfpage "seehuhn.de/go/pdf/page"
 )
@@ -112,7 +114,7 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 
 	// the merged field and its page widget must be one shared object: the field's
 	// single Kid is the very widget in the page's /Annots
-	form, err := pdf.ExtractorGet(x, nil, formRef, annotation.DecodeInteractiveForm)
+	form, err := pdf.ExtractorGet(x, nil, formRef, decode.Form)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +123,7 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 		t.Error("merged widget.Parent is not the field in /Fields")
 	}
 	kids := mergedField.GetFieldCommon().Kids
-	if len(kids) != 1 || kids[0] != annotation.Node(mergedW) {
+	if len(kids) != 1 || kids[0] != acroform.Node(mergedW) {
 		t.Errorf("merged field.Kids = %v, want the shared page widget", kids)
 	}
 

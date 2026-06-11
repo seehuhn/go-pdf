@@ -60,47 +60,18 @@ func (s *Stamp) AnnotationType() pdf.Name {
 	return "Stamp"
 }
 
-func decodeStamp(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Stamp, error) {
-	r := x.R
-	stamp := &Stamp{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &stamp.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &stamp.Markup); err != nil {
-		return nil, err
-	}
-
-	if stamp.Intent == "" {
-		stamp.Intent = StampIntentStamp
-	}
-
-	if stamp.Intent == StampIntentStamp {
-		if icon, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
-			return nil, err
-		} else if icon != "" {
-			stamp.Icon = StampIcon(icon)
-		} else {
-			stamp.Icon = StampIconDraft
-		}
-	}
-
-	return stamp, nil
-}
-
 func (s *Stamp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "stamp annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
 
-	if s.Intent != "" {
+	if s.Intent != "" && s.Intent != StampIntentStamp {
+		// IT is only written for non-default intents (Markup.fillDict omits an
+		// IT entry equal to the subtype)
 		if err := pdf.CheckVersion(rm.Out, "stamp annotation with IT field", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		if s.Intent != StampIntentStamp && s.Icon != "" {
+		if s.Icon != "" {
 			return nil, fmt.Errorf("unexpected Icon name %q", s.Icon)
 		}
 	}
@@ -118,10 +89,6 @@ func (s *Stamp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	if s.Icon != "" && s.Icon != StampIconDraft {
 		dict["Name"] = pdf.Name(s.Icon)
-	}
-	if s.Intent == StampIntentStamp {
-		// default value for stamp annotations
-		delete(dict, "IT")
 	}
 
 	return dict, nil

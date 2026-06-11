@@ -73,46 +73,6 @@ func (t *TextMarkup) AnnotationType() pdf.Name {
 	return pdf.Name(t.Type)
 }
 
-func decodeTextMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, subtype pdf.Name) (*TextMarkup, error) {
-	r := x.R
-	textMarkup := &TextMarkup{}
-
-	textMarkup.Type = TextMarkupType(subtype)
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &textMarkup.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &textMarkup.Markup); err != nil {
-		return nil, err
-	}
-
-	// Extract text markup-specific fields
-	// QuadPoints (required)
-	quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "QuadPoints")
-	}
-	if len(quadPoints) < 8 {
-		return nil, pdf.Error("QuadPoints is required for text markup annotations and must contain at least one quadrilateral (8 values)")
-	}
-
-	// process floats in groups of 8, each group becomes 4 Vec2 points
-	numCompleteQuads := len(quadPoints) / 8
-	points := make([]vec.Vec2, numCompleteQuads*4)
-	for quad := range numCompleteQuads {
-		for corner := range 4 {
-			idx := quad*8 + corner*2
-			points[quad*4+corner] = vec.Vec2{X: quadPoints[idx], Y: quadPoints[idx+1]}
-		}
-	}
-	textMarkup.QuadPoints = points
-
-	return textMarkup, nil
-}
-
 func (t *TextMarkup) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	// Check version requirements based on type
 	switch t.Type {

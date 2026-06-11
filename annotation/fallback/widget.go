@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/font/pdfenc"
@@ -34,26 +35,16 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 )
 
-// field flag bits (a subset of the AcroForm Ff flags), mirrored here so the
-// generator works from a plain [WidgetField] without resolving the field tree.
-const (
-	ffMultiline  uint32 = 1 << 12
-	ffPassword   uint32 = 1 << 13
-	ffRadio      uint32 = 1 << 15
-	ffPushbutton uint32 = 1 << 16
-	ffCombo      uint32 = 1 << 17
-	ffComb       uint32 = 1 << 24
-)
-
-// WidgetField carries the form-field context that a widget annotation does not
-// itself hold but that its appearance depends on. The caller fills it from the
-// widget's form field; a nil *WidgetField yields the MK chrome only.
-type WidgetField struct {
+// widgetField is the form-field context that a widget annotation's appearance
+// depends on but that the widget does not itself hold. It is resolved from the
+// widget's form field (w.Parent), with flag and value inheritance from ancestor
+// fields already applied.
+type widgetField struct {
 	// FieldType is the field type: "Btn", "Tx", "Ch", or "Sig".
 	FieldType pdf.Name
 
 	// Flags is the field's effective flag bit set (the /Ff value).
-	Flags uint32
+	Flags acroform.FieldFlags
 
 	// Value is the field's value rendered as text: the contents of a text
 	// field, or the selected display string of a choice field.
@@ -86,18 +77,139 @@ type WidgetField struct {
 	MaxLen int
 }
 
-// AddWidgetAppearance generates the appearance stream(s) for a form-field widget
+// resolveWidgetField gathers the form-field context for w from its form field
+// (w.Parent), or returns nil if the widget has no associated field.
+func resolveWidgetField(w *annotation.Widget) *widgetField {
+	f := w.Parent
+	if f == nil {
+		return nil
+	}
+	p := &widgetField{
+		FieldType: acroform.ResolvedFT(f),
+		Flags:     acroform.ResolvedFf(f),
+		OnState:   widgetOnState(f, widgetIndex(w)),
+	}
+	if vt, ok := f.(acroform.VariableTextField); ok {
+		v := vt.GetVariableText()
+		p.DefaultAppearance = v.DefaultAppearance
+		p.Align = v.Align
+	}
+	switch x := f.(type) {
+	case *acroform.FieldTx:
+		p.Value = valueText(acroform.ResolvedV(f))
+		p.MaxLen = x.MaxLen
+	case *acroform.FieldChoice:
+		p.Options = make([]string, len(x.Opt))
+		for i, o := range x.Opt {
+			p.Options[i] = o.Display
+		}
+		p.Selected = x.Selected
+		p.TopIndex = x.TopIndex
+		p.Value = choiceValue(x)
+	}
+	return p
+}
+
+// widgetIndex returns the position of w among the widget children of its field.
+// Radio buttons name each widget's on-state by this index.
+func widgetIndex(w *annotation.Widget) int {
+	if w.Parent == nil {
+		return 0
+	}
+	i := 0
+	for _, kid := range w.Parent.GetFieldCommon().Kids {
+		kw, ok := kid.(*annotation.Widget)
+		if !ok {
+			continue
+		}
+		if kw == w {
+			return i
+		}
+		i++
+	}
+	return 0
+}
+
+// widgetOnState returns the on-state name of the index-th widget of a check box
+// or radio button field, or the empty string for other field types.
+func widgetOnState(f acroform.Field, index int) pdf.Name {
+	ff := acroform.ResolvedFf(f)
+	if acroform.ResolvedFT(f) != "Btn" || ff&acroform.FieldPushbutton != 0 {
+		return ""
+	}
+	if opt := resolvedOpt(f); index < len(opt) {
+		return pdf.Name(opt[index])
+	}
+	// a single check box may name its on-state via the field value
+	if ff&acroform.FieldRadio == 0 {
+		if v := buttonValue(f); v != "" && v != "Off" {
+			return v
+		}
+	}
+	return "On"
+}
+
+// buttonValue returns a check box or radio button field's effective value name,
+// inherited from an ancestor if the field itself does not set one.
+func buttonValue(f acroform.Field) pdf.Name {
+	v, _ := acroform.ResolvedV(f).(pdf.Name)
+	return v
+}
+
+// resolvedOpt returns a button field's effective export-value array, inherited
+// from an ancestor if the field itself does not set one (the Opt entry is
+// inheritable).
+func resolvedOpt(f acroform.Field) []string {
+	for n := f; n != nil; n = acroform.ParentOf(n) {
+		if x, ok := n.(*acroform.FieldBtn); ok && len(x.Opt) > 0 {
+			return x.Opt
+		}
+	}
+	return nil
+}
+
+// choiceValue returns the display text of a choice field's current selection.
+func choiceValue(x *acroform.FieldChoice) string {
+	if len(x.Selected) > 0 {
+		i := x.Selected[0]
+		if i >= 0 && i < len(x.Opt) {
+			return x.Opt[i].Display
+		}
+	}
+	return valueText(x.V)
+}
+
+// valueText renders a stored field value as display text.
+func valueText(obj pdf.Object) string {
+	switch v := obj.(type) {
+	case pdf.String:
+		return string(v.AsTextString())
+	case pdf.TextString:
+		return string(v)
+	case pdf.Name:
+		return string(v)
+	default:
+		return ""
+	}
+}
+
+// addWidgetAppearance generates the appearance stream(s) for a form-field widget
 // annotation and stores them in the widget's appearance dictionary. The field
-// context is taken from fld; a nil fld draws only the MK chrome.
+// context is resolved from the widget's form field (w.Parent); a widget with no
+// field draws only the MK chrome. It is the dispatch target of
+// [Style.AddAppearance] for [annotation.Widget].
 //
 // Check boxes and radio buttons receive two appearances, keyed by the on-state
 // name and "Off"; all other field types receive a single normal appearance.
-func (s *Style) AddWidgetAppearance(w *annotation.Widget, fld *WidgetField) error {
+func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
+	fld := resolveWidgetField(w)
 	if fld == nil {
-		fld = &WidgetField{}
+		w.Appearance = &appearance.Dict{SingleUse: true, Normal: s.drawChromeField(w)}
+		w.AppearanceState = ""
+		return nil
 	}
 
-	if fld.FieldType == "Btn" && fld.Flags&ffPushbutton == 0 {
+	if fld.FieldType == "Btn" && fld.Flags&acroform.FieldPushbutton == 0 {
 		// check box or radio button: an on and an off appearance
 		on := s.drawToggle(w, fld, true)
 		off := s.drawToggle(w, fld, false)
@@ -109,8 +221,13 @@ func (s *Style) AddWidgetAppearance(w *annotation.Widget, fld *WidgetField) erro
 			SingleUse: true,
 			NormalMap: map[pdf.Name]*form.Form{onState: on, "Off": off},
 		}
+		// select the current appearance from the field value
 		if w.AppearanceState == "" {
-			w.AppearanceState = "Off"
+			if buttonValue(w.Parent) == onState {
+				w.AppearanceState = onState
+			} else {
+				w.AppearanceState = "Off"
+			}
 		}
 		return nil
 	}
@@ -130,13 +247,6 @@ func (s *Style) AddWidgetAppearance(w *annotation.Widget, fld *WidgetField) erro
 	w.Appearance = &appearance.Dict{SingleUse: true, Normal: normal}
 	w.AppearanceState = ""
 	return nil
-}
-
-// addWidgetAppearance generates a fallback appearance for a widget annotation
-// without field context, drawing only the MK chrome. It is the dispatch target
-// of [Style.AddAppearance].
-func (s *Style) addWidgetAppearance(a *annotation.Widget) *form.Form {
-	return s.drawChromeField(a)
 }
 
 // fieldContext sets up a content builder for a widget's appearance and returns
@@ -253,9 +363,9 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 
 // drawToggle draws one appearance of a check box or radio button: the on-glyph
 // when on is true, chrome only otherwise. Radio buttons use a circular border.
-func (s *Style) drawToggle(w *annotation.Widget, fld *WidgetField, on bool) *form.Form {
+func (s *Style) drawToggle(w *annotation.Widget, fld *widgetField, on bool) *form.Form {
 	b, width, height, m := s.fieldContext(w)
-	isRadio := fld.Flags&ffRadio != 0
+	isRadio := fld.Flags&acroform.FieldRadio != 0
 
 	if isRadio {
 		drawCircleChrome(b, width, height, w)
@@ -352,7 +462,7 @@ func (s *Style) drawPushButton(w *annotation.Widget) *form.Form {
 }
 
 // drawTextField draws a text field's chrome and value.
-func (s *Style) drawTextField(w *annotation.Widget, fld *WidgetField) *form.Form {
+func (s *Style) drawTextField(w *annotation.Widget, fld *widgetField) *form.Form {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 
@@ -360,12 +470,12 @@ func (s *Style) drawTextField(w *annotation.Widget, fld *WidgetField) *form.Form
 	const pad = 2.0
 
 	switch {
-	case fld.Flags&ffPassword != 0:
+	case fld.Flags&acroform.FieldPassword != 0:
 		// the value is masked: one bullet per character
 		s.drawSingleLine(b, width, height, lw, pad, fld, strings.Repeat("*", utf8.RuneCountInString(fld.Value)))
-	case fld.Flags&ffComb != 0 && fld.MaxLen > 0:
+	case fld.Flags&acroform.FieldComb != 0 && fld.MaxLen > 0:
 		s.drawComb(b, width, height, lw, fld)
-	case fld.Flags&ffMultiline != 0:
+	case fld.Flags&acroform.FieldMultiline != 0:
 		s.drawMultiline(b, width, height, lw, pad, fld)
 	case fld.Value != "":
 		s.drawSingleLine(b, width, height, lw, pad, fld, fld.Value)
@@ -375,7 +485,7 @@ func (s *Style) drawTextField(w *annotation.Widget, fld *WidgetField) *form.Form
 }
 
 // drawSingleLine draws text as a single, vertically centred line.
-func (s *Style) drawSingleLine(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField, text string) {
+func (s *Style) drawSingleLine(b *builder.Builder, width, height, lw, pad float64, fld *widgetField, text string) {
 	if text == "" {
 		return
 	}
@@ -402,7 +512,7 @@ func (s *Style) drawSingleLine(b *builder.Builder, width, height, lw, pad float6
 }
 
 // drawMultiline draws word-wrapped, top-aligned field text.
-func (s *Style) drawMultiline(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField) {
+func (s *Style) drawMultiline(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
 	if fld.Value == "" {
 		return
 	}
@@ -450,7 +560,7 @@ func (s *Style) drawMultiline(b *builder.Builder, width, height, lw, pad float64
 
 // drawComb lays the value out into MaxLen equal cells separated by hairline
 // rules, one character per cell.
-func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *WidgetField) {
+func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *widgetField) {
 	n := fld.MaxLen
 	if n <= 0 {
 		return
@@ -484,13 +594,13 @@ func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *Wid
 }
 
 // drawChoiceField draws a list box or, when the combo flag is set, a combo box.
-func (s *Style) drawChoiceField(w *annotation.Widget, fld *WidgetField) *form.Form {
+func (s *Style) drawChoiceField(w *annotation.Widget, fld *widgetField) *form.Form {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 	lw := borderWidth(w)
 	const pad = 2.0
 
-	if fld.Flags&ffCombo != 0 {
+	if fld.Flags&acroform.FieldCombo != 0 {
 		s.drawCombo(b, width, height, lw, pad, fld)
 	} else {
 		s.drawListBox(b, width, height, lw, pad, fld)
@@ -501,7 +611,7 @@ func (s *Style) drawChoiceField(w *annotation.Widget, fld *WidgetField) *form.Fo
 
 // drawCombo draws the selected value as a single line plus a divider and a
 // disclosure chevron at the right edge.
-func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField) {
+func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
 	chevronW := height
 	divX := width - chevronW
 
@@ -538,7 +648,7 @@ func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fl
 
 // drawListBox draws the option items, scrolled to TopIndex, with the selected
 // rows highlighted in the Quire selection treatment (amber wash and indicator).
-func (s *Style) drawListBox(b *builder.Builder, width, height, lw, pad float64, fld *WidgetField) {
+func (s *Style) drawListBox(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
 	size, col := parseDA(fld.DefaultAppearance)
 	if size == 0 {
 		size = 11

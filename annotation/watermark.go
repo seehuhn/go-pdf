@@ -68,55 +68,6 @@ func (w *Watermark) AnnotationType() pdf.Name {
 	return "Watermark"
 }
 
-func decodeWatermark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Watermark, error) {
-	r := x.R
-	watermark := &Watermark{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &watermark.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract watermark-specific fields
-	// FixedPrint (optional)
-	if fixedPrintRef, ok := dict["FixedPrint"].(pdf.Reference); ok {
-		fixedPrintDict, err := pdf.GetDictTyped(r, fixedPrintRef, "FixedPrint")
-		if err != nil {
-			return nil, err
-		}
-
-		fixedPrint := &FixedPrint{}
-
-		// Matrix (optional) - default to identity matrix
-		if matrix, err := pdf.GetArray(r, fixedPrintDict["Matrix"]); err == nil && len(matrix) == 6 {
-			matrixValues := make([]float64, 6)
-			for i, val := range matrix {
-				if num, err := pdf.GetNumber(r, val); err == nil {
-					matrixValues[i] = float64(num)
-				}
-			}
-			fixedPrint.Matrix = matrixValues
-		} else {
-			// Default identity matrix
-			fixedPrint.Matrix = []float64{1, 0, 0, 1, 0, 0}
-		}
-
-		// H (optional) - default 0
-		if h, err := pdf.GetNumber(r, fixedPrintDict["H"]); err == nil {
-			fixedPrint.H = float64(h)
-		}
-
-		// V (optional) - default 0
-		if v, err := pdf.GetNumber(r, fixedPrintDict["V"]); err == nil {
-			fixedPrint.V = float64(v)
-		}
-
-		watermark.FixedPrint = fixedPrint
-	}
-
-	return watermark, nil
-}
-
 func (w *Watermark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "watermark annotation", pdf.V1_6); err != nil {
 		return nil, err

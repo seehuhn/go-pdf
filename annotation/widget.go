@@ -18,9 +18,11 @@ package annotation
 
 import (
 	"errors"
+	"fmt"
+	"maps"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/action"
+	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation/appearance"
 )
@@ -70,20 +72,23 @@ type Widget struct {
 	BorderStyle *BorderStyle
 
 	// Parent (optional) is the form field this widget belongs to, or nil if the
-	// widget is not part of an interactive form. It is the back-edge of the field/widget
-	// hierarchy: the field's [FieldCommon.Kids] holds this widget, and this
-	// widget's Parent holds that field. It is set when the field tree is decoded
-	// (see [DecodeInteractiveForm], which page decoding triggers automatically)
-	// and is used on encode to write the widget's /Parent entry and, for a
-	// single-widget field merged into this widget, to fold in the field's own
-	// dictionary entries.
+	// widget is not part of an interactive form. It is the back-edge of the
+	// field/widget hierarchy: the field's [acroform.FieldCommon.Kids] holds this
+	// widget, and this widget's Parent holds that field. It is set when the field
+	// tree is decoded (page decoding triggers this automatically) and is used on
+	// encode to write the widget's /Parent entry and, for a single-widget field
+	// merged into this widget, to fold in the field's own dictionary entries.
 	//
-	// Because it forms a cycle with [FieldCommon.Kids], round-trip comparisons
-	// must ignore it; the field tree is the authoritative representation.
-	Parent Field
+	// Because it forms a cycle with [acroform.FieldCommon.Kids], round-trip
+	// comparisons must ignore it; the field tree is the authoritative
+	// representation.
+	Parent acroform.Field
 }
 
-var _ Annotation = (*Widget)(nil)
+var (
+	_ Annotation    = (*Widget)(nil)
+	_ acroform.Node = (*Widget)(nil)
+)
 
 // AnnotationType returns "Widget".
 // This implements the [Annotation] interface.
@@ -92,84 +97,27 @@ func (w *Widget) AnnotationType() pdf.Name {
 }
 
 // IsFieldNode marks a widget annotation as a possible child in an AcroForm
-// field hierarchy. It lets a widget be used as a child node of a form field
-// without the annotation package depending on the form package.
+// field hierarchy, satisfying the acroform.Node interface.
 func (w *Widget) IsFieldNode() {}
 
-// decodeWidget decodes a widget annotation. A merged field/widget dictionary
-// (a Widget that also carries field entries) is decoded as a linked field+widget
-// pair by [decodeMergedField]; this returns the widget half so that the page's
-// /Annots and the field tree's /Kids share one object.
-func decodeWidget(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widget, error) {
-	if path != nil && isMergedFieldDict(dict) {
-		_, w, err := decodeMergedField(x, path, path.Ref, dict)
-		return w, err
+// SetFieldParent links this widget to the form field f as its parent. It is the
+// back-edge of the field/widget hierarchy (see [Widget.Parent]) and is set by
+// the field tree on encode and decode.
+func (w *Widget) SetFieldParent(f acroform.Field) { w.Parent = f }
+
+// AddWidget adds a widget annotation for the terminal field f at the given
+// rectangle and returns it. A terminal field may have several widgets, one per
+// place it appears. The caller must add the returned widget to the annotation
+// list of the page it appears on.
+func AddWidget(f acroform.Field, rect pdf.Rectangle) *Widget {
+	w := &Widget{
+		Common:    Common{Rect: rect},
+		Highlight: "I",
 	}
-	return decodeWidgetBody(x, path, dict)
-}
-
-// decodeWidgetBody decodes the annotation-level half of a widget dictionary (the
-// entries that pertain to a widget annotation, not to a form field). It never
-// sets Parent: the field tree owns that linkage.
-func decodeWidgetBody(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Widget, error) {
-	r := x.R
-	widget := &Widget{}
-
-	// Extract common annotation fields
-	if err := decodeCommon(x, path, &widget.Common, dict); err != nil {
-		return nil, err
-	}
-
-	// Extract widget-specific fields
-	// H (optional) - default to "I" if not specified
-	if h, err := pdf.GetName(r, dict["H"]); err == nil && h != "" {
-		widget.Highlight = h
-	} else {
-		widget.Highlight = "I" // PDF default value
-	}
-
-	// MK (optional)
-	if mk, err := pdf.ExtractorGetOptional(x, path, dict["MK"], appearance.ExtractCharacteristics); err != nil {
-		return nil, err
-	} else {
-		widget.MK = mk
-	}
-
-	// A (optional)
-	if a, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode); err != nil {
-		return nil, err
-	} else {
-		widget.Action = a
-	}
-
-	// AA (optional)
-	if aa, err := pdf.ExtractorGetOptional(x, path, dict["AA"], triggers.DecodeAnnotation); err != nil {
-		return nil, err
-	} else {
-		widget.AA = aa
-	}
-
-	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], ExtractBorderStyle); err != nil {
-		return nil, err
-	} else {
-		widget.BorderStyle = bs
-		if bs != nil {
-			// per PDF spec, Border is ignored when BS is present
-			widget.Common.Border = nil
-		}
-	}
-
-	// /Parent is intentionally not read here: the field tree owns the linkage
-	// and sets Widget.Parent when the form is decoded.
-
-	// the widget half of a shared /AA keeps only the annotation-level triggers;
-	// drop an empty remnant left by the field/widget split
-	if widget.AA != nil && widget.AA.IsEmpty() {
-		widget.AA = nil
-	}
-
-	return widget, nil
+	w.Parent = f
+	c := f.GetFieldCommon()
+	c.Kids = append(c.Kids, w)
+	return w
 }
 
 func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
@@ -243,4 +191,79 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	return dict, nil
+}
+
+// foldFieldIntoWidget ties an encoded widget dictionary to its form field
+// (w.Parent). If the widget is the single widget of a terminal field, the
+// field's own entries are folded into the widget dictionary, producing one
+// merged field/widget object, and /Parent names the field's own parent (absent
+// for a root field). Otherwise the widget gets a /Parent pointing at the field's
+// own object. It is called from [Widget.Encode] and keeps the merge rules here.
+//
+// Field entries take precedence over the widget's, except for the shared /AA,
+// whose field half (K/F/V/C) and widget half (E/X/Fo/Bl/…) are combined.
+func foldFieldIntoWidget(rm *pdf.ResourceManager, w *Widget, dict pdf.Dict) (pdf.Native, error) {
+	f := w.Parent
+
+	// w's entries are folded into the field only when w is the sole widget of a
+	// terminal field: no sub-fields and exactly one widget child, which is w
+	var theWidget acroform.Node
+	widgetCount := 0
+	hasSubfield := false
+	for _, kid := range f.GetFieldCommon().Kids {
+		if _, ok := kid.(acroform.Field); ok {
+			hasSubfield = true
+		} else {
+			widgetCount++
+			theWidget = kid
+		}
+	}
+	if hasSubfield || widgetCount != 1 || theWidget != acroform.Node(w) {
+		// a non-merged widget kid of a multi-widget field
+		dict["Parent"] = rm.GetReference(f)
+		return dict, nil
+	}
+
+	// the single widget of a terminal field: fold the field's entries in
+	entries, err := acroform.FieldEntries(rm, f)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range entries {
+		if existing, exists := dict[k]; exists && k == "AA" {
+			merged, err := mergeAADicts(v, existing)
+			if err != nil {
+				return nil, err
+			}
+			dict[k] = merged
+			continue
+		}
+		dict[k] = v
+	}
+	if p := acroform.ParentOf(f); p != nil {
+		dict["Parent"] = rm.GetReference(p)
+	}
+	return dict, nil
+}
+
+// mergeAADicts combines the field-level (K/F/V/C) and annotation-level
+// (E/X/Fo/Bl/…) halves of a merged field's shared /AA dictionary. The two key
+// sets are disjoint by construction, so an overlap signals a bug.
+func mergeAADicts(field, widget pdf.Object) (pdf.Dict, error) {
+	fd, ok := field.(pdf.Dict)
+	if !ok {
+		return nil, errors.New("field AA did not encode to a dictionary")
+	}
+	wd, ok := widget.(pdf.Dict)
+	if !ok {
+		return nil, errors.New("widget AA did not encode to a dictionary")
+	}
+	merged := maps.Clone(fd)
+	for k, v := range wd {
+		if _, exists := merged[k]; exists {
+			return nil, fmt.Errorf("conflicting AA entry %q", k)
+		}
+		merged[k] = v
+	}
+	return merged, nil
 }
