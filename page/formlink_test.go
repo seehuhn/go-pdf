@@ -118,21 +118,27 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mergedField := form.Fields[0]
+	mergedField, ok := form.Fields[0].(acroform.Field)
+	if !ok {
+		t.Fatalf("form field 0 is %T, want a terminal field", form.Fields[0])
+	}
 	if mergedW.Parent != mergedField {
 		t.Error("merged widget.Parent is not the field in /Fields")
 	}
-	kids := mergedField.GetFieldCommon().Kids
-	if len(kids) != 1 || kids[0] != acroform.Node(mergedW) {
-		t.Errorf("merged field.Kids = %v, want the shared page widget", kids)
+	widgets := mergedField.Widgets()
+	if len(widgets) != 1 || widgets[0] != acroform.Widget(mergedW) {
+		t.Errorf("merged field widgets = %v, want the shared page widget", widgets)
 	}
 
 	// the multi-widget field links both widgets; widget A is the page's object
-	multiField := form.Fields[1]
+	multiField, ok := form.Fields[1].(acroform.Field)
+	if !ok {
+		t.Fatalf("form field 1 is %T, want a terminal field", form.Fields[1])
+	}
 	if multiW.Parent != multiField {
 		t.Error("multi-widget A.Parent is not the multi field")
 	}
-	if len(multiField.GetFieldCommon().Kids) != 2 {
-		t.Errorf("multi field has %d kids, want 2", len(multiField.GetFieldCommon().Kids))
+	if len(multiField.Widgets()) != 2 {
+		t.Errorf("multi field has %d widgets, want 2", len(multiField.Widgets()))
 	}
 }

@@ -19,37 +19,25 @@ package decode
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
-	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/optional"
 )
 
-// a terminal field built with several widgets keeps them all and round-trips
-func TestBuilderMultiWidgetRoundTrip(t *testing.T) {
-	for _, version := range testVersions {
-		t.Run(version.String(), func(t *testing.T) {
-			btn := (&acroform.InteractiveForm{}).NewButtonField("color")
-			btn.Ff = optional.New(acroform.FieldRadio)
-			btn.Opt = []string{"red", "green"}
-			annotation.AddWidget(btn, pdf.Rectangle{URx: 20, URy: 20})
-			annotation.AddWidget(btn, pdf.Rectangle{LLx: 30, URx: 50, URy: 20})
-
-			if n := len(btn.Kids); n != 2 {
-				t.Fatalf("field has %d kids, want 2", n)
-			}
-			fieldRoundTripTest(t, version, btn)
-		})
-	}
-}
-
-// a builder-assembled hierarchy of non-terminal and terminal fields round-trips
-func TestBuilderTreeRoundTrip(t *testing.T) {
-	form := &acroform.InteractiveForm{}
-	root := form.NewField("request")
-	text := acroform.NewTextField(root, "text")
+// a group nesting terminal fields with values round-trips, with the field type
+// and value attributes flattened back onto each terminal
+func TestTreeRoundTrip(t *testing.T) {
+	text := acroform.NewTextField("text")
 	text.V = pdf.String("hello")
-	acroform.NewButtonField(root, "flag")
+	text.DefaultAppearance = "/Helv 12 Tf 0 g"
+	other := acroform.NewTextField("note")
+	other.DefaultAppearance = "/Helv 12 Tf 0 g"
 
-	formRoundTripTest(t, pdf.V1_7, form)
+	root := &acroform.Group{Name: "request", Kids: []acroform.TreeNode{text, other}}
+
+	got := roundTripRoots(t, pdf.V1_7, root)
+	if diff := cmp.Diff(snapNodes([]acroform.TreeNode{root}), snapNodes(got), fieldCmpOptions()...); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
 }

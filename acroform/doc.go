@@ -18,20 +18,23 @@
 // the PDF specification chapter 12.7.
 //
 // A document's interactive form is an [InteractiveForm], referenced from the
-// AcroForm entry in the document catalog. It holds a tree of form fields. Each
-// field is a [Field]: a [FieldTx] (text), [FieldBtn] (button), [FieldChoice]
-// (choice), or [FieldSig] (signature) for a terminal field with its own type,
-// or a [FieldCommon] for a non-terminal field or one whose type is inherited.
+// AcroForm entry in the document catalog. It holds a tree of nodes ([TreeNode]):
+// terminal fields ([Field]) and interior [Group]s that merely group their
+// descendants under a common name. Each terminal field has a concrete type: a
+// [FieldTx] (text), [FieldBtn] (button), [FieldChoice] (choice), or [FieldSig]
+// (signature).
 //
-// Build a field tree with the builder methods on [InteractiveForm] for root
-// fields and the [NewField] family of functions for sub-fields; both wire the
-// parent links automatically. A terminal field's
-// on-page appearance is a widget annotation, "seehuhn.de/go/pdf/annotation".Widget;
-// add one with that package's AddWidget function. After assembling a field's
-// children by hand (rather than with the builders), set each child's parent
-// link ([FieldCommon.Parent], or the Parent field of a widget child) so that
-// the inheritance helpers (see [ResolvedFT]) and
-// [FieldCommon.FullyQualifiedName] resolve correctly.
+// A field tree is plain top-down data. Build it from [Group] literals and the
+// field constructors ([NewTextField] and friends), placing children directly in
+// a [Group.Kids] slice or in [InteractiveForm.Fields]. Attach a field's on-page
+// appearance with "seehuhn.de/go/pdf/annotation".AddWidget. Iterate the terminal
+// fields, with their fully qualified names, using [InteractiveForm.AllFields].
+//
+// In a PDF file many field attributes are inheritable: a field without its own
+// value takes its nearest ancestor's (12.7.4.1). This package hides that. A
+// decoded field carries fully resolved values, and the encoder re-creates the
+// inheritance where it shrinks the file, invisibly. There are therefore no
+// inheritance helpers.
 //
 // Forms and fields are read with the "seehuhn.de/go/pdf/annotation/decode"
 // package.

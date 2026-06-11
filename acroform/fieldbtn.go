@@ -41,19 +41,17 @@ const (
 //
 // The three button kinds — check box, radio button, and push button — share one
 // dictionary layout and differ only in their flags, so a single type represents
-// all of them. Use [FieldBtn.Variant] to obtain the kind; it is derived from the
-// field's effective (possibly inherited) flags, so a button whose variant flag
-// is inherited from an ancestor is classified correctly.
+// all of them. Use [FieldBtn.Variant] to obtain the kind.
 type FieldBtn struct {
-	FieldCommon
+	fieldBase
 	VariableText
 
 	// Opt (optional) holds the export value of each of the field's widget
-	// annotations, in the same order as its [FieldCommon.Kids]. It allows
-	// widgets that share an on-state name to be told apart. It does not apply to
-	// push buttons.
+	// annotations, in the same order as the field's widgets (see
+	// [Field.Widgets]). It allows widgets that share an on-state name to be told
+	// apart. It does not apply to push buttons.
 	//
-	// This corresponds to the /Opt entry.
+	// This corresponds to the /Opt entry in the PDF field dictionary.
 	Opt []string
 
 	// V (optional) is the field's value, the on-state name of the selected
@@ -61,41 +59,32 @@ type FieldBtn struct {
 	// retains no value, so V is empty for that variant. An empty value indicates
 	// that the field has no value of its own.
 	//
-	// This corresponds to the /V entry.
+	// This corresponds to the /V entry in the PDF field dictionary.
 	V pdf.Name
 
 	// DV (optional) is the field's default value, used when the form is reset.
 	//
-	// This corresponds to the /DV entry.
+	// This corresponds to the /DV entry in the PDF field dictionary.
 	DV pdf.Name
 }
 
 var _ Field = (*FieldBtn)(nil)
 
 // Variant reports whether the button is a check box, radio button, or push
-// button, derived from the field's effective (possibly inherited) flags.
+// button, derived from the field's flags.
 func (f *FieldBtn) Variant() ButtonVariant {
-	ff := ResolvedFf(f)
 	switch {
-	case ff&FieldPushbutton != 0:
+	case f.Ff&FieldPushbutton != 0:
 		return ButtonPush
-	case ff&FieldRadio != 0:
+	case f.Ff&FieldRadio != 0:
 		return ButtonRadio
 	default:
 		return ButtonCheckbox
 	}
 }
 
-// Encode implements [pdf.Encoder]; see [encodeField].
-func (f *FieldBtn) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	return encodeField(rm, f)
-}
-
 // FieldType implements the [Field] interface.
 func (f *FieldBtn) FieldType() pdf.Name { return "Btn" }
-
-func (f *FieldBtn) ownValue() pdf.Object        { return optionalName(f.V) }
-func (f *FieldBtn) ownDefaultValue() pdf.Object { return optionalName(f.DV) }
 
 func (f *FieldBtn) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if err := f.VariableText.fillDict(rm, dict); err != nil {
@@ -114,15 +103,6 @@ func (f *FieldBtn) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	fillName(dict, "V", f.V)
 	fillName(dict, "DV", f.DV)
 	return nil
-}
-
-// optionalName converts a button value to a PDF object for inheritance, mapping
-// an empty name to an absent value.
-func optionalName(n pdf.Name) pdf.Object {
-	if n == "" {
-		return nil
-	}
-	return n
 }
 
 // fillName writes a name entry, omitting it when the name is empty.

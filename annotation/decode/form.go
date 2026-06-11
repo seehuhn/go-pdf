@@ -40,8 +40,18 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 
 	form := &acroform.InteractiveForm{}
 
+	// the document-wide /DA and /Q defaults seed field-attribute inheritance,
+	// which the decoder flattens away; the values are not kept on the form
+	da, _ := pdf.Optional(x.GetString(path, dict["DA"]))
+	var q pdf.TextAlign
+	if v, err := pdf.Optional(x.GetInteger(path, dict["Q"])); err == nil && v >= 0 && v <= 2 {
+		q = pdf.TextAlign(v)
+	}
+	rootCtx := inherited{da: string(da), q: q}
+
 	// Fields (required)
-	if fields, err := decodeFieldRefs(x, path, dict["Fields"]); err != nil {
+	d := newFieldTreeDecoder()
+	if fields, err := d.decodeRoots(x, path, dict["Fields"], rootCtx); err != nil {
 		return nil, err
 	} else {
 		form.Fields = fields
@@ -61,9 +71,9 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 		form.SigFlags = acroform.SignatureFlags(sf)
 	}
 
-	// CO (optional); resolved through the same extractor, so each entry is the
-	// same field value as in the Fields tree
-	if co, err := decodeFieldRefs(x, path, dict["CO"]); err != nil {
+	// CO (optional); each entry resolves to a field already in the tree, so the
+	// same field value is shared with the Fields tree
+	if co, err := decodeCalculationOrder(x, path, dict["CO"], d); err != nil {
 		return nil, err
 	} else {
 		form.CalculationOrder = co
@@ -78,47 +88,29 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 		}
 	}
 
-	// DA (optional)
-	if da, err := pdf.Optional(x.GetString(path, dict["DA"])); err != nil {
-		return nil, err
-	} else {
-		form.DefaultAppearance = string(da)
-	}
-
-	// Q (optional)
-	if q, err := pdf.Optional(x.GetInteger(path, dict["Q"])); err != nil {
-		return nil, err
-	} else if q >= 0 && q <= 2 {
-		form.Align = pdf.TextAlign(q)
-	}
-
 	// XFA (optional)
 	form.XFA = dict["XFA"]
 
 	return form, nil
 }
 
-// decodeFieldRefs decodes an array of field references (the /Fields or /CO entry)
-// into the matching fields. The same extractor resolves both, so a reference
-// shared between the two yields the same field value.
-func decodeFieldRefs(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]acroform.Field, error) {
+// decodeCalculationOrder decodes the /CO array into the fields it names,
+// resolving each reference against the fields already decoded from the tree and
+// dropping any that names a field not in the tree.
+func decodeCalculationOrder(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, d *fieldTreeDecoder) ([]acroform.Field, error) {
 	arr, err := pdf.Optional(x.GetArray(path, obj))
 	if err != nil {
 		return nil, err
 	}
-	var fields []acroform.Field
+	var co []acroform.Field
 	for _, el := range arr {
 		ref, ok := el.(pdf.Reference)
 		if !ok {
 			continue
 		}
-		fld, err := pdf.Optional(pdf.ExtractorGet(x, path, ref, field))
-		if err != nil {
-			return nil, err
-		}
-		if fld != nil {
-			fields = append(fields, fld)
+		if fld := d.byRef[ref]; fld != nil {
+			co = append(co, fld)
 		}
 	}
-	return fields, nil
+	return co, nil
 }

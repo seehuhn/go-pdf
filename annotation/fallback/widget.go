@@ -86,8 +86,8 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 		return nil
 	}
 	p := &widgetField{
-		FieldType: acroform.ResolvedFT(f),
-		Flags:     acroform.ResolvedFf(f),
+		FieldType: f.FieldType(),
+		Flags:     f.Flags(),
 		OnState:   widgetOnState(f, widgetIndex(w)),
 	}
 	if vt, ok := f.(acroform.VariableTextField); ok {
@@ -97,8 +97,8 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	}
 	switch x := f.(type) {
 	case *acroform.FieldTx:
-		p.Value = valueText(acroform.ResolvedV(f))
-		p.MaxLen = acroform.ResolvedMaxLen(f)
+		p.Value = valueText(x.V)
+		p.MaxLen = x.MaxLen
 	case *acroform.FieldChoice:
 		p.Options = make([]string, len(x.Opt))
 		for i, o := range x.Opt {
@@ -111,22 +111,16 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	return p
 }
 
-// widgetIndex returns the position of w among the widget children of its field.
-// Radio buttons name each widget's on-state by this index.
+// widgetIndex returns the position of w among the widgets of its field. Radio
+// buttons name each widget's on-state by this index.
 func widgetIndex(w *annotation.Widget) int {
 	if w.Parent == nil {
 		return 0
 	}
-	i := 0
-	for _, kid := range w.Parent.GetFieldCommon().Kids {
-		kw, ok := kid.(*annotation.Widget)
-		if !ok {
-			continue
-		}
-		if kw == w {
+	for i, kw := range w.Parent.Widgets() {
+		if kw == acroform.Widget(w) {
 			return i
 		}
-		i++
 	}
 	return 0
 }
@@ -134,12 +128,12 @@ func widgetIndex(w *annotation.Widget) int {
 // widgetOnState returns the on-state name of the index-th widget of a check box
 // or radio button field, or the empty string for other field types.
 func widgetOnState(f acroform.Field, index int) pdf.Name {
-	ff := acroform.ResolvedFf(f)
-	if acroform.ResolvedFT(f) != "Btn" || ff&acroform.FieldPushbutton != 0 {
+	ff := f.Flags()
+	if f.FieldType() != "Btn" || ff&acroform.FieldPushbutton != 0 {
 		return ""
 	}
-	if opt := resolvedOpt(f); index < len(opt) {
-		return pdf.Name(opt[index])
+	if btn, ok := f.(*acroform.FieldBtn); ok && index < len(btn.Opt) {
+		return pdf.Name(btn.Opt[index])
 	}
 	// a single check box may name its on-state via the field value
 	if ff&acroform.FieldRadio == 0 {
@@ -150,23 +144,12 @@ func widgetOnState(f acroform.Field, index int) pdf.Name {
 	return "On"
 }
 
-// buttonValue returns a check box or radio button field's effective value name,
-// inherited from an ancestor if the field itself does not set one.
+// buttonValue returns a check box or radio button field's value name.
 func buttonValue(f acroform.Field) pdf.Name {
-	v, _ := acroform.ResolvedV(f).(pdf.Name)
-	return v
-}
-
-// resolvedOpt returns a button field's effective export-value array, inherited
-// from an ancestor if the field itself does not set one (the Opt entry is
-// inheritable).
-func resolvedOpt(f acroform.Field) []string {
-	for n := f; n != nil; n = n.FieldParent() {
-		if x, ok := n.(*acroform.FieldBtn); ok && len(x.Opt) > 0 {
-			return x.Opt
-		}
+	if b, ok := f.(*acroform.FieldBtn); ok {
+		return b.V
 	}
-	return nil
+	return ""
 }
 
 // choiceValue returns the display text of a choice field's current selection.

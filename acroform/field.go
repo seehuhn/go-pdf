@@ -22,68 +22,78 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action/triggers"
-	"seehuhn.de/go/pdf/optional"
 )
 
 // PDF 2.0 sections: 12.7.4.1 12.7.4.2
 
-// Node is a child of a field in the field hierarchy. A node is either a [Field]
-// (a sub-field) or a widget annotation ("seehuhn.de/go/pdf/annotation".Widget).
-type Node interface {
-	// A node encodes to its own dictionary. Fields are written through the
-	// form (see [InteractiveForm.Encode]); a single-widget terminal field has
-	// no object of its own (it is folded into its widget), so its Encode is
-	// never called — its reference is the widget's.
+// TreeNode is a node of a field tree.
+// This must be either a [*Group] or a [Field].
+type TreeNode interface {
+	// PartialName returns the node's partial field name (the /T entry). An
+	// empty value means the node contributes no component to the fully
+	// qualified names of its descendants.
+	PartialName() string
+}
+
+// Field is a terminal field in a PDF interactive form: a [FieldTx] (text),
+// [FieldBtn] (button), [FieldChoice] (choice), or [FieldSig] (signature).
+//
+// In a PDF file, field attributes may be inherited from ancestors in the field
+// tree (12.7.4.1). This package hides that: a decoded field carries fully
+// resolved ("flattened") attribute values, and the encoder restores the
+// inheritance as a storage optimization, invisibly. There are therefore no
+// inheritance helpers; read a field's attributes directly from its fields.
+//
+// A terminal field is rendered on a page by one or more widget annotations
+// ("seehuhn.de/go/pdf/annotation".Widget); see [Field.Widgets]. A field with
+// exactly one widget is written as a single combined field/widget dictionary;
+// this merging is automatic and transparent.
+//
+// Fields are not written individually; [InteractiveForm.Encode] writes the
+// whole tree when the form is stored.
+type Field interface {
+	TreeNode
+
+	// FieldType returns the PDF field type, one of "Btn", "Tx", "Ch", or "Sig".
+	FieldType() pdf.Name
+
+	// Flags returns the field's flags.
+	Flags() FieldFlags
+
+	// Widgets returns the field's widget annotations, one for each place the
+	// field appears on a page.
+	Widgets() []Widget
+
+	// AddWidget appends a widget annotation to the field. Prefer
+	// "seehuhn.de/go/pdf/annotation".AddWidget, which also sets the widget's
+	// parent link.
+	AddWidget(Widget)
+
+	base() *fieldBase
+	fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error
+}
+
+// Widget is the interface satisfied by a terminal field's widget annotations.
+// Its only implementation is "seehuhn.de/go/pdf/annotation".Widget; the
+// interface exists so that the acroform package can refer to widgets without
+// importing the annotation package.
+type Widget interface {
 	pdf.Encoder
 
-	// FieldParent returns the form field this node is a child of, or nil if
-	// the node is not linked to a parent field.
+	// FieldParent returns the field this widget belongs to, or nil.
 	FieldParent() Field
 }
 
-// Field is a single field in a PDF interactive form.
-//
-// Fields form a tree: a non-terminal field has sub-fields as its children,
-// while a terminal field has widget annotations as its children. A terminal
-// field with exactly one widget is written as a single combined field/widget
-// dictionary; this merging is applied automatically and is transparent to the
-// Go representation, where the widget is always a child in [FieldCommon.Kids].
-//
-// Fields are not written individually; they are written, with the whole
-// subtree rooted at each, by [InteractiveForm.Encode] when the form is stored.
-//
-// Each terminal field has a concrete type matching its field type: [FieldTx]
-// (text), [FieldBtn] (button), [FieldChoice] (choice), and [FieldSig]
-// (signature). A field with no field type of its own — a non-terminal field,
-// or one whose type is inherited — is represented by a [*FieldCommon].
-//
-// Several attributes (the field type, Ff, V, DV) are inheritable: a field that
-// does not specify them takes the value from its nearest ancestor that does.
-// The stored values are not flattened; use the Resolved* functions to obtain
-// the effective value.
-type Field interface {
-	Node
-
-	// FieldType returns the field type, one of "Btn", "Tx", "Ch", or "Sig".
-	// An empty value indicates a field with no type of its own.
-	FieldType() pdf.Name
-
-	// GetFieldCommon returns the attributes common to all field types.
-	GetFieldCommon() *FieldCommon
-
-	fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error
-	ownValue() pdf.Object
-	ownDefaultValue() pdf.Object
-}
-
-// FieldCommon holds the attributes shared by all field types. Concrete field
-// types embed it; on its own, a *FieldCommon represents a non-terminal field or
-// a field whose type is inherited from an ancestor.
-type FieldCommon struct {
-	// T (optional) is the partial field name. An empty value indicates that
-	// the field has no name of its own and does not contribute to fully
-	// qualified field names.
-	T string
+// fieldBase holds the attributes shared by all terminal field types. The four
+// concrete types embed it. Its exported fields can be set directly; the
+// unexported fields carry the widget list and per-encoding state.
+type fieldBase struct {
+	// Name (optional) is the partial field name. An empty value means the
+	// field has no name of its own and does not contribute to fully qualified
+	// field names.
+	//
+	// This corresponds to the /T entry in the PDF field dictionary.
+	Name string
 
 	// TU (optional) is an alternative field name used in the user interface
 	// and for accessibility.
@@ -92,201 +102,86 @@ type FieldCommon struct {
 	// TM (optional) is the mapping name used when exporting field data.
 	TM string
 
-	// Ff holds the field flags common to all field types. Because the flags
-	// are inheritable, a present value of zero is distinct from an absent
-	// entry: a present zero blocks inheritance, while an absent value lets the
-	// field inherit its flags from the nearest ancestor that sets them.
-	Ff optional.Value[FieldFlags]
+	// Ff holds the field flags. The zero value means no flags are set.
+	//
+	// This corresponds to the /Ff entry in the PDF field dictionary.
+	Ff FieldFlags
 
 	// AA (optional) is the field's additional-actions dictionary.
 	AA *triggers.Form
 
-	// Kids holds the field's children, either sub-fields or widget annotations.
-	// A terminal field with a single widget child is encoded as one combined
-	// field/widget dictionary; the merge is applied automatically on write.
-	Kids []Node
-
-	// Parent points to the field's parent in the hierarchy, for inheritance
-	// and name resolution. It is nil for a root field. The builder functions
-	// and decoding set it; when assembling a field's Kids by hand, set it on
-	// each sub-field child.
-	//
-	// This corresponds to the /Parent entry.
-	Parent Field
+	widgets []Widget
+	enc     *fieldEncState
 }
 
-// FieldParent implements the [Node] interface; it returns
-// [FieldCommon.Parent].
-func (c *FieldCommon) FieldParent() Field { return c.Parent }
-
-// GetFieldCommon implements the [Field] interface.
-func (c *FieldCommon) GetFieldCommon() *FieldCommon { return c }
-
-// FieldType implements the [Field] interface. For a bare [FieldCommon] it
-// returns the empty string.
-func (c *FieldCommon) FieldType() pdf.Name { return "" }
-
-func (c *FieldCommon) fillTypeDict(*pdf.ResourceManager, pdf.Dict) error { return nil }
-
-// a typeless field has no value of its own; it serves only as a container for
-// inheritable attributes
-func (c *FieldCommon) ownValue() pdf.Object        { return nil }
-func (c *FieldCommon) ownDefaultValue() pdf.Object { return nil }
-
-// Encode implements [pdf.Encoder]; see [encodeField].
-func (c *FieldCommon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	return encodeField(rm, c)
+// fieldEncState records, for one encoding pass, how a field's widget
+// annotations should tie themselves to the field tree. [InteractiveForm.Encode]
+// sets it; the annotation package reads it through the formhooks seam when it
+// later writes the widgets.
+type fieldEncState struct {
+	rm        *pdf.ResourceManager
+	parentRef pdf.Reference // the enclosing group's reference, or 0 for a root
+	fieldRef  pdf.Reference // the field's own reference, or its single widget's
+	entries   pdf.Dict      // the field's own entries; non-nil only when merged
 }
 
-var (
-	_ Field = (*FieldCommon)(nil)
-	_ Node  = (*FieldCommon)(nil)
-)
+// PartialName implements the [TreeNode] interface.
+func (b *fieldBase) PartialName() string { return b.Name }
 
-// newField returns an empty concrete field for the given field type, one of
-// "Tx", "Ch", "Btn", or "Sig". A field with no recognised type is represented by
-// a bare [FieldCommon]. A button field's variant (check box / radio / push) is
-// not fixed here; it is derived on demand from the effective flags (see
-// [FieldBtn.Variant]).
-//
-// This is the factory used when decoding, reached through the formhooks
-// package; field trees are otherwise built with the builder functions and the
-// methods on [InteractiveForm].
-func newField(ft pdf.Name) Field {
-	switch ft {
-	case "Tx":
-		return &FieldTx{}
-	case "Ch":
-		return &FieldChoice{}
-	case "Sig":
-		return &FieldSig{}
-	case "Btn":
-		return &FieldBtn{}
-	default:
-		return &FieldCommon{}
-	}
-}
+// Flags implements the [Field] interface.
+func (b *fieldBase) Flags() FieldFlags { return b.Ff }
 
-// encodeField builds the dictionary for a field that has its own object — every
-// field except a single-widget terminal field, which is folded into its widget
-// (see [fieldRef]). It writes the field's own entries, its /Parent, and its
-// /Kids (each kid named by [fieldRef] for sub-fields or by the widget's
-// reference for widget kids). It implements [Field.Encode]; the form, not the
-// caller, drives this through [InteractiveForm.Encode].
-//
-// Widget annotations are not written here: each is written later, when the
-// page listing it is written, and then folds in its field's entries using its
-// parent link. The ordering contract (store the form before closing pages)
-// ensures the link is still in place by then.
-//
-// Encoding never modifies the tree: it fails with an error if a child's
-// parent link does not point back to f.
-func encodeField(rm *pdf.ResourceManager, f Field) (pdf.Native, error) {
-	dict, err := fieldEntries(rm, f)
-	if err != nil {
-		return nil, err
-	}
-	c := f.GetFieldCommon()
-	if c.Parent != nil {
-		dict["Parent"] = rm.GetReference(c.Parent)
-	}
+// Widgets implements the [Field] interface.
+func (b *fieldBase) Widgets() []Widget { return b.widgets }
 
-	var kidRefs pdf.Array
-	for _, kid := range c.Kids {
-		if kid.FieldParent() != f {
-			return nil, errors.New("field kid with missing or wrong Parent link")
-		}
-		if k, ok := kid.(Field); ok {
-			kidRef, err := fieldRef(rm, k)
-			if err != nil {
-				return nil, err
-			}
-			kidRefs = append(kidRefs, kidRef)
-		} else {
-			// a widget annotation kid, named by its own reference
-			kidRefs = append(kidRefs, rm.GetReference(kid))
-		}
-	}
-	if len(kidRefs) > 0 {
-		dict["Kids"] = kidRefs
-	}
-	return dict, nil
-}
+// AddWidget implements the [Field] interface.
+func (b *fieldBase) AddWidget(w Widget) { b.widgets = append(b.widgets, w) }
 
-// fieldRef returns the reference that names f in the file. A single-widget
-// terminal field has no object of its own: its reference is its widget's, which
-// writes the merged field/widget dictionary (the widget folds in the field's
-// entries via foldFieldIntoWidget). Every other field is written via rm.Store
-// and named by its own reference.
-func fieldRef(rm *pdf.ResourceManager, f Field) (pdf.Reference, error) {
-	widgets, hasSubfield := classifyKids(f.GetFieldCommon().Kids)
-	if !hasSubfield && len(widgets) == 1 {
-		w := widgets[0]
-		if w.FieldParent() != f {
-			return 0, errors.New("widget with missing or wrong Parent link")
-		}
-		return rm.GetReference(w), nil
-	}
-	return rm.Store(f)
-}
+func (b *fieldBase) base() *fieldBase { return b }
 
-// classifyKids splits a field's children into widget annotations (any child that
-// is not itself a [Field]) and a flag for whether any child is a sub-field.
-func classifyKids(kids []Node) (widgets []Node, hasSubfield bool) {
-	for _, kid := range kids {
-		if _, ok := kid.(Field); ok {
-			hasSubfield = true
-		} else {
-			widgets = append(widgets, kid)
-		}
-	}
-	return widgets, hasSubfield
-}
-
-// fieldEntries builds the field-level dictionary entries (FT, T, the flags, AA,
-// and the type-specific entries), excluding /Parent and /Kids. The annotation
-// package reaches it through the formhooks package, to fold a terminal field's
-// entries into the field's single widget annotation.
-func fieldEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
+// terminalEntries builds the dictionary entries of a terminal field — its
+// flattened own entries (FT, T, TU, TM, Ff, AA, and the type-specific entries),
+// excluding /Parent and /Kids. The factoring pass may later remove inheritable
+// entries that are hoisted into an ancestor.
+func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "interactive form field", pdf.V1_2); err != nil {
 		return nil, err
 	}
 
-	c := f.GetFieldCommon()
-	dict := pdf.Dict{}
-
-	if ft := f.FieldType(); ft != "" {
-		dict["FT"] = ft
+	b := f.base()
+	dict := pdf.Dict{
+		"FT": f.FieldType(),
 	}
-	if c.T != "" {
-		if strings.Contains(c.T, ".") {
+
+	if b.Name != "" {
+		if strings.Contains(b.Name, ".") {
 			return nil, errors.New("field partial name must not contain a period")
 		}
-		dict["T"] = pdf.TextString(c.T)
+		dict["T"] = pdf.TextString(b.Name)
 	}
-	if c.TU != "" {
+	if b.TU != "" {
 		if err := pdf.CheckVersion(rm.Out, "field TU entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["TU"] = pdf.TextString(c.TU)
+		dict["TU"] = pdf.TextString(b.TU)
 	}
-	if c.TM != "" {
+	if b.TM != "" {
 		if err := pdf.CheckVersion(rm.Out, "field TM entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["TM"] = pdf.TextString(c.TM)
+		dict["TM"] = pdf.TextString(b.TM)
 	}
-	if ff, ok := c.Ff.Get(); ok {
-		if err := checkFlagVersions(rm.Out, ff); err != nil {
+	if b.Ff != 0 {
+		if err := checkFlagVersions(rm.Out, b.Ff); err != nil {
 			return nil, err
 		}
-		dict["Ff"] = pdf.Integer(uint32(ff))
+		dict["Ff"] = pdf.Integer(uint32(b.Ff))
 	}
-	if c.AA != nil {
+	if b.AA != nil {
 		if err := pdf.CheckVersion(rm.Out, "field AA entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		aa, err := c.AA.Encode(rm)
+		aa, err := b.AA.Encode(rm)
 		if err != nil {
 			return nil, err
 		}
@@ -301,87 +196,21 @@ func fieldEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 	return dict, nil
 }
 
-// ResolvedFT returns the field's effective type, inherited from an ancestor if
-// the field itself does not specify one.
-//
-// The resolution walks the field's ancestors, so the parent links must be in
-// place: the builder functions and decoding set them; set [FieldCommon.Parent]
-// yourself when assembling a tree by hand. The same applies to [ResolvedFf],
-// [ResolvedV], and [ResolvedDV].
-func ResolvedFT(f Field) pdf.Name {
-	for n := f; n != nil; n = n.FieldParent() {
-		if ft := n.FieldType(); ft != "" {
-			return ft
-		}
-	}
-	return ""
+// mergedDetectionKeys are the entries whose presence marks a Widget-subtype
+// dictionary as a field merged with its single widget (see isMergedFieldDict
+// in the annotation/decode package). The factoring pass must leave at least one
+// of these on every merged terminal so it stays recognisable as a field.
+var mergedDetectionKeys = []pdf.Name{
+	"FT", "T", "TU", "TM", "Ff", "V", "DV", "DA", "Q", "MaxLen", "Opt", "Lock", "SV",
 }
 
-// ResolvedFf returns the field's effective flags, inherited from an ancestor
-// if the field itself does not specify them.
-func ResolvedFf(f Field) FieldFlags {
-	for n := f; n != nil; n = n.FieldParent() {
-		if ff, ok := n.GetFieldCommon().Ff.Get(); ok {
-			return ff
+// hasMergedDetectionKey reports whether dict carries any entry that marks it as
+// a merged field/widget dictionary.
+func hasMergedDetectionKey(dict pdf.Dict) bool {
+	for _, key := range mergedDetectionKeys {
+		if _, ok := dict[key]; ok {
+			return true
 		}
 	}
-	return 0
-}
-
-// ResolvedV returns the field's effective value, inherited from an ancestor if
-// the field itself does not specify one.
-func ResolvedV(f Field) pdf.Object {
-	for n := f; n != nil; n = n.FieldParent() {
-		if v := n.ownValue(); v != nil {
-			return v
-		}
-	}
-	return nil
-}
-
-// ResolvedDV returns the field's effective default value, inherited from an
-// ancestor if the field itself does not specify one.
-func ResolvedDV(f Field) pdf.Object {
-	for n := f; n != nil; n = n.FieldParent() {
-		if dv := n.ownDefaultValue(); dv != nil {
-			return dv
-		}
-	}
-	return nil
-}
-
-// ResolvedMaxLen returns a text field's effective maximum text length,
-// inherited from an ancestor if the field itself does not set one. A value of
-// zero indicates that no maximum is set.
-func ResolvedMaxLen(f Field) int {
-	for n := f; n != nil; n = n.FieldParent() {
-		if x, ok := n.(*FieldTx); ok && x.MaxLen > 0 {
-			return x.MaxLen
-		}
-	}
-	return 0
-}
-
-// FullyQualifiedName returns the field's fully qualified name, formed by
-// joining the partial names of the field and its ancestors with a period.
-// Ancestors without a partial name are skipped.
-//
-// The name walks the field's ancestors, so the parent links must be in place:
-// the builder functions and decoding set them; set [FieldCommon.Parent]
-// yourself when assembling a tree by hand.
-func (c *FieldCommon) FullyQualifiedName() string {
-	var parts []string
-	for n := c; n != nil; {
-		if n.T != "" {
-			parts = append(parts, n.T)
-		}
-		if n.Parent == nil {
-			break
-		}
-		n = n.Parent.GetFieldCommon()
-	}
-	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
-		parts[i], parts[j] = parts[j], parts[i]
-	}
-	return strings.Join(parts, ".")
+	return false
 }

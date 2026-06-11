@@ -36,7 +36,6 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/optional"
 )
 
 const (
@@ -110,8 +109,7 @@ func createDocument(filename string) error {
 		page:  page,
 		style: style,
 		form: &acroform.InteractiveForm{
-			DefaultResources:  &content.Resources{Font: map[pdf.Name]font.Instance{"Helv": H}},
-			DefaultAppearance: defaultDA,
+			DefaultResources: &content.Resources{Font: map[pdf.Name]font.Instance{"Helv": H}},
 		},
 		label: H,
 		yPos:  startY,
@@ -267,7 +265,8 @@ func (wr *writer) makeField(d demo) acroform.Field {
 	case "Btn":
 		// a push button retains no value; check boxes and radio buttons carry
 		// the on-state name in V, and radio buttons name their widgets in Opt
-		btn := wr.form.NewButtonField(name)
+		btn := acroform.NewButtonField(name)
+		btn.Ff = d.ff
 		if d.ff&acroform.FieldPushbutton == 0 {
 			btn.V = pdf.Name(d.value)
 			if d.ff&acroform.FieldRadio != 0 {
@@ -277,7 +276,8 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		f = btn
 
 	case "Tx":
-		tx := wr.form.NewTextField(name)
+		tx := acroform.NewTextField(name)
+		tx.Ff = d.ff
 		tx.DefaultAppearance = defaultDA
 		tx.Align = d.align
 		tx.MaxLen = d.maxLen
@@ -287,7 +287,8 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		f = tx
 
 	case "Ch":
-		ch := wr.form.NewChoiceField(name)
+		ch := acroform.NewChoiceField(name)
+		ch.Ff = d.ff
 		ch.DefaultAppearance = defaultDA
 		ch.Align = d.align
 		ch.Selected = d.sel
@@ -300,11 +301,11 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		f = ch
 
 	default: // "Sig"
-		f = wr.form.NewSignatureField(name)
+		sig := acroform.NewSignatureField(name)
+		sig.Ff = d.ff
+		f = sig
 	}
 
-	if d.ff != 0 {
-		f.GetFieldCommon().Ff = optional.New(d.ff)
-	}
+	wr.form.Fields = append(wr.form.Fields, f)
 	return f
 }

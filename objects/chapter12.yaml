@@ -5779,9 +5779,9 @@ types:
     - 3DMeasureLD3
     - 3DMeasurePD3
     - 3DMeasureRD3
-- name: Field
-  purpose: interactive form field properties common to all field types
-  goType: acroform.FieldCommon
+- name: Group
+  purpose: non-terminal interactive form field; a container that groups its descendants under a common partial name (12.7.4.1)
+  goType: acroform.Group
   goPackage: acroform
   goRepr: struct
   pdfRepr: dict
@@ -5789,43 +5789,40 @@ types:
   specSection: 12.7.4.1 12.7.4.2
   specTable: Table 226
   fileDependent: true
-  writeMethod: (*FieldCommon).Encode
+  notes: |
+    Inheritable attributes (FT, Ff, V, DV, DA, Q, MaxLen) are flattened onto the
+    descendant terminal fields on read; on write the encoder hoists shared values
+    back into group dictionaries (and the form's DA/Q) where it shrinks the file.
+    A non-terminal field therefore carries no attributes of its own in the Go
+    model; TU/TM/AA on such a dictionary are dropped on read.
   fields:
-  - goName: FT
-    pdfKey: FT
-    pdfType: name
+  - goName: Name
+    pdfKey: T
+    pdfType: text-string
     required: false
     introduced: '1.2'
-    goType: pdf.Name
-    inheritable: true
-    possibleValues:
-    - Btn
-    - Tx
-    - Ch
-    - Sig
-  - goName:
-    pdfKey: Parent
-    pdfType: dictionary
-    required: false
-    introduced: '1.2'
-    refTypes:
-    - FieldTx
-    - FieldBtn
-    - FieldChoice
-    - type: FieldSig
-      since: '1.3'
-    - Field
-    notes: Table 226
+    goType: string
   - goName: Kids
     pdfKey: Kids
     pdfType: array
     required: false
     introduced: '1.2'
-    goType: '[]acroform.Node'
+    goType: '[]acroform.TreeNode'
     refTypes:
     - type: Field
       collection: array
-  - goName: T
+- name: Field
+  purpose: attributes shared by all terminal field types (the unexported base the field types embed)
+  goType: acroform.fieldBase
+  goPackage: acroform
+  goRepr: struct
+  pdfRepr: dict
+  introduced: '1.2'
+  specSection: 12.7.4.1 12.7.4.2
+  specTable: Table 226
+  fileDependent: true
+  fields:
+  - goName: Name
     pdfKey: T
     pdfType: text-string
     required: false
@@ -5848,8 +5845,7 @@ types:
     pdfType: bitmask
     required: false
     introduced: '1.2'
-    goType: optional.Value[acroform.FieldFlags]
-    goPresenceTracking: true
+    goType: acroform.FieldFlags
     inheritable: true
   - goName: AA
     pdfKey: AA
@@ -5912,7 +5908,6 @@ types:
   specSection: 12.7.5.2.2 12.7.5.2.3 12.7.5.2.4
   specTable: Table 226 and Table 229 and Table 230
   fileDependent: true
-  writeMethod: (*FieldBtn).Encode
   embeds:
   - Field
   - VariableText
@@ -5957,7 +5952,6 @@ types:
   specSection: 12.7.5.4
   specTable: Table 226 and Table 234
   fileDependent: true
-  writeMethod: (*FieldChoice).Encode
   embeds:
   - Field
   - VariableText
@@ -6056,7 +6050,6 @@ types:
   specSection: 12.7.5.5
   specTable: Table 226 and Table 235
   fileDependent: true
-  writeMethod: (*FieldSig).Encode
   embeds:
   - Field
   fields:
@@ -6115,7 +6108,6 @@ types:
   specSection: 12.7.5.3
   specTable: Table 226 and Table 228 and Table 231
   fileDependent: true
-  writeMethod: (*FieldTx).Encode
   embeds:
   - Field
   - VariableText
@@ -6291,7 +6283,7 @@ types:
     pdfType: array
     required: true
     introduced: '1.2'
-    goType: '[]pdf.Reference'
+    goType: '[]acroform.TreeNode'
     refTypes:
     - type: Field
       collection: array
@@ -6330,23 +6322,25 @@ types:
     refTypes:
     - Resource
     notes: At a minimum, this dictionary shall contain a Font entry specifying the resource name and font dictionary of the default font for displaying text.
-  - goName: DefaultAppearance
+  - goName:
     pdfKey: DA
     pdfType: byte-string
     required: false
     introduced: '1.2'
-    goType: string
-    notes: https://github.com/pdf-association/pdf-issues/issues/318
-  - goName: Align
+    notes: |
+      Document-wide default appearance; handled internally. On read it seeds
+      field-attribute inheritance (flattened away); on write the encoder hoists
+      the dominant field DA here. Not a Go field.
+  - goName:
     pdfKey: Q
     pdfType: integer
     required: false
     introduced: '1.2'
-    goType: pdf.TextAlign
     possibleValues:
     - '0'
     - '1'
     - '2'
+    notes: Document-wide default quadding; handled internally like DA. Not a Go field.
   - goName: XFA
     pdfKey: XFA
     pdfType: fn:SinceVersion(1.6,array);stream

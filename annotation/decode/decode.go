@@ -34,9 +34,10 @@ func Annotation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) 
 	// a field merged with its single widget is one object that is both a Widget
 	// annotation and a form field; decode it as a linked field+widget pair and
 	// return the widget half, so the page's /Annots and the field tree's /Kids
-	// share one object
+	// share one object. The field's inheritable attributes are flattened against
+	// the context reconstructed from its /Parent chain, matching the field tree.
 	if path != nil && isMergedFieldDict(dict) {
-		_, w, err := decodeMergedField(x, path, path.Ref, dict)
+		_, w, err := decodeMergedField(x, path, path.Ref, dict, inheritedFromChain(x, dict))
 		return w, err
 	}
 

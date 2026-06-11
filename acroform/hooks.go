@@ -17,17 +17,30 @@
 package acroform
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/formhooks"
 )
 
-// register the field plumbing used by the annotation and annotation/decode
-// packages, so that it need not be part of the public API
+// register the field plumbing used by the annotation package, so that it need
+// not be part of the public API
 func init() {
-	formhooks.NewField = func(fieldType pdf.Name) any {
-		return newField(fieldType)
-	}
-	formhooks.FieldEntries = func(rm *pdf.ResourceManager, field any) (pdf.Dict, error) {
-		return fieldEntries(rm, field.(Field))
+	formhooks.WidgetFieldInfo = func(rm *pdf.ResourceManager, field, widget any) (formhooks.WidgetInfo, error) {
+		f, ok := field.(Field)
+		if !ok {
+			return formhooks.WidgetInfo{}, errors.New("widget parent is not a form field")
+		}
+		st := f.base().enc
+		if st == nil || st.rm != rm {
+			return formhooks.WidgetInfo{}, errors.New("interactive form must be stored before its widget annotations are written")
+		}
+		if st.entries != nil {
+			// a merged field/widget: fold the field's entries in and point
+			// /Parent at the field's own parent group
+			return formhooks.WidgetInfo{ParentRef: st.parentRef, Entries: st.entries}, nil
+		}
+		// a widget of a multi-widget field: /Parent points at the field object
+		return formhooks.WidgetInfo{ParentRef: st.fieldRef}, nil
 	}
 }

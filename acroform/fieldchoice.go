@@ -31,50 +31,42 @@ type ChoiceOption struct {
 // FieldChoice is a choice form field: a list box, or a combo box when the
 // [FieldCombo] flag is set (field type "Ch").
 type FieldChoice struct {
-	FieldCommon
+	fieldBase
 	VariableText
 
 	// Opt holds the field's selectable options, in display order.
 	//
-	// This corresponds to the /Opt entry.
+	// This corresponds to the /Opt entry in the PDF field dictionary.
 	Opt []ChoiceOption
 
 	// TopIndex is the index in Opt of the first option visible in a scrollable
 	// list box.
 	//
-	// This corresponds to the /TI entry.
+	// This corresponds to the /TI entry in the PDF field dictionary.
 	TopIndex int
 
 	// Selected (optional) holds the indices into Opt of the currently selected
 	// options, in ascending order.
 	//
-	// This corresponds to the /I entry.
+	// This corresponds to the /I entry in the PDF field dictionary.
 	Selected []int
 
 	// V (optional) is the field's value: the display string of the selected
 	// option, or an array of strings for a multi-select field.
 	//
-	// This corresponds to the /V entry.
+	// This corresponds to the /V entry in the PDF field dictionary.
 	V pdf.Object
 
 	// DV (optional) is the field's default value, used when the form is reset.
 	//
-	// This corresponds to the /DV entry.
+	// This corresponds to the /DV entry in the PDF field dictionary.
 	DV pdf.Object
 }
 
 var _ Field = (*FieldChoice)(nil)
 
-// Encode implements [pdf.Encoder]; see [encodeField].
-func (f *FieldChoice) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	return encodeField(rm, f)
-}
-
 // FieldType implements the [Field] interface.
 func (f *FieldChoice) FieldType() pdf.Name { return "Ch" }
-
-func (f *FieldChoice) ownValue() pdf.Object        { return f.V }
-func (f *FieldChoice) ownDefaultValue() pdf.Object { return f.DV }
 
 func (f *FieldChoice) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if err := f.VariableText.fillDict(rm, dict); err != nil {

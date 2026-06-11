@@ -26,41 +26,29 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/optional"
 )
 
-// combWidget builds a comb text field with the given flags, value and
-// justification, MaxLen on a parent field, and one widget.
+// combWidget builds a comb text field with the given value, MaxLen and
+// justification, and one widget.
 func combWidget(value string, maxLen int, align pdf.TextAlign) *annotation.Widget {
-	parent := &acroform.FieldTx{
-		FieldCommon: acroform.FieldCommon{T: "p"},
-		MaxLen:      maxLen,
-	}
-	child := &acroform.FieldTx{
-		FieldCommon: acroform.FieldCommon{
-			T:  "c",
-			Ff: optional.New(acroform.FieldComb),
-		},
-		VariableText: acroform.VariableText{Align: align},
-		V:            pdf.TextString(value),
-	}
-	parent.Kids = []acroform.Node{child}
-	child.Parent = parent
+	f := acroform.NewTextField("c")
+	f.Ff = acroform.FieldComb
+	f.MaxLen = maxLen
+	f.Align = align
+	f.V = pdf.TextString(value)
 
-	w := annotation.AddWidget(child, pdf.Rectangle{LLx: 0, LLy: 0, URx: 62, URy: 20})
-	return w
+	return annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 62, URy: 20})
 }
 
-// MaxLen is inheritable; the widget's field context must pick it up from an
-// ancestor field.
-func TestResolveWidgetFieldInheritedMaxLen(t *testing.T) {
+// the widget's field context reflects the field's MaxLen and flags
+func TestResolveWidgetFieldMaxLen(t *testing.T) {
 	w := combWidget("AB", 6, pdf.TextAlignLeft)
 	fld := resolveWidgetField(w)
 	if fld == nil {
 		t.Fatal("expected a field context")
 	}
 	if fld.MaxLen != 6 {
-		t.Errorf("MaxLen = %d, want 6 (inherited)", fld.MaxLen)
+		t.Errorf("MaxLen = %d, want 6", fld.MaxLen)
 	}
 	if fld.Flags&acroform.FieldComb == 0 {
 		t.Error("Comb flag missing from field context")

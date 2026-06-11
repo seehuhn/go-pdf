@@ -19,62 +19,26 @@ package acroform
 import (
 	"testing"
 
-	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf"
 )
 
-// a builder-assembled tree resolves names and inherited attributes correctly
-// without first being encoded or decoded
-func TestBuilderResolveBeforeEncode(t *testing.T) {
-	form := &InteractiveForm{}
-	root := form.NewField("request")
-	sender := NewField(root, "sender")
-	name := NewField(sender, "name")
-	first := NewTextField(name, "first")
-
-	if got := first.FullyQualifiedName(); got != "request.sender.name.first" {
-		t.Errorf("FullyQualifiedName = %q, want %q", got, "request.sender.name.first")
+// the field constructors set the partial name and the field type
+func TestConstructors(t *testing.T) {
+	tests := []struct {
+		field Field
+		want  pdf.Name
+	}{
+		{NewTextField("a"), "Tx"},
+		{NewButtonField("b"), "Btn"},
+		{NewChoiceField("c"), "Ch"},
+		{NewSignatureField("d"), "Sig"},
 	}
-	if got := ResolvedFT(first); got != "Tx" {
-		t.Errorf("ResolvedFT = %q, want %q", got, "Tx")
-	}
-}
-
-// a child of a typed parent inherits the parent's type and flags; the parent
-// link must reach the concrete *FieldBtn rather than its embedded *FieldCommon
-func TestBuilderTypedParentInheritance(t *testing.T) {
-	form := &InteractiveForm{}
-	btn := form.NewButtonField("color")
-	btn.Ff = optional.New(FieldRadio)
-	sub := NewField(btn, "option1")
-
-	if got := ResolvedFT(sub); got != "Btn" {
-		t.Errorf("ResolvedFT = %q, want %q", got, "Btn")
-	}
-	if got := ResolvedFf(sub); got != FieldRadio {
-		t.Errorf("ResolvedFf = %d, want %d", got, FieldRadio)
-	}
-}
-
-// the builder functions work on fields assembled from raw struct literals
-func TestBuilderOnLiteralParent(t *testing.T) {
-	btn := &FieldBtn{FieldCommon: FieldCommon{T: "color"}}
-	sub := NewField(btn, "option1")
-
-	if got := ResolvedFT(sub); got != "Btn" {
-		t.Errorf("ResolvedFT = %q, want %q", got, "Btn")
-	}
-	if len(btn.Kids) != 1 || btn.Kids[0] != Node(sub) {
-		t.Error("child was not added to the parent's Kids")
-	}
-}
-
-// a nil parent yields a detached field, usable as a root field
-func TestBuilderDetached(t *testing.T) {
-	f := NewTextField(nil, "surname")
-	if f.FieldParent() != nil {
-		t.Error("detached field has a parent")
-	}
-	if got := f.FullyQualifiedName(); got != "surname" {
-		t.Errorf("FullyQualifiedName = %q, want %q", got, "surname")
+	for _, tc := range tests {
+		if got := tc.field.FieldType(); got != tc.want {
+			t.Errorf("FieldType = %q, want %q", got, tc.want)
+		}
+		if got := tc.field.PartialName(); got == "" {
+			t.Errorf("%s field has no partial name", tc.want)
+		}
 	}
 }

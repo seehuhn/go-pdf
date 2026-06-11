@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package formhooks gives the annotation and annotation/decode packages
-// access to form field plumbing of the acroform package, without making it
-// part of the public acroform API.
+// Package formhooks gives the annotation package access to form field plumbing
+// of the acroform package, without making it part of the public acroform API.
 //
 // The function variables are set by the acroform package when it is
 // initialised. This package must not import acroform (every consumer of a
@@ -26,13 +25,22 @@ package formhooks
 
 import "seehuhn.de/go/pdf"
 
-// NewField returns an empty concrete field (an acroform.Field) for the given
-// field type, one of "Tx", "Ch", "Btn", or "Sig". Any other type yields a
-// typeless field, a bare *acroform.FieldCommon.
-var NewField func(fieldType pdf.Name) any
+// WidgetInfo tells a widget annotation how to tie itself to its form field when
+// the widget is written.
+type WidgetInfo struct {
+	// ParentRef is the value for the widget's /Parent entry, or 0 to omit it.
+	// For a merged field/widget it is the field's enclosing group; for a widget
+	// of a multi-widget field it is the field's own object.
+	ParentRef pdf.Reference
 
-// FieldEntries builds the field-level dictionary entries (FT, T, the flags,
-// AA, and the type-specific entries) of an acroform.Field, excluding /Parent
-// and /Kids. The annotation package uses it to fold a terminal field's
-// entries into the field's single widget annotation.
-var FieldEntries func(rm *pdf.ResourceManager, field any) (pdf.Dict, error)
+	// Entries holds the field's own dictionary entries to fold into a merged
+	// field/widget dictionary. It is nil when the widget is not merged with its
+	// field.
+	Entries pdf.Dict
+}
+
+// WidgetFieldInfo reports how a widget annotation should be tied to its form
+// field. The field and widget are passed as untyped values (an acroform.Field
+// and the *annotation.Widget). The acroform package sets this when it is
+// initialised; it returns an error if the form has not been stored yet.
+var WidgetFieldInfo func(rm *pdf.ResourceManager, field, widget any) (WidgetInfo, error)

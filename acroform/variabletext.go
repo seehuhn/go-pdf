@@ -33,7 +33,7 @@ type VariableText struct {
 	// establishing the text font, size, and colour; at a minimum it sets the
 	// font and size with a Tf operator. A font size of zero requests automatic
 	// sizing. An empty value indicates that the field has no default appearance
-	// string of its own and inherits one from the form or an ancestor field.
+	// string.
 	//
 	// This corresponds to the /DA entry.
 	DefaultAppearance string
@@ -60,8 +60,8 @@ type VariableText struct {
 // GetVariableText returns the variable-text attributes.
 func (v *VariableText) GetVariableText() *VariableText { return v }
 
-// VariableTextField is the interface satisfied by field types that carry
-// variable-text attributes — the default appearance, justification, and
+// VariableTextField is the interface satisfied by terminal field types that
+// carry variable-text attributes — the default appearance, justification, and
 // rich-text entries. It lets these attributes be read from a [Field] without a
 // type switch on the concrete field type:
 //

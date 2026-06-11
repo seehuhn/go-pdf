@@ -77,8 +77,8 @@ type Widget struct {
 }
 
 var (
-	_ Annotation    = (*Widget)(nil)
-	_ acroform.Node = (*Widget)(nil)
+	_ Annotation      = (*Widget)(nil)
+	_ acroform.Widget = (*Widget)(nil)
 )
 
 // AnnotationType returns "Widget".
@@ -87,7 +87,7 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
-// FieldParent implements the acroform.Node interface; it returns
+// FieldParent implements the acroform.Widget interface; it returns
 // [Widget.Parent], the form field this widget is a child of.
 func (w *Widget) FieldParent() acroform.Field { return w.Parent }
 
@@ -101,8 +101,7 @@ func AddWidget(f acroform.Field, rect pdf.Rectangle) *Widget {
 		Highlight: HighlightInvert,
 	}
 	w.Parent = f
-	c := f.GetFieldCommon()
-	c.Kids = append(c.Kids, w)
+	f.AddWidget(w)
 	return w
 }
 
@@ -179,42 +178,22 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 // foldFieldIntoWidget ties an encoded widget dictionary to its form field
-// (w.Parent). If the widget is the single widget of a terminal field, the
-// field's own entries are folded into the widget dictionary, producing one
-// merged field/widget object, and /Parent names the field's own parent (absent
+// (w.Parent), using the encode state the form recorded on the field when it was
+// stored. If the widget is the single widget of a terminal field, the field's
+// own entries are folded into the widget dictionary, producing one merged
+// field/widget object, and /Parent names the field's own parent group (absent
 // for a root field). Otherwise the widget gets a /Parent pointing at the field's
-// own object. It is called from [Widget.Encode] and keeps the merge rules here.
+// own object.
 //
 // Field entries take precedence over the widget's, except for the shared /AA,
 // whose field half (K/F/V/C) and widget half (E/X/Fo/Bl/…) are combined.
 func foldFieldIntoWidget(rm *pdf.ResourceManager, w *Widget, dict pdf.Dict) (pdf.Native, error) {
-	f := w.Parent
-
-	// w's entries are folded into the field only when w is the sole widget of a
-	// terminal field: no sub-fields and exactly one widget child, which is w
-	var theWidget acroform.Node
-	widgetCount := 0
-	hasSubfield := false
-	for _, kid := range f.GetFieldCommon().Kids {
-		if _, ok := kid.(acroform.Field); ok {
-			hasSubfield = true
-		} else {
-			widgetCount++
-			theWidget = kid
-		}
-	}
-	if hasSubfield || widgetCount != 1 || theWidget != acroform.Node(w) {
-		// a non-merged widget kid of a multi-widget field
-		dict["Parent"] = rm.GetReference(f)
-		return dict, nil
-	}
-
-	// the single widget of a terminal field: fold the field's entries in
-	entries, err := formhooks.FieldEntries(rm, f)
+	info, err := formhooks.WidgetFieldInfo(rm, w.Parent, w)
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range entries {
+
+	for k, v := range info.Entries {
 		if existing, exists := dict[k]; exists && k == "AA" {
 			merged, err := mergeAADicts(v, existing)
 			if err != nil {
@@ -225,8 +204,8 @@ func foldFieldIntoWidget(rm *pdf.ResourceManager, w *Widget, dict pdf.Dict) (pdf
 		}
 		dict[k] = v
 	}
-	if p := f.FieldParent(); p != nil {
-		dict["Parent"] = rm.GetReference(p)
+	if info.ParentRef != 0 {
+		dict["Parent"] = info.ParentRef
 	}
 	return dict, nil
 }

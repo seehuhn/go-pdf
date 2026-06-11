@@ -24,45 +24,37 @@ import "seehuhn.de/go/pdf"
 //
 // The signature value is kept opaque.
 type FieldSig struct {
-	FieldCommon
+	fieldBase
 
 	// V (optional) is the field's signature dictionary. The library treats this
 	// value as opaque.
 	//
-	// This corresponds to the /V entry.
+	// This corresponds to the /V entry in the PDF field dictionary.
 	V pdf.Object
 
 	// DV (optional) is the field's default value. The library treats this value
 	// as opaque.
 	//
-	// This corresponds to the /DV entry.
+	// This corresponds to the /DV entry in the PDF field dictionary.
 	DV pdf.Object
 
 	// Lock (optional) specifies the form fields that are locked when this
 	// signature field is signed.
 	//
-	// This corresponds to the /Lock entry.
+	// This corresponds to the /Lock entry in the PDF field dictionary.
 	Lock *SigFieldLock
 
 	// SV (optional) constrains the properties of a signature applied to this
 	// field.
 	//
-	// This corresponds to the /SV entry.
+	// This corresponds to the /SV entry in the PDF field dictionary.
 	SV *SigSeedValue
 }
 
 var _ Field = (*FieldSig)(nil)
 
-// Encode implements [pdf.Encoder]; see [encodeField].
-func (f *FieldSig) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	return encodeField(rm, f)
-}
-
 // FieldType implements the [Field] interface.
 func (f *FieldSig) FieldType() pdf.Name { return "Sig" }
-
-func (f *FieldSig) ownValue() pdf.Object        { return f.V }
-func (f *FieldSig) ownDefaultValue() pdf.Object { return f.DV }
 
 func (f *FieldSig) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if err := pdf.CheckVersion(rm.Out, "signature field", pdf.V1_3); err != nil {

@@ -26,41 +26,32 @@ import (
 
 // FieldTx is a text input form field (field type "Tx").
 type FieldTx struct {
-	FieldCommon
+	fieldBase
 	VariableText
 
 	// V (optional) is the field's text value, a text string or a text stream.
 	//
-	// This corresponds to the /V entry.
+	// This corresponds to the /V entry in the PDF field dictionary.
 	V pdf.Object
 
 	// DV (optional) is the field's default text value, used when the form is
 	// reset.
 	//
-	// This corresponds to the /DV entry.
+	// This corresponds to the /DV entry in the PDF field dictionary.
 	DV pdf.Object
 
 	// MaxLen is the maximum length of the field's text in characters. A value
-	// of zero indicates that no maximum is set. The entry is inheritable; a
-	// field with the [FieldComb] flag set must have a MaxLen, either of its
-	// own or inherited from an ancestor.
+	// of zero indicates that no maximum is set. A field with the [FieldComb]
+	// flag set must have a MaxLen.
 	//
-	// This corresponds to the /MaxLen entry.
+	// This corresponds to the /MaxLen entry in the PDF field dictionary.
 	MaxLen int
 }
 
 var _ Field = (*FieldTx)(nil)
 
-// Encode implements [pdf.Encoder]; see [encodeField].
-func (f *FieldTx) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	return encodeField(rm, f)
-}
-
 // FieldType implements the [Field] interface.
 func (f *FieldTx) FieldType() pdf.Name { return "Tx" }
-
-func (f *FieldTx) ownValue() pdf.Object        { return f.V }
-func (f *FieldTx) ownDefaultValue() pdf.Object { return f.DV }
 
 func (f *FieldTx) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if err := f.VariableText.fillDict(rm, dict); err != nil {
@@ -72,13 +63,13 @@ func (f *FieldTx) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if f.DV != nil {
 		dict["DV"] = f.DV
 	}
-	// the Comb flag requires a MaxLen (both are inheritable) and may not be
-	// combined with the Multiline, Password or FileSelect flags
-	if ff := ResolvedFf(f); ff&FieldComb != 0 {
-		if ff&(FieldMultiline|FieldPassword|FieldFileSelect) != 0 {
+	// the Comb flag requires a MaxLen and may not be combined with the
+	// Multiline, Password or FileSelect flags
+	if f.Ff&FieldComb != 0 {
+		if f.Ff&(FieldMultiline|FieldPassword|FieldFileSelect) != 0 {
 			return errors.New("Comb flag conflicts with Multiline, Password or FileSelect")
 		}
-		if ResolvedMaxLen(f) <= 0 {
+		if f.MaxLen <= 0 {
 			return errors.New("text field with Comb flag requires MaxLen")
 		}
 	}

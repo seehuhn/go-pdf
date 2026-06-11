@@ -34,10 +34,10 @@ func makeFormPDF(t *testing.T, path, fieldName string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := acroform.NewTextField(nil, fieldName)
+	f := acroform.NewTextField(fieldName)
 	w := annotation.AddWidget(f, pdf.Rectangle{LLx: 100, LLy: 700, URx: 300, URy: 720})
 	page.Page.Annots = append(page.Page.Annots, w)
-	form := &acroform.InteractiveForm{Fields: []acroform.Field{f}}
+	form := &acroform.InteractiveForm{Fields: []acroform.TreeNode{f}}
 	formRef, err := page.RM.Store(form)
 	if err != nil {
 		t.Fatal(err)
