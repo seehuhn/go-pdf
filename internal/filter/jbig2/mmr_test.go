@@ -334,9 +334,10 @@ func FuzzPatternDictMMRRoundTrip(f *testing.F) {
 	f.Add(seed)
 
 	f.Fuzz(func(t *testing.T, data []byte) {
+		// untrusted input → production-sized budget
 		d1 := &decoder{
 			segments: make(map[uint32]segmentResult),
-			pool:     bitmapPool{budget: testBudget()},
+			pool:     bitmapPool{budget: fuzzBudget(len(data))},
 		}
 		if err := d1.processStream(data); err != nil {
 			return

@@ -102,8 +102,8 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 			}
 		}
 
-		// only keep CreatorInfo if it has required fields
-		if info.Creator != "" {
+		// only keep CreatorInfo if it has both required fields
+		if info.Creator != "" && info.Subtype != "" {
 			usage.Creator = info
 		}
 	}
@@ -115,9 +115,9 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 		if langStr, err := pdf.Optional(pdf.GetTextString(x.R, langDict["Lang"])); err != nil {
 			return nil, err
 		} else if langStr != "" {
-			// parse language tag
+			// parse language tag; the writer requires a non-root tag
 			tag, err := language.Parse(string(langStr))
-			if err == nil {
+			if err == nil && !tag.IsRoot() {
 				info := &UsageLanguage{Lang: tag}
 
 				if preferred, err := pdf.Optional(x.GetName(path, langDict["Preferred"])); err != nil {
@@ -144,7 +144,10 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 			info.ExportState = parseStateRec(state)
 		}
 
-		usage.Export = info
+		// the writer omits an Export dict with no usable state
+		if info.ExportState != StateUnset {
+			usage.Export = info
+		}
 	}
 
 	// extract Zoom dictionary
@@ -209,7 +212,10 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 			info.ViewState = parseStateRec(state)
 		}
 
-		usage.View = info
+		// the writer omits a View dict with no usable state
+		if info.ViewState != StateUnset {
+			usage.View = info
+		}
 	}
 
 	// extract User dictionary
@@ -218,10 +224,16 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	} else if userDict != nil {
 		info := &UsageUser{}
 
+		// Type must be one of Ind/Ttl/Org (8.11.4.4); ignore any other value
+		// so a permissively-read User dict round-trips through the strict
+		// writer (a User with no valid Type is dropped below)
 		if userType, err := pdf.Optional(x.GetName(path, userDict["Type"])); err != nil {
 			return nil, err
-		} else if userType != "" {
-			info.Type = UserType(userType)
+		} else {
+			switch UserType(userType) {
+			case UserTypeIndividual, UserTypeTitle, UserTypeOrganisation:
+				info.Type = UserType(userType)
+			}
 		}
 
 		// Name can be either a text string or an array of text strings
@@ -241,7 +253,8 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 			info.Name = []string{string(str)}
 		}
 
-		if info.Type != "" {
+		// the writer requires both a valid Type and at least one Name
+		if info.Type != "" && len(info.Name) > 0 {
 			usage.User = info
 		}
 	}
@@ -250,11 +263,14 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	if pageDict, err := pdf.Optional(x.GetDict(path, dict["PageElement"])); err != nil {
 		return nil, err
 	} else if pageDict != nil {
+		// Subtype must be one of the defined values (8.11.4.4); ignore any
+		// other so the result round-trips through the strict writer
 		if subtype, err := pdf.Optional(x.GetName(path, pageDict["Subtype"])); err != nil {
 			return nil, err
-		} else if subtype != "" {
-			usage.PageElement = &UsagePageElement{
-				Subtype: PageElement(subtype),
+		} else {
+			switch PageElement(subtype) {
+			case PageElementHeaderFooter, PageElementForeground, PageElementBackground, PageElementLogo:
+				usage.PageElement = &UsagePageElement{Subtype: PageElement(subtype)}
 			}
 		}
 	}

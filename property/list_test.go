@@ -199,6 +199,9 @@ func FuzzRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Skip("malformed property list")
 		}
+		if propList == nil {
+			t.Skip("no property list")
+		}
 
 		// check that AsDirectDict doesn't crash
 		_ = propList.AsDirectDict()

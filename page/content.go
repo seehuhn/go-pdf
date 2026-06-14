@@ -88,7 +88,13 @@ func (r *contentReader) Read(p []byte) (n int, err error) {
 		// read from the current segment
 		nn, err := r.cur.Read(p[n:])
 		n += nn
-		if err == io.EOF {
+		switch {
+		case err == nil:
+			// keep reading from this segment
+		case err == io.EOF || pdf.IsMalformed(err):
+			// the segment ended, or its filter data is corrupt or
+			// truncated; a permissive reader keeps the bytes decoded so far
+			// and moves on to the next segment
 			r.cur.Close()
 			r.cur = nil
 			// insert a separator before the next segment
@@ -97,7 +103,7 @@ func (r *contentReader) Read(p []byte) (n int, err error) {
 			} else {
 				return n, io.EOF
 			}
-		} else if err != nil {
+		default:
 			return n, err
 		}
 	}

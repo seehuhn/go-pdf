@@ -36,10 +36,15 @@ func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annota
 		return nil, err
 	}
 
-	// Sound (required)
+	// Sound (required): without a usable Sound the annotation cannot be
+	// written back, so reject it; the page decoder drops annotations that
+	// fail to decode, matching the permissive-reader policy.
 	s, err := pdf.ExtractorGet(x, path, dict["Sound"], sound.Extract)
 	if err != nil {
 		return nil, err
+	}
+	if s == nil {
+		return nil, pdf.Error("sound annotation missing Sound")
 	}
 	a.Sound = s
 

@@ -38,9 +38,13 @@ func decodeMovie(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annota
 		annot.Title = string(t)
 	}
 
-	// Movie (required)
+	// Movie (required): a movie annotation without a usable Movie cannot be
+	// written back, so reject it here.  The page decoder drops annotations
+	// that fail to decode, matching the permissive-reader policy.
 	if m, err := pdf.ExtractorGetOptional(x, path, dict["Movie"], movie.Extract); err != nil {
 		return nil, err
+	} else if m == nil {
+		return nil, pdf.Error("movie annotation missing Movie")
 	} else {
 		annot.Movie = m
 	}

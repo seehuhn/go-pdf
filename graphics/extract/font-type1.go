@@ -159,11 +159,6 @@ func repairType1(d *dict.Type1, r pdf.Getter) {
 		d.Name = ""
 	}
 
-	// FontFile and SubsetTag consistency: external fonts cannot be subsetted
-	if d.FontFile == nil {
-		d.SubsetTag = ""
-	}
-
 	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
 	if m != nil {
 		if d.SubsetTag == "" {
@@ -179,6 +174,12 @@ func repairType1(d *dict.Type1, r pdf.Getter) {
 		d.PostScriptName = "Font"
 	}
 	if !subset.IsValidTag(d.SubsetTag) {
+		d.SubsetTag = ""
+	}
+	// external fonts cannot be subsetted, so they must not carry a subset tag
+	// (the tag is dropped after the FontName-derived tag above, otherwise a
+	// "TAG+Name" external font would re-acquire one and fail to embed)
+	if d.FontFile == nil {
 		d.SubsetTag = ""
 	}
 	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)

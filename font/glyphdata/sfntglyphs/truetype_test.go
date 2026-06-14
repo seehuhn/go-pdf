@@ -196,7 +196,7 @@ func ttFont(numGlyphs int, cmaps sfntcmap.Table, names []string) *sfnt.Font {
 		UnitsPerEm: 1000,
 		Outlines: &glyf.Outlines{
 			Glyphs: make(glyf.Glyphs, numGlyphs),
-			Widths: make([]funit.Int16, numGlyphs),
+			Widths: make([]funit.Uint16, numGlyphs),
 			Names:  names,
 		},
 		CMapTable: cmaps,

@@ -274,7 +274,7 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 
 	// Since we are not sure which glyphs are going to be shown,
 	// make sure that all glyphs have the same width.
-	var w funit.Int16
+	var w funit.Uint16
 	for _, wi := range outlines.Widths[1:] {
 		if wi > w {
 			w = wi

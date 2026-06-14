@@ -245,7 +245,9 @@ func TestGenericRegionExtTemplate(t *testing.T) {
 func fuzzBitmapRoundTrip(t *testing.T, data []byte) {
 	t.Helper()
 
-	bm1, err := Decode(nil, data, testBudget())
+	// the first decode processes untrusted input, so it gets the same
+	// input-proportional budget a real caller would impose
+	bm1, err := Decode(nil, data, fuzzBudget(len(data)))
 	if err != nil || bm1 == nil {
 		return
 	}

@@ -101,8 +101,12 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		return nil, pdf.Errorf("invalid appearance dict entry: N %T", N)
 	}
 
+	// absent or malformed /R falls back to the normal appearance (N is always
+	// a dict or stream, validated above), so the result round-trips
 	R, _ := x.Resolve(path, dict["R"])
-	if R == nil {
+	switch R.(type) {
+	case pdf.Dict, *pdf.Stream:
+	default:
 		R = N
 	}
 	switch R := R.(type) {
@@ -124,8 +128,11 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		res.RollOver = formObj
 	}
 
+	// absent or malformed /D falls back to the normal appearance, as for /R
 	D, _ := x.Resolve(path, dict["D"])
-	if D == nil {
+	switch D.(type) {
+	case pdf.Dict, *pdf.Stream:
+	default:
 		D = N
 	}
 	switch D := D.(type) {

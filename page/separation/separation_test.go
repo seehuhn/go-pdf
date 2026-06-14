@@ -105,12 +105,11 @@ func roundTripTest(t *testing.T, version pdf.Version, d1 *Dict) {
 		t.Fatalf("rm.Close failed: %v", err)
 	}
 
-	// write dummy page dicts
-	for _, ref := range d1.Pages {
-		if err := w.Put(ref, pdf.Dict{"Type": pdf.Name("Page")}); err != nil {
-			t.Fatalf("Put page failed: %v", err)
-		}
-	}
+	// The decoded Pages references use the source file's object numbers, which
+	// may duplicate each other or collide with objects the writer allocated
+	// while encoding.  The round trip compares the references only as opaque
+	// values, and the writer tolerates dangling references, so the referenced
+	// page objects need not be written.
 
 	err = w.Close()
 	if err != nil {

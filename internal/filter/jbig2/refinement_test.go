@@ -374,7 +374,8 @@ func FuzzRefinementRegionSegmentRoundTrip(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		bm1, err := Decode(nil, data, testBudget())
+		// untrusted input gets the production-sized budget
+		bm1, err := Decode(nil, data, fuzzBudget(len(data)))
 		if err != nil || bm1 == nil {
 			return
 		}

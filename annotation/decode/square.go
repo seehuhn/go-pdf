@@ -48,10 +48,11 @@ func decodeSquare(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annot
 		}
 	}
 
-	// BE (optional)
+	// BE (optional): a border effect is meaningful only together with a
+	// border style, so drop it when BS is absent (the writer requires BS)
 	if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
-	} else {
+	} else if square.BorderStyle != nil {
 		square.BorderEffect = be
 	}
 

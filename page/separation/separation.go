@@ -131,7 +131,8 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Di
 		return nil, pdf.Wrap(err, "Pages")
 	}
 	for _, item := range pagesArr {
-		if ref, ok := item.(pdf.Reference); ok {
+		// object 0 is the reserved free entry, never a valid page reference
+		if ref, ok := item.(pdf.Reference); ok && ref.Number() != 0 {
 			d.Pages = append(d.Pages, ref)
 		}
 	}

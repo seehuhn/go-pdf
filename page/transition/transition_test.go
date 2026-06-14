@@ -167,7 +167,11 @@ func roundTripTest(t *testing.T, version pdf.Version, original *Transition) {
 	rm := pdf.NewResourceManager(buf)
 
 	embedded, err := rm.Embed(original)
-	if err != nil {
+	if pdf.IsWrongVersion(err) {
+		// a transition read permissively from an older-version file cannot be
+		// written back at that version; the writer correctly rejects it
+		t.Skip("version not supported")
+	} else if err != nil {
 		t.Fatal(err)
 	}
 
@@ -236,6 +240,9 @@ func FuzzRoundTrip(f *testing.F) {
 		trans, err := pdf.ExtractorGet(x, nil, obj, Extract)
 		if err != nil {
 			t.Skip("malformed transition")
+		}
+		if trans == nil {
+			t.Skip("no transition")
 		}
 
 		roundTripTest(t, pdf.GetVersion(r), trans)

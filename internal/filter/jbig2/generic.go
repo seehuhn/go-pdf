@@ -57,11 +57,17 @@ var tpgdContexts = [4]uint16{
 	3: 0x0195, // template 3
 }
 
+// getPixel reads the pixel at (x, y), returning 0 for out-of-bounds.
+// This is the hot path of generic/refinement region decoding, so it
+// accesses the packed pixel data directly instead of going through
+// [bitmap.Bitmap.GetPixel], avoiding per-call image.Point overhead.
 func getPixel(bm *bitmap.Bitmap, x, y int) int {
-	if bm.GetPixel(x, y) {
-		return 1
+	x -= bm.Rect.Min.X
+	y -= bm.Rect.Min.Y
+	if x < 0 || y < 0 || x >= bm.Rect.Dx() || y >= bm.Rect.Dy() {
+		return 0
 	}
-	return 0
+	return int(bm.Pix[y*bm.Stride+x>>3]>>(7-x&7)) & 1
 }
 
 func decodeGenericRegion(pool *bitmapPool, dec *mqDecoder, p *genericRegionParams, cx []byte) (*bitmap.Bitmap, error) {

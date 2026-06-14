@@ -407,7 +407,11 @@ func ExtractorGet[T any](x *Extractor, path *CycleCheck, obj Object, extract fun
 		key := extractorKey{ref: ref, tp: tp}
 
 		if v, ok := x.cacheGet(key); ok {
-			return v.(T), nil
+			// a cached nil interface result (T is an interface type and the
+			// extractor returned nil) is an untyped nil here; the comma-ok form
+			// yields the zero value instead of panicking on the assertion
+			r, _ := v.(T)
+			return r, nil
 		}
 
 		// check for cycle
@@ -446,7 +450,9 @@ func ExtractorGet[T any](x *Extractor, path *CycleCheck, obj Object, extract fun
 	// publish under all refs; adopt a concurrent decoder's result on a race so
 	// callers share one object (see cacheStoreOrLoad)
 	if len(refs) > 0 {
-		res = x.cacheStoreOrLoad(refs, tp, res).(T)
+		// comma-ok so a nil interface result (cached as an untyped nil) does
+		// not panic on the assertion; it yields the zero value instead
+		res, _ = x.cacheStoreOrLoad(refs, tp, res).(T)
 	}
 
 	return res, nil

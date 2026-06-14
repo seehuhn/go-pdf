@@ -69,8 +69,19 @@ func ExtractProperties(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _
 		return nil, err
 	}
 	if p.D == nil {
-		// permissive: create a default configuration
+		// permissive: synthesize a default configuration
 		p.D = &Configuration{BaseState: BaseStateON}
+	}
+	// the default configuration has stricter constraints than alternate ones:
+	// its BaseState must be ON and its Intent must be View (8.11.4.3).  Snap
+	// any non-conforming value so a permissively-read Properties round-trips
+	// through the strict writer.  Copy first so a configuration shared with
+	// the Configs array (via the extractor cache) is not mutated.
+	if p.D.BaseState != BaseStateON || len(p.D.Intent) != 1 || p.D.Intent[0] != "View" {
+		d := *p.D
+		d.BaseState = BaseStateON
+		d.Intent = []pdf.Name{"View"}
+		p.D = &d
 	}
 
 	// Configs (optional)

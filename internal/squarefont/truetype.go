@@ -57,10 +57,10 @@ func makeTrueTypeFont(unitsPerEm uint16) font.Layouter {
 	glyphs[2] = createSquareGlyph(scale) // A
 
 	// Create widths
-	widths := []funit.Int16{
-		funit.Int16(NotdefWidth * scale), // .notdef width
-		funit.Int16(SpaceWidth * scale),  // space width
-		funit.Int16(SquareWidth * scale), // A width
+	widths := []funit.Uint16{
+		funit.Uint16(NotdefWidth * scale), // .notdef width
+		funit.Uint16(SpaceWidth * scale),  // space width
+		funit.Uint16(SquareWidth * scale), // A width
 	}
 
 	// Create outlines

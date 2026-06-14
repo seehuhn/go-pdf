@@ -17,6 +17,7 @@
 package page
 
 import (
+	"bytes"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -89,13 +90,22 @@ func (s *Source) RawBytes() (io.ReadCloser, error) {
 
 // Embed writes the segment's decoded bytes verbatim to a new PDF stream
 // object.  No fix-ups are applied at embed time — bytes are preserved
-// as faithfully as the underlying stream filters allow.  Repeated embeds
-// of the same *Source value dedup to a single output object via
-// [pdf.ResourceManager].
+// as faithfully as the underlying stream filters allow.  A segment whose
+// filters cannot be decoded is written as an empty stream, matching the
+// way a reader skips it.  Repeated embeds of the same *Source value dedup
+// to a single output object via [pdf.ResourceManager].
 func (s *Source) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	r, err := s.RawBytes()
 	if err != nil {
-		return nil, err
+		if !pdf.IsMalformed(err) {
+			return nil, err
+		}
+		// The segment uses a filter the library cannot decode (e.g. an
+		// unknown or unimplemented filter).  A reader treats such a segment
+		// as empty (see contentReader.Read), and emitting the original
+		// filter name would produce an invalid PDF, so write an empty
+		// content stream to keep the page valid and round-tripping.
+		r = io.NopCloser(bytes.NewReader(nil))
 	}
 	defer r.Close()
 
@@ -109,8 +119,13 @@ func (s *Source) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if _, err := io.Copy(stm, r); err != nil {
-		stm.Close()
-		return nil, err
+		// a corrupt or truncated filter stream yields a malformed error
+		// part-way through; keep the bytes decoded so far, matching the way
+		// a reader uses the decoded prefix (see contentReader.Read)
+		if !pdf.IsMalformed(err) {
+			stm.Close()
+			return nil, err
+		}
 	}
 	if err := stm.Close(); err != nil {
 		return nil, err

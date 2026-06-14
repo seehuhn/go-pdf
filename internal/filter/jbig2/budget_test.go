@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func newTestPool(remaining int64) *bitmapPool {
@@ -31,6 +32,26 @@ func newTestPool(remaining int64) *bitmapPool {
 // the cap.
 func testBudget() *membudget.Budget {
 	return membudget.New(1 << 30)
+}
+
+// fuzzBudget returns the memory budget used when decoding untrusted input
+// in a fuzz target.  It is input-proportional, like the production budget
+// [limits.StreamBudget], but with a smaller base and a hard ceiling.
+//
+// The unrealistically large [testBudget] (1 GiB) must not be used on fuzz
+// input: because JBIG2 is a compression format, a tiny stream (MQ data
+// padded past its end) can decode billions of pixels, which never happens
+// in production and only manifests as fuzzing-engine timeouts.  Even the
+// production 8 MiB floor is too generous here, because the round-trip
+// targets decode→encode→decode in a single execution (three passes over
+// the bitmap); the ceiling keeps that cycle well within the fuzzing
+// engine's hang detector while still exercising multi-symbol and
+// multi-region code paths.
+func fuzzBudget(dataLen int) *membudget.Budget {
+	const fuzzBudgetBase = 1 << 20 // 1 MiB
+	const fuzzBudgetMax = 2 << 20  // 2 MiB
+	b := fuzzBudgetBase + int64(limits.StreamBudgetMultiplier)*int64(dataLen)
+	return membudget.New(min(b, fuzzBudgetMax))
 }
 
 func TestAllocBitmap(t *testing.T) {
