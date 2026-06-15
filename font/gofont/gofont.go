@@ -36,6 +36,7 @@ import (
 
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/parser"
 )
 
 // TODO(voss): Make it easier to use the alterative zeros provided in the
@@ -68,7 +69,7 @@ func (f Font) NewSimple(opt *truetype.OptionsSimple) (*truetype.Simple, error) {
 		return nil, fmt.Errorf("gofont: unknown font %d", f)
 	}
 
-	info, err := sfnt.Read(bytes.NewReader(data))
+	info, err := sfnt.Read(bytes.NewReader(data), parser.NewBudget(int64(len(data))))
 	if err != nil {
 		return nil, fmt.Errorf("gofont: %w", err)
 	}
@@ -89,7 +90,7 @@ func (f Font) NewComposite(opt *truetype.OptionsComposite) (*truetype.Composite,
 		return nil, fmt.Errorf("gofont: unknown font %d", f)
 	}
 
-	info, err := sfnt.Read(bytes.NewReader(data))
+	info, err := sfnt.Read(bytes.NewReader(data), parser.NewBudget(int64(len(data))))
 	if err != nil {
 		return nil, fmt.Errorf("gofont: %w", err)
 	}

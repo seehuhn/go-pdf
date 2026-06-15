@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/header"
+	"seehuhn.de/go/sfnt/parser"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -79,7 +80,7 @@ func main() {
 			log.Printf("%s: %v", fname, err)
 			continue
 		}
-		cffFont, err := cff.Read(bytes.NewReader(cffData))
+		cffFont, err := cff.Read(bytes.NewReader(cffData), parser.NewBudget(int64(len(cffData))))
 		if err != nil {
 			log.Fatal(err)
 		}

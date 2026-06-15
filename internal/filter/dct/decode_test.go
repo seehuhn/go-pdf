@@ -485,6 +485,79 @@ func TestDecodeSOFStripeOverBudget(t *testing.T) {
 	}
 }
 
+// TestDecodeProgressiveScanLimit verifies that a progressive JPEG with
+// many scans is rejected rather than decoded slowly.  Each scan here
+// skips every block with a single EOB-run token, so it carries almost no
+// entropy data; without the per-decode cap on coefficient-buffer
+// re-traversals a tiny multi-scan stream would drive (scans × blocks)
+// passes, work unbounded by the per-stream memory budget.
+func TestDecodeProgressiveScanLimit(t *testing.T) {
+	// build a progressive grayscale JPEG with nScans AC scans over a
+	// 256x256 image (32x32 = 1024 MCU blocks).  The lone AC Huffman code
+	// "00" maps to EOBn(14); zero entropy bytes therefore decode as
+	// EOB-run tokens that skip the whole image per scan.
+	build := func(nScans int) []byte {
+		var b bytes.Buffer
+		w := func(p ...byte) { b.Write(p) }
+		w(0xFF, 0xD8) // SOI
+		w(0xFF, 0xDB, 0x00, 0x43, 0x00)
+		for range 64 {
+			w(0x01) // DQT table 0, all ones
+		}
+		const dim = 256
+		w(0xFF, 0xC2, 0x00, 0x0B, 0x08, dim>>8, dim&0xff, dim>>8, dim&0xff,
+			0x01, 0x01, 0x11, 0x00) // SOF2 grayscale
+		w(0xFF, 0xC4, 0x00, 0x15, 0x10) // DHT AC: two length-2 codes
+		counts := [16]byte{}
+		counts[1] = 2
+		w(counts[:]...)
+		w(0xE0, 0x00) // "00"->EOBn(14), "01"->EOB
+		for range nScans {
+			w(0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x01, 0x3F, 0x00) // SOS Ss=1 Se=63
+			w(0x00, 0x00, 0x00, 0x00)                                     // zero entropy
+		}
+		w(0xFF, 0xD9) // EOI
+		return b.Bytes()
+	}
+
+	decode := func(data []byte) error {
+		budget := membudget.New(limits.StreamBudget(int64(len(data))))
+		rc, err := Decode(bytes.NewReader(data), nil, budget)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(io.Discard, rc)
+		rc.Close()
+		return err
+	}
+
+	// a single scan stays well within the cap and decodes
+	if err := decode(build(1)); err != nil {
+		t.Fatalf("single-scan progressive should decode: %v", err)
+	}
+	// far more scans than maxProgPasses must be rejected
+	if err := decode(build(500)); err == nil {
+		t.Fatal("expected rejection of excessive-scan progressive JPEG")
+	}
+}
+
+// fuzzBudget returns the memory budget used when decoding untrusted
+// input in the fuzz target.  It is input-proportional like the
+// production budget [limits.StreamBudget], but with a smaller base and a
+// much lower ceiling.  The production 256 MiB ceiling is unrealistic for
+// fuzzing: the engine drives many decodes back-to-back and runs a tight
+// minimisation loop, so a mutated stream declaring near-maximal
+// dimensions would let several hundred-MiB coefficient buffers pile up
+// and exhaust the worker process.  The lower ceiling keeps each decode
+// cheap while still exercising the progressive, multi-component and
+// colour-transform paths on sub-megapixel images.
+func fuzzBudget(dataLen int) *membudget.Budget {
+	const base = 1 << 20 // 1 MiB
+	const ceiling = 4 << 20
+	b := base + int64(limits.StreamBudgetMultiplier)*int64(dataLen)
+	return membudget.New(min(b, ceiling))
+}
+
 // FuzzDecode feeds arbitrary bytes to Decode and asserts only that
 // neither Decode itself nor draining the returned reader panics.  Real
 // JPEGs are accepted via the existing testdata seeds; everything else
@@ -498,7 +571,7 @@ func FuzzDecode(f *testing.F) {
 		f.Add(data)
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
-		rc, err := Decode(bytes.NewReader(data), nil, membudget.New(1<<30))
+		rc, err := Decode(bytes.NewReader(data), nil, fuzzBudget(len(data)))
 		if err != nil {
 			return
 		}

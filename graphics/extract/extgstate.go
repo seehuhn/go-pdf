@@ -264,14 +264,22 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 		case "TR2":
 			tr2 = v
 		case "HT":
-			ht, err := pdf.ExtractorGetOptional(x, path, v, halftone.Extract)
-			if pdf.IsMalformed(err) {
+			// the name /Default denotes the device's default halftone,
+			// represented by a nil Halftone with the state bit set
+			if name, _ := pdf.Optional(x.GetName(path, v)); name == "Default" {
+				set |= graphics.StateHalftone
 				break
-			} else if err != nil {
+			}
+			ht, err := pdf.ExtractorGetOptional(x, path, v, halftone.Extract)
+			if err != nil {
 				return nil, err
 			}
-			res.Halftone = ht
-			set |= graphics.StateHalftone
+			// drop a malformed or unsupported /HT (ht == nil) rather than
+			// setting the state bit with no halftone, which Embed cannot write
+			if ht != nil {
+				res.Halftone = ht
+				set |= graphics.StateHalftone
+			}
 		case "HTO":
 			a, err := x.GetArray(path, v)
 			if pdf.IsMalformed(err) {

@@ -28,6 +28,7 @@ import (
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/parser"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
@@ -109,7 +110,7 @@ func makeTestFont() (font.Instance, error) {
 	width := map[cmap.CID]float64{}
 
 	// Create a TrueType font with the required subset of glyphs.
-	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF))
+	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF), parser.NewBudget(int64(len(goregular.TTF))))
 	if err != nil {
 		return nil, err
 	}

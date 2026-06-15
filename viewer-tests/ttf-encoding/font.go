@@ -31,6 +31,7 @@ import (
 	sfntcmap "seehuhn.de/go/sfnt/cmap"
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/parser"
 	"seehuhn.de/go/sfnt/post"
 
 	"seehuhn.de/go/pdf"
@@ -48,7 +49,7 @@ type fontBuilder struct {
 }
 
 func NewFontBuilder() (*fontBuilder, error) {
-	base, err := sfnt.Read(bytes.NewReader(gomono.TTF))
+	base, err := sfnt.Read(bytes.NewReader(gomono.TTF), parser.NewBudget(int64(len(gomono.TTF))))
 	if err != nil {
 		return nil, fmt.Errorf("gofont: %w", err)
 	}

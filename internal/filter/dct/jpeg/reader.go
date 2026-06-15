@@ -181,6 +181,13 @@ type entropyState struct {
 	eobRun     uint16                 // End-of-Band run, specified in section G.1.2.2.
 	progCoeffs [maxComponents][]block // Saved state between progressive-mode scans.
 	tmp        [2 * blockSize]byte
+
+	// progVisits counts coefficient-block iterations across all
+	// progressive scans; totalProgBlocks is the number of blocks in one
+	// pass (the sum of the allocated progCoeffs lengths).  Their ratio is
+	// capped at maxProgPasses to bound re-traversal work (see scan.go).
+	progVisits      int64
+	totalProgBlocks int64
 }
 
 // outputState holds the pixel plane storage and the per-stripe

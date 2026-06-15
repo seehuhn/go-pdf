@@ -32,13 +32,7 @@ func main() {
 	}
 	fontFileName := os.Args[1]
 
-	fd, err := os.Open(fontFileName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer fd.Close()
-
-	info, err := sfnt.Read(fd)
+	info, err := sfnt.ReadFile(fontFileName)
 	if err != nil {
 		log.Fatal(err)
 	}

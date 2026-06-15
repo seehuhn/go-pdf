@@ -16,6 +16,8 @@
 
 package ccittfax
 
+import "sort"
+
 //go:generate go run ./generate/
 
 const maxColumns = 1 << 20
@@ -107,6 +109,65 @@ func (p Params) findB1B2(lineData []byte, a0 int, currentBit byte) (int, int) {
 	b2 := min(b1+1, p.Columns)
 	for b2 < p.Columns && p.getPixel(lineData, b2) != currentBit {
 		b2++
+	}
+	return b1, b2
+}
+
+// changingElements appends to dst the columns where lineData's colour
+// changes, treating the imaginary pixel before column 0 as white.  The
+// result is strictly increasing and lies in [0, Columns).  It is built
+// once per row so that [findB1B2FromChanges] can resolve the reference
+// line's changing elements in O(log n) instead of scanning pixel by
+// pixel, which is O(changes × Columns) for a row with many transitions.
+func (p Params) changingElements(lineData []byte, dst []int) []int {
+	prev := p.whiteBit()
+	for x := range p.Columns {
+		c := p.getPixel(lineData, x)
+		if c != prev {
+			dst = append(dst, x)
+			prev = c
+		}
+	}
+	return dst
+}
+
+// nextTwoChanges returns the smallest element of changes greater than a0
+// and the one after it, each capped at columns.  In the 2D encoder the
+// run containing a0 on the coding line always has colour currentBit, so
+// these are the encoder's a1 and a2 (the ends of the next two runs).
+func nextTwoChanges(changes []int, columns, a0 int) (int, int) {
+	idx := sort.Search(len(changes), func(i int) bool { return changes[i] > a0 })
+	a1, a2 := columns, columns
+	if idx < len(changes) {
+		a1 = changes[idx]
+	}
+	if idx+1 < len(changes) {
+		a2 = changes[idx+1]
+	}
+	return a1, a2
+}
+
+// findB1B2FromChanges returns the same (b1, b2) as [Params.findB1B2] but
+// uses the precomputed changing elements of the reference line.  changes
+// must be the result of [Params.changingElements] for that line.
+//
+// The colour of the run starting at changes[i] is 1-whiteBit for even i
+// and whiteBit for odd i (the line starts white before column 0), so b1
+// is the first changing element after a0 whose colour is 1-currentBit and
+// b2 is the changing element that follows it.
+func findB1B2FromChanges(changes []int, columns, a0 int, currentBit, whiteBit byte) (int, int) {
+	idx := sort.Search(len(changes), func(i int) bool { return changes[i] > a0 })
+	colourEven := 1 - whiteBit // colour at an even-indexed changing element
+	if idx < len(changes) && (idx%2 == 0) != (colourEven == 1-currentBit) {
+		// changes[idx] has colour currentBit; the next one is 1-currentBit
+		idx++
+	}
+	b1, b2 := columns, columns
+	if idx < len(changes) {
+		b1 = changes[idx]
+	}
+	if idx+1 < len(changes) {
+		b2 = changes[idx+1]
 	}
 	return b1, b2
 }

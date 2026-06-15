@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/pagetree"
 	"seehuhn.de/go/pdf/reader"
 	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/parser"
 )
 
 func TestPredefined(t *testing.T) {
@@ -47,7 +48,7 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontInfo, err := sfnt.Read(bytes.NewReader(goregular.TTF))
+	fontInfo, err := sfnt.Read(bytes.NewReader(goregular.TTF), parser.NewBudget(int64(len(goregular.TTF))))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,12 +22,13 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 
 	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/parser"
 )
 
 // TrueType returns a font with glyf outlines.
 func TrueType() *sfnt.Font {
 	r := bytes.NewReader(goregular.TTF)
-	info, err := sfnt.Read(r)
+	info, err := sfnt.Read(r, parser.NewBudget(int64(len(goregular.TTF))))
 	if err != nil {
 		panic(err)
 	}

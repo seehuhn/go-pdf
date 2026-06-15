@@ -52,6 +52,17 @@ package jpeg
 // per-component progressive coefficient buffer ([blockSize]int32).
 const bytesPerProgBlock = blockSize * 4
 
+// maxProgPasses bounds how many times the progressive scan loop may
+// revisit the coefficient buffer in total, summed over every SOS.  A
+// progressive JPEG transmits each block once per scan, and the eobRun
+// mechanism lets a single token skip thousands of blocks without
+// consuming input, so a tiny multi-scan stream could otherwise drive
+// (scans × blocks) buffer traversals — work unbounded by the per-stream
+// memory budget, which only caps the buffer size, not the number of
+// passes.  Real progressive JPEGs use about ten scans; the limit leaves
+// generous headroom while keeping decode work proportional to the input.
+const maxProgPasses = 64
+
 // pixelPlaneBytes returns the total byte count for the buffers
 // [decoder.makeImg] will allocate for an MCU grid of mxx columns and
 // storeMyy rows.  Pass storeMyy = myy for full-buffer mode and
@@ -268,6 +279,7 @@ func (d *decoder) processSOS(n int) error {
 					return FormatError("progressive coefficient buffer exceeds budget")
 				}
 				d.progCoeffs[compIndex] = make([]block, nBlocks)
+				d.totalProgBlocks += nBlocks
 			}
 		}
 	}
@@ -338,6 +350,12 @@ func (d *decoder) processSOS(n int) error {
 
 					// Load the previous partially decoded coefficients, if applicable.
 					if d.progressive {
+						// bound total buffer re-traversals so a tiny
+						// multi-scan stream cannot drive unbounded work
+						d.progVisits++
+						if d.progVisits > maxProgPasses*d.totalProgBlocks {
+							return FormatError("excessive progressive scan data")
+						}
 						b = d.progCoeffs[compIndex][by*mxx*hi+bx]
 					} else {
 						b = block{}

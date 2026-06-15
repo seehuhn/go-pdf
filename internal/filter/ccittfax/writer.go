@@ -32,7 +32,12 @@ type Writer struct {
 	lineBytes int
 	line      []byte
 	refLine   []byte
-	numRows   int
+	// refChanges and lineChanges hold the changing elements of refLine and
+	// the coding line, rebuilt once per 2D row so b1/b2 and a1/a2 are
+	// O(log n) lookups rather than pixel scans (§ params.go).
+	refChanges  []int
+	lineChanges []int
+	numRows     int
 
 	byteVal   byte
 	validBits int
@@ -301,11 +306,12 @@ func (w *Writer) encode1DRun(runLength int, runBit byte) error {
 func (w *Writer) encode2DLineG3() error {
 	a0 := -1
 	currentBit := w.whiteBit()
+	w.refChanges = w.changingElements(w.refLine, w.refChanges[:0])
+	w.lineChanges = w.changingElements(w.line, w.lineChanges[:0])
 	for a0 < w.Columns {
-		a1 := w.endOfRun(w.line, a0+1, currentBit)
-		a2 := w.endOfRun(w.line, a1+1, 1-currentBit)
+		a1, a2 := nextTwoChanges(w.lineChanges, w.Columns, a0)
 
-		b1, b2 := w.findB1B2(w.refLine, a0, currentBit)
+		b1, b2 := findB1B2FromChanges(w.refChanges, w.Columns, a0, currentBit, w.whiteBit())
 
 		delta := a1 - b1
 		switch {

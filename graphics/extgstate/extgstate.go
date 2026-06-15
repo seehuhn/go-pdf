@@ -546,11 +546,16 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateHalftone != 0 {
-		htEmbedded, err := rm.Embed(e.Halftone)
-		if err != nil {
-			return nil, err
+		if e.Halftone == nil {
+			// nil denotes the device's default halftone
+			dict["HT"] = pdf.Name("Default")
+		} else {
+			htEmbedded, err := rm.Embed(e.Halftone)
+			if err != nil {
+				return nil, err
+			}
+			dict["HT"] = htEmbedded
 		}
-		dict["HT"] = htEmbedded
 	} else {
 		if e.Halftone != nil {
 			return nil, errors.New("unexpected Halftone value")

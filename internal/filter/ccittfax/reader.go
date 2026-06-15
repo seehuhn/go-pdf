@@ -34,13 +34,18 @@ type Reader struct {
 	line    []byte // Current line being decoded
 	refLine []byte // Reference line (previous line) for 2D decoding
 
+	// refChanges holds the changing elements of refLine, rebuilt once per
+	// 2D row so findB1B2 is O(log n) rather than a pixel scan (§ params.go).
+	refChanges []int
+
 	// numRows is the number of complete lines delivered to the caller.
 	numRows int
 }
 
 // BufferBytes returns the working-memory size [NewReader] will allocate
 // for these parameters: the line buffer plus, for 2D modes (K != 0),
-// the reference line buffer.  Callers should charge their memory
+// the reference line buffer and the reference-line changing-elements
+// index (up to one int per column).  Callers should charge their memory
 // budget for this amount before calling [NewReader] or [NewReaderRaw].
 func BufferBytes(p *Params) int {
 	columns := p.Columns
@@ -52,7 +57,8 @@ func BufferBytes(p *Params) int {
 	}
 	lineBufSize := (columns + 7) / 8
 	if p.K != 0 {
-		return 2 * lineBufSize
+		const intBytes = 8 // 64-bit int width of the changing-elements index
+		return 2*lineBufSize + columns*intBytes
 	}
 	return lineBufSize
 }
@@ -255,6 +261,7 @@ func (r *Reader) decode2D() {
 	r.line = r.line[:0]
 
 	white := r.whiteBit()
+	r.refChanges = r.changingElements(r.refLine, r.refChanges[:0])
 
 	a0 := -1
 	prevA0 := -2         // track forward progress
@@ -285,7 +292,7 @@ func (r *Reader) decode2D() {
 			r.consumeBits(int(entry.Width))
 		}
 
-		b1, b2 := r.findB1B2(r.refLine, a0, currentCol)
+		b1, b2 := findB1B2FromChanges(r.refChanges, r.Columns, a0, currentCol, white)
 
 		switch entry.State {
 		case S_Pass:

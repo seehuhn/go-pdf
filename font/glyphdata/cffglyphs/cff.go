@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/parser"
 )
 
 // FromStream extracts a CFF font from a font file stream.
@@ -43,7 +44,7 @@ func FromStream(stream *glyphdata.Stream) (*cff.Font, error) {
 		return nil, fmt.Errorf("extracting font data: %w", err)
 	}
 
-	font, err := cff.Read(bytes.NewReader(buf.Bytes()))
+	font, err := cff.Read(bytes.NewReader(buf.Bytes()), parser.NewBudget(int64(buf.Len())))
 	if err != nil {
 		return nil, fmt.Errorf("parsing CFF font: %w", err)
 	}

@@ -52,8 +52,8 @@ type Type2 struct {
 	// TMin, TMax specify the limiting values of the parametric variable t.
 	// The variable is considered to vary linearly between these two values
 	// as the color gradient varies between the starting and ending points
-	// of the axis.  When writing, TMin=0, TMax=0 is treated as TMin=0,
-	// TMax=1.
+	// of the axis.  TMin=0, TMax=0 is treated as TMin=0, TMax=1, both when
+	// writing and when reading, so the [0,1] default round-trips.
 	TMin, TMax float64
 
 	// ExtendStart specifies whether to extend the shading beyond the starting
@@ -189,6 +189,12 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 		}
 	} else {
 		s.TMin, s.TMax = 0.0, 1.0
+	}
+	// mirror the writer's zero-value normalization so an explicit [0,0]
+	// domain round-trips (the writer treats TMin=0,TMax=0 as the [0,1]
+	// default and omits it, which a plain read would recover as TMax=1)
+	if s.TMin == 0 && s.TMax == 0 {
+		s.TMax = 1
 	}
 
 	// validate function domain contains shading domain
