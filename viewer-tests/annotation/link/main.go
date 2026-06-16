@@ -70,7 +70,7 @@ func createDocument(filename string) error {
 		TextCol: color.DeviceGray(0.1),
 		LinkCol: color.DeviceRGB{0, 0, 0.9},
 
-		style: fallback.NewStyle(),
+		style: fallback.NewStyle(pdf.V1_7),
 		page:  page,
 		yPos:  startY,
 	}

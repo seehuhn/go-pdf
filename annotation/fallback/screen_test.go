@@ -26,14 +26,17 @@ import (
 )
 
 func TestScreenIcon(t *testing.T) {
-	s := NewStyle()
+	s := NewStyle(pdf.V2_0)
 	icon := &form.Form{BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 32, URy: 32}}
 	a := &annotation.Screen{
 		Common: annotation.Common{Rect: mediaRect},
 		MK:     &appearance.Characteristics{Icon: icon},
 	}
 
-	f := s.addScreenAppearance(a)
+	f, err := s.addScreenAppearance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if f.BBox != mediaRect {
 		t.Errorf("BBox = %v, want %v", f.BBox, mediaRect)
@@ -49,7 +52,7 @@ func TestScreenIcon(t *testing.T) {
 }
 
 func TestScreenPlaceholder(t *testing.T) {
-	s := NewStyle()
+	s := NewStyle(pdf.V2_0)
 	cases := map[string]*appearance.Characteristics{
 		"nil MK":      nil,
 		"MK, no icon": {},
@@ -60,7 +63,10 @@ func TestScreenPlaceholder(t *testing.T) {
 				Common: annotation.Common{Rect: mediaRect},
 				MK:     mk,
 			}
-			f := s.addScreenAppearance(a)
+			f, err := s.addScreenAppearance(a)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if f.BBox != mediaRect {
 				t.Errorf("BBox = %v, want %v", f.BBox, mediaRect)
@@ -76,11 +82,14 @@ func TestScreenPlaceholder(t *testing.T) {
 }
 
 func TestScreenZeroRect(t *testing.T) {
-	s := NewStyle()
+	s := NewStyle(pdf.V2_0)
 	zero := pdf.Rectangle{LLx: 5, LLy: 5, URx: 5, URy: 5}
 	a := &annotation.Screen{Common: annotation.Common{Rect: zero}}
 
-	f := s.addScreenAppearance(a)
+	f, err := s.addScreenAppearance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if f.Content != nil {
 		t.Error("zero-area Rect should produce empty content")

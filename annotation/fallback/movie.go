@@ -32,15 +32,15 @@ import (
 // When the movie dictionary supplies an embedded poster image, that image is
 // drawn stretched to fill the Rect; otherwise a generic media placeholder is
 // drawn (see [drawMediaPlaceholder]).
-func (s *Style) addMovieAppearance(a *annotation.Movie) *form.Form {
+func (s *Style) addMovieAppearance(a *annotation.Movie) (*form.Form, error) {
 	rect := a.Rect
 	w := rect.Dx()
 	h := rect.Dy()
 	if w <= 0 || h <= 0 {
-		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}
+		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 	b.SetExtGState(s.reset)
 	mediaAlpha(b, a.StrokingTransparency, a.NonStrokingTransparency)
 
@@ -55,11 +55,7 @@ func (s *Style) addMovieAppearance(a *annotation.Movie) *form.Form {
 		drawMediaPlaceholder(b, rect)
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    rect,
-	}
+	return harvest(b, rect)
 }
 
 // mediaAlpha applies the annotation's stroking and non-stroking transparency

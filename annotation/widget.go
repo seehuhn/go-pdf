@@ -58,8 +58,6 @@ type Widget struct {
 
 	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
 	// the annotation's behaviour in response to various trigger events.
-	//
-	// This corresponds to the /AA entry in the PDF annotation dictionary.
 	AA *triggers.Annotation
 
 	// BorderStyle (optional; PDF 1.2) is a border style dictionary specifying

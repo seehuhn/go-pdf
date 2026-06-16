@@ -61,7 +61,7 @@ func createDocument(filename string) error {
 	w := &writer{
 		b:     page.Builder,
 		font:  font.Must(standard.TimesRoman.New()),
-		style: fallback.NewStyle(),
+		style: fallback.NewStyle(pdf.V1_7),
 		page:  page,
 		yPos:  startY,
 	}

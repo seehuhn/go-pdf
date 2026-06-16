@@ -33,7 +33,7 @@ import (
 // a fixed 24×24 icon anchored at the upper-left of the supplied Rect,
 // with NoZoom and NoRotate forced so the icon stays icon-sized at any
 // zoom level.
-func (s *Style) addSoundAppearance(a *annotation.Sound) *form.Form {
+func (s *Style) addSoundAppearance(a *annotation.Sound) (*form.Form, error) {
 	a.Rect = pdf.Rectangle{
 		LLx: a.Rect.LLx,
 		LLy: a.Rect.URy - 24,
@@ -47,7 +47,7 @@ func (s *Style) addSoundAppearance(a *annotation.Sound) *form.Form {
 		col = quireInk2
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 	b.SetExtGState(s.reset)
 
 	// slate card backdrop, identical to file attachments
@@ -65,11 +65,7 @@ func (s *Style) addSoundAppearance(a *annotation.Sound) *form.Form {
 		drawSpeakerIcon(b, col)
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
-	}
+	return harvest(b, pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24})
 }
 
 // drawSpeakerIcon draws a loudspeaker silhouette as a single filled

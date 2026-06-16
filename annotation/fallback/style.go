@@ -26,6 +26,7 @@ import (
 	"seehuhn.de/go/pdf/font/extended"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 )
@@ -56,11 +57,11 @@ type Style struct {
 	// for example for FreeText annotations.
 	ContentFont font.Layouter
 
-	// Version is the PDF version targeted by appearance streams built
-	// via this Style.  It is passed through to [builder.New] so that
-	// version-restricted operators (e.g. `gs` on pre-1.2) are rejected
-	// at build time.  Defaults to [pdf.V2_0] in [NewStyle].
-	Version pdf.Version
+	// version is the PDF version targeted by appearance streams built via
+	// this Style.  It is passed through to [builder.New] so that
+	// version-restricted operators (e.g. `gs` on pre-1.2) are rejected at
+	// build time.
+	version pdf.Version
 
 	// iconFont is the font used to render symbols inside some of the icons for
 	// text annotations.  If this is changed to be different from
@@ -78,9 +79,9 @@ type Style struct {
 }
 
 // NewStyle returns a new Style with default fonts and graphics state.
-// The default [Style.Version] is [pdf.V2_0]; callers writing to an older
-// PDF should set Version explicitly.
-func NewStyle() *Style {
+// Appearance streams are built for the given PDF version, so that
+// version-restricted operators are rejected at build time.
+func NewStyle(version pdf.Version) *Style {
 	reset := &extgstate.ExtGState{
 		Set: graphics.StateTextKnockout |
 			graphics.StateLineCap |
@@ -100,7 +101,7 @@ func NewStyle() *Style {
 	// Allocate fonts once here, to make sure that at most one instance of each
 	// font is embedded in an output file.
 	return &Style{
-		Version:      pdf.V2_0,
+		version:      version,
 		iconFont:     font.Must(extended.NimbusRomanBold.New()),
 		dingbatsFont: font.Must(standard.ZapfDingbats.New()),
 		ContentFont:  font.Must(standard.Helvetica.New()),
@@ -116,45 +117,49 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 	// TODO(voss): cache appearances where possible
 
 	var normal *form.Form
+	var err error
 	switch a := a.(type) {
 	case *annotation.Text:
-		normal = s.addTextAppearance(a)
+		normal, err = s.addTextAppearance(a)
 	case *annotation.Link:
-		normal = s.addLinkAppearance(a)
+		normal, err = s.addLinkAppearance(a)
 	case *annotation.FreeText:
-		normal = s.addFreeTextAppearance(a)
+		normal, err = s.addFreeTextAppearance(a)
 	case *annotation.Line:
-		normal = s.addLineAppearance(a)
+		normal, err = s.addLineAppearance(a)
 	case *annotation.Square:
-		normal = s.addSquareAppearance(a)
+		normal, err = s.addSquareAppearance(a)
 	case *annotation.Circle:
-		normal = s.addCircleAppearance(a)
+		normal, err = s.addCircleAppearance(a)
 	case *annotation.Polygon:
-		normal = s.addPolygonAppearance(a)
+		normal, err = s.addPolygonAppearance(a)
 	case *annotation.PolyLine:
-		normal = s.addPolyLineAppearance(a)
+		normal, err = s.addPolyLineAppearance(a)
 	case *annotation.Ink:
-		normal = s.addInkAppearance(a)
+		normal, err = s.addInkAppearance(a)
 	case *annotation.TextMarkup:
-		normal = s.addTextMarkupAppearance(a)
+		normal, err = s.addTextMarkupAppearance(a)
 	case *annotation.Caret:
-		normal = s.addCaretAppearance(a)
+		normal, err = s.addCaretAppearance(a)
 	case *annotation.Stamp:
-		normal = s.addStampAppearance(a)
+		normal, err = s.addStampAppearance(a)
 	case *annotation.FileAttachment:
-		normal = s.addFileAttachmentAppearance(a)
+		normal, err = s.addFileAttachmentAppearance(a)
 	case *annotation.Sound:
-		normal = s.addSoundAppearance(a)
+		normal, err = s.addSoundAppearance(a)
 	case *annotation.Movie:
-		normal = s.addMovieAppearance(a)
+		normal, err = s.addMovieAppearance(a)
 	case *annotation.Screen:
-		normal = s.addScreenAppearance(a)
+		normal, err = s.addScreenAppearance(a)
 	case *annotation.Widget:
 		// widgets build their own appearance dictionary (check boxes and radio
 		// buttons need an on/off map, not a single normal stream)
 		return s.addWidgetAppearance(a)
 	default:
 		return fmt.Errorf("unsupported annotation type: %T", a)
+	}
+	if err != nil {
+		return err
 	}
 
 	c := a.GetCommon()
@@ -185,6 +190,21 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 	}
 
 	return nil
+}
+
+// harvest finalizes the builder into a form with the given bounding box.  It
+// returns an error if the content stream cannot be built, for example because
+// it uses operators unavailable in the target PDF version.
+func harvest(b *builder.Builder, bbox pdf.Rectangle) (*form.Form, error) {
+	ops, err := b.Harvest()
+	if err != nil {
+		return nil, err
+	}
+	return &form.Form{
+		Content: ops,
+		Res:     b.Resources,
+		BBox:    bbox,
+	}, nil
 }
 
 // getBorderLineWidth returns the line width from BorderStyle, Border, or default

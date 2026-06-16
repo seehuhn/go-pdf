@@ -102,8 +102,7 @@ func createDocument(filename string) error {
 
 	H := font.Must(standard.Helvetica.New())
 	B := font.Must(standard.HelveticaBold.New())
-	style := fallback.NewStyle()
-	style.Version = pdf.V1_7
+	style := fallback.NewStyle(pdf.V1_7)
 
 	wr := &writer{
 		page:  page,

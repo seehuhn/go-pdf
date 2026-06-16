@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
+func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, error) {
 	col := a.Color
 
 	if len(a.QuadPoints) < 4 {
@@ -37,17 +37,13 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    a.Rect,
-		}
+		}, nil
 	}
 
 	if col == nil {
-		b := builder.New(content.Form, nil, s.Version)
+		b := builder.New(content.Form, nil, s.version)
 		b.SetExtGState(s.reset)
-		return &form.Form{
-			Content: builder.Must(b.Harvest()),
-			Res:     b.Resources,
-			BBox:    a.Rect,
-		}
+		return harvest(b, a.Rect)
 	}
 
 	bw := getBorderLineWidth(a.Common.Border, nil)
@@ -84,7 +80,7 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
 	bbox.IRound(2)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 	b.SetExtGState(s.reset)
 
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -157,11 +153,7 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) *form.Form {
 		}
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    bbox,
-	}
+	return harvest(b, bbox)
 }
 
 // inwardOffset returns a vector of the given length pointing from outer

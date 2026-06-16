@@ -37,14 +37,17 @@ func (stubImage) Embed(*pdf.EmbedHelper) (pdf.Native, error) { return pdf.Intege
 var mediaRect = pdf.Rectangle{LLx: 10, LLy: 20, URx: 210, URy: 120}
 
 func TestMoviePoster(t *testing.T) {
-	s := NewStyle()
+	s := NewStyle(pdf.V2_0)
 	poster := stubImage{}
 	a := &annotation.Movie{
 		Common: annotation.Common{Rect: mediaRect},
 		Movie:  &movie.Movie{Poster: poster},
 	}
 
-	f := s.addMovieAppearance(a)
+	f, err := s.addMovieAppearance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if f.BBox != mediaRect {
 		t.Errorf("BBox = %v, want %v", f.BBox, mediaRect)
@@ -60,7 +63,7 @@ func TestMoviePoster(t *testing.T) {
 }
 
 func TestMoviePlaceholder(t *testing.T) {
-	s := NewStyle()
+	s := NewStyle(pdf.V2_0)
 	cases := map[string]*movie.Movie{
 		"nil movie":        nil,
 		"nil poster":       {},
@@ -72,7 +75,10 @@ func TestMoviePlaceholder(t *testing.T) {
 				Common: annotation.Common{Rect: mediaRect},
 				Movie:  m,
 			}
-			f := s.addMovieAppearance(a)
+			f, err := s.addMovieAppearance(a)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if f.BBox != mediaRect {
 				t.Errorf("BBox = %v, want %v", f.BBox, mediaRect)
@@ -88,11 +94,14 @@ func TestMoviePlaceholder(t *testing.T) {
 }
 
 func TestMovieZeroRect(t *testing.T) {
-	s := NewStyle()
+	s := NewStyle(pdf.V2_0)
 	zero := pdf.Rectangle{LLx: 5, LLy: 5, URx: 5, URy: 5}
 	a := &annotation.Movie{Common: annotation.Common{Rect: zero}}
 
-	f := s.addMovieAppearance(a)
+	f, err := s.addMovieAppearance(a)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if f.Content != nil {
 		t.Error("zero-area Rect should produce empty content")

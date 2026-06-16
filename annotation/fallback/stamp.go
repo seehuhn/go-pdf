@@ -31,7 +31,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addStampAppearance(a *annotation.Stamp) *form.Form {
+func (s *Style) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
 	col := a.Color
 	if col == nil {
 		col = quireSignalError
@@ -47,10 +47,10 @@ func (s *Style) addStampAppearance(a *annotation.Stamp) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    rect,
-		}
+		}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -137,11 +137,7 @@ func (s *Style) addStampAppearance(a *annotation.Stamp) *form.Form {
 
 	b.PopGraphicsState()
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    rect,
-	}
+	return harvest(b, rect)
 }
 
 // stampLabel converts a StampIcon name to display text.

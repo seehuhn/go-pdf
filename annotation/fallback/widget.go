@@ -188,15 +188,25 @@ func valueText(obj pdf.Object) string {
 func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 	fld := resolveWidgetField(w)
 	if fld == nil {
-		w.Appearance = &appearance.Dict{SingleUse: true, Normal: s.drawChromeField(w)}
+		chrome, err := s.drawChromeField(w)
+		if err != nil {
+			return err
+		}
+		w.Appearance = &appearance.Dict{SingleUse: true, Normal: chrome}
 		w.AppearanceState = ""
 		return nil
 	}
 
 	if fld.FieldType == "Btn" && fld.Flags&acroform.FieldPushbutton == 0 {
 		// check box or radio button: an on and an off appearance
-		on := s.drawToggle(w, fld, true)
-		off := s.drawToggle(w, fld, false)
+		on, err := s.drawToggle(w, fld, true)
+		if err != nil {
+			return err
+		}
+		off, err := s.drawToggle(w, fld, false)
+		if err != nil {
+			return err
+		}
 		onState := fld.OnState
 		if onState == "" {
 			onState = "On"
@@ -217,15 +227,19 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 	}
 
 	var normal *form.Form
+	var err error
 	switch fld.FieldType {
 	case "Btn":
-		normal = s.drawPushButton(w)
+		normal, err = s.drawPushButton(w)
 	case "Tx":
-		normal = s.drawTextField(w, fld)
+		normal, err = s.drawTextField(w, fld)
 	case "Ch":
-		normal = s.drawChoiceField(w, fld)
+		normal, err = s.drawChoiceField(w, fld)
 	default: // Sig and anything else: chrome only
-		normal = s.drawChromeField(w)
+		normal, err = s.drawChromeField(w)
+	}
+	if err != nil {
+		return err
 	}
 
 	w.Appearance = &appearance.Dict{SingleUse: true, Normal: normal}
@@ -242,9 +256,9 @@ func (s *Style) fieldContext(w *annotation.Widget) (b *builder.Builder, width, h
 	if w.MK != nil {
 		rot = ((w.MK.Rotation % 360) + 360) % 360
 	}
-	rw := w.Rect.Dx()
-	rh := w.Rect.Dy()
-	llx, lly := w.Rect.LLx, w.Rect.LLy
+	rw := pdf.Round(w.Rect.Dx(), 2)
+	rh := pdf.Round(w.Rect.Dy(), 2)
+	llx, lly := pdf.Round(w.Rect.LLx, 2), pdf.Round(w.Rect.LLy, 2)
 
 	switch rot {
 	case 90:
@@ -261,22 +275,26 @@ func (s *Style) fieldContext(w *annotation.Widget) (b *builder.Builder, width, h
 		m = matrix.Matrix{1, 0, 0, 1, llx, lly}
 	}
 
-	b = builder.New(content.Form, nil, s.Version)
+	b = builder.New(content.Form, nil, s.version)
 	b.SetExtGState(s.reset)
 	return b, width, height, m
 }
 
-func (s *Style) finishForm(b *builder.Builder, width, height float64, m matrix.Matrix) *form.Form {
+func (s *Style) finishForm(b *builder.Builder, width, height float64, m matrix.Matrix) (*form.Form, error) {
+	ops, err := b.Harvest()
+	if err != nil {
+		return nil, err
+	}
 	return &form.Form{
-		Content: builder.Must(b.Harvest()),
+		Content: ops,
 		Res:     b.Resources,
 		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: width, URy: height},
 		Matrix:  m,
-	}
+	}, nil
 }
 
 // drawChromeField draws background and border only.
-func (s *Style) drawChromeField(w *annotation.Widget) *form.Form {
+func (s *Style) drawChromeField(w *annotation.Widget) (*form.Form, error) {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 	return s.finishForm(b, width, height, m)
@@ -353,7 +371,7 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 
 // drawToggle draws one appearance of a check box or radio button: the on-glyph
 // when on is true, chrome only otherwise. Radio buttons use a circular border.
-func (s *Style) drawToggle(w *annotation.Widget, fld *widgetField, on bool) *form.Form {
+func (s *Style) drawToggle(w *annotation.Widget, fld *widgetField, on bool) (*form.Form, error) {
 	b, width, height, m := s.fieldContext(w)
 	isRadio := fld.Flags&acroform.FieldRadio != 0
 
@@ -434,7 +452,7 @@ func dingbatText(marker string) string {
 }
 
 // drawPushButton draws a push button's chrome and centred caption.
-func (s *Style) drawPushButton(w *annotation.Widget) *form.Form {
+func (s *Style) drawPushButton(w *annotation.Widget) (*form.Form, error) {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 
@@ -452,7 +470,7 @@ func (s *Style) drawPushButton(w *annotation.Widget) *form.Form {
 }
 
 // drawTextField draws a text field's chrome and value.
-func (s *Style) drawTextField(w *annotation.Widget, fld *widgetField) *form.Form {
+func (s *Style) drawTextField(w *annotation.Widget, fld *widgetField) (*form.Form, error) {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 
@@ -602,7 +620,7 @@ func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *wid
 }
 
 // drawChoiceField draws a list box or, when the combo flag is set, a combo box.
-func (s *Style) drawChoiceField(w *annotation.Widget, fld *widgetField) *form.Form {
+func (s *Style) drawChoiceField(w *annotation.Widget, fld *widgetField) (*form.Form, error) {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 	lw := borderWidth(w)

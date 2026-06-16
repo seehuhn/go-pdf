@@ -86,7 +86,7 @@ func run() error {
 	}
 
 	page := doc.AddPage()
-	fbStyle := fallback.NewStyle()
+	fbStyle := fallback.NewStyle(pdf.V1_7)
 
 	iconRects := drawDescription(page)
 

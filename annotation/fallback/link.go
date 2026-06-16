@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/internal/colconv"
 )
 
-func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
+func (s *Style) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 	borderWidth := 0.0
 	var dashPattern []float64
 	style := pdf.Name("S")
@@ -60,10 +60,10 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    bbox,
-		}
+		}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	switch style {
 	case "U": // underline
@@ -102,11 +102,7 @@ func (s *Style) addLinkAppearance(a *annotation.Link) *form.Form {
 		b.Stroke()
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    bbox,
-	}
+	return harvest(b, bbox)
 }
 
 // drawBeveledBorder fills a raised ("B" beveled) or, when raised is false, an

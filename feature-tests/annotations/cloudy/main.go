@@ -57,7 +57,7 @@ func run() error {
 
 	w := &writer{
 		doc:   doc,
-		style: fallback.NewStyle(),
+		style: fallback.NewStyle(pdf.V1_7),
 		font:  font.Must(standard.Helvetica.New()),
 	}
 

@@ -36,15 +36,15 @@ import (
 // requires.  Readers must not call it for a screen annotation lacking an
 // appearance stream: §12.5.6.18 says such an annotation has no default visual
 // appearance.
-func (s *Style) addScreenAppearance(a *annotation.Screen) *form.Form {
+func (s *Style) addScreenAppearance(a *annotation.Screen) (*form.Form, error) {
 	rect := a.Rect
 	w := rect.Dx()
 	h := rect.Dy()
 	if w <= 0 || h <= 0 {
-		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}
+		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 	b.SetExtGState(s.reset)
 	mediaAlpha(b, a.StrokingTransparency, a.NonStrokingTransparency)
 
@@ -57,11 +57,7 @@ func (s *Style) addScreenAppearance(a *annotation.Screen) *form.Form {
 		drawMediaPlaceholder(b, rect)
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    rect,
-	}
+	return harvest(b, rect)
 }
 
 // fitToRect returns the transform that maps the form's bounding box, after the

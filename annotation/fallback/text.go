@@ -24,7 +24,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
+func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	// §12.5.6.4: text annotations behave as if NoZoom and NoRotate were
 	// always set, anchored at the upper-left corner of Rect.  Pin Rect to
 	// a 24×24 square at that corner so the §12.5.5 scale-to-Rect algorithm
@@ -41,7 +41,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		bgCol = stickyYellow
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	switch a.Icon {
 	case annotation.TextIconComment:
@@ -248,11 +248,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) *form.Form {
 		}
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24},
-	}
+	return harvest(b, pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24})
 }
 
 var (

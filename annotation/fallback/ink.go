@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addInkAppearance(a *annotation.Ink) *form.Form {
+func (s *Style) addInkAppearance(a *annotation.Ink) (*form.Form, error) {
 	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
 	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
 	col := a.Color
@@ -37,7 +37,7 @@ func (s *Style) addInkAppearance(a *annotation.Ink) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    a.Rect,
-		}
+		}, nil
 	}
 
 	// We draw InkList only. The optional PDF 2.0 Path entry is used by
@@ -46,7 +46,7 @@ func (s *Style) addInkAppearance(a *annotation.Ink) *form.Form {
 	bbox := inkBBox(a.InkList, lw)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -87,11 +87,7 @@ func (s *Style) addInkAppearance(a *annotation.Ink) *form.Form {
 	}
 	b.Stroke()
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    bbox,
-	}
+	return harvest(b, bbox)
 }
 
 // hasInkPoints reports whether any sub-path contains at least one point.

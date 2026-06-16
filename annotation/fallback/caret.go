@@ -25,14 +25,14 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addCaretAppearance(a *annotation.Caret) *form.Form {
+func (s *Style) addCaretAppearance(a *annotation.Caret) (*form.Form, error) {
 	col := a.Color
 	if col == nil {
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    a.Rect,
-		}
+		}, nil
 	}
 
 	inner := applyMargins(a.Rect, a.Margin)
@@ -52,7 +52,7 @@ func (s *Style) addCaretAppearance(a *annotation.Caret) *form.Form {
 		}
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -104,9 +104,5 @@ func (s *Style) addCaretAppearance(a *annotation.Caret) *form.Form {
 		b.TextEnd()
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    a.Rect,
-	}
+	return harvest(b, a.Rect)
 }

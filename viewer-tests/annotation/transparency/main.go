@@ -116,7 +116,7 @@ func withAP(filename string) error {
 
 	page.DrawShading(pageBackground(paper))
 
-	style := fallback.NewStyle()
+	style := fallback.NewStyle(pdf.V2_0)
 
 	for ca := 0.1; ca <= 1.0; ca += 0.2 {
 		for CA := 0.1; CA <= 1.0; CA += 0.2 {

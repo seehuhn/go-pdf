@@ -35,7 +35,7 @@ const (
 	freeTextPadding  = 2
 )
 
-func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
+func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error) {
 	// extract information from the pre-set fields
 	lw := a.BorderWidth()
 	bgCol := a.Color
@@ -69,7 +69,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 	a.DefaultStyle = ""
 
 	// generate the appearance stream
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 
@@ -207,9 +207,5 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) *form.Form {
 		fontName, freeTextFontSize,
 		quireInk[0], quireInk[1], quireInk[2])
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    outer,
-	}
+	return harvest(b, outer)
 }

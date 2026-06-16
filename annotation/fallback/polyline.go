@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) *form.Form {
+func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, error) {
 	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
 	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
 	col := a.Color
@@ -36,7 +36,7 @@ func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    a.Rect,
-		}
+		}, nil
 	}
 
 	points := polylineVertices(a)
@@ -45,7 +45,7 @@ func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    a.Rect,
-		}
+		}, nil
 	}
 
 	startLE := normalizeLE(a.LineEndingStyle[0])
@@ -54,7 +54,7 @@ func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) *form.Form {
 	bbox := openPolylineBBox(points, lw, startLE, endLE)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -75,11 +75,7 @@ func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) *form.Form {
 
 	drawOpenPolyline(b, points, startLE, endLE, a.FillColor)
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    bbox,
-	}
+	return harvest(b, bbox)
 }
 
 // polylineVertices extracts the vertex list from a polyline annotation.

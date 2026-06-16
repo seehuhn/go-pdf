@@ -28,14 +28,14 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
+func (s *Style) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 	lw := getLineWidth(a)
 	dashPattern := getDashPattern(a)
 
 	bbox := calculateLineBBox(a, lw)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 	b.SetLineWidth(lw)
@@ -48,11 +48,7 @@ func (s *Style) addLineAppearance(a *annotation.Line) *form.Form {
 		drawSimpleLineBuilder(b, a)
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    bbox,
-	}
+	return harvest(b, bbox)
 }
 
 // getLineWidth returns the line width from BorderStyle, Border, or default

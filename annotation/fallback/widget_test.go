@@ -117,7 +117,7 @@ func TestCombAppearance(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			w := combWidget("AB", 6, tc.align)
-			s := NewStyle()
+			s := NewStyle(pdf.V2_0)
 			if err := s.AddAppearance(w); err != nil {
 				t.Fatal(err)
 			}
@@ -147,7 +147,7 @@ func TestCombAppearance(t *testing.T) {
 // a value longer than MaxLen is truncated to the available cells.
 func TestCombOverlongValue(t *testing.T) {
 	w := combWidget("ABCDEFGH", 6, pdf.TextAlignLeft)
-	s := NewStyle()
+	s := NewStyle(pdf.V2_0)
 	if err := s.AddAppearance(w); err != nil {
 		t.Fatal(err)
 	}

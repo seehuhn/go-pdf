@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
+func (s *Style) addCircleAppearance(a *annotation.Circle) (*form.Form, error) {
 	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
 	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
 	col := a.Color
@@ -51,10 +51,10 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    rect,
-		}
+		}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -127,11 +127,7 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) *form.Form {
 		}
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    bbox,
-	}
+	return harvest(b, bbox)
 }
 
 // flattenEllipse approximates the ellipse inscribed in rect (inset by lw/2) as

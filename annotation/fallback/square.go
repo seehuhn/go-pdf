@@ -27,7 +27,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
+func (s *Style) addSquareAppearance(a *annotation.Square) (*form.Form, error) {
 	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
 	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
 	col := a.Color
@@ -49,10 +49,10 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 			Content: nil,
 			Res:     &content.Resources{},
 			BBox:    rect,
-		}
+		}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.Version)
+	b := builder.New(content.Form, nil, s.version)
 
 	b.SetExtGState(s.reset)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
@@ -122,9 +122,5 @@ func (s *Style) addSquareAppearance(a *annotation.Square) *form.Form {
 		a.Rect = rect
 	}
 
-	return &form.Form{
-		Content: builder.Must(b.Harvest()),
-		Res:     b.Resources,
-		BBox:    bbox,
-	}
+	return harvest(b, bbox)
 }

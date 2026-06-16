@@ -70,7 +70,7 @@ func createDocument(filename string) error {
 
 	w := &writer{
 		page:  page,
-		style: fallback.NewStyle(),
+		style: fallback.NewStyle(pdf.V1_7),
 		yPos:  startY,
 	}
 
