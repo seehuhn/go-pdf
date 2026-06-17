@@ -374,11 +374,16 @@ func FuzzRefinementRegionSegmentRoundTrip(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		// untrusted input gets the production-sized budget
-		bm1, err := Decode(nil, data, fuzzBudget(len(data)))
-		if err != nil || bm1 == nil {
+		// untrusted input gets the input-proportional memory and work budgets
+		d1 := &decoder{
+			segments:         make(map[uint32]segmentResult),
+			prescannedHeight: prescanPageHeight(data),
+			pool:             bitmapPool{budget: fuzzBudget(len(data)), work: fuzzWorkBudget(len(data))},
+		}
+		if err := d1.processStream(data); err != nil || d1.pageBitmap == nil {
 			return
 		}
+		bm1 := d1.pageBitmap
 		if bm1.Width() == 0 || bm1.Height() == 0 {
 			return
 		}

@@ -57,6 +57,10 @@ func decodeMMR(pool *bitmapPool, data []byte, width, height int) (*bitmap.Bitmap
 		return nil, 0, err
 	}
 
+	if err := pool.chargeWork(int64(width) * int64(height)); err != nil {
+		return nil, 0, err
+	}
+
 	buf := make([]byte, (width+7)/8)
 	for y := range height {
 		_, err := io.ReadFull(reader, buf)

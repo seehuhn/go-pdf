@@ -43,6 +43,10 @@ func decodeRefinementRegion(pool *bitmapPool, dec *mqDecoder, p *refinementParam
 		return bm, nil
 	}
 
+	if err := pool.chargeWork(int64(p.Width) * int64(p.Height)); err != nil {
+		return nil, err
+	}
+
 	if cx == nil {
 		tmp := make([]byte, 1<<13)
 		cx = tmp

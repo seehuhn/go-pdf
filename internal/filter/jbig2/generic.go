@@ -79,6 +79,10 @@ func decodeGenericRegion(pool *bitmapPool, dec *mqDecoder, p *genericRegionParam
 		return bm, nil
 	}
 
+	if err := pool.chargeWork(int64(p.Width) * int64(p.Height)); err != nil {
+		return nil, err
+	}
+
 	if cx == nil {
 		cx = make([]byte, genericContextSize(p.Template))
 	}

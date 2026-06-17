@@ -164,6 +164,11 @@ func decodeTextRegion(pool *bitmapPool, dec *mqDecoder, p *textRegionParams) (*b
 			wi := int64(ib.Width())
 			hi := int64(ib.Height())
 
+			// charge the composite work
+			if err := pool.chargeWork(wi * hi); err != nil {
+				return nil, err
+			}
+
 			// update CURS before placement (§6.4.5 step 3c-vi)
 			if !p.Transposed {
 				if p.RefCorner == cornerTopRight || p.RefCorner == cornerBottomRight {
@@ -367,6 +372,11 @@ func decodeTextRegionHuffman(pool *bitmapPool, hr *huffReader, p *textRegionHuff
 
 			wi := int64(ib.Width())
 			hi := int64(ib.Height())
+
+			// charge the composite work
+			if err := pool.chargeWork(wi * hi); err != nil {
+				return nil, err
+			}
 
 			// CURS pre-update (§6.4.5 step 3c-vi)
 			if !p.Transposed {

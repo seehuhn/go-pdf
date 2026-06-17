@@ -115,7 +115,13 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 		}
 	}
 
-	// place patterns (§6.6.5.3)
+	// place patterns (§6.6.5.3); each of the hgw*hgh cells composites a
+	// pattern of up to hpw*hph pixels, so the real placement work is the
+	// product.  hgw*hgh <= maxPixels (checkedMul above) and hpw*hph <=
+	// 255*255, so the int64 product cannot overflow.
+	if err := d.pool.chargeWork(int64(hgw) * int64(hgh) * int64(hpw) * int64(hph)); err != nil {
+		return err
+	}
 	for mg := range hgh {
 		for ng := range hgw {
 			if henableSkip && hskip.GetPixel(ng, mg) {

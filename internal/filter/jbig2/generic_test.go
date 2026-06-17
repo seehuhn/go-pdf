@@ -246,11 +246,16 @@ func fuzzBitmapRoundTrip(t *testing.T, data []byte) {
 	t.Helper()
 
 	// the first decode processes untrusted input, so it gets the same
-	// input-proportional budget a real caller would impose
-	bm1, err := Decode(nil, data, fuzzBudget(len(data)))
-	if err != nil || bm1 == nil {
+	// input-proportional memory and work budgets a real caller would impose
+	d1 := &decoder{
+		segments:         make(map[uint32]segmentResult),
+		prescannedHeight: prescanPageHeight(data),
+		pool:             bitmapPool{budget: fuzzBudget(len(data)), work: fuzzWorkBudget(len(data))},
+	}
+	if err := d1.processStream(data); err != nil || d1.pageBitmap == nil {
 		return
 	}
+	bm1 := d1.pageBitmap
 	if bm1.Width() == 0 || bm1.Height() == 0 {
 		return
 	}

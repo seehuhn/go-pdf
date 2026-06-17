@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"slices"
 
 	"seehuhn.de/go/membudget"
@@ -54,6 +55,41 @@ const (
 	// maximum halftone bitplanes (65536 grey levels)
 	maxBitplanes = 16
 )
+
+// Work-budget constants bound the cumulative pixel-decode work of a single
+// JBIG2 decode, sized from the encoded input length.  A JBIG2 codestream may
+// contain an unbounded number of regions, and each region's per-pixel decode
+// loop runs Width*Height iterations regardless of how little coded data backs
+// it (an exhausted arithmetic stream still drives the full loop).  The
+// peak-memory budget bounds only live memory, not cumulative work, so this
+// separate counter enforces "resource usage in proportion to input size".
+const (
+	// baseline work allowance; a single full-size region (maxPixels) decodes
+	// well within this, so small legitimate images never trip the cap
+	workBudgetBase = 64 << 20
+
+	// pixel-decode operations allowed per encoded input byte.  Realistic
+	// JBIG2 compression yields on the order of 100 decoded pixels per byte;
+	// this leaves ample headroom while rejecting the ~10^5 px/byte
+	// amplification of a region with no coded payload.
+	workBudgetPerByte = 4096
+
+	// absolute ceiling, independent of input length, so even a maximal
+	// (64 MiB) input cannot drive an unbounded amount of work
+	workBudgetHardCap = 512 << 20
+)
+
+// workLimit returns the cumulative pixel-decode work budget for an encoded
+// input of rawLen bytes.
+func workLimit(rawLen int64) int64 {
+	if rawLen < 0 {
+		rawLen = 0
+	}
+	if rawLen > (workBudgetHardCap-workBudgetBase)/workBudgetPerByte {
+		return workBudgetHardCap
+	}
+	return workBudgetBase + workBudgetPerByte*rawLen
+}
 
 // checkBitmapSize returns an error if dimensions are negative, if
 // either dimension exceeds maxPixels, if width*height exceeds
@@ -89,6 +125,32 @@ type bitmapPool struct {
 	budget *membudget.Budget
 	live   int // bytes currently allocated (post-free)
 	peak   int // peak live; what has been charged against budget
+
+	// work bounds cumulative pixel-decode work.  Unlike budget, it is only
+	// ever charged, never credited back, so it caps total work rather than
+	// live work.  A nil work budget disables the cap; the production decoder
+	// always sets one (see [Decode]), so only test pools decoding trusted,
+	// size-bounded input leave it nil.
+	work *membudget.Budget
+}
+
+// chargeWork charges pixels units of decode work against the work budget,
+// returning [membudget.ErrExceeded] once the cumulative total is exceeded.
+// Callers charge before doing the work — a region's pixel count before its
+// per-pixel loop, a symbol's area before each composite — so an over-budget
+// operation fails without doing the work.
+//
+// pixels is int64 because the halftone placement charge (grid cells times
+// pattern area) can exceed a 32-bit int; values above [math.MaxInt32] are
+// clamped, which still exceeds workBudgetHardCap, so the charge fails.
+func (p *bitmapPool) chargeWork(pixels int64) error {
+	if p.work == nil {
+		return nil
+	}
+	if pixels > math.MaxInt32 {
+		pixels = math.MaxInt32
+	}
+	return p.work.Charge(int(pixels))
 }
 
 // charge bumps the live counter by n and, if it grows above the peak,
@@ -204,10 +266,11 @@ func checkedMul(a, b int) (int, error) {
 // globals stream may be nil if there are no global segments.  Working
 // memory is charged against budget.
 func Decode(globals, page []byte, budget *membudget.Budget) (*bitmap.Bitmap, error) {
+	work := membudget.New(workLimit(int64(len(globals)) + int64(len(page))))
 	d := &decoder{
 		segments:         make(map[uint32]segmentResult),
 		prescannedHeight: prescanPageHeight(page),
-		pool:             bitmapPool{budget: budget},
+		pool:             bitmapPool{budget: budget, work: work},
 	}
 
 	// parse global segments (page association 0)

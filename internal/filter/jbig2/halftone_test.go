@@ -221,7 +221,7 @@ func FuzzPatternDictRoundTrip(f *testing.F) {
 		// untrusted input → production-sized budget
 		d1 := &decoder{
 			segments: make(map[uint32]segmentResult),
-			pool:     bitmapPool{budget: fuzzBudget(len(data))},
+			pool:     bitmapPool{budget: fuzzBudget(len(data)), work: fuzzWorkBudget(len(data))},
 		}
 		if err := d1.processStream(data); err != nil {
 			return
