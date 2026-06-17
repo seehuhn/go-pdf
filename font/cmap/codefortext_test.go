@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"testing"
 	"time"
+
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestCodeForTextSingles(t *testing.T) {
@@ -139,27 +141,32 @@ func TestCodeForTextManyRanges(t *testing.T) {
 	}
 }
 
-// TestCodeForTextWideRange checks that a missing text is reported promptly even
-// when a range spans an enormous code space: the scan is bounded.
-func TestCodeForTextWideRange(t *testing.T) {
+// TestCodeForTextBudget checks that the reverse scan in CodeForText stops at
+// limits.MaxCMapMappings, independent of how wide the range is. The range's
+// values auto-increment from "a", so the code at enumeration index i carries
+// the text rune('a'+i); the code a little past the budget therefore has a
+// known, unique text that a bounded scan never reaches. A scan that ignored the
+// budget would walk the whole range and report it. This is a deterministic
+// stand-in for a wall-clock "finishes in time" check, which is sensitive to
+// machine load.
+func TestCodeForTextBudget(t *testing.T) {
+	n := limits.MaxCMapMappings
+	// A 3-byte range spans 256^3 ≈ 16.8M codes, far more than the budget. Codes
+	// are enumerated last-byte-fastest, so index i is reached after i steps.
 	tu := &ToUnicodeFile{
 		Ranges: []ToUnicodeRange{
 			{
-				First:  []byte{0, 0, 0, 0},
-				Last:   []byte{0xFF, 0xFF, 0xFF, 0xFF},
+				First:  []byte{0, 0, 0},
+				Last:   []byte{0xFF, 0xFF, 0xFF},
 				Values: []string{"a"},
 			},
 		},
 	}
 
-	done := make(chan struct{})
-	go func() {
-		tu.CodeForText("this text does not appear")
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("CodeForText did not finish on a wide range")
+	// text of a code just past the budget; n stays well below the Unicode
+	// maximum, so the incremented value is a valid, unique rune.
+	target := nextString("a", n+1000)
+	if _, ok := tu.CodeForText(target); ok {
+		t.Errorf("CodeForText found a code past the %d-entry budget", n)
 	}
 }

@@ -65,6 +65,8 @@ func Dict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (dict.
 		cidFontDict, err := x.GetDictTyped(path, a[0], "Font")
 		if err != nil {
 			return nil, err
+		} else if cidFontDict == nil {
+			return nil, pdf.Error("missing descendant font dictionary")
 		}
 		a[0] = cidFontDict
 

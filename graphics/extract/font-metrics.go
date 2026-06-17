@@ -59,6 +59,10 @@ func decodeCompositeWidths(r pdf.Getter, obj pdf.Object) (map[cid.CID]float64, e
 	}
 
 	res := make(map[cid.CID]float64)
+	// CIDs are at most 65535, so a valid W array assigns at most 65536 widths.
+	// Crafted overlapping or repeated ranges that exceed this are rejected to
+	// bound both the map size and the loop work.
+	count := 0
 	for len(w) > 1 {
 		c0, err := pdf.GetInteger(r, w[0])
 		if err != nil {
@@ -69,7 +73,7 @@ func decodeCompositeWidths(r pdf.Getter, obj pdf.Object) (map[cid.CID]float64, e
 			return nil, err
 		}
 		if c1, ok := obj1.(pdf.Integer); ok {
-			if len(w) < 3 || c0 < 0 || c1 < c0 || c1-c0 > 65536 {
+			if len(w) < 3 || c0 < 0 || c1 < c0 || c1 > 65535 {
 				return nil, pdf.Error("invalid W entry in CIDFont dictionary")
 			}
 			wi, err := pdf.GetNumber(r, w[2])
@@ -77,11 +81,11 @@ func decodeCompositeWidths(r pdf.Getter, obj pdf.Object) (map[cid.CID]float64, e
 				return nil, err
 			}
 			for c := c0; c <= c1; c++ {
-				cid := cid.CID(c)
-				if pdf.Integer(cid) != c {
+				count++
+				if count > 65536 {
 					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
 				}
-				res[cid] = float64(wi)
+				res[cid.CID(c)] = float64(wi)
 			}
 			w = w[3:]
 		} else {
@@ -89,16 +93,22 @@ func decodeCompositeWidths(r pdf.Getter, obj pdf.Object) (map[cid.CID]float64, e
 			if err != nil {
 				return nil, err
 			}
+			if c0 < 0 {
+				return nil, pdf.Error("invalid W entry in CIDFont dictionary")
+			}
 			for _, wiObj := range wi {
 				wi, err := pdf.GetNumber(r, wiObj)
 				if err != nil {
 					return nil, err
 				}
-				cid := cid.CID(c0)
-				if pdf.Integer(cid) != c0 {
+				if c0 > 65535 {
 					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
 				}
-				res[cid] = float64(wi)
+				count++
+				if count > 65536 {
+					return nil, pdf.Error("invalid W entry in CIDFont dictionary")
+				}
+				res[cid.CID(c0)] = float64(wi)
 				c0++
 			}
 			w = w[2:]
@@ -150,6 +160,10 @@ func decodeVMetrics(r pdf.Getter, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 	}
 
 	res := make(map[cid.CID]dict.VMetrics)
+	// CIDs are at most 65535, so a valid W2 array assigns at most 65536 entries.
+	// Crafted overlapping or repeated ranges that exceed this are rejected to
+	// bound both the map size and the loop work.
+	count := 0
 	for len(a) > 0 {
 		if len(a) < 2 {
 			return nil, errInvalidVMetrics
@@ -189,6 +203,13 @@ func decodeVMetrics(r pdf.Getter, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 					return nil, err
 				}
 
+				if cidVal > 65535 {
+					return nil, errInvalidVMetrics
+				}
+				count++
+				if count > 65536 {
+					return nil, errInvalidVMetrics
+				}
 				res[cidVal] = dict.VMetrics{
 					DeltaY: float64(dy),
 					OffsX:  float64(offsX),
@@ -225,8 +246,12 @@ func decodeVMetrics(r pdf.Getter, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 				return nil, err
 			}
 
-			for c := int(cidVal); c <= int(cidEnd); c++ {
-				res[cid.CID(c)] = dict.VMetrics{
+			for c := cidVal; c <= cidEnd; c++ {
+				count++
+				if count > 65536 {
+					return nil, errInvalidVMetrics
+				}
+				res[c] = dict.VMetrics{
 					DeltaY: float64(dy),
 					OffsX:  float64(offsX),
 					OffsY:  float64(offsY),

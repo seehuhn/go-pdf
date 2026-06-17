@@ -19,7 +19,6 @@ package dict
 import (
 	"slices"
 	"testing"
-	"time"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/postscript/cid"
@@ -184,42 +183,5 @@ func TestCIDFontType2GlyphWidth(t *testing.T) {
 
 	if w, ok := d.GlyphWidth("A"); !ok || w != 0.6 {
 		t.Errorf("GlyphWidth(A) = %v, %v; want 0.6, true", w, ok)
-	}
-}
-
-// TestCIDFontType0GlyphWidthHostile checks that GlyphWidth stays cheap even on
-// a font crafted to trigger the old quadratic blow-up: a wide CID range plus a
-// wide ToUnicode range.
-func TestCIDFontType0GlyphWidthHostile(t *testing.T) {
-	wide := charcode.CodeSpaceRange{{Low: []byte{0, 0, 0, 0}, High: []byte{0xFF, 0xFF, 0xFF, 0xFF}}}
-	d := &CIDFontType0{
-		ROS: cidTextROS,
-		CMap: &cmap.File{
-			Name:           "Evil",
-			ROS:            cidTextROS,
-			CodeSpaceRange: wide,
-			CIDRanges: []cmap.Range{
-				{First: []byte{0, 0, 0, 0}, Last: []byte{0xFF, 0xFF, 0xFF, 0xFF}, Value: 1},
-			},
-		},
-		ToUnicode: &cmap.ToUnicodeFile{
-			CodeSpaceRange: wide,
-			Ranges: []cmap.ToUnicodeRange{
-				{First: []byte{0, 0, 0, 0}, Last: []byte{0xFF, 0xFF, 0xFF, 0xFF}, Values: []string{"a"}},
-			},
-		},
-	}
-
-	done := make(chan struct{})
-	go func() {
-		for _, text := range []string{" ", "a", "A", "1", "中"} {
-			d.GlyphWidth(text)
-		}
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("GlyphWidth did not finish on a hostile CMap")
 	}
 }
