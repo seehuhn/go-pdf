@@ -3398,13 +3398,16 @@ types:
     purpose: 'Group specifies transparency group attributes (PDF 1.4).
 
       If non-nil, this form XObject is a transparency group XObject.'
-  - goName:
+  - goName: Ref
     pdfKey: Ref
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
     - Reference
+    goType: '*reference.Dict'
+    purpose: 'Ref (optional; PDF 1.4) makes this form a reference XObject: a proxy
+      for a single page imported from another PDF file.'
   - goName: Metadata
     pdfKey: Metadata
     pdfType: stream
@@ -3448,7 +3451,7 @@ types:
     required: false
     introduced: '1.3'
     notes: Table 359
-  - goName:
+  - goName: OPI
     pdfKey: OPI
     pdfType: dictionary
     required: false
@@ -3457,6 +3460,9 @@ types:
     refTypes:
     - OPIVersion13
     - OPIVersion20
+    goType: opi.Dict
+    purpose: 'OPI (optional; PDF 1.2) is an Open Prepress Interface dictionary
+      describing a low-resolution proxy for a high-resolution image.'
   - goName: OptionalContent
     pdfKey: OC
     pdfType: dictionary

@@ -29,6 +29,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/group"
+	"seehuhn.de/go/pdf/graphics/opi"
+	"seehuhn.de/go/pdf/graphics/reference"
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
@@ -78,6 +80,20 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 		return nil, err
 	} else {
 		f.Group = g
+	}
+
+	// Ref (optional)
+	if r, err := pdf.ExtractorGetOptional(x, path, dict["Ref"], reference.ExtractDict); err != nil {
+		return nil, err
+	} else {
+		f.Ref = r
+	}
+
+	// OPI (optional)
+	if o, err := pdf.ExtractorGetOptional(x, path, dict["OPI"], opi.Extract); err != nil {
+		return nil, err
+	} else {
+		f.OPI = o
 	}
 
 	// Metadata (optional)

@@ -29,6 +29,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/opi"
+	"seehuhn.de/go/pdf/graphics/reference"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/optional"
@@ -354,6 +356,70 @@ func TestFormWithStructParent(t *testing.T) {
 	// Verify StructParent value 0 was preserved
 	if key, ok := form2.StructParent.Get(); !ok || key != 0 {
 		t.Errorf("StructParent value 0 not preserved: got %v (present=%v), want 0", key, ok)
+	}
+}
+
+// roundTripForm embeds f, extracts it back, and returns the extracted form.
+func roundTripForm(t *testing.T, version pdf.Version, f *form.Form) *form.Form {
+	t.Helper()
+	writer, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(writer)
+	ref, err := rm.Embed(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(writer)
+	got, err := extract.Form(x, nil, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+// TestFormWithRef verifies that a reference XObject's Ref entry survives a
+// form XObject read/write cycle.
+func TestFormWithRef(t *testing.T) {
+	form0 := makeTestForm()
+	form0.Ref = &reference.Dict{
+		F:         &file.Specification{FileName: "target.pdf", AFRelationship: file.RelationshipUnspecified},
+		PageIndex: 2,
+	}
+
+	form1 := roundTripForm(t, pdf.V2_0, form0)
+	if form1.Ref == nil {
+		t.Fatal("Ref was lost during extraction")
+	}
+
+	form2 := roundTripForm(t, pdf.V2_0, form1)
+	if !form1.Equal(form2) {
+		t.Error("Ref round trip failed")
+	}
+}
+
+// TestFormWithOPI verifies that an OPI entry survives a form XObject read/write
+// cycle. OPI is deprecated in PDF 2.0, so the test uses PDF 1.7.
+func TestFormWithOPI(t *testing.T) {
+	form0 := makeTestForm()
+	form0.OPI = &opi.V20{
+		F:         &file.Specification{FileName: "proxy.tif", AFRelationship: file.RelationshipUnspecified},
+		MainImage: pdf.String("/vol/full.tif"),
+		Overprint: true,
+	}
+
+	form1 := roundTripForm(t, pdf.V1_7, form0)
+	if form1.OPI == nil {
+		t.Fatal("OPI was lost during extraction")
+	}
+
+	form2 := roundTripForm(t, pdf.V1_7, form1)
+	if !form1.Equal(form2) {
+		t.Error("OPI round trip failed")
 	}
 }
 

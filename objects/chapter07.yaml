@@ -2646,30 +2646,34 @@ types:
     notes: Inheritable
 - name: Reference
   purpose: cross-reference to a related PDF file
-  goType:
+  goType: graphics/reference.Dict
   pdfRepr: dict
   introduced: '1.4'
   fields:
-  - goName:
+  - goName: F
     pdfKey: F
     pdfType: dictionary;string
     required: true
     introduced: '1.4'
     refTypes:
     - FileSpecification
+    goType: '*file.Specification'
     notes: Table 95
-  - goName:
+  - goName: PageIndex
     pdfKey: Page
     pdfType: integer;text-string
     required: true
     introduced: '1.4'
     possibleValues:
     - fn:Eval(@Page>=0)
-  - goName:
+    goType: int
+    notes: integer page index; the text-string page-label form maps to PageLabel
+  - goName: ID
     pdfKey: ID
     pdfType: array
     required: false
     introduced: '1.4'
+    goType: '[]pdf.String'
 - name: Resource
   purpose: named resources used by a content stream
   goType: graphics/content.Resources

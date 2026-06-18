@@ -1658,7 +1658,7 @@ types:
   writeMethod: (*MetadataStream).Embed
 - name: OPIVersion13
   purpose: "OPI 1.3 proxy image"
-  goType:
+  goType: graphics/opi.Dict
   pdfRepr: dict
   introduced: '1.2'
   fields:
@@ -1673,7 +1673,7 @@ types:
     notes: Table 405
 - name: OPIVersion13Dict
   purpose: "OPI 1.3 dictionary entries"
-  goType:
+  goType: graphics/opi.V13
   pdfType: OPI
   pdfRepr: dict
   introduced: '1.2'
@@ -1685,6 +1685,7 @@ types:
     required: false
     introduced: '1.2'
     deprecated: '2.0'
+    discriminator: true
     possibleValues:
     - OPI
     notes: Table 406
@@ -1694,9 +1695,10 @@ types:
     required: true
     introduced: '1.2'
     deprecated: '2.0'
+    discriminator: true
     possibleValues:
     - '1.3'
-  - goName:
+  - goName: F
     pdfKey: F
     pdfType: dictionary;string
     required: true
@@ -1704,99 +1706,115 @@ types:
     deprecated: '2.0'
     refTypes:
     - FileSpecification
-  - goName:
+    goType: '*file.Specification'
+  - goName: ID
     pdfKey: ID
     pdfType: byte-string
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: pdf.String
+  - goName: Comments
     pdfKey: Comments
     pdfType: text-string
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: string
+  - goName: Size
     pdfKey: Size
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '[2]int'
+  - goName: CropRect
     pdfKey: CropRect
     pdfType: rectangle
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '[4]int'
+  - goName: CropFixed
     pdfKey: CropFixed
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*[4]float64'
+  - goName: Position
     pdfKey: Position
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '[8]float64'
+  - goName: Resolution
     pdfKey: Resolution
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*[2]float64'
+  - goName: ColorType
     pdfKey: ColorType
     pdfType: name
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: pdf.Name
+  - goName: Color
     pdfKey: Color
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*opi.Color13'
+  - goName: Tint
     pdfKey: Tint
     pdfType: number
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*float64'
+  - goName: Overprint
     pdfKey: Overprint
     pdfType: boolean
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: bool
+  - goName: ImageType
     pdfKey: ImageType
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*[2]int'
+  - goName: GrayMap
     pdfKey: GrayMap
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '[]int'
+  - goName: Transparency
     pdfKey: Transparency
     pdfType: boolean
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*bool'
+  - goName: Tags
     pdfKey: Tags
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
+    goType: '[]opi.Tag13'
 - name: OPIVersion20
   purpose: "OPI 2.0 proxy image"
-  goType:
+  goType: graphics/opi.Dict
   pdfRepr: dict
   introduced: '1.2'
   fields:
@@ -1811,7 +1829,7 @@ types:
     notes: Table 405
 - name: OPIVersion20Dict
   purpose: "OPI 2.0 dictionary entries"
-  goType:
+  goType: graphics/opi.V20
   pdfType: OPI
   pdfRepr: dict
   introduced: '1.2'
@@ -1823,6 +1841,7 @@ types:
     required: false
     introduced: '1.2'
     deprecated: '2.0'
+    discriminator: true
     possibleValues:
     - OPI
     notes: Table 407
@@ -1832,9 +1851,10 @@ types:
     required: true
     introduced: '1.2'
     deprecated: '2.0'
+    discriminator: true
     possibleValues:
     - '2.0'
-  - goName:
+  - goName: F
     pdfKey: F
     pdfType: dictionary;string
     required: true
@@ -1842,57 +1862,66 @@ types:
     deprecated: '2.0'
     refTypes:
     - FileSpecification
-  - goName:
+    goType: '*file.Specification'
+  - goName: MainImage
     pdfKey: MainImage
     pdfType: byte-string
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: pdf.String
+  - goName: Tags
     pdfKey: Tags
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '[]opi.Tag20'
+  - goName: Size
     pdfKey: Size
     pdfType: array
     required: fn:IsRequired(fn:IsPresent(CropRect))
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*[2]float64'
+  - goName: CropRect
     pdfKey: CropRect
     pdfType: rectangle
     required: fn:IsRequired(fn:IsPresent(Size))
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*[4]float64'
+  - goName: Overprint
     pdfKey: Overprint
     pdfType: boolean
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: bool
+  - goName: Inks
     pdfKey: Inks
     pdfType: array;name
     required: false
     introduced: '1.2'
     deprecated: '2.0'
+    goType: '*opi.Inks20'
     possibleValues:
     - full_color
     - registration
-  - goName:
+  - goName: IncludedImageDimensions
     pdfKey: IncludedImageDimensions
     pdfType: array
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-  - goName:
+    goType: '*[2]int'
+  - goName: IncludedImageQuality
     pdfKey: IncludedImageQuality
     pdfType: number
     required: false
     introduced: '1.2'
     deprecated: '2.0'
+    goType: float64
     possibleValues:
     - '1'
     - '2'

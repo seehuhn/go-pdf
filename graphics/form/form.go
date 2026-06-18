@@ -28,6 +28,8 @@ import (
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/group"
+	"seehuhn.de/go/pdf/graphics/opi"
+	"seehuhn.de/go/pdf/graphics/reference"
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
@@ -62,6 +64,15 @@ type Form struct {
 	// Group specifies transparency group attributes (PDF 1.4).
 	// If non-nil, this form XObject is a transparency group XObject.
 	Group *group.TransparencyAttributes
+
+	// Ref (optional; PDF 1.4) makes this form a reference XObject: a proxy for
+	// a single page imported from another PDF file.
+	Ref *reference.Dict
+
+	// OPI (optional; PDF 1.2) is an Open Prepress Interface dictionary
+	// describing a low-resolution proxy for a high-resolution image.
+	// OPI is deprecated in PDF 2.0.
+	OPI opi.Dict
 
 	// Metadata is an optional reference to metadata for this form.
 	Metadata *pdf.MetadataStream
@@ -168,6 +179,20 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["Group"] = groupObj
+	}
+	if f.Ref != nil {
+		refObj, err := e.Embed(f.Ref)
+		if err != nil {
+			return nil, err
+		}
+		dict["Ref"] = refObj
+	}
+	if f.OPI != nil {
+		opiObj, err := e.Embed(f.OPI)
+		if err != nil {
+			return nil, err
+		}
+		dict["OPI"] = opiObj
 	}
 	if f.Metadata != nil {
 		embedded, err := e.Embed(f.Metadata)
@@ -318,6 +343,15 @@ func (f *Form) Equal(other *Form) bool {
 		return false
 	}
 	if !f.Group.Equal(other.Group) {
+		return false
+	}
+	if !f.Ref.Equal(other.Ref) {
+		return false
+	}
+	if (f.OPI == nil) != (other.OPI == nil) {
+		return false
+	}
+	if f.OPI != nil && !f.OPI.Equal(other.OPI) {
 		return false
 	}
 
