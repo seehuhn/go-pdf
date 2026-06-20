@@ -94,7 +94,7 @@ func (o *Object) resolve() (pdf.Native, error) {
 	if o.src == nil {
 		return o.obj.AsPDF(0), nil
 	}
-	return deepResolve(o.src, nil, 0, o.obj)
+	return deepResolve(pdf.CursorAt(o.src, nil), 0, o.obj)
 }
 
 // maxDeepResolveDepth caps the recursion depth of [deepResolve],
@@ -111,7 +111,7 @@ const maxDeepResolveDepth = 256
 // loops that cross structural boundaries (e.g. dict A holds a reference
 // to dict B which holds a reference back to A) are detected.  depth
 // bounds the recursion against adversarial nesting.
-func deepResolve(x *pdf.Extractor, path *pdf.CycleCheck, depth int, obj pdf.Object) (pdf.Native, error) {
+func deepResolve(c pdf.Cursor, depth int, obj pdf.Object) (pdf.Native, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -120,18 +120,19 @@ func deepResolve(x *pdf.Extractor, path *pdf.CycleCheck, depth int, obj pdf.Obje
 	}
 	native := obj.AsPDF(0)
 	if ref, ok := native.(pdf.Reference); ok {
-		resolved, err := x.Resolve(path, ref)
+		resolved, err := c.Resolve(ref)
 		if err != nil {
 			return nil, err
 		}
-		path = &pdf.CycleCheck{Ref: ref, Parent: path}
+		// extend the path with ref so nested resolves detect back-references
+		c = pdf.CursorAt(c.Extractor(), &pdf.CycleCheck{Ref: ref, Parent: c.Path()})
 		native = resolved
 	}
 	switch v := native.(type) {
 	case pdf.Dict:
 		res := make(pdf.Dict, len(v))
 		for k, val := range v {
-			r, err := deepResolve(x, path, depth+1, val)
+			r, err := deepResolve(c, depth+1, val)
 			if err != nil {
 				return nil, err
 			}
@@ -141,7 +142,7 @@ func deepResolve(x *pdf.Extractor, path *pdf.CycleCheck, depth int, obj pdf.Obje
 	case pdf.Array:
 		res := make(pdf.Array, len(v))
 		for i, val := range v {
-			r, err := deepResolve(x, path, depth+1, val)
+			r, err := deepResolve(c, depth+1, val)
 			if err != nil {
 				return nil, err
 			}
@@ -175,11 +176,11 @@ func (o *Object) AsDirectDict() pdf.Dict {
 func ObjectAs[T any](
 	o *Object,
 	path *pdf.CycleCheck,
-	extract func(*pdf.Extractor, *pdf.CycleCheck, pdf.Object, bool) (T, error),
+	extract func(pdf.Cursor, pdf.Object, bool) (T, error),
 ) (T, error) {
 	if o.src == nil {
 		var zero T
 		return zero, errors.New("opaque: ObjectAs requires an Object built via Extract")
 	}
-	return pdf.ExtractorGet(o.src, path, o.obj, extract)
+	return pdf.Decode(pdf.CursorAt(o.src, path), o.obj, extract)
 }

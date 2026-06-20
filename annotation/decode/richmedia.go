@@ -21,11 +21,11 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeRichMedia(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.RichMedia, error) {
+func decodeRichMedia(c pdf.Cursor, dict pdf.Dict) (*annotation.RichMedia, error) {
 	richMedia := &annotation.RichMedia{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &richMedia.Common, dict); err != nil {
+	if err := decodeCommon(c, &richMedia.Common, dict); err != nil {
 		return nil, err
 	}
 

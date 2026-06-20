@@ -54,8 +54,8 @@ type Stream struct {
 }
 
 // ExtractStream extracts an embedded file stream from a PDF stream object.
-func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Stream, error) {
-	stream, err := x.GetStream(path, obj)
+func ExtractStream(c pdf.Cursor, obj pdf.Object, _ bool) (*Stream, error) {
+	stream, err := c.Stream(obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -63,46 +63,46 @@ func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ boo
 	}
 
 	// Check Type field - optional for embedded file streams
-	if err := pdf.CheckDictType(x.R, stream.Dict, "EmbeddedFile"); err != nil {
+	if err := c.CheckDictType(stream.Dict, "EmbeddedFile"); err != nil {
 		return nil, err
 	}
 
 	result := &Stream{}
 
 	// Extract Subtype (MimeType) - optional
-	if subtype, err := pdf.Optional(x.GetName(path, stream.Dict["Subtype"])); err != nil {
+	if subtype, err := pdf.Optional(c.Name(stream.Dict["Subtype"])); err != nil {
 		return nil, err
 	} else {
 		result.MimeType = string(subtype)
 	}
 
 	// Extract Params dictionary - optional
-	if paramsDict, err := pdf.Optional(x.GetDict(path, stream.Dict["Params"])); err != nil {
+	if paramsDict, err := pdf.Optional(c.Dict(stream.Dict["Params"])); err != nil {
 		return nil, err
 	} else if paramsDict != nil {
 		// Extract Size
-		if size, err := pdf.Optional(x.GetInteger(path, paramsDict["Size"])); err != nil {
+		if size, err := pdf.Optional(c.Integer(paramsDict["Size"])); err != nil {
 			return nil, err
 		} else if size >= 0 {
 			result.Size = int64(size)
 		}
 
 		// Extract CreationDate
-		if creationDate, err := pdf.Optional(pdf.GetDate(x.R, paramsDict["CreationDate"])); err != nil {
+		if creationDate, err := pdf.Optional(c.Date(paramsDict["CreationDate"])); err != nil {
 			return nil, err
 		} else {
 			result.CreationDate = time.Time(creationDate)
 		}
 
 		// Extract ModDate
-		if modDate, err := pdf.Optional(pdf.GetDate(x.R, paramsDict["ModDate"])); err != nil {
+		if modDate, err := pdf.Optional(c.Date(paramsDict["ModDate"])); err != nil {
 			return nil, err
 		} else {
 			result.ModDate = time.Time(modDate)
 		}
 
 		// Extract CheckSum
-		if checkSum, err := pdf.Optional(x.GetString(path, paramsDict["CheckSum"])); err != nil {
+		if checkSum, err := pdf.Optional(c.String(paramsDict["CheckSum"])); err != nil {
 			return nil, err
 		} else if len(checkSum) == 16 { // MD5 is exactly 16 bytes
 			result.CheckSum = []byte(checkSum)
@@ -113,7 +113,7 @@ func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ boo
 
 	// Set up WriteData to read from the stream
 	result.WriteData = func(w io.Writer) error {
-		r, err := pdf.GetStreamReader(x.R, nil, stream)
+		r, err := c.StreamReader(stream)
 		if err != nil {
 			return err
 		}

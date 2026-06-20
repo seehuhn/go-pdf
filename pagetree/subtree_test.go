@@ -303,7 +303,7 @@ func FuzzInherit(f *testing.F) {
 			}
 
 			// Check MediaBox
-			gotMediaBox, err := pdf.GetRectangle(doc, dict["MediaBox"])
+			gotMediaBox, err := pdf.NewCursor(doc).Rectangle(dict["MediaBox"])
 			if err != nil {
 				t.Fatalf("page %d: failed to get MediaBox: %v", i, err)
 			}
@@ -313,7 +313,7 @@ func FuzzInherit(f *testing.F) {
 
 			// Check CropBox
 			if expectedCropBox[i] != nil {
-				gotCropBox, err := pdf.GetRectangle(doc, dict["CropBox"])
+				gotCropBox, err := pdf.NewCursor(doc).Rectangle(dict["CropBox"])
 				if err != nil {
 					t.Fatalf("page %d: failed to get CropBox: %v", i, err)
 				}
@@ -323,7 +323,7 @@ func FuzzInherit(f *testing.F) {
 			}
 
 			// Check Rotate - account for inheritance (RotateInherit means 0 degrees)
-			rotate, _ := pdf.GetInteger(doc, dict["Rotate"])
+			rotate, _ := pdf.NewCursor(doc).Integer(dict["Rotate"])
 			expectedDegrees := expectedRotate[i].Degrees()
 			if int(rotate) != expectedDegrees {
 				t.Errorf("page %d: wrong Rotate: got %d, expected %d", i, rotate, expectedDegrees)

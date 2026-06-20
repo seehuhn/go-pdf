@@ -133,8 +133,8 @@ func (p *MediaPlayEntries) isEmpty() bool {
 }
 
 // ExtractMediaPlayParameters reads a media play parameters dictionary.
-func ExtractMediaPlayParameters(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MediaPlayParameters, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaPlayParams")
+func ExtractMediaPlayParameters(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaPlayParameters, error) {
+	dict, err := c.DictTyped(obj, "MediaPlayParams")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -143,24 +143,24 @@ func ExtractMediaPlayParameters(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.
 
 	p := &MediaPlayParameters{SingleUse: isDirect}
 
-	if pl, err := pdf.ExtractorGetOptional(x, path, dict["PL"], ExtractMediaPlayers); err != nil {
+	if pl, err := pdf.DecodeOptional(c, dict["PL"], ExtractMediaPlayers); err != nil {
 		return nil, err
 	} else {
 		p.Players = pl
 	}
 
-	if p.MustHonour, err = extractPlayEntries(x, path, dict["MH"]); err != nil {
+	if p.MustHonour, err = extractPlayEntries(c, dict["MH"]); err != nil {
 		return nil, err
 	}
-	if p.BestEffort, err = extractPlayEntries(x, path, dict["BE"]); err != nil {
+	if p.BestEffort, err = extractPlayEntries(c, dict["BE"]); err != nil {
 		return nil, err
 	}
 
 	return p, nil
 }
 
-func extractPlayEntries(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*MediaPlayEntries, error) {
-	dict, err := pdf.Optional(x.GetDict(path, obj))
+func extractPlayEntries(c pdf.Cursor, obj pdf.Object) (*MediaPlayEntries, error) {
+	dict, err := pdf.Optional(c.Dict(obj))
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -170,43 +170,43 @@ func extractPlayEntries(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) 
 	p := &MediaPlayEntries{}
 
 	if dict["V"] != nil {
-		if v, err := pdf.Optional(x.GetInteger(path, dict["V"])); err != nil {
+		if v, err := pdf.Optional(c.Integer(dict["V"])); err != nil {
 			return nil, err
 		} else if v >= 0 {
 			p.Volume.Set(uint(v))
 		}
 	}
 	if dict["C"] != nil {
-		if c, err := pdf.Optional(x.GetBoolean(path, dict["C"])); err != nil {
+		if c, err := pdf.Optional(c.Boolean(dict["C"])); err != nil {
 			return nil, err
 		} else {
 			p.Controller.Set(bool(c))
 		}
 	}
 	if dict["F"] != nil {
-		if f, err := pdf.Optional(x.GetInteger(path, dict["F"])); err != nil {
+		if f, err := pdf.Optional(c.Integer(dict["F"])); err != nil {
 			return nil, err
 		} else {
 			p.Fit = fitFromPDF(f)
 		}
 	}
-	if d, err := pdf.ExtractorGetOptional(x, path, dict["D"], ExtractMediaDuration); err != nil {
+	if d, err := pdf.DecodeOptional(c, dict["D"], ExtractMediaDuration); err != nil {
 		return nil, err
 	} else {
 		p.Duration = d
 	}
 	if dict["A"] != nil {
-		if a, err := pdf.Optional(x.GetBoolean(path, dict["A"])); err != nil {
+		if a, err := pdf.Optional(c.Boolean(dict["A"])); err != nil {
 			return nil, err
 		} else {
 			p.AutoPlay.Set(bool(a))
 		}
 	}
 	if dict["RC"] != nil {
-		if rc, err := pdf.Optional(x.GetNumber(path, dict["RC"])); err != nil {
+		if rc, err := pdf.Optional(c.Number(dict["RC"])); err != nil {
 			return nil, err
 		} else if rc >= 0 {
-			p.RepeatCount.Set(float64(rc))
+			p.RepeatCount.Set(rc)
 		}
 	}
 
@@ -317,15 +317,15 @@ type MediaDuration struct {
 }
 
 // ExtractMediaDuration reads a media duration dictionary.
-func ExtractMediaDuration(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MediaDuration, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaDuration")
+func ExtractMediaDuration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaDuration, error) {
+	dict, err := c.DictTyped(obj, "MediaDuration")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing media duration dictionary")
 	}
 
-	s, err := pdf.Optional(x.GetName(path, dict["S"]))
+	s, err := pdf.Optional(c.Name(dict["S"]))
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func ExtractMediaDuration(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 	case DurationIntrinsic, DurationInfinity:
 		d.Kind = DurationKind(s)
 	case DurationExplicit:
-		t, err := pdf.ExtractorGet(x, path, dict["T"], ExtractTimespan)
+		t, err := pdf.Decode(c, dict["T"], ExtractTimespan)
 		if err != nil {
 			return nil, err
 		} else if t == nil {

@@ -56,7 +56,7 @@ func TestType3Roundtrip(t *testing.T) {
 				// == Read ==
 
 				x := pdf.NewExtractor(w)
-				d2Any, err := extract.Dict(x, nil, fontDictRef, false)
+				d2Any, err := extract.Dict(pdf.CursorAt(x, nil), fontDictRef, false)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -154,7 +154,7 @@ func FuzzType3Dict(f *testing.F) {
 			t.Skip("broken reference")
 		}
 		x := pdf.NewExtractor(r)
-		d1Any, err := extract.Dict(x, nil, obj, false)
+		d1Any, err := extract.Dict(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("broken Type3Dict")
 		}
@@ -180,7 +180,7 @@ func FuzzType3Dict(f *testing.F) {
 		// Read back the data.
 		// Make sure we get the same Type3Dict back.
 		x2 := pdf.NewExtractor(w)
-		d2Any, err := extract.Dict(x2, nil, fontDictRef, false)
+		d2Any, err := extract.Dict(pdf.CursorAt(x2, nil), fontDictRef, false)
 		if err != nil {
 			t.Fatal(err)
 		}

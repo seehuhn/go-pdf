@@ -61,28 +61,28 @@ var _ pdf.Embedder = (*Stream)(nil)
 //
 // The dictType parameter specifies the font dictionary type (e.g., "Type1", "TrueType", "Type0").
 // The fdKey parameter specifies the font descriptor key ("FontFile", "FontFile2" or "FontFile3").
-func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, dictType, fdKey pdf.Name) (*Stream, error) {
-	stm, err := pdf.Optional(x.GetStream(path, obj))
+func ExtractStream(c pdf.Cursor, obj pdf.Object, dictType, fdKey pdf.Name) (*Stream, error) {
+	stm, err := pdf.Optional(c.Stream(obj))
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
 		return nil, nil
 	}
 
-	tp, err := determineType(x, path, dictType, fdKey, stm.Dict)
+	tp, err := determineType(c, dictType, fdKey, stm.Dict)
 	if err != nil {
 		return nil, err
 	}
 
-	length1, err := pdf.Optional(x.GetInteger(path, stm.Dict["Length1"]))
+	length1, err := pdf.Optional(c.Integer(stm.Dict["Length1"]))
 	if err != nil {
 		return nil, err
 	}
-	length2, err := pdf.Optional(x.GetInteger(path, stm.Dict["Length2"]))
+	length2, err := pdf.Optional(c.Integer(stm.Dict["Length2"]))
 	if err != nil {
 		return nil, err
 	}
-	length3, err := pdf.Optional(x.GetInteger(path, stm.Dict["Length3"]))
+	length3, err := pdf.Optional(c.Integer(stm.Dict["Length3"]))
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func ExtractStream(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, dictT
 	return &Stream{
 		Type: tp,
 		WriteTo: func(w io.Writer, length *Lengths) error {
-			body, err := pdf.DecodeStream(x.R, nil, stm, 0)
+			body, err := c.StreamReader(stm)
 			if err != nil {
 				return err
 			}
@@ -220,8 +220,8 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // determineType determines the glyphdata.Type from the font dictionary type,
 // font descriptor key, and stream dictionary.
-func determineType(x *pdf.Extractor, path *pdf.CycleCheck, dictType, fdKey pdf.Name, streamDict pdf.Dict) (Type, error) {
-	subtype, err := pdf.Optional(x.GetName(path, streamDict["Subtype"]))
+func determineType(c pdf.Cursor, dictType, fdKey pdf.Name, streamDict pdf.Dict) (Type, error) {
+	subtype, err := pdf.Optional(c.Name(streamDict["Subtype"]))
 	if err != nil {
 		return 0, err
 	}

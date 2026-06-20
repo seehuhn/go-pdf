@@ -227,7 +227,7 @@ func doit() error {
 				return err
 			}
 
-			fontDict, err := pdf.GetDict(doc.Out, refY)
+			fontDict, err := pdf.NewCursor(doc.Out).Dict(refY)
 			if err != nil {
 				return err
 			}
@@ -238,11 +238,11 @@ func doit() error {
 
 			df := fontDict["DescendantFonts"]
 			if df != nil {
-				dfArray, err := pdf.GetArray(doc.Out, df)
+				dfArray, err := pdf.NewCursor(doc.Out).Array(df)
 				if err != nil {
 					return err
 				}
-				cidFontDict, err := pdf.GetDict(doc.Out, dfArray[0])
+				cidFontDict, err := pdf.NewCursor(doc.Out).Dict(dfArray[0])
 				if err != nil {
 					return err
 				}
@@ -255,7 +255,7 @@ func doit() error {
 			}
 
 			if fd != nil {
-				fdDict, err := pdf.GetDict(doc.Out, fd)
+				fdDict, err := pdf.NewCursor(doc.Out).Dict(fd)
 				if err != nil {
 					return err
 				}
@@ -265,7 +265,7 @@ func doit() error {
 
 				ff := fdDict[ffKey]
 				if ff != nil {
-					ffStream, err := pdf.GetStream(doc.Out, ff)
+					ffStream, err := pdf.NewCursor(doc.Out).Stream(ff)
 					if err != nil {
 						return err
 					}
@@ -278,7 +278,7 @@ func doit() error {
 			}
 
 			if title == "Type3 Fonts" {
-				cp, err := pdf.GetDict(doc.Out, fontDict["CharProcs"])
+				cp, err := pdf.NewCursor(doc.Out).Dict(fontDict["CharProcs"])
 				if err != nil {
 					return err
 				}

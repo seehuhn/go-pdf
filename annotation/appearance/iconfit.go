@@ -57,8 +57,8 @@ var _ pdf.Embedder = (*IconFit)(nil)
 
 // ExtractIconFit reads an icon fit dictionary from the PDF object obj.
 // If obj is absent or resolves to null, ExtractIconFit returns (nil, nil).
-func ExtractIconFit(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*IconFit, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractIconFit(c pdf.Cursor, obj pdf.Object, isDirect bool) (*IconFit, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -68,30 +68,30 @@ func ExtractIconFit(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDi
 
 	res := &IconFit{SingleUse: isDirect}
 
-	if sw, err := pdf.Optional(x.GetName(path, dict["SW"])); err != nil {
+	if sw, err := pdf.Optional(c.Name(dict["SW"])); err != nil {
 		return nil, err
 	} else {
 		res.ScaleWhen = IconScaleWhen(sw)
 	}
 
-	if s, err := pdf.Optional(x.GetName(path, dict["S"])); err != nil {
+	if s, err := pdf.Optional(c.Name(dict["S"])); err != nil {
 		return nil, err
 	} else {
 		res.Scaling = IconScaling(s)
 	}
 
-	if a, err := pdf.Optional(x.GetArray(path, dict["A"])); err != nil {
+	if a, err := pdf.Optional(c.Array(dict["A"])); err != nil {
 		return nil, err
 	} else if len(a) == 2 {
-		v0, err0 := pdf.GetNumber(x.R, a[0])
-		v1, err1 := pdf.GetNumber(x.R, a[1])
+		v0, err0 := c.Number(a[0])
+		v1, err1 := c.Number(a[1])
 		if err0 == nil && err1 == nil &&
 			v0 >= 0 && v0 <= 1 && v1 >= 0 && v1 <= 1 {
-			res.LeftoverSpace = &[2]float64{float64(v0), float64(v1)}
+			res.LeftoverSpace = &[2]float64{v0, v1}
 		}
 	}
 
-	if fb, err := pdf.Optional(x.GetBoolean(path, dict["FB"])); err != nil {
+	if fb, err := pdf.Optional(c.Boolean(dict["FB"])); err != nil {
 		return nil, err
 	} else {
 		res.FitToBounds = bool(fb)

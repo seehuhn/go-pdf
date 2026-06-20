@@ -294,7 +294,7 @@ func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, R
 	if err != nil {
 		return nil, 0, err
 	}
-	decoded, err := DecodeStream(r, nil, stream, 0)
+	decoded, err := DecodeStream(r, nil, stream)
 	if err != nil {
 		return nil, 0, err
 	}

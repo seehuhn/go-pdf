@@ -26,8 +26,8 @@ import (
 
 // Font extracts a font from a PDF file as an immutable font object.
 // This combines Dict with MakeFont() for convenience.
-func Font(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (font.Instance, error) {
-	d, err := Dict(x, path, obj, false)
+func Font(c pdf.Cursor, obj pdf.Object, _ bool) (font.Instance, error) {
+	d, err := Dict(c, obj, false)
 	if err != nil {
 		return nil, err
 	}
@@ -37,22 +37,21 @@ func Font(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (font.
 // Dict reads a font dictionary from a PDF file.
 // This returns a concrete type implementing dict.Dict,
 // allowing access to font-specific properties.
-func Dict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (dict.Dict, error) {
-	fontDict, err := x.GetDictTyped(path, obj, "Font")
+func Dict(c pdf.Cursor, obj pdf.Object, _ bool) (dict.Dict, error) {
+	fontDict, err := c.DictTyped(obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
 		return nil, pdf.Error("missing font dictionary")
 	}
 
-	fontType, err := x.GetName(path, fontDict["Subtype"])
+	fontType, err := c.Name(fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
-	fontDict["Subtype"] = fontType
 
 	if fontType == "Type0" {
-		a, err := x.GetArray(path, fontDict["DescendantFonts"])
+		a, err := c.Array(fontDict["DescendantFonts"])
 		if err != nil {
 			return nil, err
 		} else if len(a) < 1 {
@@ -60,34 +59,31 @@ func Dict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (dict.
 				Err: errors.New("composite font with no descendant fonts"),
 			}
 		}
-		fontDict["DescendantFonts"] = a
 
-		cidFontDict, err := x.GetDictTyped(path, a[0], "Font")
+		cidFontDict, err := c.DictTyped(a[0], "Font")
 		if err != nil {
 			return nil, err
 		} else if cidFontDict == nil {
 			return nil, pdf.Error("missing descendant font dictionary")
 		}
-		a[0] = cidFontDict
 
-		fontType, err = x.GetName(path, cidFontDict["Subtype"])
+		fontType, err = c.Name(cidFontDict["Subtype"])
 		if err != nil {
 			return nil, err
 		}
-		cidFontDict["Subtype"] = fontType
 	}
 
 	switch fontType {
 	case "Type1":
-		return extractFontType1(x, path, fontDict)
+		return extractFontType1(c, fontDict)
 	case "TrueType":
-		return extractFontTrueType(x, path, fontDict)
+		return extractFontTrueType(c, fontDict)
 	case "Type3":
-		return extractFontType3(x, path, fontDict)
+		return extractFontType3(c, fontDict)
 	case "CIDFontType0":
-		return extractFontCIDType0(x, path, fontDict)
+		return extractFontCIDType0(c, fontDict)
 	case "CIDFontType2":
-		return extractFontCIDType2(x, path, fontDict)
+		return extractFontCIDType2(c, fontDict)
 	default:
 		return nil, pdf.Errorf("unsupported font type: %s", fontType)
 	}

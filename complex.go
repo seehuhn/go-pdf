@@ -28,36 +28,11 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 )
 
 // A Number is either an Integer or a Real.
 type Number float64
-
-// GetNumber is a helper function for reading numeric values from a PDF file.
-// This resolves indirect references and makes sure the resulting object is an
-// Integer or a Real.
-//
-// TODO(voss): should this return float64?
-func GetNumber(r Getter, obj Object) (Number, error) {
-	obj, err := Resolve(r, obj)
-	if err != nil {
-		return 0, err
-	}
-	switch x := obj.(type) {
-	case Integer:
-		return Number(x), nil
-	case Real:
-		return Number(x), nil
-	case nil:
-		return 0, nil
-	default:
-		return 0, &MalformedFileError{
-			Err: fmt.Errorf("expected Number but got %T", obj),
-		}
-	}
-}
 
 // AsPDF implements the [Object] interface.
 func (x Number) AsPDF(opt OutputOptions) Native {
@@ -71,16 +46,6 @@ func (x Number) AsPDF(opt OutputOptions) Native {
 }
 
 type TextString string
-
-// GetTextString interprets x as a PDF "text string" and returns
-// the corresponding utf-8 encoded string.
-func GetTextString(r Getter, obj Object) (TextString, error) {
-	s, err := GetString(r, obj)
-	if err != nil {
-		return "", err
-	}
-	return s.AsTextString(), nil
-}
 
 var utf16Marker = []byte{254, 255}
 var utf8Marker = []byte{239, 187, 191}
@@ -156,16 +121,6 @@ func (d Date) IsZero() bool {
 
 func (d Date) Equal(other Date) bool {
 	return time.Time(d).Equal(time.Time(other))
-}
-
-func GetDate(r Getter, obj Object) (Date, error) {
-	var zero Date
-
-	s, err := GetString(r, obj)
-	if err != nil {
-		return zero, err
-	}
-	return s.AsDate()
 }
 
 // AsPDF creates a PDF String object encoding the given date and time.
@@ -255,44 +210,6 @@ func (r *Rectangle) IsDirect() bool {
 // GetRectangle resolves references to indirect objects and makes sure the
 // resulting object is a PDF rectangle object.
 // If the object is null, nil is returned.
-func GetRectangle(r Getter, obj Object) (*Rectangle, error) {
-	if rect, ok := obj.(*Rectangle); ok {
-		return rect, nil
-	}
-
-	a, err := GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	if a == nil {
-		return nil, nil
-	}
-
-	return asRectangle(r, a)
-}
-
-// asRectangle converts an array of 4 numbers to a Rectangle object.
-// If the array does not have the correct format, an error is returned.
-func asRectangle(r Getter, a Array) (*Rectangle, error) {
-	if len(a) != 4 {
-		return nil, errNoRectangle
-	}
-	values, err := GetFloatArray(r, a)
-	if err != nil {
-		return nil, err
-	}
-	if len(values) != 4 {
-		return nil, errNoRectangle
-	}
-	rect := &Rectangle{
-		LLx: math.Min(values[0], values[2]),
-		LLy: math.Min(values[1], values[3]),
-		URx: math.Max(values[0], values[2]),
-		URy: math.Max(values[1], values[3]),
-	}
-	return rect, nil
-}
-
 func (r *Rectangle) String() string {
 	return fmt.Sprintf("[%.2f %.2f %.2f %.2f]", r.LLx, r.LLy, r.URx, r.URy)
 }
@@ -422,29 +339,6 @@ func (r *Rectangle) IRound(digits int) {
 func (r *Rectangle) Contains(point vec.Vec2) bool {
 	return point.X >= r.LLx && point.X <= r.URx &&
 		point.Y >= r.LLy && point.Y <= r.URy
-}
-
-func GetMatrix(r Getter, obj Object) (m matrix.Matrix, err error) {
-	defer func() {
-		if err != nil {
-			err = Wrap(err, "GetMatrix")
-		}
-	}()
-
-	a, err := GetFloatArray(r, obj)
-	if err != nil {
-		return matrix.Matrix{}, err
-	}
-
-	if len(a) != 6 {
-		return m, &MalformedFileError{
-			Err: fmt.Errorf("expected 6 numbers, got %d", len(a)),
-		}
-	}
-
-	copy(m[:], a)
-
-	return m, nil
 }
 
 // Function represents a PDF function.

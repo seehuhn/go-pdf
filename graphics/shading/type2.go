@@ -109,7 +109,7 @@ func (s *Type2) Equal(other graphics.Shading) bool {
 }
 
 // extractType2 reads a Type 2 (axial) shading from a PDF dictionary.
-func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect bool) (*Type2, error) {
+func extractType2(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type2, error) {
 	s := &Type2{}
 
 	// Read required ColorSpace
@@ -119,7 +119,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, path, csObj, false)
+	cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 			Err: fmt.Errorf("missing /Coords entry"),
 		}
 	}
-	coords, err := pdf.GetFloatArray(x.R, coordsObj)
+	coords, err := c.FloatArray(coordsObj)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 			Err: fmt.Errorf("missing /Function entry"),
 		}
 	}
-	fn, err := pdf.ExtractorGet(x, path, fnObj, function.Extract)
+	fn, err := pdf.Decode(c, fnObj, function.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 
 	// Read optional Domain (renamed to TMin/TMax for Type2)
 	if domainObj, ok := d["Domain"]; ok {
-		if domain, err := pdf.Optional(pdf.GetFloatArray(x.R, domainObj)); err != nil {
+		if domain, err := pdf.Optional(c.FloatArray(domainObj)); err != nil {
 			return nil, err
 		} else if len(domain) >= 2 {
 			s.TMin, s.TMax = min(domain[0], domain[1]), max(domain[0], domain[1])
@@ -205,18 +205,18 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 
 	// Read optional Extend
 	if extendObj, ok := d["Extend"]; ok {
-		if extendArray, err := pdf.Optional(x.GetArray(path, extendObj)); err != nil {
+		if extendArray, err := pdf.Optional(c.Array(extendObj)); err != nil {
 			return nil, err
 		} else {
 			if len(extendArray) >= 1 {
-				if extendStart, err := pdf.Optional(x.GetBoolean(path, extendArray[0])); err != nil {
+				if extendStart, err := pdf.Optional(c.Boolean(extendArray[0])); err != nil {
 					return nil, err
 				} else {
 					s.ExtendStart = bool(extendStart)
 				}
 			}
 			if len(extendArray) >= 2 {
-				if extendEnd, err := pdf.Optional(x.GetBoolean(path, extendArray[1])); err != nil {
+				if extendEnd, err := pdf.Optional(c.Boolean(extendArray[1])); err != nil {
 					return nil, err
 				} else {
 					s.ExtendEnd = bool(extendEnd)
@@ -227,7 +227,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 
 	// Read optional Background
 	if bgObj, ok := d["Background"]; ok {
-		if bg, err := pdf.Optional(pdf.GetFloatArray(x.R, bgObj)); err != nil {
+		if bg, err := pdf.Optional(c.FloatArray(bgObj)); err != nil {
 			return nil, err
 		} else if len(bg) > 0 {
 			if len(bg) != cs.Channels() {
@@ -239,7 +239,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 
 	// Read optional BBox
 	if bboxObj, ok := d["BBox"]; ok {
-		if bbox, err := pdf.Optional(pdf.GetRectangle(x.R, bboxObj)); err != nil {
+		if bbox, err := pdf.Optional(c.Rectangle(bboxObj)); err != nil {
 			return nil, err
 		} else {
 			s.BBox = bbox
@@ -248,7 +248,7 @@ func extractType2(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict, isDirect b
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(x.GetBoolean(path, aaObj)); err != nil {
+		if aa, err := pdf.Optional(c.Boolean(aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)

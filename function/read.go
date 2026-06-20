@@ -24,9 +24,9 @@ import (
 
 // Extract extracts a function from a PDF file.
 // Cycle detection for recursive Type 3 functions is handled by routing
-// sub-function extraction through [pdf.ExtractorGet].
-func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pdf.Function, error) {
-	resolved, err := x.Resolve(path, obj)
+// sub-function extraction through [pdf.Decode].
+func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (pdf.Function, error) {
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	} else if resolved == nil {
@@ -44,15 +44,15 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pd
 			}
 		}
 
-		ftNum, err := x.GetInteger(path, ft)
+		ftNum, err := c.Integer(ft)
 		if err != nil {
 			return nil, err
 		}
 		switch ftNum {
 		case 2:
-			return extractType2(x, path, obj)
+			return extractType2(c, obj)
 		case 3:
-			return extractType3(x, path, obj)
+			return extractType3(c, obj)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("invalid function type %d for dict", ftNum),
@@ -66,15 +66,15 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pd
 			}
 		}
 
-		ftNum, err := x.GetInteger(path, ft)
+		ftNum, err := c.Integer(ft)
 		if err != nil {
 			return nil, err
 		}
 		switch ftNum {
 		case 0:
-			return extractType0(x, path, obj)
+			return extractType0(c, obj)
 		case 4:
-			return extractType4(x, path, obj)
+			return extractType4(c, obj)
 		default:
 			return nil, &pdf.MalformedFileError{
 				Err: fmt.Errorf("invalid function type %d for stream", ftNum),
@@ -88,15 +88,15 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pd
 }
 
 // getFloatArray extracts a slice of float64 from a PDF Array.
-func getFloatArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]float64, error) {
-	a, err := x.GetArray(path, obj)
+func getFloatArray(c pdf.Cursor, obj pdf.Object) ([]float64, error) {
+	a, err := c.Array(obj)
 	if a == nil {
 		return nil, err
 	}
 
 	res := make([]float64, len(a))
 	for i, obj := range a {
-		num, err := x.GetNumber(path, obj)
+		num, err := c.Number(obj)
 		if err != nil {
 			return nil, fmt.Errorf("array element %d: %w", i, err)
 		}
@@ -106,15 +106,15 @@ func getFloatArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]fl
 }
 
 // readInts extracts a slice of int from a PDF Array.
-func readInts(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]int, error) {
-	a, err := x.GetArray(path, obj)
+func readInts(c pdf.Cursor, obj pdf.Object) ([]int, error) {
+	a, err := c.Array(obj)
 	if a == nil {
 		return nil, err
 	}
 
 	res := make([]int, len(a))
 	for i, obj := range a {
-		num, err := x.GetInteger(path, obj)
+		num, err := c.Integer(obj)
 		if err != nil {
 			return nil, err
 		}

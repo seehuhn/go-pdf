@@ -110,8 +110,8 @@ func (c *Catalog) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeCatalog reads a document catalog's additional-actions dictionary from
 // a PDF object.
-func DecodeCatalog(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Catalog, error) {
-	dict, err := x.GetDict(path, obj)
+func DecodeCatalog(c pdf.Cursor, obj pdf.Object, _ bool) (*Catalog, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -119,37 +119,37 @@ func DecodeCatalog(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ boo
 		return nil, nil
 	}
 
-	c := &Catalog{}
+	cat := &Catalog{}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["WC"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["WC"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
-		c.WillClose = js
+		cat.WillClose = js
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["WS"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["WS"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
-		c.WillSave = js
+		cat.WillSave = js
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["DS"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["DS"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
-		c.DidSave = js
+		cat.DidSave = js
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["WP"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["WP"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
-		c.WillPrint = js
+		cat.WillPrint = js
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["DP"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["DP"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
-		c.DidPrint = js
+		cat.DidPrint = js
 	}
 
-	return c, nil
+	return cat, nil
 }

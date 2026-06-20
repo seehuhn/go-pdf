@@ -34,8 +34,8 @@ import (
 )
 
 // extractFontCIDType2 reads a Type 2 CIDFont dictionary from the PDF file.
-func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*dict.CIDFontType2, error) {
-	fontDict, err := x.GetDictTyped(path, obj, "Font")
+func extractFontCIDType2(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType2, error) {
+	fontDict, err := c.DictTyped(obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -43,7 +43,7 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := x.GetName(path, fontDict["Subtype"])
+	subtype, err := c.Name(fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		}
 	}
 
-	a, err := x.GetArray(path, fontDict["DescendantFonts"])
+	a, err := c.Array(fontDict["DescendantFonts"])
 	if err != nil {
 		return nil, err
 	} else if len(a) != 1 {
@@ -61,7 +61,7 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 			Err: errors.New("invalid DescendantFonts array"),
 		}
 	}
-	cidFontDict, err := x.GetDictTyped(path, a[0], "Font")
+	cidFontDict, err := c.DictTyped(a[0], "Font")
 	if err != nil {
 		return nil, err
 	} else if cidFontDict == nil {
@@ -69,7 +69,7 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 			Err: errors.New("missing CIDFont dictionary"),
 		}
 	}
-	subtype, err = x.GetName(path, cidFontDict["Subtype"])
+	subtype, err = c.Name(cidFontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	} else if subtype != "CIDFontType2" {
@@ -82,16 +82,16 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 
 	// fields in the font dictionary
 
-	d.CMap, err = cmap.Extract(x, path, fontDict["Encoding"], false)
+	d.CMap, err = cmap.Extract(c, fontDict["Encoding"], false)
 	if err != nil {
 		return nil, err
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, path, fontDict["ToUnicode"], false)
+	d.ToUnicode, _ = pdf.Decode(c, fontDict["ToUnicode"], cmap.ExtractToUnicode)
 
 	// fields in the CIDFont dictionary
 
-	baseFont, err := x.GetName(path, cidFontDict["BaseFont"])
+	baseFont, err := c.Name(cidFontDict["BaseFont"])
 	if err != nil {
 		return nil, err
 	}
@@ -102,20 +102,23 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		d.PostScriptName = string(baseFont)
 	}
 
-	fdDict, err := x.GetDictTyped(path, cidFontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := c.DictTyped(cidFontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
-	d.Descriptor, _ = font.ExtractDescriptor(x.R, fdDict)
+	d.Descriptor, err = pdf.DecodeOptional(c, fdDict, font.ExtractDescriptor)
+	if err != nil {
+		return nil, err
+	}
 
-	d.ROS, _ = font.ExtractCIDSystemInfo(x, path, cidFontDict["CIDSystemInfo"], false)
+	d.ROS, _ = pdf.Decode(c, cidFontDict["CIDSystemInfo"], font.ExtractCIDSystemInfo)
 
-	d.Width, err = decodeCompositeWidths(x.R, cidFontDict["W"])
+	d.Width, err = decodeCompositeWidths(c, cidFontDict["W"])
 	if err != nil {
 		return nil, err
 	}
 	if obj, ok := cidFontDict["DW"]; ok {
-		dw, err := x.GetNumber(path, obj)
+		dw, err := c.Number(obj)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}
@@ -124,18 +127,18 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		d.DefaultWidth = dict.DefaultWidthDefault
 	}
 
-	dw2, err := decodeVDefault(x.R, cidFontDict["DW2"])
+	dw2, err := decodeVDefault(c, cidFontDict["DW2"])
 	if err != nil {
 		return nil, err
 	}
 	d.DefaultVMetrics = dw2
-	w2, err := decodeVMetrics(x.R, cidFontDict["W2"])
+	w2, err := decodeVMetrics(c, cidFontDict["W2"])
 	if err != nil {
 		return nil, err
 	}
 	d.VMetrics = w2
 
-	c2g, err := x.Resolve(path, cidFontDict["CIDToGIDMap"])
+	c2g, err := c.Resolve(cidFontDict["CIDToGIDMap"])
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +154,7 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		}
 
 	case *pdf.Stream:
-		cid2gidData, err := pdf.ReadAll(x.R, path, c2g, limits.MaxCIDToGIDMapBytes)
+		cid2gidData, err := c.ReadAll(c2g, limits.MaxCIDToGIDMapBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -172,9 +175,9 @@ func extractFontCIDType2(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 	}
 
 	for _, key := range []pdf.Name{"FontFile2", "FontFile3"} {
-		if fontFile, err := pdf.ExtractorGetOptional(x, path, fdDict[key],
-			func(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
-				return glyphdata.ExtractStream(x, path, obj, "TrueType", key)
+		if fontFile, err := pdf.DecodeOptional(c, fdDict[key],
+			func(c pdf.Cursor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
+				return glyphdata.ExtractStream(c, obj, "TrueType", key)
 			}); err != nil {
 			return nil, err
 		} else if fontFile != nil {

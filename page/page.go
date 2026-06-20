@@ -611,10 +611,10 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 // The page dictionary should already have inherited attributes resolved
 // (e.g., via [pagetree.Iterator]).
 //
-// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Page, error) {
-	dict, err := x.GetDictTyped(path, obj, "Page")
+func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
+	dict, err := c.DictTyped(obj, "Page")
 	if err != nil {
 		return nil, err
 	}
@@ -630,14 +630,14 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// MediaBox (required, inheritable)
-	if mediaBox, err := pdf.GetRectangle(x.R, dict["MediaBox"]); err != nil {
+	if mediaBox, err := c.Rectangle(dict["MediaBox"]); err != nil {
 		return nil, err
 	} else if mediaBox != nil {
 		p.MediaBox = mediaBox
 	}
 
 	// Resources (required, inheritable)
-	if res, err := pdf.ExtractorGet(x, path, dict["Resources"], extract.Resources); err != nil {
+	if res, err := pdf.Decode(c, dict["Resources"], extract.Resources); err != nil {
 		return nil, err
 	} else {
 		p.Resources = res
@@ -645,11 +645,11 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 
 	// Contents (optional)
 	if contentsObj := dict["Contents"]; contentsObj != nil {
-		resolved, err := x.Resolve(path, contentsObj)
+		resolved, err := c.Resolve(contentsObj)
 		if err != nil {
 			return nil, err
 		}
-		segments, err := ExtractContents(x.R, resolved)
+		segments, err := ExtractContents(c, resolved)
 		if err != nil {
 			return nil, err
 		}
@@ -657,28 +657,28 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// CropBox (optional, inheritable)
-	if cropBox, err := pdf.GetRectangle(x.R, dict["CropBox"]); err != nil {
+	if cropBox, err := c.Rectangle(dict["CropBox"]); err != nil {
 		return nil, err
 	} else if cropBox != nil {
 		p.CropBox = cropBox
 	}
 
 	// BleedBox (optional)
-	if bleedBox, err := pdf.GetRectangle(x.R, dict["BleedBox"]); err != nil {
+	if bleedBox, err := c.Rectangle(dict["BleedBox"]); err != nil {
 		return nil, err
 	} else if bleedBox != nil {
 		p.BleedBox = bleedBox
 	}
 
 	// TrimBox (optional)
-	if trimBox, err := pdf.GetRectangle(x.R, dict["TrimBox"]); err != nil {
+	if trimBox, err := c.Rectangle(dict["TrimBox"]); err != nil {
 		return nil, err
 	} else if trimBox != nil {
 		p.TrimBox = trimBox
 	}
 
 	// ArtBox (optional)
-	if artBox, err := pdf.GetRectangle(x.R, dict["ArtBox"]); err != nil {
+	if artBox, err := c.Rectangle(dict["ArtBox"]); err != nil {
 		return nil, err
 	} else if artBox != nil {
 		p.ArtBox = artBox
@@ -693,7 +693,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// BoxColorInfo (optional)
-	if bci, err := pdf.ExtractorGetOptional(x, path, dict["BoxColorInfo"], boxcolor.ExtractInfo); err != nil {
+	if bci, err := pdf.DecodeOptional(c, dict["BoxColorInfo"], boxcolor.ExtractInfo); err != nil {
 		return nil, err
 	} else {
 		p.BoxColorInfo = bci
@@ -701,7 +701,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 
 	// Rotate (optional, inheritable)
 	if dict["Rotate"] != nil {
-		rotate, err := pdf.Optional(x.GetInteger(path, dict["Rotate"]))
+		rotate, err := pdf.Optional(c.Integer(dict["Rotate"]))
 		if err != nil {
 			return nil, err
 		}
@@ -724,21 +724,21 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	// If Rotate key is absent, p.Rotate remains RotateInherit (zero value)
 
 	// Group (optional)
-	if grp, err := pdf.ExtractorGetOptional(x, path, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
+	if grp, err := pdf.DecodeOptional(c, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
 		return nil, err
 	} else {
 		p.Group = grp
 	}
 
 	// Thumb (optional)
-	if thumb, err := pdf.ExtractorGetOptional(x, path, dict["Thumb"], thumbnail.ExtractThumbnail); err != nil {
+	if thumb, err := pdf.DecodeOptional(c, dict["Thumb"], thumbnail.ExtractThumbnail); err != nil {
 		return nil, err
 	} else {
 		p.Thumbnail = thumb
 	}
 
 	// B (optional)
-	if bArray, err := pdf.Optional(x.GetArray(path, dict["B"])); err != nil {
+	if bArray, err := pdf.Optional(c.Array(dict["B"])); err != nil {
 		return nil, err
 	} else {
 		for _, item := range bArray {
@@ -749,21 +749,21 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// Dur (optional)
-	if dur, err := pdf.Optional(x.GetNumber(path, dict["Dur"])); err != nil {
+	if dur, err := pdf.Optional(c.Number(dict["Dur"])); err != nil {
 		return nil, err
 	} else {
 		p.Duration = dur
 	}
 
 	// Trans (optional)
-	if trans, err := pdf.ExtractorGetOptional(x, path, dict["Trans"], transition.Extract); err != nil {
+	if trans, err := pdf.DecodeOptional(c, dict["Trans"], transition.Extract); err != nil {
 		return nil, err
 	} else {
 		p.Transition = trans
 	}
 
 	// Annots (optional; spec requires indirect references)
-	if annotsArray, err := pdf.Optional(x.GetArray(path, dict["Annots"])); err != nil {
+	if annotsArray, err := pdf.Optional(c.Array(dict["Annots"])); err != nil {
 		return nil, err
 	} else {
 		pageRefs := map[pdf.Reference]bool{}
@@ -772,7 +772,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 			if !ok {
 				continue
 			}
-			annot, err := pdf.ExtractorGet(x, path, item, decode.Annotation)
+			annot, err := pdf.Decode(c, item, decode.Annotation)
 			if err != nil {
 				// permissive: skip invalid annotations
 				continue
@@ -804,39 +804,39 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 		// A widget annotation belongs to a form field. Decoding the interactive
 		// form links each widget to its field (annotation.Widget.Parent); the
 		// page's widgets are already cached, so the form's top-down walk links
-		// them via cache hits without a cycle. ExtractorGetExclusive single-flights
+		// them via cache hits without a cycle. DecodeExclusive single-flights
 		// so concurrent page decodes share one field tree. Errors are non-fatal: a
 		// malformed form must not break page decoding.
 		if hasWidget {
-			if m := x.R.GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
-				_, _ = pdf.ExtractorGetExclusive(x, nil, m.Catalog.AcroForm, decode.Form)
+			if m := c.Getter().GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
+				_, _ = pdf.DecodeExclusive(pdf.CursorAt(c.Extractor(), nil), m.Catalog.AcroForm, decode.Form)
 			}
 		}
 	}
 
 	// AA (optional)
-	if aa, err := pdf.ExtractorGet(x, path, dict["AA"], triggers.DecodePage); err != nil {
+	if aa, err := pdf.Decode(c, dict["AA"], triggers.DecodePage); err != nil {
 		return nil, err
 	} else {
 		p.AA = aa
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.Optional(pdf.ExtractMetadataStream(x, path, dict["Metadata"], false)); err != nil {
+	if meta, err := pdf.DecodeOptional(c, dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
 		return nil, err
 	} else {
 		p.Metadata = meta
 	}
 
 	// LastModified (optional)
-	if lastMod, err := pdf.Optional(pdf.GetDate(x.R, dict["LastModified"])); err != nil {
+	if lastMod, err := pdf.Optional(c.Date(dict["LastModified"])); err != nil {
 		return nil, err
 	} else if !time.Time(lastMod).IsZero() {
 		p.LastModified = time.Time(lastMod)
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.ExtractorGetOptional(x, path, dict["PieceInfo"], pieceinfo.Extract); err != nil {
+	if piece, err := pdf.DecodeOptional(c, dict["PieceInfo"], pieceinfo.Extract); err != nil {
 		return nil, err
 	} else {
 		p.PieceInfo = piece
@@ -844,7 +844,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 
 	// StructParents (optional)
 	if dict["StructParents"] != nil {
-		if key, err := pdf.Optional(x.GetInteger(path, dict["StructParents"])); err != nil {
+		if key, err := pdf.Optional(c.Integer(dict["StructParents"])); err != nil {
 			return nil, err
 		} else if key >= 0 && uint64(key) <= math.MaxUint {
 			p.StructParents.Set(uint(key))
@@ -852,14 +852,14 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// ID (optional, deprecated)
-	if id, err := pdf.Optional(x.GetString(path, dict["ID"])); err != nil {
+	if id, err := pdf.Optional(c.String(dict["ID"])); err != nil {
 		return nil, err
 	} else {
 		p.ID = id
 	}
 
 	// PZ (optional)
-	if pz, err := pdf.Optional(x.GetNumber(path, dict["PZ"])); err != nil {
+	if pz, err := pdf.Optional(c.Number(dict["PZ"])); err != nil {
 		return nil, err
 	} else {
 		p.PZ = pz
@@ -867,7 +867,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 
 	// SeparationInfo (optional)
 	if dict["SeparationInfo"] != nil {
-		sep, err := pdf.ExtractorGet(x, path, dict["SeparationInfo"], separation.Decode)
+		sep, err := pdf.Decode(c, dict["SeparationInfo"], separation.Decode)
 		if err != nil {
 			return nil, err
 		}
@@ -875,7 +875,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// Tabs (optional; only accept valid values)
-	if tabs, err := pdf.Optional(x.GetName(path, dict["Tabs"])); err != nil {
+	if tabs, err := pdf.Optional(c.Name(dict["Tabs"])); err != nil {
 		return nil, err
 	} else {
 		switch tabs {
@@ -887,21 +887,21 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// TemplateInstantiated (optional)
-	if tmpl, err := pdf.Optional(x.GetName(path, dict["TemplateInstantiated"])); err != nil {
+	if tmpl, err := pdf.Optional(c.Name(dict["TemplateInstantiated"])); err != nil {
 		return nil, err
 	} else {
 		p.TemplateInstantiated = tmpl
 	}
 
 	// PresSteps (optional)
-	if presSteps, err := pdf.ExtractorGet(x, path, dict["PresSteps"], navnode.Decode); err != nil {
+	if presSteps, err := pdf.Decode(c, dict["PresSteps"], navnode.Decode); err != nil {
 		return nil, pdf.Wrap(err, "PresSteps")
 	} else {
 		p.PresSteps = presSteps
 	}
 
 	// UserUnit (optional; default 1.0)
-	if userUnit, err := pdf.Optional(x.GetNumber(path, dict["UserUnit"])); err != nil {
+	if userUnit, err := pdf.Optional(c.Number(dict["UserUnit"])); err != nil {
 		return nil, err
 	} else if userUnit > 0 {
 		p.UserUnit = userUnit
@@ -910,19 +910,19 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Pa
 	}
 
 	// VP (optional)
-	if vp, err := pdf.ExtractorGetOptional(x, path, dict["VP"], measure.ExtractViewportArray); err != nil {
+	if vp, err := pdf.DecodeOptional(c, dict["VP"], measure.ExtractViewportArray); err != nil {
 		return nil, err
 	} else {
 		p.VP = vp
 	}
 
 	// AF (optional)
-	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
+	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
 		return nil, err
 	} else if afArray != nil {
 		p.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := pdf.DecodeOptional(c, afObj, file.ExtractSpecification); err != nil {
 				return nil, err
 			} else if spec != nil {
 				p.AssociatedFiles = append(p.AssociatedFiles, spec)

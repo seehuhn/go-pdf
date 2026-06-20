@@ -253,7 +253,7 @@ func TestWriterGet(t *testing.T) {
 					t.Errorf("expected %v, got %v", testObjects[i], obj)
 				}
 			}
-			obj, err := GetName(w, extraRef)
+			obj, err := NewCursor(w).Name(extraRef)
 			if err != nil {
 				t.Errorf("error reading extra object: %v", err)
 			} else if obj != extraObj {

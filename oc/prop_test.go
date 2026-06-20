@@ -220,7 +220,7 @@ func testPropertiesRoundTrip(t *testing.T, version pdf.Version, data *Properties
 	}
 
 	extractor := pdf.NewExtractor(w)
-	extracted, err := pdf.ExtractorGet(extractor, nil, obj, ExtractProperties)
+	extracted, err := pdf.Decode(pdf.CursorAt(extractor, nil), obj, ExtractProperties)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -336,7 +336,7 @@ func FuzzPropertiesRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.ExtractorGet(x, nil, obj, ExtractProperties)
+		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractProperties)
 		if err != nil {
 			t.Skip("malformed object")
 		}

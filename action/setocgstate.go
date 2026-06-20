@@ -76,8 +76,8 @@ func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeSetOCGState(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*SetOCGState, error) {
-	state, err := x.GetArray(path, dict["State"])
+func decodeSetOCGState(c pdf.Cursor, dict pdf.Dict) (*SetOCGState, error) {
+	state, err := c.Array(dict["State"])
 	if err != nil {
 		return nil, err
 	}
@@ -87,11 +87,11 @@ func decodeSetOCGState(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*
 
 	ignoreRB := false // default: preserve radio-button groups
 	if dict["PreserveRB"] != nil {
-		rb, _ := pdf.Optional(x.GetBoolean(path, dict["PreserveRB"]))
+		rb, _ := pdf.Optional(c.Boolean(dict["PreserveRB"]))
 		ignoreRB = !bool(rb)
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

@@ -102,14 +102,14 @@ func embedCompositeCFF(t *testing.T, v pdf.Version, fontData *sfnt.Font) *dict.C
 	}
 	gg := F.Layout(nil, 12, "Hello")
 	for _, g := range gg.Seq {
-		_, _ = F.Encode(g.GID, string(g.Text))
+		_, _ = F.Encode(g.GID, g.Text)
 	}
 	if err := rm.Close(); err != nil {
 		t.Fatal(err)
 	}
 
 	x := pdf.NewExtractor(w)
-	dictObj, err := extract.Dict(x, nil, ref, false)
+	dictObj, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -34,22 +34,22 @@ type Timespan struct {
 }
 
 // ExtractTimespan reads a timespan dictionary.
-func ExtractTimespan(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Timespan, error) {
-	dict, err := x.GetDictTyped(path, obj, "Timespan")
+func ExtractTimespan(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Timespan, error) {
+	dict, err := c.DictTyped(obj, "Timespan")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing timespan dictionary")
 	}
 
-	v, err := pdf.Optional(x.GetNumber(path, dict["V"]))
+	v, err := pdf.Optional(c.Number(dict["V"]))
 	if err != nil {
 		return nil, err
 	} else if v < 0 {
 		return nil, pdf.Error("invalid timespan value")
 	}
 
-	return &Timespan{Seconds: float64(v), SingleUse: isDirect}, nil
+	return &Timespan{Seconds: v, SingleUse: isDirect}, nil
 }
 
 // Embed converts the timespan to its PDF representation.
@@ -123,22 +123,22 @@ func (*MediaOffsetMarker) isMediaOffset() {}
 
 // ExtractMediaOffset reads a media offset dictionary and dispatches on its
 // subtype.
-func ExtractMediaOffset(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (MediaOffset, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaOffset")
+func ExtractMediaOffset(c pdf.Cursor, obj pdf.Object, isDirect bool) (MediaOffset, error) {
+	dict, err := c.DictTyped(obj, "MediaOffset")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing media offset dictionary")
 	}
 
-	s, err := pdf.Optional(x.GetName(path, dict["S"]))
+	s, err := pdf.Optional(c.Name(dict["S"]))
 	if err != nil {
 		return nil, err
 	}
 
 	switch s {
 	case "T":
-		t, err := pdf.ExtractorGet(x, path, dict["T"], ExtractTimespan)
+		t, err := pdf.Decode(c, dict["T"], ExtractTimespan)
 		if err != nil {
 			return nil, err
 		} else if t == nil {
@@ -146,7 +146,7 @@ func ExtractMediaOffset(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, 
 		}
 		return &MediaOffsetTime{Time: t, SingleUse: isDirect}, nil
 	case "F":
-		f, err := pdf.Optional(x.GetInteger(path, dict["F"]))
+		f, err := pdf.Optional(c.Integer(dict["F"]))
 		if err != nil {
 			return nil, err
 		} else if f < 0 {
@@ -154,7 +154,7 @@ func ExtractMediaOffset(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, 
 		}
 		return &MediaOffsetFrame{Frame: int(f), SingleUse: isDirect}, nil
 	case "M":
-		m, err := pdf.Optional(pdf.GetTextString(x.R, dict["M"]))
+		m, err := pdf.Optional(c.TextString(dict["M"]))
 		if err != nil {
 			return nil, err
 		}

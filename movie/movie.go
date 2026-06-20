@@ -87,8 +87,8 @@ func (posterFromMovieFile) Embed(*pdf.EmbedHelper) (pdf.Native, error) {
 // Extract reads a movie dictionary from the PDF file.  The isDirect
 // parameter indicates whether the object was stored directly (true)
 // or reached via an indirect reference (false).
-func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Movie, error) {
-	dict, err := x.GetDict(path, obj)
+func Extract(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Movie, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -98,7 +98,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 	m := &Movie{SingleUse: isDirect}
 
 	// F (required)
-	if f, err := pdf.ExtractorGetOptional(x, path, dict["F"], file.ExtractSpecification); err != nil {
+	if f, err := pdf.DecodeOptional(c, dict["F"], file.ExtractSpecification); err != nil {
 		return nil, err
 	} else {
 		m.File = f
@@ -108,18 +108,18 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 	}
 
 	// Aspect (optional)
-	if arr, err := pdf.Optional(x.GetArray(path, dict["Aspect"])); err != nil {
+	if arr, err := pdf.Optional(c.Array(dict["Aspect"])); err != nil {
 		return nil, err
 	} else if len(arr) >= 2 {
-		w, errW := pdf.Optional(x.GetInteger(path, arr[0]))
-		h, errH := pdf.Optional(x.GetInteger(path, arr[1]))
+		w, errW := pdf.Optional(c.Integer(arr[0]))
+		h, errH := pdf.Optional(c.Integer(arr[1]))
 		if errW == nil && errH == nil && w > 0 && h > 0 {
 			m.Aspect = Aspect{Width: int(w), Height: int(h)}
 		}
 	}
 
 	// Rotate (optional, multiple of 90, default 0)
-	if rot, err := pdf.Optional(x.GetInteger(path, dict["Rotate"])); err != nil {
+	if rot, err := pdf.Optional(c.Integer(dict["Rotate"])); err != nil {
 		return nil, err
 	} else if rot%90 == 0 {
 		m.Rotate = int(rot)
@@ -127,14 +127,14 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 
 	// Poster (optional; boolean or image XObject stream; default false)
 	if posterObj := dict["Poster"]; posterObj != nil {
-		resolved, _ := pdf.Resolve(x.R, posterObj)
+		resolved, _ := c.Resolve(posterObj)
 		switch v := resolved.(type) {
 		case pdf.Boolean:
 			if bool(v) {
 				m.Poster = PosterFromMovieFile
 			}
 		case *pdf.Stream:
-			if img, err := pdf.ExtractorGetOptional(x, path, posterObj, image.ExtractDict); err != nil {
+			if img, err := pdf.DecodeOptional(c, posterObj, image.ExtractDict); err != nil {
 				return nil, err
 			} else if img != nil {
 				m.Poster = img

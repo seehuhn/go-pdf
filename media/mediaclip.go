@@ -35,24 +35,24 @@ func (*MediaClipSection) isMediaClip() {}
 
 // ExtractMediaClip reads a media clip dictionary and dispatches on its
 // subtype.
-func ExtractMediaClip(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (MediaClip, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaClip")
+func ExtractMediaClip(c pdf.Cursor, obj pdf.Object, isDirect bool) (MediaClip, error) {
+	dict, err := c.DictTyped(obj, "MediaClip")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing media clip dictionary")
 	}
 
-	s, err := pdf.Optional(x.GetName(path, dict["S"]))
+	s, err := pdf.Optional(c.Name(dict["S"]))
 	if err != nil {
 		return nil, err
 	}
 
 	switch s {
 	case "MCD":
-		return extractMediaClipData(x, path, dict, isDirect)
+		return extractMediaClipData(c, dict, isDirect)
 	case "MCS":
-		return extractMediaClipSection(x, path, dict, isDirect)
+		return extractMediaClipSection(c, dict, isDirect)
 	default:
 		return nil, pdf.Error("unknown media clip subtype: " + string(s))
 	}
@@ -101,73 +101,73 @@ type MediaClipData struct {
 	SingleUse bool
 }
 
-func extractMediaClipData(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirect bool) (*MediaClipData, error) {
-	c := &MediaClipData{SingleUse: isDirect}
+func extractMediaClipData(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaClipData, error) {
+	clip := &MediaClipData{SingleUse: isDirect}
 
-	if n, err := pdf.Optional(pdf.GetTextString(x.R, dict["N"])); err != nil {
+	if n, err := pdf.Optional(c.TextString(dict["N"])); err != nil {
 		return nil, err
 	} else {
-		c.Name = string(n)
+		clip.Name = string(n)
 	}
 
-	resolved, err := pdf.Resolve(x.R, dict["D"])
+	resolved, err := c.Resolve(dict["D"])
 	if err != nil {
 		return nil, err
 	}
 	switch resolved.(type) {
 	case *pdf.Stream:
-		f, err := pdf.ExtractorGet(x, path, dict["D"], extract.Form)
+		f, err := pdf.Decode(c, dict["D"], extract.Form)
 		if err != nil {
 			return nil, err
 		}
-		c.DataForm = f
+		clip.DataForm = f
 	case pdf.Dict:
-		spec, err := pdf.ExtractorGet(x, path, dict["D"], file.ExtractSpecification)
+		spec, err := pdf.Decode(c, dict["D"], file.ExtractSpecification)
 		if err != nil {
 			return nil, err
 		}
-		c.DataFile = spec
+		clip.DataFile = spec
 	}
-	if c.DataFile == nil && c.DataForm == nil {
+	if clip.DataFile == nil && clip.DataForm == nil {
 		return nil, pdf.Error("media clip data has no valid D entry")
 	}
 
-	if c.DataFile != nil {
-		if ct, err := pdf.Optional(x.GetString(path, dict["CT"])); err != nil {
+	if clip.DataFile != nil {
+		if ct, err := pdf.Optional(c.String(dict["CT"])); err != nil {
 			return nil, err
 		} else {
-			c.ContentType = string(ct)
+			clip.ContentType = string(ct)
 		}
 	}
 
-	if p, err := pdf.ExtractorGetOptional(x, path, dict["P"], ExtractMediaPermissions); err != nil {
+	if p, err := pdf.DecodeOptional(c, dict["P"], ExtractMediaPermissions); err != nil {
 		return nil, err
 	} else {
-		c.Permissions = p
+		clip.Permissions = p
 	}
 
-	if c.Alt, err = extractMultiLangText(x, path, dict["Alt"]); err != nil {
+	if clip.Alt, err = extractMultiLangText(c, dict["Alt"]); err != nil {
 		return nil, err
 	}
 
-	if pl, err := pdf.ExtractorGetOptional(x, path, dict["PL"], ExtractMediaPlayers); err != nil {
+	if pl, err := pdf.DecodeOptional(c, dict["PL"], ExtractMediaPlayers); err != nil {
 		return nil, err
 	} else {
-		c.Players = pl
+		clip.Players = pl
 	}
 
-	c.MustHonourBaseURL = extractBaseURL(x, path, dict["MH"])
-	c.BestEffortBaseURL = extractBaseURL(x, path, dict["BE"])
+	clip.MustHonourBaseURL = extractBaseURL(c, dict["MH"])
+	clip.BestEffortBaseURL = extractBaseURL(c, dict["BE"])
 
-	return c, nil
+	return clip, nil
 }
 
-func extractBaseURL(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) string {
-	dict, err := pdf.Optional(x.GetDict(path, obj))
+func extractBaseURL(c pdf.Cursor, obj pdf.Object) string {
+	dict, err := pdf.Optional(c.Dict(obj))
 	if err != nil || dict == nil {
 		return ""
 	}
-	bu, _ := pdf.Optional(x.GetString(path, dict["BU"]))
+	bu, _ := pdf.Optional(c.String(dict["BU"]))
 	return string(bu)
 }
 
@@ -271,48 +271,48 @@ type MediaClipSection struct {
 	SingleUse bool
 }
 
-func extractMediaClipSection(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirect bool) (*MediaClipSection, error) {
-	c := &MediaClipSection{SingleUse: isDirect}
+func extractMediaClipSection(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaClipSection, error) {
+	sec := &MediaClipSection{SingleUse: isDirect}
 
-	if n, err := pdf.Optional(pdf.GetTextString(x.R, dict["N"])); err != nil {
+	if n, err := pdf.Optional(c.TextString(dict["N"])); err != nil {
 		return nil, err
 	} else {
-		c.Name = string(n)
+		sec.Name = string(n)
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["D"], ExtractMediaClip)
+	next, err := pdf.Decode(c, dict["D"], ExtractMediaClip)
 	if err != nil {
 		return nil, err
 	} else if next == nil {
 		return nil, pdf.Error("media clip section missing D entry")
 	}
-	c.Next = next
+	sec.Next = next
 
-	if c.Alt, err = extractMultiLangText(x, path, dict["Alt"]); err != nil {
+	if sec.Alt, err = extractMultiLangText(c, dict["Alt"]); err != nil {
 		return nil, err
 	}
 
-	c.MustHonourBegin, c.MustHonourEnd, err = extractSectionOffsets(x, path, dict["MH"])
+	sec.MustHonourBegin, sec.MustHonourEnd, err = extractSectionOffsets(c, dict["MH"])
 	if err != nil {
 		return nil, err
 	}
-	c.BestEffortBegin, c.BestEffortEnd, err = extractSectionOffsets(x, path, dict["BE"])
+	sec.BestEffortBegin, sec.BestEffortEnd, err = extractSectionOffsets(c, dict["BE"])
 	if err != nil {
 		return nil, err
 	}
 
-	return c, nil
+	return sec, nil
 }
 
-func extractSectionOffsets(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (begin, end MediaOffset, err error) {
-	dict, err := pdf.Optional(x.GetDict(path, obj))
+func extractSectionOffsets(c pdf.Cursor, obj pdf.Object) (begin, end MediaOffset, err error) {
+	dict, err := pdf.Optional(c.Dict(obj))
 	if err != nil || dict == nil {
 		return nil, nil, err
 	}
-	if begin, err = pdf.ExtractorGetOptional(x, path, dict["B"], ExtractMediaOffset); err != nil {
+	if begin, err = pdf.DecodeOptional(c, dict["B"], ExtractMediaOffset); err != nil {
 		return nil, nil, err
 	}
-	if end, err = pdf.ExtractorGetOptional(x, path, dict["E"], ExtractMediaOffset); err != nil {
+	if end, err = pdf.DecodeOptional(c, dict["E"], ExtractMediaOffset); err != nil {
 		return nil, nil, err
 	}
 	return begin, end, nil

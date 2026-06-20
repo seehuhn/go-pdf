@@ -60,9 +60,9 @@ var (
 )
 
 // ExtractMembership extracts an optional content membership dictionary from a PDF object.
-func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Membership, error) {
+func ExtractMembership(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Membership, error) {
 
-	dict, err := x.GetDictTyped(path, obj, "OCMD")
+	dict, err := c.DictTyped(obj, "OCMD")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -73,32 +73,32 @@ func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 
 	// /OCGs is one of: an array of OCG references/dicts, a single OCG
 	// reference, or a single inline OCG dict.  Detect the array case via
-	// GetArray (which resolves but returns nil for non-array values), and
+	// Cursor.Array (which resolves but returns nil for non-array values), and
 	// fall through to the single-OCG case otherwise — passing the original
-	// dict["OCGs"] preserves the reference so [pdf.ExtractorGet] can hit
+	// dict["OCGs"] preserves the reference so [pdf.Decode] can hit
 	// the cache and return the same *Group as other extraction paths.
 	ocgsRaw := dict["OCGs"]
-	arr, err := pdf.Optional(x.GetArray(path, ocgsRaw))
+	arr, err := pdf.Optional(c.Array(ocgsRaw))
 	if err != nil {
 		return nil, err
 	}
 	if arr != nil {
 		for _, item := range arr {
-			if group, err := pdf.ExtractorGetOptional(x, path, item, ExtractGroup); err != nil {
+			if group, err := pdf.DecodeOptional(c, item, ExtractGroup); err != nil {
 				return nil, err
 			} else if group != nil {
 				m.OCGs = append(m.OCGs, group)
 			}
 		}
 	} else if ocgsRaw != nil {
-		if group, err := pdf.ExtractorGetOptional(x, path, ocgsRaw, ExtractGroup); err != nil {
+		if group, err := pdf.DecodeOptional(c, ocgsRaw, ExtractGroup); err != nil {
 			return nil, err
 		} else if group != nil {
 			m.OCGs = []*Group{group}
 		}
 	}
 
-	if pName, err := pdf.Optional(x.GetName(path, dict["P"])); err != nil {
+	if pName, err := pdf.Optional(c.Name(dict["P"])); err != nil {
 		return nil, err
 	} else {
 		switch MembershipPolicy(pName) {
@@ -109,7 +109,7 @@ func ExtractMembership(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 		}
 	}
 
-	if ve, err := pdf.ExtractorGetOptional(x, path, dict["VE"], ExtractVisibilityExpression); err != nil {
+	if ve, err := pdf.DecodeOptional(c, dict["VE"], ExtractVisibilityExpression); err != nil {
 		return nil, err
 	} else {
 		m.VE = ve

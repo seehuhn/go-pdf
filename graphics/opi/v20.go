@@ -177,8 +177,8 @@ func (v *V20) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return embedVersion(rm, "2.0", inner, v.SingleUse)
 }
 
-func extractV20(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*V20, error) {
-	dict, err := x.GetDictTyped(path, obj, "OPI")
+func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
+	dict, err := c.DictTyped(obj, "OPI")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -187,7 +187,7 @@ func extractV20(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect
 
 	v := &V20{SingleUse: isDirect}
 
-	fs, err := pdf.ExtractorGet(x, path, dict["F"], file.ExtractSpecification)
+	fs, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	} else if fs == nil {
@@ -195,55 +195,55 @@ func extractV20(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect
 	}
 	v.F = fs
 
-	if mi, err := pdf.Optional(x.GetString(path, dict["MainImage"])); err != nil {
+	if mi, err := pdf.Optional(c.String(dict["MainImage"])); err != nil {
 		return nil, err
 	} else if len(mi) > 0 {
 		v.MainImage = mi
 	}
-	if tags, err := pdf.Optional(x.GetArray(path, dict["Tags"])); err != nil {
+	if tags, err := pdf.Optional(c.Array(dict["Tags"])); err != nil {
 		return nil, err
 	} else if len(tags) >= 2 {
 		for i := 0; i+1 < len(tags); i += 2 {
-			num, err := pdf.Optional(x.GetInteger(path, tags[i]))
+			num, err := pdf.Optional(c.Integer(tags[i]))
 			if err != nil {
 				return nil, err
 			}
-			text, err := readTagText(x, path, tags[i+1])
+			text, err := readTagText(c, tags[i+1])
 			if err != nil {
 				return nil, err
 			}
 			v.Tags = append(v.Tags, Tag20{Num: int(num), Text: text})
 		}
 	}
-	if s, err := readNumbers(x, path, dict["Size"]); err != nil {
+	if s, err := readNumbers(c, dict["Size"]); err != nil {
 		return nil, err
 	} else if len(s) == 2 {
 		v.Size = &[2]float64{s[0], s[1]}
 	}
-	if c, err := readNumbers(x, path, dict["CropRect"]); err != nil {
+	if c, err := readNumbers(c, dict["CropRect"]); err != nil {
 		return nil, err
 	} else if len(c) == 4 {
 		v.CropRect = &[4]float64{c[0], c[1], c[2], c[3]}
 	}
-	if o, err := pdf.Optional(x.GetBoolean(path, dict["Overprint"])); err != nil {
+	if o, err := pdf.Optional(c.Boolean(dict["Overprint"])); err != nil {
 		return nil, err
 	} else {
 		v.Overprint = bool(o)
 	}
-	if inks, err := readInks(x, path, dict["Inks"]); err != nil {
+	if inks, err := readInks(c, dict["Inks"]); err != nil {
 		return nil, err
 	} else {
 		v.Inks = inks
 	}
-	if d, err := readInts(x, path, dict["IncludedImageDimensions"]); err != nil {
+	if d, err := readInts(c, dict["IncludedImageDimensions"]); err != nil {
 		return nil, err
 	} else if len(d) == 2 {
 		v.IncludedImageDimensions = &[2]int{d[0], d[1]}
 	}
-	if q, err := pdf.Optional(x.GetNumber(path, dict["IncludedImageQuality"])); err != nil {
+	if q, err := pdf.Optional(c.Number(dict["IncludedImageQuality"])); err != nil {
 		return nil, err
 	} else {
-		v.IncludedImageQuality = float64(q)
+		v.IncludedImageQuality = q
 	}
 
 	// Size and CropRect are present or absent together.
@@ -262,8 +262,8 @@ func extractV20(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect
 
 // readTagText reads an OPI 2.0 tag value, which is a single ASCII string or an
 // array of ASCII strings.
-func readTagText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]string, error) {
-	resolved, err := pdf.Resolve(x.R, obj)
+func readTagText(c pdf.Cursor, obj pdf.Object) ([]string, error) {
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +274,7 @@ func readTagText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]stri
 		}
 		out := make([]string, 0, len(t))
 		for _, el := range t {
-			s, err := pdf.Optional(x.GetString(path, el))
+			s, err := pdf.Optional(c.String(el))
 			if err != nil {
 				return nil, err
 			}
@@ -290,8 +290,8 @@ func readTagText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]stri
 
 // readInks reads the OPI 2.0 Inks entry, which is either a name or a
 // /monochrome array.
-func readInks(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*Inks20, error) {
-	resolved, err := pdf.Resolve(x.R, obj)
+func readInks(c pdf.Cursor, obj pdf.Object) (*Inks20, error) {
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -301,15 +301,15 @@ func readInks(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*Inks20, 
 	case pdf.Array:
 		inks := &Inks20{}
 		for i := 1; i+1 < len(t); i += 2 {
-			name, err := pdf.Optional(x.GetString(path, t[i]))
+			name, err := pdf.Optional(c.String(t[i]))
 			if err != nil {
 				return nil, err
 			}
-			tint, err := pdf.Optional(x.GetNumber(path, t[i+1]))
+			tint, err := pdf.Optional(c.Number(t[i+1]))
 			if err != nil {
 				return nil, err
 			}
-			inks.Monochrome = append(inks.Monochrome, Ink20Comp{Name: name, Tint: float64(tint)})
+			inks.Monochrome = append(inks.Monochrome, Ink20Comp{Name: name, Tint: tint})
 		}
 		if len(inks.Monochrome) == 0 {
 			return nil, nil

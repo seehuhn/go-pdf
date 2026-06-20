@@ -109,12 +109,12 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontDict, err := pdf.GetDictTyped(r, fontRef, "Font")
+	fontDict, err := pdf.NewCursor(r).DictTyped(fontRef, "Font")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	encoding, err := pdf.GetName(r, fontDict["Encoding"])
+	encoding, err := pdf.NewCursor(r).Name(fontDict["Encoding"])
 	if err != nil {
 		t.Fatal(err)
 	} else if encoding != "Adobe-Japan1-7" {
@@ -131,7 +131,7 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 	x := pdf.NewExtractor(r)
-	pg, err := pdf.ExtractorGet(x, nil, pageDict, page.Decode)
+	pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageDict, page.Decode)
 	if err != nil {
 		t.Fatal(err)
 	}

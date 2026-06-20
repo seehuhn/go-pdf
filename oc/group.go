@@ -49,8 +49,8 @@ var (
 )
 
 // ExtractGroup extracts an optional content group from a PDF object.
-func ExtractGroup(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Group, error) {
-	dict, err := x.GetDictTyped(path, obj, "OCG")
+func ExtractGroup(c pdf.Cursor, obj pdf.Object, _ bool) (*Group, error) {
+	dict, err := c.DictTyped(obj, "OCG")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -60,7 +60,7 @@ func ExtractGroup(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 	group := &Group{}
 
 	// extract Name (required)
-	if name, err := pdf.Optional(pdf.GetTextString(x.R, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(c.TextString(dict["Name"])); err != nil {
 		return nil, err
 	} else if name != "" {
 		group.Name = string(name)
@@ -69,14 +69,14 @@ func ExtractGroup(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 	}
 
 	// Intent (optional) can be either a single name or an array of names.
-	intent, err := x.Resolve(path, dict["Intent"])
+	intent, err := c.Resolve(dict["Intent"])
 	if err != nil {
 		return nil, err
 	}
 	switch intent := intent.(type) {
 	case pdf.Array:
 		for _, o := range intent {
-			if name, err := pdf.Optional(x.GetName(path, o)); err != nil {
+			if name, err := pdf.Optional(c.Name(o)); err != nil {
 				return nil, err
 			} else if name != "" {
 				group.Intent = append(group.Intent, name)
@@ -91,7 +91,7 @@ func ExtractGroup(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 		group.Intent = []pdf.Name{"View"}
 	}
 
-	if usage, err := pdf.ExtractorGetOptional(x, path, dict["Usage"], ExtractUsage); err != nil {
+	if usage, err := pdf.DecodeOptional(c, dict["Usage"], ExtractUsage); err != nil {
 		return nil, err
 	} else {
 		group.Usage = usage

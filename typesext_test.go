@@ -38,7 +38,7 @@ func TestArrayRoundTrip(t *testing.T) {
 			w, m := memfile.NewPDFWriter(pdf.V2_0, nil)
 			ref := w.Alloc()
 			w.Put(ref, a)
-			b, err := pdf.GetArray(w, ref)
+			b, err := pdf.NewCursor(w).Array(ref)
 			if err != nil {
 				t.Fatal(err)
 			}

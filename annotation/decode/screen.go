@@ -24,38 +24,38 @@ import (
 	"seehuhn.de/go/pdf/annotation/appearance"
 )
 
-func decodeScreen(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Screen, error) {
+func decodeScreen(c pdf.Cursor, dict pdf.Dict) (*annotation.Screen, error) {
 	screen := &annotation.Screen{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &screen.Common, dict); err != nil {
+	if err := decodeCommon(c, &screen.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract screen-specific fields
 	// T (optional)
-	if t, err := pdf.Optional(pdf.GetTextString(x.R, dict["T"])); err != nil {
+	if t, err := pdf.Optional(c.TextString(dict["T"])); err != nil {
 		return nil, err
 	} else {
 		screen.Title = string(t)
 	}
 
 	// MK (optional)
-	if mk, err := pdf.ExtractorGetOptional(x, path, dict["MK"], appearance.ExtractCharacteristics); err != nil {
+	if mk, err := pdf.DecodeOptional(c, dict["MK"], appearance.ExtractCharacteristics); err != nil {
 		return nil, err
 	} else {
 		screen.MK = mk
 	}
 
 	// A (optional)
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["A"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		screen.Action = act
 	}
 
 	// AA (optional)
-	if aa, err := pdf.ExtractorGetOptional(x, path, dict["AA"], triggers.DecodeAnnotation); err != nil {
+	if aa, err := pdf.DecodeOptional(c, dict["AA"], triggers.DecodeAnnotation); err != nil {
 		return nil, err
 	} else {
 		screen.AA = aa

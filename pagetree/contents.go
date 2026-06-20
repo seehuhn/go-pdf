@@ -31,17 +31,18 @@ import (
 // processing.  To iterate operators, decode the page with [page.Decode]
 // and call [page.Page.NewIter] instead.
 func ContentStream(r pdf.Getter, pageDict pdf.Object) (io.ReadCloser, error) {
-	dict, err := pdf.GetDictTyped(r, pageDict, "Page")
+	c := pdf.NewCursor(r)
+	dict, err := c.DictTyped(pageDict, "Page")
 	if err != nil {
 		return nil, err
 	}
 
-	contents, err := pdf.Resolve(r, dict["Contents"])
+	contents, err := c.Resolve(dict["Contents"])
 	if err != nil {
 		return nil, err
 	}
 
-	segments, err := page.ExtractContents(r, contents)
+	segments, err := page.ExtractContents(c, contents)
 	if err != nil {
 		return nil, err
 	}

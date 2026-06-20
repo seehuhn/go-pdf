@@ -68,26 +68,26 @@ type MediaCriteria struct {
 }
 
 // ExtractMediaCriteria reads a media criteria dictionary.
-func ExtractMediaCriteria(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MediaCriteria, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaCriteria")
+func ExtractMediaCriteria(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaCriteria, error) {
+	dict, err := c.DictTyped(obj, "MediaCriteria")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing media criteria dictionary")
 	}
 
-	c := &MediaCriteria{SingleUse: isDirect}
+	crit := &MediaCriteria{SingleUse: isDirect}
 
 	for key, field := range map[pdf.Name]*optional.Bool{
-		"A": &c.AudioDescriptions,
-		"C": &c.Captions,
-		"O": &c.Overdubs,
-		"S": &c.Subtitles,
+		"A": &crit.AudioDescriptions,
+		"C": &crit.Captions,
+		"O": &crit.Overdubs,
+		"S": &crit.Subtitles,
 	} {
 		if dict[key] == nil {
 			continue
 		}
-		if b, err := pdf.Optional(x.GetBoolean(path, dict[key])); err != nil {
+		if b, err := pdf.Optional(c.Boolean(dict[key])); err != nil {
 			return nil, err
 		} else {
 			field.Set(bool(b))
@@ -95,45 +95,45 @@ func ExtractMediaCriteria(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 	}
 
 	if dict["R"] != nil {
-		if r, err := pdf.Optional(x.GetInteger(path, dict["R"])); err != nil {
+		if r, err := pdf.Optional(c.Integer(dict["R"])); err != nil {
 			return nil, err
 		} else if r >= 0 {
-			c.Bandwidth.Set(uint(r))
+			crit.Bandwidth.Set(uint(r))
 		}
 	}
 
-	if d, err := pdf.ExtractorGetOptional(x, path, dict["D"], ExtractMinBitDepth); err != nil {
+	if d, err := pdf.DecodeOptional(c, dict["D"], ExtractMinBitDepth); err != nil {
 		return nil, err
 	} else {
-		c.MinBitDepth = d
+		crit.MinBitDepth = d
 	}
-	if z, err := pdf.ExtractorGetOptional(x, path, dict["Z"], ExtractMinScreenSize); err != nil {
+	if z, err := pdf.DecodeOptional(c, dict["Z"], ExtractMinScreenSize); err != nil {
 		return nil, err
 	} else {
-		c.MinScreenSize = z
+		crit.MinScreenSize = z
 	}
 
-	if v, err := pdf.Optional(x.GetArray(path, dict["V"])); err != nil {
+	if v, err := pdf.Optional(c.Array(dict["V"])); err != nil {
 		return nil, err
 	} else {
 		for _, elem := range v {
-			id, err := pdf.ExtractorGetOptional(x, path, elem, ExtractSoftwareIdentifier)
+			id, err := pdf.DecodeOptional(c, elem, ExtractSoftwareIdentifier)
 			if err != nil {
 				return nil, err
 			}
 			if id != nil {
-				c.Software = append(c.Software, id)
+				crit.Software = append(crit.Software, id)
 			}
 		}
 	}
 
-	if p, err := pdf.Optional(x.GetArray(path, dict["P"])); err != nil {
+	if p, err := pdf.Optional(c.Array(dict["P"])); err != nil {
 		return nil, err
 	} else if len(p) == 1 || len(p) == 2 {
 		ok := true
 		ver := make([]pdf.Name, 0, len(p))
 		for _, elem := range p {
-			name, err := pdf.Optional(x.GetName(path, elem))
+			name, err := pdf.Optional(c.Name(elem))
 			if err != nil {
 				return nil, err
 			} else if name == "" {
@@ -143,23 +143,23 @@ func ExtractMediaCriteria(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 			ver = append(ver, name)
 		}
 		if ok {
-			c.Version = ver
+			crit.Version = ver
 		}
 	}
 
-	if l, err := pdf.Optional(x.GetArray(path, dict["L"])); err != nil {
+	if l, err := pdf.Optional(c.Array(dict["L"])); err != nil {
 		return nil, err
 	} else {
 		for _, elem := range l {
-			lang, err := pdf.Optional(pdf.GetTextString(x.R, elem))
+			lang, err := pdf.Optional(c.TextString(elem))
 			if err != nil {
 				return nil, err
 			}
-			c.Languages = append(c.Languages, string(lang))
+			crit.Languages = append(crit.Languages, string(lang))
 		}
 	}
 
-	return c, nil
+	return crit, nil
 }
 
 // Embed converts the media criteria to its PDF representation.
@@ -259,15 +259,15 @@ type MinBitDepth struct {
 }
 
 // ExtractMinBitDepth reads a minimum bit depth dictionary.
-func ExtractMinBitDepth(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MinBitDepth, error) {
-	dict, err := x.GetDictTyped(path, obj, "MinBitDepth")
+func ExtractMinBitDepth(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MinBitDepth, error) {
+	dict, err := c.DictTyped(obj, "MinBitDepth")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing minimum bit depth dictionary")
 	}
 
-	v, err := pdf.Optional(x.GetInteger(path, dict["V"]))
+	v, err := pdf.Optional(c.Integer(dict["V"]))
 	if err != nil {
 		return nil, err
 	} else if v <= 0 {
@@ -275,7 +275,7 @@ func ExtractMinBitDepth(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, 
 	}
 
 	d := &MinBitDepth{Depth: int(v), SingleUse: isDirect}
-	if m, err := pdf.Optional(x.GetInteger(path, dict["M"])); err != nil {
+	if m, err := pdf.Optional(c.Integer(dict["M"])); err != nil {
 		return nil, err
 	} else if MonitorSpecifier(m).isValid() {
 		d.Monitor = MonitorSpecifier(m)
@@ -334,22 +334,22 @@ type MinScreenSize struct {
 }
 
 // ExtractMinScreenSize reads a minimum screen size dictionary.
-func ExtractMinScreenSize(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MinScreenSize, error) {
-	dict, err := x.GetDictTyped(path, obj, "MinScreenSize")
+func ExtractMinScreenSize(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MinScreenSize, error) {
+	dict, err := c.DictTyped(obj, "MinScreenSize")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing minimum screen size dictionary")
 	}
 
-	arr, err := pdf.Optional(x.GetArray(path, dict["V"]))
+	arr, err := pdf.Optional(c.Array(dict["V"]))
 	if err != nil {
 		return nil, err
 	} else if len(arr) < 2 {
 		return nil, pdf.Error("invalid minimum screen size")
 	}
-	w, errW := pdf.Optional(x.GetInteger(path, arr[0]))
-	h, errH := pdf.Optional(x.GetInteger(path, arr[1]))
+	w, errW := pdf.Optional(c.Integer(arr[0]))
+	h, errH := pdf.Optional(c.Integer(arr[1]))
 	if errW != nil {
 		return nil, errW
 	}
@@ -361,7 +361,7 @@ func ExtractMinScreenSize(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 	}
 
 	s := &MinScreenSize{Width: int(w), Height: int(h), SingleUse: isDirect}
-	if m, err := pdf.Optional(x.GetInteger(path, dict["M"])); err != nil {
+	if m, err := pdf.Optional(c.Integer(dict["M"])); err != nil {
 		return nil, err
 	} else if MonitorSpecifier(m).isValid() {
 		s.Monitor = MonitorSpecifier(m)

@@ -195,7 +195,7 @@ func roundTripForm(t *testing.T, version pdf.Version, want *acroform.Interactive
 	t.Cleanup(func() { r.Close() })
 
 	x := pdf.NewExtractor(r)
-	got, err := pdf.ExtractorGet(x, nil, r.GetMeta().Catalog.AcroForm, Form)
+	got, err := pdf.Decode(pdf.CursorAt(x, nil), r.GetMeta().Catalog.AcroForm, Form)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -311,7 +311,7 @@ func TestDecodeValues(t *testing.T) {
 		"Q":               pdf.Integer(99), // out of range, must be ignored
 	}
 
-	form, err := Form(x, nil, dict, true)
+	form, err := Form(pdf.CursorAt(x, nil), dict, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +331,7 @@ func TestDecodeNil(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
-	form, err := Form(x, nil, nil, false)
+	form, err := Form(pdf.CursorAt(x, nil), nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -366,7 +366,7 @@ func FuzzFormRoundTrip(f *testing.F) {
 		defer r.Close()
 
 		x := pdf.NewExtractor(r)
-		form1, err := pdf.ExtractorGet(x, nil, r.GetMeta().Catalog.AcroForm, Form)
+		form1, err := pdf.Decode(pdf.CursorAt(x, nil), r.GetMeta().Catalog.AcroForm, Form)
 		if err != nil || form1 == nil {
 			t.Skip("no interactive form")
 		}

@@ -21,16 +21,16 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeProjection(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Projection, error) {
+func decodeProjection(c pdf.Cursor, dict pdf.Dict) (*annotation.Projection, error) {
 	projection := &annotation.Projection{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &projection.Common, dict); err != nil {
+	if err := decodeCommon(c, &projection.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &projection.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &projection.Markup); err != nil {
 		return nil, err
 	}
 

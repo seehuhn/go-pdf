@@ -54,16 +54,16 @@ type MetadataStream struct {
 //
 // I/O errors from the underlying file are surfaced unchanged.  Errors
 // caused by malformed XMP data are returned as [*MalformedFileError]
-// so callers can use [Optional] / [ExtractorGetOptional] to swallow
+// so callers can use [Optional] / [DecodeOptional] to swallow
 // them.
-func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (*MetadataStream, error) {
+func ExtractMetadataStream(c Cursor, ref Object, _ bool) (*MetadataStream, error) {
 	if ref == nil {
 		return nil, &MalformedFileError{
 			Err: errors.New("missing metadata stream"),
 		}
 	}
 
-	stream, err := x.GetStream(path, ref)
+	stream, err := c.Stream(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (
 		return nil, nil
 	}
 
-	body, err := DecodeStream(x.R, path, stream, 0)
+	body, err := c.StreamReader(stream)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (
 	// decoded length, not the stored length, so it's not a meaningful
 	// pad target on rewrite).
 	plaintext := false
-	if filters, ferr := GetFilters(x.R, path, stream.Dict); ferr == nil {
+	if filters, ferr := c.Filters(stream.Dict); ferr == nil {
 		// the bytes on disk are raw XMP iff:
 		//   - in an unencrypted file: there are no filters at all
 		//   - in an encrypted file: the chain is exactly /Crypt /Identity,
@@ -100,7 +100,7 @@ func ExtractMetadataStream(x *Extractor, path *CycleCheck, ref Object, _ bool) (
 		//     the on-disk bytes are not raw XMP.
 		// the catalog /EncryptMetadata=false case is handled by the
 		// reader after extraction (it sets Plaintext on the typed value).
-		if x.R.GetMeta().Encryption == nil {
+		if c.Getter().GetMeta().Encryption == nil {
 			plaintext = len(filters) == 0
 		} else if len(filters) == 1 {
 			_, plaintext = filters[0].(FilterCryptIdentity)

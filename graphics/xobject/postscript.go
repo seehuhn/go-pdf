@@ -32,13 +32,13 @@ type postScript struct {
 var _ graphics.XObject = (*postScript)(nil)
 
 // ExtractPostScript extracts a PostScript XObject from a PDF stream.
-func ExtractPostScript(x *pdf.Extractor, path *pdf.CycleCheck, stm *pdf.Stream) (*postScript, error) {
-	err := pdf.CheckDictType(x.R, stm.Dict, "XObject")
+func ExtractPostScript(c pdf.Cursor, stm *pdf.Stream) (*postScript, error) {
+	err := c.CheckDictType(stm.Dict, "XObject")
 	if err != nil {
 		return nil, err
 	}
 
-	subtype, err := x.GetName(path, stm.Dict["Subtype"])
+	subtype, err := c.Name(stm.Dict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func ExtractPostScript(x *pdf.Extractor, path *pdf.CycleCheck, stm *pdf.Stream) 
 	}
 
 	draw := func(w io.Writer) error {
-		r, err := pdf.GetStreamReader(x.R, nil, stm)
+		r, err := c.StreamReader(stm)
 		if err != nil {
 			return err
 		}

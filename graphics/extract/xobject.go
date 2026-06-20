@@ -26,8 +26,8 @@ import (
 )
 
 // XObject extracts an XObject from a PDF file.
-func XObject(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (graphics.XObject, error) {
-	stm, err := x.GetStream(path, obj)
+func XObject(c pdf.Cursor, obj pdf.Object, isDirect bool) (graphics.XObject, error) {
+	stm, err := c.Stream(obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -35,28 +35,28 @@ func XObject(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 			Err: errors.New("missing XObject"),
 		}
 	}
-	err = pdf.CheckDictType(x.R, stm.Dict, "XObject")
+	err = c.CheckDictType(stm.Dict, "XObject")
 	if err != nil {
 		return nil, err
 	}
 
-	subtype, err := x.GetName(path, stm.Dict["Subtype"])
+	subtype, err := c.Name(stm.Dict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
 
 	switch subtype {
 	case "Image":
-		if isImageMask, _ := x.GetBoolean(path, stm.Dict["ImageMask"]); isImageMask {
-			return image.ExtractMask(x, path, obj, isDirect)
+		if isImageMask, _ := c.Boolean(stm.Dict["ImageMask"]); isImageMask {
+			return image.ExtractMask(c, obj, isDirect)
 		}
-		img, err := image.ExtractDict(x, path, stm, isDirect)
+		img, err := image.ExtractDict(c, stm, isDirect)
 		return img, err
 	case "Form":
-		f, err := Form(x, path, stm, isDirect)
+		f, err := Form(c, stm, isDirect)
 		return f, err
 	case "PS":
-		ps, err := xobject.ExtractPostScript(x, path, stm)
+		ps, err := xobject.ExtractPostScript(c, stm)
 		return ps, err
 	default:
 		return nil, pdf.Errorf("unsupported XObject Subtype %q", subtype)

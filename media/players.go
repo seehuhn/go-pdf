@@ -39,8 +39,8 @@ type MediaPlayers struct {
 }
 
 // ExtractMediaPlayers reads a media players dictionary.
-func ExtractMediaPlayers(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MediaPlayers, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaPlayers")
+func ExtractMediaPlayers(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaPlayers, error) {
+	dict, err := c.DictTyped(obj, "MediaPlayers")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -49,27 +49,27 @@ func ExtractMediaPlayers(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 
 	p := &MediaPlayers{SingleUse: isDirect}
 
-	if p.MustUse, err = extractPlayerInfoArray(x, path, dict["MU"]); err != nil {
+	if p.MustUse, err = extractPlayerInfoArray(c, dict["MU"]); err != nil {
 		return nil, err
 	}
-	if p.Allowed, err = extractPlayerInfoArray(x, path, dict["A"]); err != nil {
+	if p.Allowed, err = extractPlayerInfoArray(c, dict["A"]); err != nil {
 		return nil, err
 	}
-	if p.NotUsed, err = extractPlayerInfoArray(x, path, dict["NU"]); err != nil {
+	if p.NotUsed, err = extractPlayerInfoArray(c, dict["NU"]); err != nil {
 		return nil, err
 	}
 
 	return p, nil
 }
 
-func extractPlayerInfoArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]*MediaPlayerInfo, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
+func extractPlayerInfoArray(c pdf.Cursor, obj pdf.Object) ([]*MediaPlayerInfo, error) {
+	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil {
 		return nil, err
 	}
 	var out []*MediaPlayerInfo
 	for _, elem := range arr {
-		info, err := pdf.ExtractorGetOptional(x, path, elem, ExtractMediaPlayerInfo)
+		info, err := pdf.DecodeOptional(c, elem, ExtractMediaPlayerInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -131,15 +131,15 @@ type MediaPlayerInfo struct {
 }
 
 // ExtractMediaPlayerInfo reads a media player info dictionary.
-func ExtractMediaPlayerInfo(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MediaPlayerInfo, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaPlayerInfo")
+func ExtractMediaPlayerInfo(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaPlayerInfo, error) {
+	dict, err := c.DictTyped(obj, "MediaPlayerInfo")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing media player info dictionary")
 	}
 
-	pid, err := pdf.ExtractorGet(x, path, dict["PID"], ExtractSoftwareIdentifier)
+	pid, err := pdf.Decode(c, dict["PID"], ExtractSoftwareIdentifier)
 	if err != nil {
 		return nil, err
 	} else if pid == nil {

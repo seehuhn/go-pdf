@@ -59,11 +59,11 @@ type Type16 struct {
 var _ graphics.Halftone = (*Type16)(nil)
 
 // extractType16 reads a Type 16 halftone from a PDF stream.
-func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type16, error) {
+func extractType16(c pdf.Cursor, stream *pdf.Stream) (*Type16, error) {
 	h := &Type16{}
 
 	if width, ok := stream.Dict["Width"]; ok {
-		widthVal, err := x.GetInteger(path, width)
+		widthVal, err := c.Integer(width)
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +71,7 @@ func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 	}
 
 	if height, ok := stream.Dict["Height"]; ok {
-		heightVal, err := x.GetInteger(path, height)
+		heightVal, err := c.Integer(height)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 	}
 
 	if width2, ok := stream.Dict["Width2"]; ok {
-		width2Val, err := x.GetInteger(path, width2)
+		width2Val, err := c.Integer(width2)
 		if err != nil {
 			return nil, err
 		}
@@ -87,19 +87,19 @@ func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 	}
 
 	if height2, ok := stream.Dict["Height2"]; ok {
-		height2Val, err := x.GetInteger(path, height2)
+		height2Val, err := c.Integer(height2)
 		if err != nil {
 			return nil, err
 		}
 		h.Height2 = int(height2Val)
 	}
 
-	if tf, err := pdf.Resolve(x.R, stream.Dict["TransferFunction"]); err != nil {
+	if tf, err := c.Resolve(stream.Dict["TransferFunction"]); err != nil {
 		return nil, err
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.ExtractorGetOptional(x, path, tf, function.Extract); err != nil {
+		if F, err := pdf.DecodeOptional(c, tf, function.Extract); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F
@@ -117,7 +117,7 @@ func extractType16(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (
 	}
 	expectedBytes := expectedValues * 2
 
-	stmReader, err := pdf.DecodeStream(x.R, path, stream, 0)
+	stmReader, err := c.StreamReader(stream)
 	if err != nil {
 		return nil, err
 	}

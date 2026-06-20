@@ -39,12 +39,12 @@ var (
 // ExtractVisibilityExpression reads a visibility expression from a PDF object.
 // The object can be either an array (for And/Or/Not expressions) or a single
 // optional content group (as a reference or inline dictionary).
-func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (VisibilityExpression, error) {
+func ExtractVisibilityExpression(c pdf.Cursor, obj pdf.Object, isDirect bool) (VisibilityExpression, error) {
 	// the value is either an array (operator + operands) or a single OCG
-	// reference/dict.  Detect the array case via GetArray (which resolves
+	// reference/dict.  Detect the array case via Cursor.Array (which resolves
 	// but returns nil for non-array values), and fall through to the
 	// single-OCG case otherwise.
-	arr, err := pdf.Optional(x.GetArray(path, obj))
+	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil {
 		return nil, err
 	}
@@ -55,14 +55,14 @@ func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf
 
 		var args []VisibilityExpression
 		for _, elem := range arr[1:] {
-			arg, err := pdf.ExtractorGet(x, path, elem, ExtractVisibilityExpression)
+			arg, err := pdf.Decode(c, elem, ExtractVisibilityExpression)
 			if err != nil {
 				return nil, err
 			}
 			args = append(args, arg)
 		}
 
-		op, err := pdf.Optional(x.GetName(path, arr[0]))
+		op, err := pdf.Optional(c.Name(arr[0]))
 		if err != nil {
 			return nil, err
 		}
@@ -87,19 +87,19 @@ func ExtractVisibilityExpression(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf
 		}
 	}
 
-	// single-OCG case: when invoked via [pdf.ExtractorGet], any Reference
+	// single-OCG case: when invoked via [pdf.Decode], any Reference
 	// has already been unwrapped, so recover the original Reference from
 	// the path so the extractor cache returns the same *Group as other
 	// extraction paths.
-	groupObj, groupPath := obj, path
-	if !isDirect && path != nil {
-		groupObj = path.Ref
-		groupPath = path.Parent
+	groupObj, groupPath := obj, c.Path()
+	if !isDirect && groupPath != nil {
+		groupObj = groupPath.Ref
+		groupPath = groupPath.Parent
 	}
 	if groupObj == nil {
 		return nil, pdf.Error("invalid visibility expression: missing object")
 	}
-	g, err := pdf.ExtractorGet(x, groupPath, groupObj, ExtractGroup)
+	g, err := pdf.Decode(pdf.CursorAt(c.Extractor(), groupPath), groupObj, ExtractGroup)
 	if err != nil {
 		return nil, err
 	}

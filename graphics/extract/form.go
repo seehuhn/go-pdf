@@ -38,8 +38,8 @@ import (
 )
 
 // Form extracts a form XObject from a PDF file.
-func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form.Form, error) {
-	stream, err := x.GetStream(path, obj)
+func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
+	stream, err := c.Stream(obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -49,7 +49,7 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	}
 	dict := stream.Dict
 
-	subtypeName, _ := x.GetName(path, dict["Subtype"])
+	subtypeName, _ := c.Name(dict["Subtype"])
 	if subtypeName != "Form" {
 		return nil, &pdf.MalformedFileError{
 			Err: errors.New("invalid Subtype for form XObject"),
@@ -57,7 +57,7 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	}
 
 	// read required BBox
-	bbox, err := pdf.GetRectangle(x.R, dict["BBox"])
+	bbox, err := c.Rectangle(dict["BBox"])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read BBox: %w", err)
 	} else if bbox == nil || bbox.IsZero() {
@@ -68,71 +68,71 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 		BBox: *bbox,
 	}
 
-	f.Name, _ = x.GetName(path, dict["Name"])
+	f.Name, _ = c.Name(dict["Name"])
 
-	f.Matrix, err = pdf.GetMatrix(x.R, dict["Matrix"])
+	f.Matrix, err = c.Matrix(dict["Matrix"])
 	if err != nil {
 		f.Matrix = matrix.Identity
 	}
 
 	// Group (optional)
-	if g, err := pdf.ExtractorGetOptional(x, path, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
+	if g, err := pdf.DecodeOptional(c, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
 		return nil, err
 	} else {
 		f.Group = g
 	}
 
 	// Ref (optional)
-	if r, err := pdf.ExtractorGetOptional(x, path, dict["Ref"], reference.ExtractDict); err != nil {
+	if r, err := pdf.DecodeOptional(c, dict["Ref"], reference.ExtractDict); err != nil {
 		return nil, err
 	} else {
 		f.Ref = r
 	}
 
 	// OPI (optional)
-	if o, err := pdf.ExtractorGetOptional(x, path, dict["OPI"], opi.Extract); err != nil {
+	if o, err := pdf.DecodeOptional(c, dict["OPI"], opi.Extract); err != nil {
 		return nil, err
 	} else {
 		f.OPI = o
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.ExtractorGetOptional(x, path, dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
+	if meta, err := pdf.DecodeOptional(c, dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
 		return nil, err
 	} else {
 		f.Metadata = meta
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.ExtractorGetOptional(x, path, dict["PieceInfo"], pieceinfo.Extract); err != nil {
+	if piece, err := pdf.DecodeOptional(c, dict["PieceInfo"], pieceinfo.Extract); err != nil {
 		return nil, err
 	} else {
 		f.PieceInfo = piece
 	}
 
 	// LastModified (optional)
-	if lastModDate, err := pdf.Optional(pdf.GetDate(x.R, dict["LastModified"])); err != nil {
+	if lastModDate, err := pdf.Optional(c.Date(dict["LastModified"])); err != nil {
 		return nil, err
 	} else {
 		f.LastModified = time.Time(lastModDate)
 	}
 
 	// OC (optional)
-	if ocObj, err := pdf.ExtractorGetOptional(x, path, dict["OC"], oc.ExtractConditional); err != nil {
+	if ocObj, err := pdf.DecodeOptional(c, dict["OC"], oc.ExtractConditional); err != nil {
 		return nil, err
 	} else {
 		f.OptionalContent = ocObj
 	}
 
 	// Measure (optional)
-	if m, err := pdf.ExtractorGetOptional(x, path, dict["Measure"], measure.Extract); err != nil {
+	if m, err := pdf.DecodeOptional(c, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		f.Measure = m
 	}
 
 	// PtData (optional)
-	if ptData, err := pdf.ExtractorGetOptional(x, path, dict["PtData"], measure.ExtractPtData); err != nil {
+	if ptData, err := pdf.DecodeOptional(c, dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		f.PtData = ptData
@@ -140,7 +140,7 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 
 	// extract StructParent
 	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(x.GetInteger(path, dict["StructParent"])); err != nil {
+		if key, err := pdf.Optional(c.Integer(dict["StructParent"])); err != nil {
 			return nil, err
 		} else if key >= 0 && uint64(key) <= math.MaxUint {
 			f.StructParent.Set(uint(key))
@@ -148,12 +148,12 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	}
 
 	// extract AssociatedFiles (AF)
-	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
+	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
 		return nil, err
 	} else if afArray != nil {
 		f.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := pdf.DecodeOptional(c, afObj, file.ExtractSpecification); err != nil {
 				return nil, err
 			} else if spec != nil {
 				f.AssociatedFiles = append(f.AssociatedFiles, spec)
@@ -162,9 +162,9 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 	}
 
 	// extract resources
-	version := pdf.GetVersion(x.R)
+	version := c.Version()
 	if resObj := dict["Resources"]; resObj != nil {
-		res, err := pdf.ExtractorGet(x, path, resObj, Resources)
+		res, err := pdf.Decode(c, resObj, Resources)
 		if err != nil {
 			return nil, err
 		}
@@ -179,14 +179,13 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*form
 
 	// store a reader factory closure so each iteration re-opens the PDF stream
 	stm := stream // capture for closure
-	getter := x.R
 	f.Content = content.NewScanner(
 		func() (io.ReadCloser, error) {
-			return pdf.DecodeStream(getter, nil, stm, 0)
+			return c.StreamReader(stm)
 		},
 	)
 
-	repairForm(f, x.R)
+	repairForm(f, c.Getter())
 
 	return f, nil
 }

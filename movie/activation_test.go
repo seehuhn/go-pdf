@@ -239,7 +239,7 @@ func roundTripActivation(t *testing.T, version pdf.Version, a *Activation) {
 	x := pdf.NewExtractor(w)
 	stored := w.GetMeta().Trailer["Quir:E"]
 	_, isRef := stored.(pdf.Reference)
-	got, err := ExtractActivation(x, nil, stored, !isRef)
+	got, err := ExtractActivation(pdf.CursorAt(x, nil), stored, !isRef)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestActivationRateZeroShorthand(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	got, err := ExtractActivation(x, nil, w.GetMeta().Trailer["Quir:E"], false)
+	got, err := ExtractActivation(pdf.CursorAt(x, nil), w.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -414,7 +414,7 @@ func TestActivationDecodePermissive(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	got, err := ExtractActivation(x, nil, w.GetMeta().Trailer["Quir:E"], false)
+	got, err := ExtractActivation(pdf.CursorAt(x, nil), w.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -457,7 +457,7 @@ func FuzzActivationRoundTrip(f *testing.F) {
 		}
 		x := pdf.NewExtractor(r)
 		_, isRef := objPDF.(pdf.Reference)
-		first, err := ExtractActivation(x, nil, objPDF, !isRef)
+		first, err := ExtractActivation(pdf.CursorAt(x, nil), objPDF, !isRef)
 		if err != nil {
 			t.Skip("malformed activation dictionary")
 		}
@@ -482,7 +482,7 @@ func FuzzActivationRoundTrip(f *testing.F) {
 		x2 := pdf.NewExtractor(w)
 		stored := w.GetMeta().Trailer["Quir:E"]
 		_, isRef2 := stored.(pdf.Reference)
-		second, err := ExtractActivation(x2, nil, stored, !isRef2)
+		second, err := ExtractActivation(pdf.CursorAt(x2, nil), stored, !isRef2)
 		if err != nil {
 			t.Fatalf("second extract: %v", err)
 		}

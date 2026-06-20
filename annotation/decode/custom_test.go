@@ -45,7 +45,7 @@ func TestCustomAnnotation(t *testing.T) {
 
 	// Extract should return an Unknown annotation
 	x := pdf.NewExtractor(buf)
-	annot, err := Annotation(x, nil, ref, false)
+	annot, err := Annotation(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

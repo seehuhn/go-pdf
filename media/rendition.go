@@ -45,29 +45,29 @@ type RenditionCommon struct {
 	BestEffortCriteria *MediaCriteria
 }
 
-func extractRenditionCommon(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, c *RenditionCommon) error {
-	if n, err := pdf.Optional(pdf.GetTextString(x.R, dict["N"])); err != nil {
+func extractRenditionCommon(c pdf.Cursor, dict pdf.Dict, out *RenditionCommon) error {
+	if n, err := pdf.Optional(c.TextString(dict["N"])); err != nil {
 		return err
 	} else {
-		c.Name = string(n)
+		out.Name = string(n)
 	}
 
 	var err error
-	if c.MustHonourCriteria, err = extractCriteria(x, path, dict["MH"]); err != nil {
+	if out.MustHonourCriteria, err = extractCriteria(c, dict["MH"]); err != nil {
 		return err
 	}
-	if c.BestEffortCriteria, err = extractCriteria(x, path, dict["BE"]); err != nil {
+	if out.BestEffortCriteria, err = extractCriteria(c, dict["BE"]); err != nil {
 		return err
 	}
 	return nil
 }
 
-func extractCriteria(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*MediaCriteria, error) {
-	dict, err := pdf.Optional(x.GetDict(path, obj))
+func extractCriteria(c pdf.Cursor, obj pdf.Object) (*MediaCriteria, error) {
+	dict, err := pdf.Optional(c.Dict(obj))
 	if err != nil || dict == nil {
 		return nil, err
 	}
-	return pdf.ExtractorGetOptional(x, path, dict["C"], ExtractMediaCriteria)
+	return pdf.DecodeOptional(c, dict["C"], ExtractMediaCriteria)
 }
 
 func (c *RenditionCommon) fillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
@@ -92,24 +92,24 @@ func (c *RenditionCommon) fillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
 }
 
 // ExtractRendition reads a rendition dictionary and dispatches on its subtype.
-func ExtractRendition(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (Rendition, error) {
-	dict, err := x.GetDictTyped(path, obj, "Rendition")
+func ExtractRendition(c pdf.Cursor, obj pdf.Object, isDirect bool) (Rendition, error) {
+	dict, err := c.DictTyped(obj, "Rendition")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing rendition dictionary")
 	}
 
-	s, err := pdf.Optional(x.GetName(path, dict["S"]))
+	s, err := pdf.Optional(c.Name(dict["S"]))
 	if err != nil {
 		return nil, err
 	}
 
 	switch s {
 	case "MR":
-		return extractMediaRendition(x, path, dict, isDirect)
+		return extractMediaRendition(c, dict, isDirect)
 	case "SR":
-		return extractSelectorRendition(x, path, dict, isDirect)
+		return extractSelectorRendition(c, dict, isDirect)
 	default:
 		return nil, pdf.Error("unknown rendition subtype: " + string(s))
 	}
@@ -133,20 +133,20 @@ type MediaRendition struct {
 	SingleUse bool
 }
 
-func extractMediaRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirect bool) (*MediaRendition, error) {
+func extractMediaRendition(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaRendition, error) {
 	r := &MediaRendition{SingleUse: isDirect}
-	if err := extractRenditionCommon(x, path, dict, &r.RenditionCommon); err != nil {
+	if err := extractRenditionCommon(c, dict, &r.RenditionCommon); err != nil {
 		return nil, err
 	}
 
 	var err error
-	if r.Clip, err = pdf.ExtractorGetOptional(x, path, dict["C"], ExtractMediaClip); err != nil {
+	if r.Clip, err = pdf.DecodeOptional(c, dict["C"], ExtractMediaClip); err != nil {
 		return nil, err
 	}
-	if r.Play, err = pdf.ExtractorGetOptional(x, path, dict["P"], ExtractMediaPlayParameters); err != nil {
+	if r.Play, err = pdf.DecodeOptional(c, dict["P"], ExtractMediaPlayParameters); err != nil {
 		return nil, err
 	}
-	if r.Screen, err = pdf.ExtractorGetOptional(x, path, dict["SP"], ExtractMediaScreenParameters); err != nil {
+	if r.Screen, err = pdf.DecodeOptional(c, dict["SP"], ExtractMediaScreenParameters); err != nil {
 		return nil, err
 	}
 
@@ -215,18 +215,18 @@ type SelectorRendition struct {
 	SingleUse bool
 }
 
-func extractSelectorRendition(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, isDirect bool) (*SelectorRendition, error) {
+func extractSelectorRendition(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*SelectorRendition, error) {
 	r := &SelectorRendition{SingleUse: isDirect}
-	if err := extractRenditionCommon(x, path, dict, &r.RenditionCommon); err != nil {
+	if err := extractRenditionCommon(c, dict, &r.RenditionCommon); err != nil {
 		return nil, err
 	}
 
-	arr, err := pdf.Optional(x.GetArray(path, dict["R"]))
+	arr, err := pdf.Optional(c.Array(dict["R"]))
 	if err != nil {
 		return nil, err
 	}
 	for _, elem := range arr {
-		child, err := pdf.ExtractorGetOptional(x, path, elem, ExtractRendition)
+		child, err := pdf.DecodeOptional(c, elem, ExtractRendition)
 		if err != nil {
 			return nil, err
 		}

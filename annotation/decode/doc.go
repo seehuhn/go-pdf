@@ -23,7 +23,7 @@
 // Keeping the readers in a separate package lets them depend on both type
 // packages without an import cycle.
 //
-// There are two entry points, each to be invoked through [pdf.ExtractorGet]
+// There are two entry points, each to be invoked through [pdf.Decode]
 // so that indirect references are resolved and reference cycles are detected:
 //
 //   - [Annotation] reads any annotation, dispatching on its subtype.

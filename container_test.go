@@ -26,7 +26,7 @@ import (
 )
 
 func TestGetDictTyped_NilObject(t *testing.T) {
-	dict, err := GetDictTyped(mockGetter, nil, "test")
+	dict, err := NewCursor(mockGetter).DictTyped(nil, "test")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -35,8 +35,8 @@ func TestGetDictTyped_NilObject(t *testing.T) {
 	}
 }
 
-func TestGetStreamReaderNull(t *testing.T) {
-	r, err := GetStreamReader(mockGetter, nil, nil)
+func TestStreamReaderNull(t *testing.T) {
+	r, err := NewCursor(mockGetter).StreamReader(nil)
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("expected os.ErrNotExist, got %v", err)
 	}

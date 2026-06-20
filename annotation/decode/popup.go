@@ -21,12 +21,11 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodePopup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Popup, error) {
-	r := x.R
+func decodePopup(c pdf.Cursor, dict pdf.Dict) (*annotation.Popup, error) {
 	popup := &annotation.Popup{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &popup.Common, dict); err != nil {
+	if err := decodeCommon(c, &popup.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -37,7 +36,7 @@ func decodePopup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annota
 	}
 
 	// Open (optional)
-	if open, err := pdf.GetBoolean(r, dict["Open"]); err == nil {
+	if open, err := c.Boolean(dict["Open"]); err == nil {
 		popup.Open = bool(open)
 	}
 

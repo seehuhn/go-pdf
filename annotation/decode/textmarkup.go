@@ -22,25 +22,24 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeTextMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, subtype pdf.Name) (*annotation.TextMarkup, error) {
-	r := x.R
+func decodeTextMarkup(c pdf.Cursor, dict pdf.Dict, subtype pdf.Name) (*annotation.TextMarkup, error) {
 	textMarkup := &annotation.TextMarkup{}
 
 	textMarkup.Type = annotation.TextMarkupType(subtype)
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &textMarkup.Common, dict); err != nil {
+	if err := decodeCommon(c, &textMarkup.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &textMarkup.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &textMarkup.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract text markup-specific fields
 	// QuadPoints (required)
-	quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"])
+	quadPoints, err := c.FloatArray(dict["QuadPoints"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "QuadPoints")
 	}

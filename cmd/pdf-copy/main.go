@@ -102,10 +102,11 @@ func copyPDF(inFile, outFile string) (retErr error) {
 
 	trans := pdf.NewCopier(w, r)
 
+	c := pdf.NewCursor(r)
 	// copy the source catalog dict directly, then decode into a new
 	// Catalog struct in writer space.  Going via the source dict
 	// preserves entries that DecodeCatalog/Encode don't model.
-	srcDict, err := pdf.GetDict(r, r.GetMeta().Trailer["Root"])
+	srcDict, err := c.Dict(r.GetMeta().Trailer["Root"])
 	if err != nil {
 		return err
 	}
@@ -120,7 +121,7 @@ func copyPDF(inFile, outFile string) (retErr error) {
 	if err != nil {
 		return err
 	}
-	newCatalog, err := pdf.ExtractorGet(pdf.NewExtractor(w), nil, newDict, pdf.DecodeCatalog)
+	newCatalog, err := pdf.Decode(pdf.NewCursor(w), newDict, pdf.DecodeCatalog)
 	if err != nil {
 		return err
 	}

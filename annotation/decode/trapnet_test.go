@@ -33,7 +33,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 			"Subtype": pdf.Name("TrapNet"),
 			"Rect":    &pdf.Rectangle{URx: 612, URy: 792},
 		}
-		tn, err := decodeTrapNet(x, nil, dict)
+		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,7 +56,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 			"Version":      pdf.Array{pdf.NewReference(1, 0)},
 			"AnnotStates":  pdf.Array{pdf.Name("N")},
 		}
-		tn, err := decodeTrapNet(x, nil, dict)
+		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,7 +78,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 			"LastModified": pdf.TextString("D:20231215103000Z"),
 			"Version":      pdf.Array{pdf.NewReference(1, 0)},
 		}
-		tn, err := decodeTrapNet(x, nil, dict)
+		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,7 +97,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 			"LastModified": pdf.TextString("D:20231215103000Z"),
 			"AnnotStates":  pdf.Array{pdf.Name("N")},
 		}
-		tn, err := decodeTrapNet(x, nil, dict)
+		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 			"Rect":    &pdf.Rectangle{URx: 612, URy: 792},
 			"Version": pdf.Array{pdf.NewReference(1, 0)},
 		}
-		tn, err := decodeTrapNet(x, nil, dict)
+		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +133,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 			"Rect":        &pdf.Rectangle{URx: 612, URy: 792},
 			"AnnotStates": pdf.Array{pdf.Name("N")},
 		}
-		tn, err := decodeTrapNet(x, nil, dict)
+		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
 		if err != nil {
 			t.Fatal(err)
 		}

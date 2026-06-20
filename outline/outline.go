@@ -97,24 +97,24 @@ func (item *Item) AddChild(title string) *Item {
 // The obj argument should be the value of the Outlines entry in the catalog.
 // Returns nil if obj is nil.
 //
-// Always invoke this via [pdf.ExtractorGet] so that the outline root's
+// Always invoke this via [pdf.Decode] so that the outline root's
 // reference is resolved and cycle detection covers back-references into the
 // root.
-func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Outline, error) {
-	rootDict, err := x.GetDictTyped(path, obj, "Outlines")
+func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Outline, error) {
+	rootDict, err := c.DictTyped(obj, "Outlines")
 	if err != nil || rootDict == nil {
 		return nil, err
 	}
 
 	// Seed visited with the outline root's ref. Callers route through
-	// ExtractorGet, which extends path with that ref before invoking us.
+	// Decode, which extends path with that ref before invoking us.
 	visited := map[pdf.Reference]bool{}
-	if path != nil {
-		visited[path.Ref] = true
+	if p := c.Path(); p != nil {
+		visited[p.Ref] = true
 	}
 
 	firstRef, _ := rootDict["First"].(pdf.Reference)
-	items, err := readChildren(x, path, visited, firstRef, 0)
+	items, err := readChildren(c, visited, firstRef, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -122,47 +122,48 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Ou
 	return &Outline{Items: items}, nil
 }
 
-func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference, depth int) (*Item, pdf.Dict, error) {
-	path = &pdf.CycleCheck{Ref: ref, Parent: path}
-
-	dict, err := pdf.GetDict(x.R, ref)
+func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, depth int) (*Item, pdf.Dict, error) {
+	dict, err := c.Dict(ref)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	// extend the path with ref so nested decodes detect back-references
+	c = pdf.CursorAt(c.Extractor(), &pdf.CycleCheck{Ref: ref, Parent: c.Path()})
+
 	item := &Item{}
 
-	title, err := pdf.GetTextString(x.R, dict["Title"])
+	title, err := c.TextString(dict["Title"])
 	if err != nil {
 		return nil, nil, pdf.Wrap(err, "/Title in outline")
 	}
 	item.Title = string(title)
 
-	count, _ := pdf.GetInteger(x.R, dict["Count"])
+	count, _ := c.Integer(dict["Count"])
 	item.Open = count > 0
 
 	if dict["Dest"] != nil {
-		dest, err := pdf.ExtractorGetOptional(x, path, dict["Dest"], destination.Decode)
+		dest, err := pdf.DecodeOptional(c, dict["Dest"], destination.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/Dest in outline")
 		}
 		item.Destination = dest
 	} else if dict["A"] != nil {
-		a, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode)
+		a, err := pdf.DecodeOptional(c, dict["A"], action.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/A in outline")
 		}
 		item.Action = a
 	}
 
-	if cArr, _ := pdf.GetArray(x.R, dict["C"]); len(cArr) == 3 {
-		cr, _ := pdf.GetNumber(x.R, cArr[0])
-		cg, _ := pdf.GetNumber(x.R, cArr[1])
-		cb, _ := pdf.GetNumber(x.R, cArr[2])
-		item.Color = color.DeviceRGB{float64(cr), float64(cg), float64(cb)}
+	if cArr, _ := c.Array(dict["C"]); len(cArr) == 3 {
+		cr, _ := c.Number(cArr[0])
+		cg, _ := c.Number(cArr[1])
+		cb, _ := c.Number(cArr[2])
+		item.Color = color.DeviceRGB{cr, cg, cb}
 	}
 
-	if f, _ := pdf.GetInteger(x.R, dict["F"]); f != 0 {
+	if f, _ := c.Integer(dict["F"]); f != 0 {
 		item.Italic = f&1 != 0
 		item.Bold = f&2 != 0
 	}
@@ -172,7 +173,7 @@ func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]
 	}
 
 	firstRef, _ := dict["First"].(pdf.Reference)
-	children, err := readChildren(x, path, visited, firstRef, depth+1)
+	children, err := readChildren(c, visited, firstRef, depth+1)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -181,7 +182,7 @@ func readItem(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]
 	return item, dict, nil
 }
 
-func readChildren(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Reference]bool, ref pdf.Reference, depth int) ([]*Item, error) {
+func readChildren(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, depth int) ([]*Item, error) {
 	// drop subtrees deeper than the cap; like a /First cycle, an
 	// adversarially deep chain is silently truncated, keeping the
 	// items read so far
@@ -196,7 +197,7 @@ func readChildren(x *pdf.Extractor, path *pdf.CycleCheck, visited map[pdf.Refere
 		}
 		visited[ref] = true
 
-		item, dict, err := readItem(x, path, visited, ref, depth)
+		item, dict, err := readItem(c, visited, ref, depth)
 		if err != nil {
 			return nil, err
 		}

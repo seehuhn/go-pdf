@@ -90,7 +90,7 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 	x := pdf.NewExtractor(r)
 
 	// decode page 1 ONLY; this must trigger the form decode and link the widgets
-	p1, err := pdf.ExtractorGet(x, nil, page1Ref, pdfpage.Decode)
+	p1, err := pdf.Decode(pdf.CursorAt(x, nil), page1Ref, pdfpage.Decode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 
 	// the merged field and its page widget must be one shared object: the field's
 	// single Kid is the very widget in the page's /Annots
-	form, err := pdf.ExtractorGet(x, nil, formRef, decode.Form)
+	form, err := pdf.Decode(pdf.CursorAt(x, nil), formRef, decode.Form)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -84,21 +84,21 @@ func (a *GoTo) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeGoTo(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (pdf.Action, error) {
-	dest, err := pdf.ExtractorGet(x, path, dict["D"], destination.Decode)
+func decodeGoTo(c pdf.Cursor, dict pdf.Dict) (pdf.Action, error) {
+	dest, err := pdf.Decode(c, dict["D"], destination.Decode)
 	if err != nil {
 		return nil, err
 	}
 
 	var sd destination.Destination
 	if dict["SD"] != nil {
-		sd, err = pdf.ExtractorGetOptional(x, path, dict["SD"], destination.Decode)
+		sd, err = pdf.DecodeOptional(c, dict["SD"], destination.Decode)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

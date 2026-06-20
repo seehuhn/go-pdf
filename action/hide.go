@@ -72,7 +72,7 @@ func (a *Hide) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeHide(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Hide, error) {
+func decodeHide(c pdf.Cursor, dict pdf.Dict) (*Hide, error) {
 	t := dict["T"]
 	if t == nil {
 		return nil, pdf.Error("Hide action missing T entry")
@@ -80,11 +80,11 @@ func decodeHide(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Hide, e
 
 	h := true // default value
 	if dict["H"] != nil {
-		hVal, _ := pdf.Optional(x.GetBoolean(path, dict["H"]))
+		hVal, _ := pdf.Optional(c.Boolean(dict["H"]))
 		h = bool(hVal)
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

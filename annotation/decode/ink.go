@@ -22,22 +22,21 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Ink, error) {
-	r := x.R
+func decodeInk(c pdf.Cursor, dict pdf.Dict) (*annotation.Ink, error) {
 	ink := &annotation.Ink{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &ink.Common, dict); err != nil {
+	if err := decodeCommon(c, &ink.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &ink.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &ink.Markup); err != nil {
 		return nil, err
 	}
 
 	// InkList (required)
-	inkList, err := x.GetArray(path, dict["InkList"])
+	inkList, err := c.Array(dict["InkList"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "InkList")
 	}
@@ -46,7 +45,7 @@ func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotati
 	}
 	paths := make([][]vec.Vec2, len(inkList))
 	for i, pathEntry := range inkList {
-		coords, err := pdf.Optional(pdf.GetFloatArray(r, pathEntry))
+		coords, err := pdf.Optional(c.FloatArray(pathEntry))
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +60,7 @@ func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotati
 	ink.InkList = paths
 
 	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		ink.BorderStyle = bs
@@ -72,7 +71,7 @@ func decodeInk(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotati
 	}
 
 	// Path (optional; PDF 2.0)
-	if p, err := decodePath(x, path, dict["Path"]); err != nil {
+	if p, err := decodePath(c, dict["Path"]); err != nil {
 		return nil, err
 	} else {
 		ink.Path = p

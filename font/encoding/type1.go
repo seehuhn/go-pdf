@@ -60,8 +60,8 @@ var (
 //
 // If /Encoding is malformed, the font's built-in encoding is used as a
 // fallback.
-func ExtractSimple(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, error) {
-	obj, err := pdf.Resolve(r, obj)
+func ExtractSimple(c pdf.Cursor, obj pdf.Object, nonSymbolicExt bool) (Simple, error) {
+	obj, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -81,14 +81,14 @@ func ExtractSimple(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, e
 	if dict == nil {
 		return Builtin, nil
 	}
-	if err := pdf.CheckDictType(r, dict, "Encoding"); err != nil {
+	if err := c.CheckDictType(dict, "Encoding"); err != nil {
 		return Builtin, err
 	}
 
 	// If we reach this point, we have found an encoding dictionary.
 
 	var baseEnc Simple
-	baseEncName, _ := pdf.GetName(r, dict["BaseEncoding"])
+	baseEncName, _ := c.Name(dict["BaseEncoding"])
 	switch baseEncName {
 	case "WinAnsiEncoding":
 		baseEnc = WinAnsi
@@ -105,10 +105,10 @@ func ExtractSimple(r pdf.Getter, obj pdf.Object, nonSymbolicExt bool) (Simple, e
 	}
 
 	differences := make(map[byte]string)
-	if diffArray, _ := pdf.GetArray(r, dict["Differences"]); diffArray != nil {
+	if diffArray, _ := c.Array(dict["Differences"]); diffArray != nil {
 		currentCode := pdf.Integer(-1)
 		for _, item := range diffArray {
-			item, err = pdf.Resolve(r, item)
+			item, err = c.Resolve(item)
 			if err != nil {
 				return nil, err
 			}
@@ -303,13 +303,13 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 
 // ExtractType3 extracts the encoding from the /Encoding entry of a Type3
 // font dictionary.
-func ExtractType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Simple, error) {
-	dict, err := x.GetDictTyped(path, obj, "Encoding")
+func ExtractType3(c pdf.Cursor, obj pdf.Object, _ bool) (Simple, error) {
+	dict, err := c.DictTyped(obj, "Encoding")
 	if err != nil {
 		return nil, err
 	}
 
-	diffArray, err := x.GetArray(path, dict["Differences"])
+	diffArray, err := c.Array(dict["Differences"])
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +318,7 @@ func ExtractType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 
 	currentCode := pdf.Integer(-1)
 	for _, item := range diffArray {
-		item, err = pdf.Resolve(x.R, item)
+		item, err = c.Resolve(item)
 		if err != nil {
 			return nil, err
 		}

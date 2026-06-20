@@ -30,10 +30,10 @@ var (
 )
 
 // NewSource creates a file-backed content stream segment wrapping the
-// given PDF stream object.  The getter is used to resolve indirect
+// given PDF stream object.  The extractor is used to resolve indirect
 // references when the segment's bytes are read or re-embedded.
-func NewSource(stream *pdf.Stream, getter pdf.Getter) *Source {
-	return &Source{stream: stream, getter: getter}
+func NewSource(stream *pdf.Stream, x *pdf.Extractor) *Source {
+	return &Source{stream: stream, x: x}
 }
 
 // ExtractContents builds the [Page.Contents] segment list from a resolved
@@ -41,21 +41,21 @@ func NewSource(stream *pdf.Stream, getter pdf.Getter) *Source {
 // reference resolved (see [pdf.Resolve]); array entries are resolved
 // internally.  A nil or unrecognised object yields a nil segment list,
 // matching the permissive-reader policy.
-func ExtractContents(r pdf.Getter, contents pdf.Object) ([]Segment, error) {
-	switch c := contents.(type) {
+func ExtractContents(c pdf.Cursor, contents pdf.Object) ([]Segment, error) {
+	switch v := contents.(type) {
 	case *pdf.Stream:
-		return []Segment{NewSource(c, r)}, nil
+		return []Segment{NewSource(v, c.Extractor())}, nil
 	case pdf.Array:
-		segments := make([]Segment, 0, len(c))
-		for _, item := range c {
-			stm, err := pdf.GetStream(r, item)
+		segments := make([]Segment, 0, len(v))
+		for _, item := range v {
+			stm, err := c.Stream(item)
 			if err != nil {
 				return nil, err
 			}
 			if stm == nil {
 				continue
 			}
-			segments = append(segments, NewSource(stm, r))
+			segments = append(segments, NewSource(stm, c.Extractor()))
 		}
 		return segments, nil
 	}
@@ -78,14 +78,14 @@ func ExtractContents(r pdf.Getter, contents pdf.Object) ([]Segment, error) {
 // state across all segments.
 type Source struct {
 	stream *pdf.Stream
-	getter pdf.Getter
+	x      *pdf.Extractor
 }
 
 // RawBytes returns a reader over the segment's decoded content-stream
 // bytes.  Used by [Page.NewIter] to feed Source segments into the
 // page's combined content-stream scanner.
 func (s *Source) RawBytes() (io.ReadCloser, error) {
-	return pdf.DecodeStream(s.getter, nil, s.stream, 0)
+	return pdf.CursorAt(s.x, nil).StreamReader(s.stream)
 }
 
 // Embed writes the segment's decoded bytes verbatim to a new PDF stream

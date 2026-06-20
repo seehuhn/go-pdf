@@ -21,23 +21,22 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeTrapNet(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.TrapNet, error) {
-	r := x.R
+func decodeTrapNet(c pdf.Cursor, dict pdf.Dict) (*annotation.TrapNet, error) {
 	trapNet := &annotation.TrapNet{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &trapNet.Common, dict); err != nil {
+	if err := decodeCommon(c, &trapNet.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract trap network-specific fields
-	if lastModified, err := pdf.Optional(pdf.GetTextString(r, dict["LastModified"])); err != nil {
+	if lastModified, err := pdf.Optional(c.TextString(dict["LastModified"])); err != nil {
 		return nil, err
 	} else if lastModified != "" {
 		trapNet.LastModified = string(lastModified)
 	}
 
-	if version, err := pdf.Optional(pdf.GetArray(r, dict["Version"])); err != nil {
+	if version, err := pdf.Optional(c.Array(dict["Version"])); err != nil {
 		return nil, err
 	} else if len(version) > 0 {
 		refs := make([]pdf.Reference, 0, len(version))
@@ -51,7 +50,7 @@ func decodeTrapNet(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*anno
 		}
 	}
 
-	if annotStates, err := pdf.Optional(pdf.GetArray(r, dict["AnnotStates"])); err != nil {
+	if annotStates, err := pdf.Optional(c.Array(dict["AnnotStates"])); err != nil {
 		return nil, err
 	} else if len(annotStates) > 0 {
 		states := make([]pdf.Name, len(annotStates))
@@ -65,7 +64,7 @@ func decodeTrapNet(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*anno
 		trapNet.AnnotStates = states
 	}
 
-	if fontFauxing, err := pdf.Optional(pdf.GetArray(r, dict["FontFauxing"])); err != nil {
+	if fontFauxing, err := pdf.Optional(c.Array(dict["FontFauxing"])); err != nil {
 		return nil, err
 	} else if len(fontFauxing) > 0 {
 		refs := make([]pdf.Reference, 0, len(fontFauxing))

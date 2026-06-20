@@ -80,9 +80,9 @@ type NumberFormat struct {
 }
 
 // ExtractNumberFormat extracts a NumberFormat from a PDF object.
-func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*NumberFormat, error) {
+func ExtractNumberFormat(c pdf.Cursor, obj pdf.Object, isDirect bool) (*NumberFormat, error) {
 
-	dict, err := x.GetDict(path, obj)
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -92,7 +92,7 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 	nf := &NumberFormat{}
 
 	// Extract required fields
-	unit, err := pdf.GetTextString(x.R, dict["U"])
+	unit, err := c.TextString(dict["U"])
 	if err != nil {
 		return nil, err
 	}
@@ -101,11 +101,11 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 	}
 	nf.Unit = string(unit)
 
-	conversion, err := x.GetNumber(path, dict["C"])
+	conversion, err := c.Number(dict["C"])
 	if err != nil {
 		return nil, err
 	}
-	nf.ConversionFactor = float64(conversion)
+	nf.ConversionFactor = conversion
 	if nf.ConversionFactor == 0 {
 		// spec requires a non-zero conversion factor; silently fall back to
 		// an identity factor so the dictionary round-trips
@@ -113,7 +113,7 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 	}
 
 	// Extract optional fields with defaults
-	if f, err := pdf.Optional(x.GetName(path, dict["F"])); err != nil {
+	if f, err := pdf.Optional(c.Name(dict["F"])); err != nil {
 		return nil, err
 	} else {
 		switch f {
@@ -133,7 +133,7 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 	// Extract Precision - conditional based on FractionFormat
 	precisionMeaningful := nf.FractionFormat == FractionDecimal || nf.FractionFormat == FractionFraction
 	if precisionMeaningful {
-		precision, err := pdf.Optional(x.GetInteger(path, dict["D"]))
+		precision, err := pdf.Optional(c.Integer(dict["D"]))
 		if err != nil {
 			return nil, err
 		}
@@ -154,20 +154,20 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 		nf.Precision = 0 // not meaningful for round/truncate
 	}
 
-	if fd, err := pdf.Optional(x.GetBoolean(path, dict["FD"])); err != nil {
+	if fd, err := pdf.Optional(c.Boolean(dict["FD"])); err != nil {
 		return nil, err
 	} else {
 		nf.ForceExactFraction = bool(fd)
 	}
 
-	if rt, err := pdf.Optional(pdf.GetTextString(x.R, dict["RT"])); err != nil {
+	if rt, err := pdf.Optional(c.TextString(dict["RT"])); err != nil {
 		return nil, err
 	} else {
 		// RT present: use the value (even if empty string)
 		nf.ThousandsSeparator = string(rt)
 	} // If RT not present, PDF uses comma default, but we leave empty in Go
 
-	if rd, err := pdf.Optional(pdf.GetTextString(x.R, dict["RD"])); err != nil {
+	if rd, err := pdf.Optional(c.TextString(dict["RD"])); err != nil {
 		return nil, err
 	} else if rd != "" {
 		nf.DecimalSeparator = string(rd)
@@ -175,21 +175,21 @@ func ExtractNumberFormat(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object,
 		nf.DecimalSeparator = "."
 	}
 
-	if ps, err := pdf.Optional(pdf.GetTextString(x.R, dict["PS"])); err != nil {
+	if ps, err := pdf.Optional(c.TextString(dict["PS"])); err != nil {
 		return nil, err
 	} else {
 		// PS: store the value (empty if not present)
 		nf.PrefixSpacing = string(ps)
 	}
 
-	if ss, err := pdf.Optional(pdf.GetTextString(x.R, dict["SS"])); err != nil {
+	if ss, err := pdf.Optional(c.TextString(dict["SS"])); err != nil {
 		return nil, err
 	} else {
 		// SS: store the value (empty if not present)
 		nf.SuffixSpacing = string(ss)
 	}
 
-	if o, err := pdf.Optional(x.GetName(path, dict["O"])); err != nil {
+	if o, err := pdf.Optional(c.Name(dict["O"])); err != nil {
 		return nil, err
 	} else {
 		nf.PrefixLabel = (o == "P")

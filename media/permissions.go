@@ -55,8 +55,8 @@ type MediaPermissions struct {
 }
 
 // ExtractMediaPermissions reads a media permissions dictionary.
-func ExtractMediaPermissions(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MediaPermissions, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaPermissions")
+func ExtractMediaPermissions(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaPermissions, error) {
+	dict, err := c.DictTyped(obj, "MediaPermissions")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -65,7 +65,7 @@ func ExtractMediaPermissions(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obj
 
 	p := &MediaPermissions{SingleUse: isDirect}
 
-	if tf, err := pdf.Optional(x.GetString(path, dict["TF"])); err != nil {
+	if tf, err := pdf.Optional(c.String(dict["TF"])); err != nil {
 		return nil, err
 	} else if v := TempFilePermission(tf); v.isValid() {
 		p.TempFile = v

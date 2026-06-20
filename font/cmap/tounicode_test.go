@@ -320,7 +320,7 @@ func TestExtractToUnicode(t *testing.T) {
 
 	}
 
-	child, err := pdf.ExtractorGet(pdf.NewExtractor(data), nil, childRef, ExtractToUnicode)
+	child, err := pdf.Decode(pdf.NewCursor(data), childRef, ExtractToUnicode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -507,7 +507,7 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 				}
 			}
 
-			info, err := pdf.ExtractorGet(pdf.NewExtractor(data), nil, refs[0], ExtractToUnicode)
+			info, err := pdf.Decode(pdf.NewCursor(data), refs[0], ExtractToUnicode)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -542,7 +542,7 @@ func TestEmbedToUnicode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info, err := pdf.ExtractorGet(pdf.NewExtractor(data), nil, ref, ExtractToUnicode)
+	info, err := pdf.Decode(pdf.NewCursor(data), ref, ExtractToUnicode)
 	if err != nil {
 		t.Fatal(err)
 	}

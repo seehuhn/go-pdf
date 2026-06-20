@@ -82,40 +82,40 @@ func (f *Type0) GetDomain() []float64 {
 }
 
 // extractType0 reads a Type 0 sampled function from a PDF stream object.
-func extractType0(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type0, error) {
+func extractType0(c pdf.Cursor, stream *pdf.Stream) (*Type0, error) {
 	d := stream.Dict
 
-	domain, err := getFloatArray(x, path, d["Domain"])
+	domain, err := getFloatArray(c, d["Domain"])
 	if err != nil {
 		return nil, err
 	}
 
-	rangeArray, err := getFloatArray(x, path, d["Range"])
+	rangeArray, err := getFloatArray(c, d["Range"])
 	if err != nil {
 		return nil, err
 	}
 
-	size, err := readInts(x, path, d["Size"])
+	size, err := readInts(c, d["Size"])
 	if err != nil {
 		return nil, err
 	}
 
-	bitsPerSample, err := x.GetInteger(path, d["BitsPerSample"])
+	bitsPerSample, err := c.Integer(d["BitsPerSample"])
 	if err != nil {
 		return nil, err
 	}
 
-	order, err := x.GetInteger(path, d["Order"])
+	order, err := c.Integer(d["Order"])
 	if err != nil {
 		return nil, err
 	}
 
-	encode, err := getFloatArray(x, path, d["Encode"])
+	encode, err := getFloatArray(c, d["Encode"])
 	if err != nil {
 		return nil, err
 	}
 
-	decode, err := getFloatArray(x, path, d["Decode"])
+	decode, err := getFloatArray(c, d["Decode"])
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func extractType0(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 		Decode:        decode,
 	}
 
-	f.Samples, err = pdf.ReadAll(x.R, path, stream, int64(totalBytes))
+	f.Samples, err = c.ReadAll(stream, int64(totalBytes))
 	if err != nil {
 		return nil, err
 	}

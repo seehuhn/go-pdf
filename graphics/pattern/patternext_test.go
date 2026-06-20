@@ -149,7 +149,7 @@ func testRoundTrip(t *testing.T, pat color.Pattern) {
 	}
 
 	x1 := pdf.NewExtractor(w1)
-	pat1, err := extract.Pattern(x1, nil, ref1, false)
+	pat1, err := extract.Pattern(pdf.CursorAt(x1, nil), ref1, false)
 	if err != nil {
 		t.Fatalf("first extract failed: %v", err)
 	}
@@ -174,7 +174,7 @@ func testRoundTrip(t *testing.T, pat color.Pattern) {
 	}
 
 	x2 := pdf.NewExtractor(w2)
-	pat2, err := extract.Pattern(x2, nil, ref2, false)
+	pat2, err := extract.Pattern(pdf.CursorAt(x2, nil), ref2, false)
 	if err != nil {
 		t.Fatalf("second extract failed: %v", err)
 	}
@@ -255,7 +255,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		pat, err := extract.Pattern(x, nil, obj, false)
+		pat, err := extract.Pattern(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("malformed pattern")
 		}

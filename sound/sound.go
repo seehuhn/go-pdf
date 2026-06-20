@@ -203,14 +203,14 @@ func (s *streamSource) WriteStream(e *pdf.EmbedHelper, ref pdf.Reference, dict p
 // metadata (negative or non-finite SampleRate, zero or absurdly large
 // Channels or BitsPerSample, etc.).  Unknown Encoding values are
 // substituted with the default EncodingRaw.
-func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Sound, error) {
-	stream, err := x.GetStream(path, obj)
+func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*Sound, error) {
+	stream, err := c.Stream(obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
 		return nil, pdf.Error("missing sound stream")
 	}
-	if err := pdf.CheckDictType(x.R, stream.Dict, "Sound"); err != nil {
+	if err := c.CheckDictType(stream.Dict, "Sound"); err != nil {
 		return nil, err
 	}
 
@@ -221,7 +221,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	}
 
 	// SampleRate (R) — required.
-	if r, err := pdf.Optional(x.GetNumber(path, stream.Dict["R"])); err != nil {
+	if r, err := pdf.Optional(c.Number(stream.Dict["R"])); err != nil {
 		return nil, err
 	} else {
 		res.SampleRate = r
@@ -232,7 +232,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	// non-integer or out-of-range values are rejected rather than
 	// silently fixed.
 	if cObj := stream.Dict["C"]; cObj != nil {
-		c, err := x.GetInteger(path, cObj)
+		c, err := c.Integer(cObj)
 		if err != nil {
 			return nil, err
 		}
@@ -245,7 +245,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	// BitsPerSample (B) — optional in PDF, default 8.  Same strictness
 	// as /C: non-integer or out-of-range values are rejected.
 	if bObj := stream.Dict["B"]; bObj != nil {
-		b, err := x.GetInteger(path, bObj)
+		b, err := c.Integer(bObj)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +256,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	}
 
 	// Encoding (E) — optional, default Raw; unknown names ignored.
-	if enc, err := pdf.Optional(x.GetName(path, stream.Dict["E"])); err != nil {
+	if enc, err := pdf.Optional(c.Name(stream.Dict["E"])); err != nil {
 		return nil, err
 	} else if enc != "" {
 		switch Encoding(enc) {
@@ -266,7 +266,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	}
 
 	// CompressionFormat (CO) — optional, opaque.
-	if co, err := pdf.Optional(x.GetName(path, stream.Dict["CO"])); err != nil {
+	if co, err := pdf.Optional(c.Name(stream.Dict["CO"])); err != nil {
 		return nil, err
 	} else if co != "" {
 		res.CompressionFormat = co
@@ -275,19 +275,19 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*S
 	// CompressionParams (CP) — optional, opaque.  References inside CP
 	// are translated to the destination on Embed.
 	if cp := stream.Dict["CP"]; cp != nil {
-		res.CompressionParams = opaque.Extract(x, cp)
+		res.CompressionParams = opaque.Extract(c.Extractor(), cp)
 	}
 
 	// ExternalFile (F) — optional.  When present, the sample data lives
 	// in an external file; the inline stream body is ignored.
-	externalFile, err := pdf.ExtractorGetOptional(x, path, stream.Dict["F"], file.ExtractSpecification)
+	externalFile, err := pdf.DecodeOptional(c, stream.Dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
 	if externalFile != nil {
 		res.Data = &ExternalFileSource{File: externalFile}
 	} else {
-		res.Data = &streamSource{inner: opaque.ExtractStream(x, stream)}
+		res.Data = &streamSource{inner: opaque.ExtractStream(c.Extractor(), stream)}
 	}
 
 	if err := res.Validate(); err != nil {

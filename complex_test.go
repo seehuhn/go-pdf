@@ -70,7 +70,7 @@ func TestTextString_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetTextString(nil, tt.input)
+			got, err := NewCursor(mockGetter).TextString(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("GetTextString() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -272,7 +272,7 @@ func TestRectangle1(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rect, err := asRectangle(nil, obj.(Array))
+			rect, err := NewCursor(mockGetter).Rectangle(obj)
 
 			if err != nil {
 				t.Errorf("Decode(%q) returned error %v", test.in, err)
@@ -306,7 +306,7 @@ func TestRectangle2(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rect, err := asRectangle(nil, obj.(Array))
+			rect, err := NewCursor(mockGetter).Rectangle(obj)
 			if err != nil {
 				t.Errorf("Decode(%q) returned error %v", test.String(), err)
 			}
@@ -403,7 +403,7 @@ func TestCatalog(t *testing.T) {
 	if len(d1) != 2 {
 		t.Errorf("wrong Catalog dict: %s", AsString(d1))
 	}
-	cat1, err := DecodeCatalog(NewExtractor(nil), nil, d1, true)
+	cat1, err := DecodeCatalog(NewCursor(mockGetter), d1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func TestCatalogReadMissingPages(t *testing.T) {
 	catalogDict := Dict{
 		"Outlines": NewReference(123, 0),
 	}
-	if _, err := DecodeCatalog(NewExtractor(nil), nil, catalogDict, true); err == nil {
+	if _, err := DecodeCatalog(NewCursor(mockGetter), catalogDict, true); err == nil {
 		t.Errorf("missing Pages not detected")
 	}
 }
@@ -428,7 +428,7 @@ func TestCatalogVersionPermissive(t *testing.T) {
 	pages := NewReference(1, 0)
 	for _, version := range []Object{Name("1.5"), Real(1.5), String("1.5")} {
 		dict := Dict{"Version": version, "Pages": pages}
-		cat, err := DecodeCatalog(NewExtractor(nil), nil, dict, true)
+		cat, err := DecodeCatalog(NewCursor(mockGetter), dict, true)
 		if err != nil {
 			t.Errorf("version %v: %v", version, err)
 			continue

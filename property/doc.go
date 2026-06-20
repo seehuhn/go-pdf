@@ -40,7 +40,7 @@
 //
 // To read property lists from PDF, use [ExtractList]:
 //
-//	propList, err := property.ExtractList(x, path, obj, isDirect)
+//	propList, err := property.ExtractList(c, obj, isDirect)
 //	dict := propList.AsDirectDict() // nil if indirect
 //
 // To create property lists for writing, use the specific types like

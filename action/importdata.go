@@ -68,8 +68,8 @@ func (a *ImportData) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeImportData(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ImportData, error) {
-	f, err := pdf.ExtractorGet(x, path, dict["F"], file.ExtractSpecification)
+func decodeImportData(c pdf.Cursor, dict pdf.Dict) (*ImportData, error) {
+	f, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func decodeImportData(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*I
 		return nil, pdf.Error("ImportData action missing F entry")
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

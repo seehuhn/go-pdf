@@ -131,7 +131,7 @@ func roundTripTest(t *testing.T, version pdf.Version, d1 Dict) {
 	}
 
 	x := pdf.NewExtractor(w)
-	d2, err := Extract(x, nil, obj, true)
+	d2, err := Extract(pdf.CursorAt(x, nil), obj, true)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestReadInksDegenerate(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 	for _, obj := range []pdf.Object{pdf.Array{}, pdf.Array{pdf.Name("monochrome")}} {
-		inks, err := readInks(x, nil, obj)
+		inks, err := readInks(pdf.CursorAt(x, nil), obj)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -165,7 +165,7 @@ func TestReadTagTextDegenerate(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 	for _, obj := range []pdf.Object{pdf.Integer(42), pdf.Array{}} {
-		text, err := readTagText(x, nil, obj)
+		text, err := readTagText(pdf.CursorAt(x, nil), obj)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -218,7 +218,7 @@ func TestV20ReadFix(t *testing.T) {
 		"IncludedImageQuality": pdf.Number(5),
 	}
 	x := pdf.NewExtractor(w)
-	v, err := extractV20(x, nil, dict, true)
+	v, err := extractV20(pdf.CursorAt(x, nil), dict, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("missing object")
 		}
 		x := pdf.NewExtractor(r)
-		d, err := Extract(x, nil, obj, false)
+		d, err := Extract(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("malformed OPI dictionary")
 		}

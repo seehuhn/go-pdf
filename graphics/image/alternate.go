@@ -86,8 +86,8 @@ func hasNestedAlternates(img graphics.Image) bool {
 }
 
 // ExtractAlternate extracts an alternate image dictionary from a PDF object.
-func ExtractAlternate(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Alternate, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractAlternate(c pdf.Cursor, obj pdf.Object, _ bool) (*Alternate, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -102,15 +102,15 @@ func ExtractAlternate(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 
 	// dispatch based on ImageMask flag
 	var img graphics.Image
-	stm, err := x.GetStream(path, imgObj)
+	stm, err := c.Stream(imgObj)
 	if err != nil {
 		return nil, fmt.Errorf("invalid Image: %w", err)
 	}
 	if stm == nil {
 		return nil, pdf.Error("missing Image stream in alternate image dictionary")
 	}
-	if isImageMask, _ := x.GetBoolean(path, stm.Dict["ImageMask"]); isImageMask {
-		mask, err := ExtractMask(x, path, imgObj, false)
+	if isImageMask, _ := c.Boolean(stm.Dict["ImageMask"]); isImageMask {
+		mask, err := pdf.Decode(c, imgObj, ExtractMask)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Image: %w", err)
 		}
@@ -118,7 +118,7 @@ func ExtractAlternate(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		mask.Alternates = nil
 		img = mask
 	} else {
-		d, err := ExtractDict(x, path, imgObj, false)
+		d, err := pdf.Decode(c, imgObj, ExtractDict)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Image: %w", err)
 		}
@@ -131,12 +131,12 @@ func ExtractAlternate(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		Image: img,
 	}
 
-	if dfp, err := x.GetBoolean(path, dict["DefaultForPrinting"]); err == nil {
+	if dfp, err := c.Boolean(dict["DefaultForPrinting"]); err == nil {
 		alt.DefaultForPrinting = bool(dfp)
 	}
 
 	if ocObj, ok := dict["OC"]; ok {
-		if oc, err := pdf.ExtractorGetOptional(x, path, ocObj, oc.ExtractConditional); err != nil {
+		if oc, err := pdf.DecodeOptional(c, ocObj, oc.ExtractConditional); err != nil {
 			return nil, err
 		} else {
 			alt.OC = oc

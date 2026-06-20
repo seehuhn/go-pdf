@@ -106,7 +106,7 @@ func TestExtractMinimal(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	got, err := Extract(x, nil, w.GetMeta().Trailer["Quir:E"], false)
+	got, err := Extract(pdf.CursorAt(x, nil), w.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -273,7 +273,7 @@ func roundTripTest(t *testing.T, tc roundTripCase) {
 	}
 
 	x := pdf.NewExtractor(w)
-	got, err := Extract(x, nil, w.GetMeta().Trailer["Quir:E"], false)
+	got, err := Extract(pdf.CursorAt(x, nil), w.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -358,7 +358,7 @@ func TestCompressionParamsCrossFile(t *testing.T) {
 
 	// Read the Sound from the source.
 	srcX := pdf.NewExtractor(src)
-	srcSnd, err := Extract(srcX, nil, src.GetMeta().Trailer["Quir:E"], false)
+	srcSnd, err := Extract(pdf.CursorAt(srcX, nil), src.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("src Extract: %v", err)
 	}
@@ -384,11 +384,11 @@ func TestCompressionParamsCrossFile(t *testing.T) {
 	// Verify the destination's /CP entry: the inner reference must be
 	// fresh (not the source's), and resolve to the expected payload.
 	dstX := pdf.NewExtractor(dst)
-	dstStream, err := dstX.GetStream(nil, dst.GetMeta().Trailer["Quir:E"])
+	dstStream, err := pdf.CursorAt(dstX, nil).Stream(dst.GetMeta().Trailer["Quir:E"])
 	if err != nil {
 		t.Fatalf("dst GetStream: %v", err)
 	}
-	dstCP, err := dstX.GetDict(nil, dstStream.Dict["CP"])
+	dstCP, err := pdf.CursorAt(dstX, nil).Dict(dstStream.Dict["CP"])
 	if err != nil {
 		t.Fatalf("dst /CP GetDict: %v", err)
 	}
@@ -399,7 +399,7 @@ func TestCompressionParamsCrossFile(t *testing.T) {
 	if dstProfileRef == innerRef {
 		t.Error("dst reused the source-file reference for /CP/Profile")
 	}
-	dstProfile, err := dstX.GetDict(nil, dstProfileRef)
+	dstProfile, err := pdf.CursorAt(dstX, nil).Dict(dstProfileRef)
 	if err != nil {
 		t.Fatalf("dst Profile GetDict: %v", err)
 	}
@@ -408,7 +408,7 @@ func TestCompressionParamsCrossFile(t *testing.T) {
 	}
 
 	// Round-trip equality of the wrapped CompressionParams.
-	dstSnd, err := Extract(dstX, nil, dst.GetMeta().Trailer["Quir:E"], false)
+	dstSnd, err := Extract(pdf.CursorAt(dstX, nil), dst.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("dst Extract: %v", err)
 	}
@@ -578,7 +578,7 @@ func TestStreamSourcePreservesFilter(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(src)
-	got, err := Extract(x, nil, src.GetMeta().Trailer["Quir:E"], false)
+	got, err := Extract(pdf.CursorAt(x, nil), src.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -597,11 +597,11 @@ func TestStreamSourcePreservesFilter(t *testing.T) {
 	}
 
 	ref := obj2.(pdf.Reference)
-	stream, err := pdf.GetStream(dst, ref)
+	stream, err := pdf.NewCursor(dst).Stream(ref)
 	if err != nil {
 		t.Fatalf("get stream: %v", err)
 	}
-	filter, _ := pdf.GetName(dst, stream.Dict["Filter"])
+	filter, _ := pdf.NewCursor(dst).Name(stream.Dict["Filter"])
 	if filter != "FlateDecode" {
 		t.Errorf("re-embedded /Filter = %q, want FlateDecode", filter)
 	}
@@ -634,7 +634,7 @@ func TestExtractUnknownEncoding(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	got, err := Extract(x, nil, w.GetMeta().Trailer["Quir:E"], false)
+	got, err := Extract(pdf.CursorAt(x, nil), w.GetMeta().Trailer["Quir:E"], false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -707,7 +707,7 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("missing test object")
 		}
 		x := pdf.NewExtractor(r)
-		first, err := Extract(x, nil, objPDF, false)
+		first, err := Extract(pdf.CursorAt(x, nil), objPDF, false)
 		if err != nil {
 			t.Skip("malformed sound object")
 		}
@@ -749,7 +749,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x2 := pdf.NewExtractor(w)
-		second, err := Extract(x2, nil, w.GetMeta().Trailer["Quir:E"], false)
+		second, err := Extract(pdf.CursorAt(x2, nil), w.GetMeta().Trailer["Quir:E"], false)
 		if err != nil {
 			t.Fatalf("second extract: %v", err)
 		}

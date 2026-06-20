@@ -158,7 +158,7 @@ func (g *generator) GenerateImage(predictor, colors, bpc int) error {
 	if err != nil {
 		return err
 	}
-	s, err := pdf.GetStream(page.RM.Out, ref)
+	s, err := pdf.NewCursor(page.RM.Out).Stream(ref)
 	if err != nil {
 		return err
 	}

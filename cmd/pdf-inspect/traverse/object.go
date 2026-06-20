@@ -44,7 +44,7 @@ func (c *objectCtx) Next() []Step {
 		var steps []Step
 
 		// Special case: @contents for Page objects
-		tp, err := pdf.GetName(c.r, x["Type"])
+		tp, err := pdf.NewCursor(c.r).Name(x["Type"])
 		if err == nil && tp == "Page" {
 			_, hasParent := x["Parent"]
 			_, hasContents := x["Contents"]
@@ -180,7 +180,7 @@ func (c *objectCtx) Next() []Step {
 				if c.r == nil {
 					return nil, errors.New("reader is nil, cannot decode stream")
 				}
-				decoded, err := pdf.DecodeStream(c.r, nil, x, 0)
+				decoded, err := pdf.NewCursor(c.r).StreamReader(x)
 				if err != nil {
 					return nil, err
 				}
@@ -233,7 +233,7 @@ func (c *objectCtx) Show() error {
 		}
 		fmt.Println()
 
-		if stmData, err := pdf.DecodeStream(c.r, nil, obj, 0); err == nil {
+		if stmData, err := pdf.NewCursor(c.r).StreamReader(obj); err == nil {
 			buf := make([]byte, 128)
 			n, err := stmData.Read(buf)
 			if err != nil && err != io.EOF {
@@ -314,23 +314,23 @@ func (c *objectCtx) explainSingleLine(obj pdf.Object) (string, error) {
 	switch obj := obj.(type) {
 	case *pdf.Stream:
 		var parts []string
-		tp, err := pdf.GetName(c.r, obj.Dict["Type"])
+		tp, err := pdf.NewCursor(c.r).Name(obj.Dict["Type"])
 		if err == nil {
 			parts = append(parts, string(tp)+" stream")
 		} else {
 			parts = append(parts, "stream")
 		}
-		length, err := pdf.GetInteger(c.r, obj.Dict["Length"])
+		length, err := pdf.NewCursor(c.r).Integer(obj.Dict["Length"])
 		if err == nil {
 			parts = append(parts, fmt.Sprintf("%d bytes", length))
 		}
 		ff, ok := obj.Dict["Filter"]
 		if ok {
-			if name, err := pdf.GetName(c.r, ff); err == nil {
+			if name, err := pdf.NewCursor(c.r).Name(ff); err == nil {
 				parts = append(parts, string(name))
-			} else if arr, err := pdf.GetArray(c.r, ff); err == nil {
+			} else if arr, err := pdf.NewCursor(c.r).Array(ff); err == nil {
 				for _, elem := range arr {
-					if name, err := pdf.GetName(c.r, elem); err == nil {
+					if name, err := pdf.NewCursor(c.r).Name(elem); err == nil {
 						parts = append(parts, string(name))
 					} else {
 						parts = append(parts, "???")
@@ -359,7 +359,7 @@ func (c *objectCtx) explainSingleLine(obj pdf.Object) (string, error) {
 			}
 			return "<<" + strings.Join(parts, " ") + ">>", nil
 		}
-		tp, err := pdf.GetName(c.r, obj["Type"])
+		tp, err := pdf.NewCursor(c.r).Name(obj["Type"])
 		if err == nil {
 			parts = append(parts, string(tp)+" dict")
 		} else {

@@ -39,7 +39,7 @@ func TestExtract(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := Extract(mock.Getter, tc.in)
+			got, err := Extract(pdf.NewCursor(mock.Getter), tc.in)
 			if err != nil {
 				t.Fatalf("Extract failed: %v", err)
 			}
@@ -52,7 +52,7 @@ func TestExtract(t *testing.T) {
 
 func TestExtractClampsRange(t *testing.T) {
 	// out-of-range components are clamped to 0.0 to 1.0
-	got, err := Extract(mock.Getter, pdf.Array{pdf.Number(-0.5), pdf.Number(0.5), pdf.Number(2)})
+	got, err := Extract(pdf.NewCursor(mock.Getter), pdf.Array{pdf.Number(-0.5), pdf.Number(0.5), pdf.Number(2)})
 	if err != nil {
 		t.Fatalf("Extract failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestExtractClampsRange(t *testing.T) {
 		t.Errorf("Extract mismatch (-want +got):\n%s", diff)
 	}
 
-	rgb, err := ExtractRGB(mock.Getter, pdf.Array{pdf.Number(5), pdf.Number(-1), pdf.Number(0.25)})
+	rgb, err := ExtractRGB(pdf.NewCursor(mock.Getter), pdf.Array{pdf.Number(5), pdf.Number(-1), pdf.Number(0.25)})
 	if err != nil {
 		t.Fatalf("ExtractRGB failed: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestEncodeRange(t *testing.T) {
 
 func TestExtractInvalidLength(t *testing.T) {
 	// a 2-element array is not a valid device colour
-	_, err := Extract(mock.Getter, pdf.Array{pdf.Number(0), pdf.Number(1)})
+	_, err := Extract(pdf.NewCursor(mock.Getter), pdf.Array{pdf.Number(0), pdf.Number(1)})
 	if err == nil {
 		t.Fatal("expected error for 2-element array")
 	}
@@ -93,7 +93,7 @@ func TestExtractInvalidLength(t *testing.T) {
 }
 
 func TestExtractRGB(t *testing.T) {
-	got, err := ExtractRGB(mock.Getter, pdf.Array{pdf.Number(1), pdf.Number(0), pdf.Number(0)})
+	got, err := ExtractRGB(pdf.NewCursor(mock.Getter), pdf.Array{pdf.Number(1), pdf.Number(0), pdf.Number(0)})
 	if err != nil {
 		t.Fatalf("ExtractRGB failed: %v", err)
 	}
@@ -101,13 +101,13 @@ func TestExtractRGB(t *testing.T) {
 		t.Errorf("ExtractRGB mismatch (-want +got):\n%s", diff)
 	}
 
-	if c, err := ExtractRGB(mock.Getter, nil); err != nil || c != nil {
+	if c, err := ExtractRGB(pdf.NewCursor(mock.Getter), nil); err != nil || c != nil {
 		t.Errorf("ExtractRGB(nil) = %v, %v; want nil, nil", c, err)
 	}
-	if c, err := ExtractRGB(mock.Getter, pdf.Array{}); err != nil || c != nil {
+	if c, err := ExtractRGB(pdf.NewCursor(mock.Getter), pdf.Array{}); err != nil || c != nil {
 		t.Errorf("ExtractRGB(empty) = %v, %v; want nil, nil", c, err)
 	}
-	if _, err := ExtractRGB(mock.Getter, pdf.Array{pdf.Number(1)}); err == nil {
+	if _, err := ExtractRGB(pdf.NewCursor(mock.Getter), pdf.Array{pdf.Number(1)}); err == nil {
 		t.Error("expected error for 1-element RGB array")
 	}
 }

@@ -54,9 +54,9 @@ var PDFDefaultBorder = &Border{Width: 1}
 // ExtractBorder extracts a Border from a PDF array.
 // If no border entry exists, returns the PDF default (solid border with width 1).
 // If no border is to be drawn, returns nil.
-func ExtractBorder(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Border, error) {
+func ExtractBorder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Border, error) {
 
-	border, err := pdf.Optional(x.GetArray(path, obj))
+	border, err := pdf.Optional(c.Array(obj))
 	if err != nil {
 		return nil, err
 	}
@@ -67,22 +67,22 @@ func ExtractBorder(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDir
 
 	b := &Border{}
 
-	if h, err := pdf.Optional(x.GetNumber(path, border[0])); err != nil {
+	if h, err := pdf.Optional(c.Number(border[0])); err != nil {
 		return nil, err
 	} else {
-		b.HCornerRadius = float64(h)
+		b.HCornerRadius = h
 	}
 
-	if v, err := pdf.Optional(x.GetNumber(path, border[1])); err != nil {
+	if v, err := pdf.Optional(c.Number(border[1])); err != nil {
 		return nil, err
 	} else {
-		b.VCornerRadius = float64(v)
+		b.VCornerRadius = v
 	}
 
-	if w, err := pdf.Optional(x.GetNumber(path, border[2])); err != nil {
+	if w, err := pdf.Optional(c.Number(border[2])); err != nil {
 		return nil, err
 	} else {
-		b.Width = float64(w)
+		b.Width = w
 	}
 
 	if b.Width <= 0 {
@@ -90,7 +90,7 @@ func ExtractBorder(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDir
 	}
 
 	if len(border) > 3 {
-		if dashArray, err := pdf.Optional(pdf.GetFloatArray(x.R, border[3])); err != nil {
+		if dashArray, err := pdf.Optional(c.FloatArray(border[3])); err != nil {
 			return nil, err
 		} else {
 			// filter out negative values

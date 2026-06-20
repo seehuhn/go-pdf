@@ -33,7 +33,7 @@ func TestCompositeWidthsValid(t *testing.T) {
 		pdf.Integer(1), pdf.Integer(3), pdf.Integer(500),
 		pdf.Integer(10), pdf.Array{pdf.Integer(700), pdf.Integer(800)},
 	}
-	got, err := decodeCompositeWidths(mock.Getter, w)
+	got, err := decodeCompositeWidths(pdf.NewCursor(mock.Getter), w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestCompositeWidthsValid(t *testing.T) {
 // the maximal valid range covers all 65536 CIDs and must be accepted
 func TestCompositeWidthsFullRange(t *testing.T) {
 	w := pdf.Array{pdf.Integer(0), pdf.Integer(65535), pdf.Integer(1000)}
-	got, err := decodeCompositeWidths(mock.Getter, w)
+	got, err := decodeCompositeWidths(pdf.NewCursor(mock.Getter), w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestCompositeWidthsBudgetBoundary(t *testing.T) {
 		pdf.Integer(0), pdf.Integer(32767), pdf.Integer(500),
 		pdf.Integer(32768), pdf.Integer(65535), pdf.Integer(600),
 	}
-	got, err := decodeCompositeWidths(mock.Getter, w)
+	got, err := decodeCompositeWidths(pdf.NewCursor(mock.Getter), w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestCompositeWidthsOverlapLastWins(t *testing.T) {
 		pdf.Integer(0), pdf.Integer(10), pdf.Integer(500),
 		pdf.Integer(5), pdf.Integer(15), pdf.Integer(600),
 	}
-	got, err := decodeCompositeWidths(mock.Getter, w)
+	got, err := decodeCompositeWidths(pdf.NewCursor(mock.Getter), w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestCompositeWidthsReject(t *testing.T) {
 	}
 	for name, w := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, err := decodeCompositeWidths(mock.Getter, w); err == nil {
+			if _, err := decodeCompositeWidths(pdf.NewCursor(mock.Getter), w); err == nil {
 				t.Error("expected error, got nil")
 			}
 		})
@@ -140,7 +140,7 @@ func TestVMetricsValid(t *testing.T) {
 		},
 		pdf.Integer(5), pdf.Integer(6), pdf.Integer(-900), pdf.Integer(300), pdf.Integer(800),
 	}
-	got, err := decodeVMetrics(mock.Getter, a)
+	got, err := decodeVMetrics(pdf.NewCursor(mock.Getter), a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestVMetricsFullRange(t *testing.T) {
 		pdf.Integer(0), pdf.Integer(65535),
 		pdf.Integer(-1000), pdf.Integer(0), pdf.Integer(880),
 	}
-	got, err := decodeVMetrics(mock.Getter, a)
+	got, err := decodeVMetrics(pdf.NewCursor(mock.Getter), a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestVMetricsReject(t *testing.T) {
 	}
 	for name, a := range cases {
 		t.Run(name, func(t *testing.T) {
-			if _, err := decodeVMetrics(mock.Getter, a); err == nil {
+			if _, err := decodeVMetrics(pdf.NewCursor(mock.Getter), a); err == nil {
 				t.Error("expected error, got nil")
 			}
 		})

@@ -109,12 +109,12 @@ func TestIndirectFilterWriteInlines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := pdf.GetStream(r, streamRef)
+	stream, err := pdf.NewCursor(r).Stream(streamRef)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// The wire form must carry a direct /Filter array — OpenStream
+	// The wire form must carry a direct /Filter array â OpenStream
 	// inlines the indirect reference rather than emitting it.
 	filterArr, ok := stream.Dict["Filter"].(pdf.Array)
 	if !ok {
@@ -124,7 +124,7 @@ func TestIndirectFilterWriteInlines(t *testing.T) {
 		t.Errorf("/Filter = %v, want [/Crypt /FlateDecode]", filterArr)
 	}
 
-	decoded, err := pdf.DecodeStream(r, nil, stream, 0)
+	decoded, err := pdf.DecodeStream(r, nil, stream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestIndirectFilterReadResolves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := pdf.GetStream(r, streamRef)
+	stream, err := pdf.NewCursor(r).Stream(streamRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestIndirectFilterReadResolves(t *testing.T) {
 	// so the read paths must resolve it to classify the stream.
 	stream.Dict["Filter"] = filterRef
 
-	decoded, err := pdf.DecodeStream(r, nil, stream, 0)
+	decoded, err := pdf.DecodeStream(r, nil, stream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestCopyInlinesIndirectFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Destination: a different encrypted PDF.  bytes.Buffer is fine —
+	// Destination: a different encrypted PDF.  bytes.Buffer is fine â
 	// the Copier inlines /Filter so the writer's cheap probe never
 	// needs to call Resolve on the destination.
 	dstBuf := &bytes.Buffer{}
@@ -307,7 +307,7 @@ func TestCopyInlinesIndirectFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dstStream, err := pdf.GetStream(dstR, dstStreamRef)
+	dstStream, err := pdf.NewCursor(dstR).Stream(dstStreamRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +321,7 @@ func TestCopyInlinesIndirectFilter(t *testing.T) {
 		t.Errorf("destination /Filter = %v, want [/Crypt /FlateDecode]", filterArr)
 	}
 
-	decoded, err := pdf.DecodeStream(dstR, nil, dstStream, 0)
+	decoded, err := pdf.DecodeStream(dstR, nil, dstStream)
 	if err != nil {
 		t.Fatal(err)
 	}

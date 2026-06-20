@@ -274,7 +274,7 @@ func TestExtractCMAP(t *testing.T) {
 
 	}
 
-	child, err := Extract(pdf.NewExtractor(data), nil, childRef, false)
+	child, err := Extract(pdf.NewCursor(data), childRef, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,12 +514,12 @@ func TestExtractPredefined(t *testing.T) {
 	for _, name := range names {
 		data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		t.Run(string(name), func(t *testing.T) {
-			info, err := Extract(pdf.NewExtractor(data), nil, name, false)
+			info, err := Extract(pdf.NewCursor(data), name, false)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if strings.HasSuffix(string(info.Name), "H") {
+			if strings.HasSuffix(info.Name, "H") {
 				if info.WMode != font.Horizontal {
 					t.Errorf("expected horizontal writing mode, got %v", info.WMode)
 				}
@@ -591,7 +591,7 @@ func TestExtractLoop(t *testing.T) {
 				}
 			}
 
-			info, err := pdf.ExtractorGet(pdf.NewExtractor(data), nil, refs[0], Extract)
+			info, err := pdf.Decode(pdf.NewCursor(data), refs[0], Extract)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -625,7 +625,7 @@ func TestEmbedCMap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info2, err := pdf.ExtractorGet(pdf.NewExtractor(data), nil, ref, ExtractToUnicode)
+	info2, err := pdf.Decode(pdf.NewCursor(data), ref, ExtractToUnicode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -689,7 +689,7 @@ func TestExtractCMapOversize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Extract(pdf.NewExtractor(w), nil, ref, false); err == nil {
+	if _, err := Extract(pdf.NewCursor(w), ref, false); err == nil {
 		t.Fatal("expected error for oversize CMap, got nil")
 	}
 }

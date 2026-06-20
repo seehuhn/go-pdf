@@ -67,8 +67,8 @@ func (a *ActualText) Equal(other List) bool {
 
 // ExtractActualText extracts an ActualText property list from a PDF object.
 // The dictionary must contain an ActualText key; otherwise an error is returned.
-func ExtractActualText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*ActualText, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractActualText(c pdf.Cursor, obj pdf.Object, isDirect bool) (*ActualText, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}

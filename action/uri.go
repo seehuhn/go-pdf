@@ -74,8 +74,8 @@ func (a *URI) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeURI(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*URI, error) {
-	uri, err := x.GetString(path, dict["URI"])
+func decodeURI(c pdf.Cursor, dict pdf.Dict) (*URI, error) {
+	uri, err := c.String(dict["URI"])
 	if err != nil {
 		return nil, err
 	}
@@ -83,9 +83,9 @@ func decodeURI(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*URI, err
 		return nil, pdf.Error("URI action: missing URI")
 	}
 
-	isMap, _ := pdf.Optional(x.GetBoolean(path, dict["IsMap"]))
+	isMap, _ := pdf.Optional(c.Boolean(dict["IsMap"]))
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

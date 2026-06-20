@@ -71,31 +71,36 @@ type Descriptor struct {
 	MissingWidth float64   // optional (default: 0), PDF glyph space units
 }
 
-// ExtractDescriptor extracts information from a FontDescriptor dictionary.
+// ExtractDescriptor decodes a FontDescriptor dictionary.
 //
-// If obj is nil, the function returns nil, nil.
+// If obj is nil or does not resolve to a FontDescriptor dictionary, the result
+// is nil.
 //
 // TODO(voss): be more robust against malformed FontDescriptor dictionaries.
-func ExtractDescriptor(r pdf.Getter, fontDescriptor pdf.Dict) (*Descriptor, error) {
+func ExtractDescriptor(c pdf.Cursor, obj pdf.Object, _ bool) (*Descriptor, error) {
+	fontDescriptor, err := c.DictTyped(obj, "FontDescriptor")
+	if err != nil {
+		return nil, err
+	}
 	if fontDescriptor == nil {
 		return nil, nil
 	}
 
 	res := &Descriptor{}
 
-	fontName, err := pdf.GetName(r, fontDescriptor["FontName"])
+	fontName, err := c.Name(fontDescriptor["FontName"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontName")
 	}
 	res.FontName = string(fontName)
 
-	fontFamily, err := pdf.GetString(r, fontDescriptor["FontFamily"])
+	fontFamily, err := c.String(fontDescriptor["FontFamily"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontFamily")
 	}
 	res.FontFamily = string(fontFamily)
 
-	fontStretch, err := pdf.GetName(r, fontDescriptor["FontStretch"])
+	fontStretch, err := c.Name(fontDescriptor["FontStretch"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontStretch")
 	}
@@ -120,15 +125,15 @@ func ExtractDescriptor(r pdf.Getter, fontDescriptor pdf.Dict) (*Descriptor, erro
 		res.FontStretch = os2.WidthUltraExpanded
 	}
 
-	fontWeight, err := pdf.GetNumber(r, fontDescriptor["FontWeight"])
+	fontWeight, err := c.Number(fontDescriptor["FontWeight"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontWeight")
 	}
 	if fontWeight >= 1 && fontWeight <= 1000 {
-		res.FontWeight = os2.Weight(math.Round(float64(fontWeight))).Rounded()
+		res.FontWeight = os2.Weight(math.Round(fontWeight)).Rounded()
 	}
 
-	flags, err := pdf.GetInteger(r, fontDescriptor["Flags"])
+	flags, err := c.Integer(fontDescriptor["Flags"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "Flags")
 	}
@@ -141,7 +146,7 @@ func ExtractDescriptor(r pdf.Getter, fontDescriptor pdf.Dict) (*Descriptor, erro
 	res.IsSmallCap = flags&flagSmallCap != 0
 	res.ForceBold = flags&flagForceBold != 0
 
-	fontBBox, err := pdf.GetRectangle(r, fontDescriptor["FontBBox"])
+	fontBBox, err := c.Rectangle(fontDescriptor["FontBBox"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontBBox")
 	}
@@ -154,75 +159,75 @@ func ExtractDescriptor(r pdf.Getter, fontDescriptor pdf.Dict) (*Descriptor, erro
 		}
 	}
 
-	italicAngle, err := pdf.GetNumber(r, fontDescriptor["ItalicAngle"])
+	italicAngle, err := c.Number(fontDescriptor["ItalicAngle"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "ItalicAngle")
 	}
-	res.ItalicAngle = float64(italicAngle)
+	res.ItalicAngle = italicAngle
 
-	ascent, err := pdf.GetNumber(r, fontDescriptor["Ascent"])
+	ascent, err := c.Number(fontDescriptor["Ascent"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "Ascent")
 	}
-	res.Ascent = float64(ascent)
+	res.Ascent = ascent
 
-	descent, err := pdf.GetNumber(r, fontDescriptor["Descent"])
+	descent, err := c.Number(fontDescriptor["Descent"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "Descent")
 	}
-	res.Descent = float64(descent)
+	res.Descent = descent
 
-	leading, err := pdf.GetNumber(r, fontDescriptor["Leading"])
+	leading, err := c.Number(fontDescriptor["Leading"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "Leading")
 	}
-	res.Leading = float64(leading)
+	res.Leading = leading
 
-	capHeight, err := pdf.GetNumber(r, fontDescriptor["CapHeight"])
+	capHeight, err := c.Number(fontDescriptor["CapHeight"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "CapHeight")
 	}
-	res.CapHeight = float64(capHeight)
+	res.CapHeight = capHeight
 
-	xHeight, err := pdf.GetNumber(r, fontDescriptor["XHeight"])
+	xHeight, err := c.Number(fontDescriptor["XHeight"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "XHeight")
 	}
-	res.XHeight = float64(xHeight)
+	res.XHeight = xHeight
 
 	if stemVObj, ok := fontDescriptor["StemV"]; ok {
-		stemV, err := pdf.GetNumber(r, stemVObj)
+		stemV, err := c.Number(stemVObj)
 		if err != nil {
 			return nil, pdf.Wrap(err, "StemV")
 		}
-		res.StemV = float64(stemV)
+		res.StemV = stemV
 	} else {
 		res.StemV = -1
 	}
 
-	stemH, err := pdf.GetNumber(r, fontDescriptor["StemH"])
+	stemH, err := c.Number(fontDescriptor["StemH"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "StemH")
 	}
-	res.StemH = float64(stemH)
+	res.StemH = stemH
 
-	maxWidth, err := pdf.GetNumber(r, fontDescriptor["MaxWidth"])
+	maxWidth, err := c.Number(fontDescriptor["MaxWidth"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "MaxWidth")
 	}
-	res.MaxWidth = float64(maxWidth)
+	res.MaxWidth = maxWidth
 
-	avgWidth, err := pdf.GetNumber(r, fontDescriptor["AvgWidth"])
+	avgWidth, err := c.Number(fontDescriptor["AvgWidth"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "AvgWidth")
 	}
-	res.AvgWidth = float64(avgWidth)
+	res.AvgWidth = avgWidth
 
-	missingWidth, err := pdf.GetNumber(r, fontDescriptor["MissingWidth"])
+	missingWidth, err := c.Number(fontDescriptor["MissingWidth"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "MissingWidth")
 	}
-	res.MissingWidth = float64(missingWidth)
+	res.MissingWidth = missingWidth
 
 	return res, nil
 }

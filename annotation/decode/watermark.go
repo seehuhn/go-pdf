@@ -21,19 +21,18 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeWatermark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Watermark, error) {
-	r := x.R
+func decodeWatermark(c pdf.Cursor, dict pdf.Dict) (*annotation.Watermark, error) {
 	watermark := &annotation.Watermark{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &watermark.Common, dict); err != nil {
+	if err := decodeCommon(c, &watermark.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract watermark-specific fields
 	// FixedPrint (optional)
 	if fixedPrintRef, ok := dict["FixedPrint"].(pdf.Reference); ok {
-		fixedPrintDict, err := pdf.GetDictTyped(r, fixedPrintRef, "FixedPrint")
+		fixedPrintDict, err := c.DictTyped(fixedPrintRef, "FixedPrint")
 		if err != nil {
 			return nil, err
 		}
@@ -41,11 +40,11 @@ func decodeWatermark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*an
 		fixedPrint := &annotation.FixedPrint{}
 
 		// Matrix (optional) - default to identity matrix
-		if matrix, err := pdf.GetArray(r, fixedPrintDict["Matrix"]); err == nil && len(matrix) == 6 {
+		if matrix, err := c.Array(fixedPrintDict["Matrix"]); err == nil && len(matrix) == 6 {
 			matrixValues := make([]float64, 6)
 			for i, val := range matrix {
-				if num, err := pdf.GetNumber(r, val); err == nil {
-					matrixValues[i] = float64(num)
+				if num, err := c.Number(val); err == nil {
+					matrixValues[i] = num
 				}
 			}
 			fixedPrint.Matrix = matrixValues
@@ -55,13 +54,13 @@ func decodeWatermark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*an
 		}
 
 		// H (optional) - default 0
-		if h, err := pdf.GetNumber(r, fixedPrintDict["H"]); err == nil {
-			fixedPrint.H = float64(h)
+		if h, err := c.Number(fixedPrintDict["H"]); err == nil {
+			fixedPrint.H = h
 		}
 
 		// V (optional) - default 0
-		if v, err := pdf.GetNumber(r, fixedPrintDict["V"]); err == nil {
-			fixedPrint.V = float64(v)
+		if v, err := c.Number(fixedPrintDict["V"]); err == nil {
+			fixedPrint.V = v
 		}
 
 		watermark.FixedPrint = fixedPrint

@@ -84,11 +84,11 @@ func TestResourceManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resources1, err := pdf.GetDict(r, dict1["Resources"])
+	resources1, err := pdf.NewCursor(r).Dict(dict1["Resources"])
 	if err != nil {
 		t.Fatal(err)
 	}
-	font1, err := pdf.GetDict(r, resources1["Font"])
+	font1, err := pdf.NewCursor(r).Dict(resources1["Font"])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,11 +97,11 @@ func TestResourceManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resources2, err := pdf.GetDict(r, dict2["Resources"])
+	resources2, err := pdf.NewCursor(r).Dict(dict2["Resources"])
 	if err != nil {
 		t.Fatal(err)
 	}
-	font2, err := pdf.GetDict(r, resources2["Font"])
+	font2, err := pdf.NewCursor(r).Dict(resources2["Font"])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestExtractorResolveCycle(t *testing.T) {
 
 	// use the writer as a getter and try to resolve the cycle
 	x := pdf.NewExtractor(w)
-	_, err = x.Resolve(nil, refA)
+	_, err = pdf.CursorAt(x, nil).Resolve(refA)
 	if err == nil {
 		t.Fatal("expected cycle error, got nil")
 	}
@@ -145,8 +145,8 @@ func TestExtractorResolveCycle(t *testing.T) {
 	}
 }
 
-// TestExtractorGetArrayCycle tests that Extractor.GetArray detects cycles.
-func TestExtractorGetArrayCycle(t *testing.T) {
+// TestCursorArrayCycle tests that Cursor.Array detects cycles.
+func TestCursorArrayCycle(t *testing.T) {
 	// create a PDF with a cycle in an array
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 
@@ -164,13 +164,13 @@ func TestExtractorGetArrayCycle(t *testing.T) {
 	// use the writer as a getter and try to resolve
 	x := pdf.NewExtractor(w)
 
-	extract := func(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pdf.Array, error) {
-		arr, err := x.GetArray(path, obj.AsPDF(0))
+	extract := func(c pdf.Cursor, obj pdf.Object, _ bool) (pdf.Array, error) {
+		arr, err := c.Array(obj.AsPDF(0))
 		if err != nil {
 			return nil, err
 		}
 		for i := range arr {
-			arr[i], err = x.Resolve(path, arr[i])
+			arr[i], err = c.Resolve(arr[i])
 			if err != nil {
 				return nil, err
 			}
@@ -178,7 +178,7 @@ func TestExtractorGetArrayCycle(t *testing.T) {
 		return arr, nil
 	}
 
-	_, err = pdf.ExtractorGet(x, nil, refA, extract)
+	_, err = pdf.Decode(pdf.CursorAt(x, nil), refA, extract)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}

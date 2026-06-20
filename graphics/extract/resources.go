@@ -27,8 +27,8 @@ import (
 )
 
 // Resources extracts a resource dictionary from a PDF file.
-func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*content.Resources, error) {
-	dict, err := x.GetDict(path, obj)
+func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -44,9 +44,9 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract ExtGState subdictionary
-	if extGStateDict, err := x.GetDict(path, dict["ExtGState"]); err == nil && extGStateDict != nil {
+	if extGStateDict, err := c.Dict(dict["ExtGState"]); err == nil && extGStateDict != nil {
 		for name, obj := range extGStateDict {
-			gs, err := pdf.ExtractorGet(x, path, obj, ExtGState)
+			gs, err := pdf.Decode(c, obj, ExtGState)
 			if err != nil {
 				continue // permissive
 			}
@@ -58,9 +58,9 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract ColorSpace subdictionary
-	if colorSpaceDict, err := x.GetDict(path, dict["ColorSpace"]); err == nil && colorSpaceDict != nil {
+	if colorSpaceDict, err := c.Dict(dict["ColorSpace"]); err == nil && colorSpaceDict != nil {
 		for name, obj := range colorSpaceDict {
-			cs, err := pdf.ExtractorGet(x, path, obj, ColorSpace)
+			cs, err := pdf.Decode(c, obj, ColorSpace)
 			if err != nil {
 				continue // permissive
 			}
@@ -72,9 +72,9 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract Pattern subdictionary
-	if patternDict, err := x.GetDict(path, dict["Pattern"]); err == nil && patternDict != nil {
+	if patternDict, err := c.Dict(dict["Pattern"]); err == nil && patternDict != nil {
 		for name, obj := range patternDict {
-			pat, err := pdf.ExtractorGet(x, path, obj, Pattern)
+			pat, err := pdf.Decode(c, obj, Pattern)
 			if err != nil {
 				continue // permissive
 			}
@@ -86,9 +86,9 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract Shading subdictionary
-	if shadingDict, err := x.GetDict(path, dict["Shading"]); err == nil && shadingDict != nil {
+	if shadingDict, err := c.Dict(dict["Shading"]); err == nil && shadingDict != nil {
 		for name, obj := range shadingDict {
-			sh, err := pdf.ExtractorGet(x, path, obj, Shading)
+			sh, err := pdf.Decode(c, obj, Shading)
 			if err != nil {
 				continue // permissive
 			}
@@ -100,9 +100,9 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract XObject subdictionary
-	if xobjectDict, err := x.GetDict(path, dict["XObject"]); err == nil && xobjectDict != nil {
+	if xobjectDict, err := c.Dict(dict["XObject"]); err == nil && xobjectDict != nil {
 		for name, obj := range xobjectDict {
-			xobj, err := pdf.ExtractorGet(x, path, obj, XObject)
+			xobj, err := pdf.Decode(c, obj, XObject)
 			if err != nil {
 				continue // permissive
 			}
@@ -114,9 +114,9 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract Font subdictionary
-	if fontDict, err := x.GetDict(path, dict["Font"]); err == nil && fontDict != nil {
+	if fontDict, err := c.Dict(dict["Font"]); err == nil && fontDict != nil {
 		for name, obj := range fontDict {
-			f, err := pdf.ExtractorGet(x, path, obj, Font)
+			f, err := pdf.Decode(c, obj, Font)
 			if err != nil {
 				continue // permissive
 			}
@@ -128,9 +128,9 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract Properties subdictionary
-	if propertiesDict, err := x.GetDict(path, dict["Properties"]); err == nil && propertiesDict != nil {
+	if propertiesDict, err := c.Dict(dict["Properties"]); err == nil && propertiesDict != nil {
 		for name, obj := range propertiesDict {
-			props, err := pdf.ExtractorGet(x, path, obj, property.ExtractList)
+			props, err := pdf.Decode(c, obj, property.ExtractList)
 			if err != nil {
 				continue // permissive
 			}
@@ -142,7 +142,7 @@ func Resources(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// extract ProcSet
-	if procSetArray, err := x.GetArray(path, dict["ProcSet"]); err == nil && procSetArray != nil {
+	if procSetArray, err := c.Array(dict["ProcSet"]); err == nil && procSetArray != nil {
 		for _, obj := range procSetArray {
 			name, ok := obj.(pdf.Name)
 			if !ok {

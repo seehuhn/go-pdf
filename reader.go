@@ -213,7 +213,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		}
 	}
 
-	catalogDict, err := GetDict(r, trailer["Root"])
+	catalogDict, err := NewCursor(r).Dict(trailer["Root"])
 	if err != nil {
 		err = Wrap(err, "document catalog")
 		if shouldExit(err) {
@@ -233,7 +233,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	}
 
 	x := NewExtractor(r)
-	r.meta.Catalog, err = ExtractorGet(x, nil, catalogDict, DecodeCatalog)
+	r.meta.Catalog, err = Decode(CursorAt(x, nil), catalogDict, DecodeCatalog)
 	if shouldExit(err) {
 		return nil, err
 	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
@@ -263,7 +263,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		r.meta.ID = nil
 	}
 
-	r.meta.Info, err = ExtractorGet(x, nil, trailer["Info"], ExtractInfo)
+	r.meta.Info, err = Decode(CursorAt(x, nil), trailer["Info"], ExtractInfo)
 	if shouldExit(err) {
 		return nil, err
 	}
@@ -427,7 +427,7 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc
 }
 
 func (r *Reader) getID(obj Object) ([][]byte, error) {
-	arr, err := GetArray(r, obj)
+	arr, err := NewCursor(r).Array(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +438,7 @@ func (r *Reader) getID(obj Object) ([][]byte, error) {
 	}
 	id := make([][]byte, 2)
 	for i, obj := range arr {
-		s, err := GetString(r, obj)
+		s, err := NewCursor(r).String(obj)
 		if err != nil {
 			return nil, err
 		}
@@ -499,7 +499,7 @@ func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *
 		enc = nil
 	}
 
-	decoded, err := DecodeStream(r, nil, stream, 0)
+	decoded, err := DecodeStream(r, nil, stream)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +558,7 @@ func safeGetInteger(r Getter, canObjStm bool) getIntFn {
 			return x, nil
 		}
 		if canObjStm {
-			return GetInteger(r, obj)
+			return getInteger(r, obj)
 		}
 		return getIntegerNoObjStm(r, obj)
 	}

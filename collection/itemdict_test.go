@@ -151,7 +151,7 @@ func roundTripTest(t *testing.T, version pdf.Version, item1 *ItemDict) {
 		t.Fatal("missing test object")
 	}
 
-	item2, err := pdf.ExtractorGet(x, nil, objFromTrailer, ExtractItemDict)
+	item2, err := pdf.Decode(pdf.CursorAt(x, nil), objFromTrailer, ExtractItemDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +218,7 @@ func TestExtractItemDictMalformed(t *testing.T) {
 		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 		x := pdf.NewExtractor(w)
 
-		_, err := ExtractItemDict(x, nil, nil, false)
+		_, err := ExtractItemDict(pdf.CursorAt(x, nil), nil, false)
 		if err == nil {
 			t.Error("expected error for missing dictionary, got nil")
 		}
@@ -233,7 +233,7 @@ func TestExtractItemDictMalformed(t *testing.T) {
 			"Key":  pdf.TextString("value"),
 		}
 
-		_, err := ExtractItemDict(x, nil, dict, false)
+		_, err := ExtractItemDict(pdf.CursorAt(x, nil), dict, false)
 		if err == nil {
 			t.Error("expected error for wrong type, got nil")
 		}
@@ -284,7 +284,7 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		item1, err := pdf.ExtractorGet(x, nil, objPDF, ExtractItemDict)
+		item1, err := pdf.Decode(pdf.CursorAt(x, nil), objPDF, ExtractItemDict)
 		if err != nil {
 			t.Skip("malformed collection item")
 		}

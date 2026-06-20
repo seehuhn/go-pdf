@@ -95,17 +95,18 @@ func LoadFigure(fname string) (graphics.XObject, *pdf.Rectangle, error) {
 		return nil, nil, err
 	}
 
+	c := pdf.NewCursor(r)
 	cropBox := pageDict["CropBox"]
 	if cropBox == nil {
 		cropBox = pageDict["MediaBox"]
 	}
-	bbox, err := pdf.GetRectangle(r, cropBox)
+	bbox, err := c.Rectangle(cropBox)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	x := pdf.NewExtractor(r)
-	pg, err := pdf.ExtractorGet(x, nil, pageDict, pdfpage.Decode)
+	pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageDict, pdfpage.Decode)
 	if err != nil {
 		return nil, nil, err
 	}

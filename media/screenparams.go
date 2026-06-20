@@ -111,8 +111,8 @@ func (s *MediaScreenEntries) isEmpty() bool {
 }
 
 // ExtractMediaScreenParameters reads a media screen parameters dictionary.
-func ExtractMediaScreenParameters(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*MediaScreenParameters, error) {
-	dict, err := x.GetDictTyped(path, obj, "MediaScreenParams")
+func ExtractMediaScreenParameters(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaScreenParameters, error) {
+	dict, err := c.DictTyped(obj, "MediaScreenParams")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -120,18 +120,18 @@ func ExtractMediaScreenParameters(x *pdf.Extractor, path *pdf.CycleCheck, obj pd
 	}
 
 	s := &MediaScreenParameters{SingleUse: isDirect}
-	if s.MustHonour, err = extractScreenEntries(x, path, dict["MH"]); err != nil {
+	if s.MustHonour, err = extractScreenEntries(c, dict["MH"]); err != nil {
 		return nil, err
 	}
-	if s.BestEffort, err = extractScreenEntries(x, path, dict["BE"]); err != nil {
+	if s.BestEffort, err = extractScreenEntries(c, dict["BE"]); err != nil {
 		return nil, err
 	}
 
 	return s, nil
 }
 
-func extractScreenEntries(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*MediaScreenEntries, error) {
-	dict, err := pdf.Optional(x.GetDict(path, obj))
+func extractScreenEntries(c pdf.Cursor, obj pdf.Object) (*MediaScreenEntries, error) {
+	dict, err := pdf.Optional(c.Dict(obj))
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -141,30 +141,30 @@ func extractScreenEntries(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 	s := &MediaScreenEntries{}
 
 	if dict["W"] != nil {
-		if w, err := pdf.Optional(x.GetInteger(path, dict["W"])); err != nil {
+		if w, err := pdf.Optional(c.Integer(dict["W"])); err != nil {
 			return nil, err
 		} else {
 			s.Window = windowTypeFromPDF(w)
 		}
 	}
-	if b, err := pdf.Optional(pdf.GetFloatArray(x.R, dict["B"])); err != nil {
+	if b, err := pdf.Optional(c.FloatArray(dict["B"])); err != nil {
 		return nil, err
 	} else if len(b) == 3 && inUnitRange(b) {
 		s.Background = b
 	}
 	if dict["O"] != nil {
-		if o, err := pdf.Optional(x.GetNumber(path, dict["O"])); err != nil {
+		if o, err := pdf.Optional(c.Number(dict["O"])); err != nil {
 			return nil, err
 		} else if o >= 0 && o <= 1 {
-			s.Opacity.Set(float64(o))
+			s.Opacity.Set(o)
 		}
 	}
-	if m, err := pdf.Optional(x.GetInteger(path, dict["M"])); err != nil {
+	if m, err := pdf.Optional(c.Integer(dict["M"])); err != nil {
 		return nil, err
 	} else if MonitorSpecifier(m).isValid() {
 		s.Monitor = MonitorSpecifier(m)
 	}
-	if f, err := pdf.ExtractorGetOptional(x, path, dict["F"], ExtractFloatingWindowParameters); err != nil {
+	if f, err := pdf.DecodeOptional(c, dict["F"], ExtractFloatingWindowParameters); err != nil {
 		return nil, err
 	} else {
 		s.FloatingWindow = f

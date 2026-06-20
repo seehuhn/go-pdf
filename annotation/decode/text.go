@@ -21,24 +21,24 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Text, error) {
+func decodeText(c pdf.Cursor, dict pdf.Dict) (*annotation.Text, error) {
 	text := &annotation.Text{}
 
-	if err := decodeCommon(x, path, &text.Common, dict); err != nil {
+	if err := decodeCommon(c, &text.Common, dict); err != nil {
 		return nil, err
 	}
 
-	if err := decodeMarkup(x, path, dict, &text.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &text.Markup); err != nil {
 		return nil, err
 	}
 
-	if open, err := pdf.Optional(x.GetBoolean(path, dict["Open"])); err != nil {
+	if open, err := pdf.Optional(c.Boolean(dict["Open"])); err != nil {
 		return nil, err
 	} else {
 		text.Open = bool(open)
 	}
 
-	if name, err := pdf.Optional(x.GetName(path, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(c.Name(dict["Name"])); err != nil {
 		return nil, err
 	} else if name != "" {
 		text.Icon = annotation.TextIcon(name)
@@ -46,7 +46,7 @@ func decodeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotat
 		text.Icon = annotation.TextIconNote
 	}
 
-	stateModel, err := pdf.Optional(pdf.GetTextString(x.R, dict["StateModel"]))
+	stateModel, err := pdf.Optional(c.TextString(dict["StateModel"]))
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func decodeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotat
 		text.State = annotation.TextStateNone
 	}
 
-	state, err := pdf.Optional(pdf.GetTextString(x.R, dict["State"]))
+	state, err := pdf.Optional(c.TextString(dict["State"]))
 	if err != nil {
 		return nil, err
 	}

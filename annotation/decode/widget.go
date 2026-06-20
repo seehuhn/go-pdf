@@ -27,40 +27,40 @@ import (
 // decodeWidgetBody decodes the annotation-level half of a widget dictionary (the
 // entries that pertain to a widget annotation, not to a form field). It never
 // sets Parent: the field tree owns that linkage.
-func decodeWidgetBody(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Widget, error) {
+func decodeWidgetBody(c pdf.Cursor, dict pdf.Dict) (*annotation.Widget, error) {
 	widget := &annotation.Widget{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &widget.Common, dict); err != nil {
+	if err := decodeCommon(c, &widget.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// H (optional)
-	widget.Highlight = decodeHighlight(x, path, dict["H"])
+	widget.Highlight = decodeHighlight(c, dict["H"])
 
 	// MK (optional)
-	if mk, err := pdf.ExtractorGetOptional(x, path, dict["MK"], appearance.ExtractCharacteristics); err != nil {
+	if mk, err := pdf.DecodeOptional(c, dict["MK"], appearance.ExtractCharacteristics); err != nil {
 		return nil, err
 	} else {
 		widget.MK = mk
 	}
 
 	// A (optional)
-	if a, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode); err != nil {
+	if a, err := pdf.DecodeOptional(c, dict["A"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		widget.Action = a
 	}
 
 	// AA (optional)
-	if aa, err := pdf.ExtractorGetOptional(x, path, dict["AA"], triggers.DecodeAnnotation); err != nil {
+	if aa, err := pdf.DecodeOptional(c, dict["AA"], triggers.DecodeAnnotation); err != nil {
 		return nil, err
 	} else {
 		widget.AA = aa
 	}
 
 	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		widget.BorderStyle = bs

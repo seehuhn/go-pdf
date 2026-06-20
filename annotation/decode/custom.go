@@ -21,26 +21,25 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeCustom(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Custom, error) {
-	r := x.R
-	subtype, err := pdf.GetName(r, dict["Subtype"])
+func decodeCustom(c pdf.Cursor, dict pdf.Dict) (*annotation.Custom, error) {
+	subtype, err := c.Name(dict["Subtype"])
 	if err != nil {
 		return nil, err
 	} else if subtype == "" {
 		return nil, pdf.Error("missing annotation subtype")
 	}
 
-	c := &annotation.Custom{
+	cust := &annotation.Custom{
 		Type: subtype,
 		Data: dict,
 	}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &c.Common, dict); err != nil {
+	if err := decodeCommon(c, &cust.Common, dict); err != nil {
 		return nil, err
 	}
 
-	// Remove the entries for c.Common from the Data dict.
+	// Remove the entries for cust.Common from the Data dict.
 	all := []pdf.Name{
 		"Type",
 		"Subtype",
@@ -63,8 +62,8 @@ func decodeCustom(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annot
 		"Lang",
 	}
 	for _, key := range all {
-		delete(c.Data, key)
+		delete(cust.Data, key)
 	}
 
-	return c, nil
+	return cust, nil
 }

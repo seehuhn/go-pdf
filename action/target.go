@@ -154,19 +154,19 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 
 // DecodeTarget reads a target dictionary from a PDF object.
 //
-// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func DecodeTarget(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Target, error) {
+func DecodeTarget(c pdf.Cursor, obj pdf.Object, _ bool) (Target, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
-	dict, err := x.GetDict(path, obj)
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	relationship, err := x.GetName(path, dict["R"])
+	relationship, err := c.Name(dict["R"])
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func DecodeTarget(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 	// recursively decode nested target
 	var next Target
 	if dict["T"] != nil {
-		next, err = pdf.ExtractorGet(x, path, dict["T"], DecodeTarget)
+		next, err = pdf.Decode(c, dict["T"], DecodeTarget)
 		if err != nil {
 			return nil, err
 		}
@@ -188,7 +188,7 @@ func DecodeTarget(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool
 
 	case "C":
 		// check if it's named or annotation-based
-		if name, _ := x.GetString(path, dict["N"]); name != nil {
+		if name, _ := c.String(dict["N"]); name != nil {
 			return &TargetNamedChild{
 				Name: name,
 				Next: next,

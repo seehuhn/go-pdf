@@ -49,7 +49,7 @@ func rootDicts(t *testing.T, w *pdf.Writer, form pdf.Dict) []pdf.Dict {
 	}
 	dicts := make([]pdf.Dict, len(arr))
 	for i, ref := range arr {
-		d, err := pdf.GetDict(w, ref)
+		d, err := pdf.NewCursor(w).Dict(ref)
 		if err != nil {
 			t.Fatalf("read field %d: %v", i, err)
 		}
@@ -66,7 +66,7 @@ func kidDicts(t *testing.T, w *pdf.Writer, group pdf.Dict) []pdf.Dict {
 	}
 	dicts := make([]pdf.Dict, len(arr))
 	for i, ref := range arr {
-		d, err := pdf.GetDict(w, ref)
+		d, err := pdf.NewCursor(w).Dict(ref)
 		if err != nil {
 			t.Fatalf("read kid %d: %v", i, err)
 		}
@@ -98,7 +98,7 @@ func TestFactorHoistUnanimous(t *testing.T) {
 	if group["FT"] != pdf.Name("Tx") {
 		t.Errorf("group FT = %v, want Tx", group["FT"])
 	}
-	if s, _ := pdf.GetString(w, group["DA"]); string(s) != "/Helv 12 Tf" {
+	if s, _ := pdf.NewCursor(w).String(group["DA"]); string(s) != "/Helv 12 Tf" {
 		t.Errorf("group DA = %v, want hoisted value", group["DA"])
 	}
 	for i, kid := range kidDicts(t, w, group) {
@@ -121,7 +121,7 @@ func TestFactorHoistFormDA(t *testing.T) {
 	form := &InteractiveForm{Fields: []TreeNode{mk("a"), mk("b")}}
 	w, dict := encodeForm(t, form)
 
-	if s, _ := pdf.GetString(w, dict["DA"]); string(s) != "/Helv 0 Tf" {
+	if s, _ := pdf.NewCursor(w).String(dict["DA"]); string(s) != "/Helv 0 Tf" {
 		t.Errorf("form DA = %v, want hoisted value", dict["DA"])
 	}
 	for i, root := range rootDicts(t, w, dict) {
@@ -172,7 +172,7 @@ func TestFactorFlagsOverride(t *testing.T) {
 	w, dict := encodeForm(t, form)
 	group := rootDicts(t, w, dict)[0]
 
-	if ff, _ := pdf.GetInteger(w, group["Ff"]); ff != pdf.Integer(FieldReadOnly) {
+	if ff, _ := pdf.NewCursor(w).Integer(group["Ff"]); ff != pdf.Integer(FieldReadOnly) {
 		t.Errorf("group Ff = %v, want %d", group["Ff"], FieldReadOnly)
 	}
 	kids := kidDicts(t, w, group)

@@ -28,10 +28,10 @@ import (
 // should be the value of the AcroForm entry in the document catalog. It returns
 // nil if obj is nil.
 //
-// Always invoke this via [pdf.ExtractorGet] so that the form dictionary's
+// Always invoke this via [pdf.Decode] so that the form dictionary's
 // reference is resolved and cached.
-func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acroform.InteractiveForm, error) {
-	dict, err := x.GetDict(path, obj)
+func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.InteractiveForm, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -42,30 +42,30 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 
 	// the document-wide /DA and /Q defaults seed field-attribute inheritance,
 	// which the decoder flattens away; the values are not kept on the form
-	da, _ := pdf.Optional(x.GetString(path, dict["DA"]))
+	da, _ := pdf.Optional(c.String(dict["DA"]))
 	var q pdf.TextAlign
-	if v, err := pdf.Optional(x.GetInteger(path, dict["Q"])); err == nil && v >= 0 && v <= 2 {
+	if v, err := pdf.Optional(c.Integer(dict["Q"])); err == nil && v >= 0 && v <= 2 {
 		q = pdf.TextAlign(v)
 	}
 	rootCtx := inherited{da: string(da), q: q}
 
 	// Fields (required)
 	d := newFieldTreeDecoder()
-	if fields, err := d.decodeRoots(x, path, dict["Fields"], rootCtx); err != nil {
+	if fields, err := d.decodeRoots(c, dict["Fields"], rootCtx); err != nil {
 		return nil, err
 	} else {
 		form.Fields = fields
 	}
 
 	// NeedAppearances (optional)
-	if na, err := pdf.Optional(x.GetBoolean(path, dict["NeedAppearances"])); err != nil {
+	if na, err := pdf.Optional(c.Boolean(dict["NeedAppearances"])); err != nil {
 		return nil, err
 	} else {
 		form.NeedAppearances = bool(na)
 	}
 
 	// SigFlags (optional)
-	if sf, err := pdf.Optional(x.GetInteger(path, dict["SigFlags"])); err != nil {
+	if sf, err := pdf.Optional(c.Integer(dict["SigFlags"])); err != nil {
 		return nil, err
 	} else {
 		form.SigFlags = acroform.SignatureFlags(sf)
@@ -73,7 +73,7 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 
 	// CO (optional); each entry resolves to a field already in the tree, so the
 	// same field value is shared with the Fields tree
-	if co, err := decodeCalculationOrder(x, path, dict["CO"], d); err != nil {
+	if co, err := decodeCalculationOrder(c, dict["CO"], d); err != nil {
 		return nil, err
 	} else {
 		form.CalculationOrder = co
@@ -81,7 +81,7 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 
 	// DR (optional)
 	if drObj := dict["DR"]; drObj != nil {
-		if dr, err := pdf.Optional(pdf.ExtractorGet(x, path, drObj, extract.Resources)); err != nil {
+		if dr, err := pdf.Optional(pdf.Decode(c, drObj, extract.Resources)); err != nil {
 			return nil, err
 		} else {
 			form.DefaultResources = dr
@@ -97,8 +97,8 @@ func Form(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*acro
 // decodeCalculationOrder decodes the /CO array into the fields it names,
 // resolving each reference against the fields already decoded from the tree and
 // dropping any that names a field not in the tree.
-func decodeCalculationOrder(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, d *fieldTreeDecoder) ([]acroform.Field, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
+func decodeCalculationOrder(c pdf.Cursor, obj pdf.Object, d *fieldTreeDecoder) ([]acroform.Field, error) {
+	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil {
 		return nil, err
 	}

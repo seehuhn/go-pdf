@@ -84,7 +84,7 @@ func TestRead(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, nil, ref, false)
+	form1, err := extract.Form(pdf.CursorAt(x1, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestRead(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, nil, ref2, false)
+	form2, err := extract.Form(pdf.CursorAt(x2, nil), ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, nil, ref, false)
+	form1, err := extract.Form(pdf.CursorAt(x1, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, nil, ref2, false)
+	form2, err := extract.Form(pdf.CursorAt(x2, nil), ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestFormWithPtData(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, nil, ref, false)
+	form1, err := extract.Form(pdf.CursorAt(x1, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestFormWithPtData(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, nil, ref2, false)
+	form2, err := extract.Form(pdf.CursorAt(x2, nil), ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, nil, ref, false)
+	form1, err := extract.Form(pdf.CursorAt(x1, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,7 +348,7 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, nil, ref2, false)
+	form2, err := extract.Form(pdf.CursorAt(x2, nil), ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +375,7 @@ func roundTripForm(t *testing.T, version pdf.Version, f *form.Form) *form.Form {
 		t.Fatal(err)
 	}
 	x := pdf.NewExtractor(writer)
-	got, err := extract.Form(x, nil, ref, false)
+	got, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,11 +451,11 @@ func writeRawForm(t *testing.T, version pdf.Version, withResources bool) (*pdf.W
 
 // TestExtractFormPre20MissingResources verifies that a pre-2.0 form XObject
 // without a /Resources entry extracts with Res == nil, allowing the renderer
-// to inherit from the page (PDF 2.0 §7.8.3 Note 3).
+// to inherit from the page (PDF 2.0 Â§7.8.3 Note 3).
 func TestExtractFormPre20MissingResources(t *testing.T) {
 	writer, ref := writeRawForm(t, pdf.V1_7, false)
 	x := pdf.NewExtractor(writer)
-	f, err := extract.Form(x, nil, ref, false)
+	f, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +470,7 @@ func TestExtractFormPre20MissingResources(t *testing.T) {
 func TestExtractForm20MissingResources(t *testing.T) {
 	writer, ref := writeRawForm(t, pdf.V2_0, false)
 	x := pdf.NewExtractor(writer)
-	f, err := extract.Form(x, nil, ref, false)
+	f, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +486,7 @@ func TestExtractFormEmptyResources(t *testing.T) {
 		t.Run(v.String(), func(t *testing.T) {
 			writer, ref := writeRawForm(t, v, true)
 			x := pdf.NewExtractor(writer)
-			f, err := extract.Form(x, nil, ref, false)
+			f, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -535,7 +535,7 @@ func TestEmbedNilResOmitsResources17(t *testing.T) {
 	}
 
 	// verify the written dict has no /Resources entry
-	stm, err := pdf.GetStream(writer, ref)
+	stm, err := pdf.NewCursor(writer).Stream(ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +545,7 @@ func TestEmbedNilResOmitsResources17(t *testing.T) {
 
 	// round trip
 	x := pdf.NewExtractor(writer)
-	f2, err := extract.Form(x, nil, ref, false)
+	f2, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -595,7 +595,7 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 	}
 
 	x1 := pdf.NewExtractor(writer1)
-	form1, err := extract.Form(x1, nil, ref, false)
+	form1, err := extract.Form(pdf.CursorAt(x1, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -636,7 +636,7 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(writer2)
-	form2, err := extract.Form(x2, nil, ref2, false)
+	form2, err := extract.Form(pdf.CursorAt(x2, nil), ref2, false)
 	if err != nil {
 		t.Fatal(err)
 	}

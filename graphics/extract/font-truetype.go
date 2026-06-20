@@ -32,8 +32,8 @@ import (
 )
 
 // extractFontTrueType reads a TrueType font dictionary from a PDF file.
-func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*dict.TrueType, error) {
-	fontDict, err := x.GetDictTyped(path, obj, "Font")
+func extractFontTrueType(c pdf.Cursor, obj pdf.Object) (*dict.TrueType, error) {
+	fontDict, err := c.DictTyped(obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -41,7 +41,7 @@ func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := x.GetName(path, fontDict["Subtype"])
+	subtype, err := c.Name(fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 
 	d := &dict.TrueType{}
 
-	baseFont, err := x.GetName(path, fontDict["BaseFont"])
+	baseFont, err := c.Name(fontDict["BaseFont"])
 	if err != nil {
 		return nil, err
 	}
@@ -62,18 +62,21 @@ func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		d.PostScriptName = string(baseFont)
 	}
 
-	d.Name, _ = x.GetName(path, fontDict["Name"])
+	d.Name, _ = c.Name(fontDict["Name"])
 
 	// StdInfo will be non-nil, if the PostScript name indicates one of the
 	// standard 14 fonts. In this case, we use the corresponding metrics as
 	// default values, in case they are missing from the font dictionary.
 	stdInfo := stdmtx.Metrics[d.PostScriptName]
 
-	fdDict, err := x.GetDictTyped(path, fontDict["FontDescriptor"], "FontDescriptor")
+	fdDict, err := c.DictTyped(fontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
 		return nil, err
 	}
-	fd, _ := font.ExtractDescriptor(x.R, fdDict)
+	fd, err := pdf.DecodeOptional(c, fdDict, font.ExtractDescriptor)
+	if err != nil {
+		return nil, err
+	}
 	if fd == nil && stdInfo != nil {
 		fd = &font.Descriptor{
 			FontName:     d.PostScriptName,
@@ -98,9 +101,9 @@ func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 	d.Descriptor = fd
 
 	for _, key := range []pdf.Name{"FontFile2", "FontFile3"} {
-		if fontFile, err := pdf.ExtractorGetOptional(x, path, fdDict[key],
-			func(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
-				return glyphdata.ExtractStream(x, path, obj, "TrueType", key)
+		if fontFile, err := pdf.DecodeOptional(c, fdDict[key],
+			func(c pdf.Cursor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
+				return glyphdata.ExtractStream(c, obj, "TrueType", key)
 			}); err != nil {
 			return nil, err
 		} else if fontFile != nil {
@@ -112,7 +115,7 @@ func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 	isNonSymbolic := fd != nil && !fd.IsSymbolic
 	isExternal := d.FontFile == nil
 	nonSymbolicExt := isNonSymbolic && isExternal
-	enc, err := encoding.ExtractSimple(x.R, fontDict["Encoding"], nonSymbolicExt)
+	enc, err := encoding.ExtractSimple(c, fontDict["Encoding"], nonSymbolicExt)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +125,7 @@ func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 	if fd != nil {
 		defaultWidth = fd.MissingWidth
 	}
-	if !getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth) && stdInfo != nil {
+	if !getSimpleWidths(d.Width[:], c, fontDict, defaultWidth) && stdInfo != nil {
 		for c := range 256 {
 			w, ok := stdInfo.Width[enc(byte(c))]
 			if !ok {
@@ -132,9 +135,9 @@ func extractFontTrueType(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		}
 	}
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, path, fontDict["ToUnicode"], false)
+	d.ToUnicode, _ = pdf.Decode(c, fontDict["ToUnicode"], cmap.ExtractToUnicode)
 
-	repairTrueType(d, x.R)
+	repairTrueType(d, c.Getter())
 
 	return d, nil
 }

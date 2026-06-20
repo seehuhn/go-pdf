@@ -698,7 +698,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 
 	// Extract the data back
 	x := pdf.NewExtractor(w)
-	decoded, err := ExtractDict(x, nil, ref, false)
+	decoded, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatalf("failed to extract Dict: %v", err)
 	}
@@ -843,7 +843,7 @@ func FuzzDictRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := ExtractDict(x, nil, objPDF, false)
+		objGo, err := ExtractDict(pdf.CursorAt(x, nil), objPDF, false)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}
@@ -887,7 +887,7 @@ func TestExtractDictDecodedFloat64Oversize(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := ExtractDict(x, nil, ref, false); err == nil {
+	if _, err := ExtractDict(pdf.CursorAt(x, nil), ref, false); err == nil {
 		t.Fatal("expected error for float64-oversize image dict, got nil")
 	}
 }
@@ -956,7 +956,7 @@ func TestExtractDictTooManyAlternates(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			img, err := ExtractDict(x, nil, ref, false)
+			img, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
 			if err != nil {
 				t.Fatalf("ExtractDict failed: %v", err)
 			}
@@ -1031,7 +1031,7 @@ func TestExtractMaskTooManyAlternates(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			mask, err := ExtractMask(x, nil, ref, false)
+			mask, err := ExtractMask(pdf.CursorAt(x, nil), ref, false)
 			if err != nil {
 				t.Fatalf("ExtractMask failed: %v", err)
 			}
@@ -1099,7 +1099,7 @@ func TestExtractDictTooManyAssociatedFiles(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			img, err := ExtractDict(x, nil, ref, false)
+			img, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
 			if err != nil {
 				t.Fatalf("ExtractDict failed: %v", err)
 			}
@@ -1163,7 +1163,7 @@ func TestExtractMaskTooManyAssociatedFiles(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			mask, err := ExtractMask(x, nil, ref, false)
+			mask, err := ExtractMask(pdf.CursorAt(x, nil), ref, false)
 			if err != nil {
 				t.Fatalf("ExtractMask failed: %v", err)
 			}
@@ -1206,7 +1206,7 @@ func writeJPXImage(t *testing.T, version pdf.Version, extras pdf.Dict) (*Dict, e
 		t.Fatal(err)
 	}
 	x := pdf.NewExtractor(w)
-	return ExtractDict(x, nil, ref, false)
+	return ExtractDict(pdf.CursorAt(x, nil), ref, false)
 }
 
 // TestExtractDictJPXNoColorSpace covers a JPXDecode image XObject
@@ -1392,7 +1392,7 @@ func extractRGBImageWithDecode(t *testing.T, decode pdf.Array) *Dict {
 		t.Fatal(err)
 	}
 	x := pdf.NewExtractor(w)
-	img, err := ExtractDict(x, nil, ref, false)
+	img, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1423,7 +1423,7 @@ func TestDictJPXRoundTrip(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w2)
-	got, err := ExtractDict(x, nil, ref, false)
+	got, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatalf("ExtractDict: %v", err)
 	}
@@ -1513,7 +1513,7 @@ func TestExtractDictJPXOversizePixels(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := ExtractDict(x, nil, ref, false); err == nil {
+	if _, err := ExtractDict(pdf.CursorAt(x, nil), ref, false); err == nil {
 		t.Fatal("expected error for oversize JPX image dict, got nil")
 	}
 }
@@ -1564,7 +1564,7 @@ func TestExtractDictDCTDimensionMismatch(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	img, err := ExtractDict(x, nil, ref, false)
+	img, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

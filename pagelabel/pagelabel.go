@@ -156,6 +156,7 @@ func New(entries iter.Seq2[int, Range]) (*Labels, error) {
 
 // Extract reads page labels from a PDF PageLabels number tree object.
 func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
+	c := pdf.NewCursor(r)
 	tree, err := numtree.ExtractInMemory(r, obj)
 	if err != nil {
 		return nil, err
@@ -175,7 +176,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 			},
 		}
 
-		dict, err := pdf.GetDict(r, val)
+		dict, err := c.Dict(val)
 		if err != nil {
 			return nil, err
 		}
@@ -184,19 +185,19 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 			continue
 		}
 
-		s, err := pdf.GetName(r, dict["S"])
+		s, err := c.Name(dict["S"])
 		if err == nil && s != "" {
 			if style, ok := pdfNameToStyle[s]; ok {
 				lr.Style = style
 			}
 		}
 
-		p, err := pdf.GetTextString(r, dict["P"])
+		p, err := c.TextString(dict["P"])
 		if err == nil {
 			lr.Prefix = string(p)
 		}
 
-		st, err := pdf.GetInteger(r, dict["St"])
+		st, err := c.Integer(dict["St"])
 		if err == nil && st >= 1 {
 			lr.Start = int(st)
 		}

@@ -90,9 +90,9 @@ func (r Range) String() string {
 // Extract extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
 // Cycle detection for recursive parent CMap chains is handled by routing
-// parent extraction through [pdf.ExtractorGet].
-func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*File, error) {
-	resolved, err := pdf.Resolve(x.R, obj)
+// parent extraction through [pdf.Decode].
+func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*File, error) {
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -106,12 +106,12 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*F
 	case *pdf.Stream:
 		dict = obj.Dict
 
-		err := pdf.CheckDictType(x.R, dict, "CMap")
+		err := c.CheckDictType(dict, "CMap")
 		if err != nil {
 			return nil, err
 		}
 
-		data, err := pdf.ReadAll(x.R, path, obj, limits.MaxCMapBytes)
+		data, err := c.ReadAll(obj, limits.MaxCMapBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -127,21 +127,21 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*F
 		return nil, err
 	}
 
-	if name, _ := x.GetName(path, dict["CMapName"]); name != "" {
+	if name, _ := c.Name(dict["CMapName"]); name != "" {
 		if clean := sanitizeName(string(name)); clean != "" {
 			res.Name = clean
 		}
 	}
-	if ros, _ := font.ExtractCIDSystemInfo(x, path, dict["CIDSystemInfo"], false); ros != nil {
+	if ros, _ := pdf.Decode(c, dict["CIDSystemInfo"], font.ExtractCIDSystemInfo); ros != nil {
 		res.ROS = ros
 	}
-	if wMode, _ := x.GetInteger(path, dict["WMode"]); wMode == 1 {
+	if wMode, _ := c.Integer(dict["WMode"]); wMode == 1 {
 		res.WMode = font.Vertical
 	}
 
 	// parent CMap
 	if useCMap := dict["UseCMap"]; useCMap != nil {
-		res.Parent, err = pdf.ExtractorGet(x, path, useCMap, Extract)
+		res.Parent, err = pdf.Decode(c, useCMap, Extract)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}

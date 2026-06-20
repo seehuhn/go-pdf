@@ -150,8 +150,8 @@ var DefaultActivation = &Activation{
 // ExtractActivation reads a movie activation dictionary from the PDF
 // file.  The isDirect parameter indicates whether the object was
 // stored directly (true) or reached via an indirect reference (false).
-func ExtractActivation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Activation, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractActivation(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Activation, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -165,11 +165,11 @@ func ExtractActivation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 		SingleUse: isDirect,
 	}
 
-	a.Start = DecodeTimestamp(x, path, dict["Start"])
-	a.Duration = DecodeTimestamp(x, path, dict["Duration"])
+	a.Start = DecodeTimestamp(c, dict["Start"])
+	a.Duration = DecodeTimestamp(c, dict["Duration"])
 
 	if v := dict["Rate"]; v != nil {
-		if num, err := pdf.Optional(x.GetNumber(path, v)); err != nil {
+		if num, err := pdf.Optional(c.Number(v)); err != nil {
 			return nil, err
 		} else if num != 0 {
 			a.Rate = num
@@ -178,7 +178,7 @@ func ExtractActivation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 	}
 
 	if v := dict["Volume"]; v != nil {
-		if num, err := pdf.Optional(x.GetNumber(path, v)); err != nil {
+		if num, err := pdf.Optional(c.Number(v)); err != nil {
 			return nil, err
 		} else if num >= -1 && num <= 1 {
 			a.Volume = num
@@ -186,39 +186,39 @@ func ExtractActivation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, i
 		// out-of-range values: silently keep default 1.0
 	}
 
-	if sc, err := pdf.Optional(x.GetBoolean(path, dict["ShowControls"])); err != nil {
+	if sc, err := pdf.Optional(c.Boolean(dict["ShowControls"])); err != nil {
 		return nil, err
 	} else {
 		a.ShowControls = bool(sc)
 	}
 
-	if mode, err := pdf.Optional(x.GetName(path, dict["Mode"])); err != nil {
+	if mode, err := pdf.Optional(c.Name(dict["Mode"])); err != nil {
 		return nil, err
 	} else if mode != "" {
 		a.Mode = Mode(mode)
 	}
 
-	if sync, err := pdf.Optional(x.GetBoolean(path, dict["Synchronous"])); err != nil {
+	if sync, err := pdf.Optional(c.Boolean(dict["Synchronous"])); err != nil {
 		return nil, err
 	} else {
 		a.Synchronous = bool(sync)
 	}
 
-	if arr, err := pdf.Optional(x.GetArray(path, dict["FWScale"])); err != nil {
+	if arr, err := pdf.Optional(c.Array(dict["FWScale"])); err != nil {
 		return nil, err
 	} else if len(arr) >= 2 {
-		n, errN := pdf.Optional(x.GetInteger(path, arr[0]))
-		d, errD := pdf.Optional(x.GetInteger(path, arr[1]))
+		n, errN := pdf.Optional(c.Integer(arr[0]))
+		d, errD := pdf.Optional(c.Integer(arr[1]))
 		if errN == nil && errD == nil && n > 0 && d > 0 {
 			a.FWScale = Scale{Numerator: int(n), Denominator: int(d)}
 		}
 	}
 
-	if arr, err := pdf.Optional(x.GetArray(path, dict["FWPosition"])); err != nil {
+	if arr, err := pdf.Optional(c.Array(dict["FWPosition"])); err != nil {
 		return nil, err
 	} else if len(arr) >= 2 {
-		h, errH := pdf.Optional(x.GetNumber(path, arr[0]))
-		v, errV := pdf.Optional(x.GetNumber(path, arr[1]))
+		h, errH := pdf.Optional(c.Number(arr[0]))
+		v, errV := pdf.Optional(c.Number(arr[1]))
 		if errH == nil && errV == nil && h >= 0 && h <= 1 && v >= 0 && v <= 1 {
 			a.FWPosition = &Position{Horizontal: h, Vertical: v}
 		}
@@ -337,11 +337,11 @@ func encodeTime(v int64) pdf.Object {
 
 // DecodeTimestamp parses a movie-activation Start or Duration entry.
 // Malformed entries are silently treated as omitted (zero value).
-func DecodeTimestamp(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) Timestamp {
+func DecodeTimestamp(c pdf.Cursor, obj pdf.Object) Timestamp {
 	if obj == nil {
 		return Timestamp{}
 	}
-	resolved, err := pdf.Resolve(x.R, obj)
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return Timestamp{}
 	}
@@ -360,8 +360,8 @@ func DecodeTimestamp(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) Tim
 		if len(v) < 2 {
 			return Timestamp{}
 		}
-		t := decodeTimeOnly(x, v[0])
-		scale, _ := pdf.Optional(x.GetInteger(path, v[1]))
+		t := decodeTimeOnly(c, v[0])
+		scale, _ := pdf.Optional(c.Integer(v[1]))
 		if scale <= 0 {
 			return Timestamp{}
 		}
@@ -372,8 +372,8 @@ func DecodeTimestamp(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) Tim
 
 // decodeTimeOnly parses the time component of a [time scale] array,
 // accepting either an integer or an 8-byte two's-complement string.
-func decodeTimeOnly(x *pdf.Extractor, obj pdf.Object) int64 {
-	resolved, err := pdf.Resolve(x.R, obj)
+func decodeTimeOnly(c pdf.Cursor, obj pdf.Object) int64 {
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return 0
 	}

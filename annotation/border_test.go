@@ -50,7 +50,7 @@ func TestBorderDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dict, err := pdf.GetDict(buf, embedded)
+	dict, err := pdf.NewCursor(buf).Dict(embedded)
 	if err != nil {
 		t.Fatal(err)
 	}

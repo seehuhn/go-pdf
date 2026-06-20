@@ -52,7 +52,7 @@ func TestEmbedSimple(t *testing.T) {
 			// make sure a few glyphs are included and encoded
 			gg := fontInstance.Layout(nil, 12, "Hello")
 			for _, g := range gg.Seq {
-				_, _ = fontInstance.Encode(g.GID, string(g.Text))
+				_, _ = fontInstance.Encode(g.GID, g.Text)
 			}
 
 			err = rm.Close()
@@ -62,7 +62,7 @@ func TestEmbedSimple(t *testing.T) {
 
 			// step 2: read back the font and verify that everything is as expected
 			x := pdf.NewExtractor(w)
-			dictObj, err := extract.Dict(x, nil, ref, false)
+			dictObj, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -123,14 +123,14 @@ func embedSimpleForDescriptor(t *testing.T, fontData *sfnt.Font) *dict.Type1 {
 	}
 	gg := F.Layout(nil, 12, "Hello")
 	for _, g := range gg.Seq {
-		_, _ = F.Encode(g.GID, string(g.Text))
+		_, _ = F.Encode(g.GID, g.Text)
 	}
 	if err := rm.Close(); err != nil {
 		t.Fatal(err)
 	}
 
 	x := pdf.NewExtractor(w)
-	dictObj, err := extract.Dict(x, nil, ref, false)
+	dictObj, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

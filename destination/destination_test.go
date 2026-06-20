@@ -82,7 +82,7 @@ func testRoundTrip(t *testing.T, version pdf.Version, d Destination) {
 
 	// decode
 	x := pdf.NewExtractor(w)
-	decoded, err := Decode(x, nil, obj, false)
+	decoded, err := Decode(pdf.CursorAt(x, nil), obj, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -476,7 +476,7 @@ func TestDecodeRoundTrip(t *testing.T) {
 
 			// decode
 			x := pdf.NewExtractor(w)
-			dest, err := Decode(x, nil, tc.Obj, false)
+			dest, err := Decode(pdf.CursorAt(x, nil), tc.Obj, false)
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
@@ -494,7 +494,7 @@ func TestDecodeNamedFromName(t *testing.T) {
 	// Old-style PDF 1.1 named destination using pdf.Name
 	obj := pdf.Name("Chapter6")
 
-	dest, err := Decode(x, nil, obj, false)
+	dest, err := Decode(pdf.CursorAt(x, nil), obj, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +519,7 @@ func TestDecodeDictionaryWrapper(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	dest, err := Decode(x, nil, dict, false)
+	dest, err := Decode(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +602,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		dest, err := Decode(x, nil, obj, false)
+		dest, err := Decode(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("malformed destination")
 		}

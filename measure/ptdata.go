@@ -58,9 +58,9 @@ type PtData struct {
 }
 
 // ExtractPtData extracts a PtData object from a PDF dictionary.
-func ExtractPtData(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*PtData, error) {
+func ExtractPtData(c pdf.Cursor, obj pdf.Object, isDirect bool) (*PtData, error) {
 
-	dict, err := x.GetDictTyped(path, obj, "PtData")
+	dict, err := c.DictTyped(obj, "PtData")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -70,7 +70,7 @@ func ExtractPtData(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDir
 	ptData := &PtData{}
 
 	// Extract Subtype (required, only "Cloud" is valid)
-	if subtype, err := pdf.Optional(x.GetName(path, dict["Subtype"])); err != nil {
+	if subtype, err := pdf.Optional(c.Name(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtype == "" || subtype == PtDataSubtypeCloud {
 		ptData.Subtype = PtDataSubtypeCloud
@@ -79,12 +79,12 @@ func ExtractPtData(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDir
 	}
 
 	// Extract Names (required)
-	if namesArray, err := pdf.Optional(x.GetArray(path, dict["Names"])); err != nil {
+	if namesArray, err := pdf.Optional(c.Array(dict["Names"])); err != nil {
 		return nil, err
 	} else if namesArray != nil {
 		names := make([]string, 0, len(namesArray))
 		for _, nameObj := range namesArray {
-			if name, err := pdf.Optional(x.GetName(path, nameObj)); err != nil {
+			if name, err := pdf.Optional(c.Name(nameObj)); err != nil {
 				return nil, err
 			} else if name != "" {
 				names = append(names, string(name))
@@ -99,14 +99,14 @@ func ExtractPtData(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDir
 	}
 
 	// Extract XPTS (required)
-	xptsArray, err := pdf.Optional(x.GetArray(path, dict["XPTS"]))
+	xptsArray, err := pdf.Optional(c.Array(dict["XPTS"]))
 	if err != nil {
 		return nil, err
 	}
 	xpts := make([][]pdf.Object, 0, len(xptsArray))
 	expectedLen := len(ptData.Names)
 	for _, pointObj := range xptsArray {
-		if pointArray, err := pdf.Optional(x.GetArray(path, pointObj)); err != nil {
+		if pointArray, err := pdf.Optional(c.Array(pointObj)); err != nil {
 			return nil, err
 		} else if pointArray != nil {
 			// Be permissive: truncate or pad to match Names length

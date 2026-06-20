@@ -185,8 +185,8 @@ func (v *V13) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return embedVersion(rm, "1.3", inner, v.SingleUse)
 }
 
-func extractV13(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*V13, error) {
-	dict, err := x.GetDictTyped(path, obj, "OPI")
+func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
+	dict, err := c.DictTyped(obj, "OPI")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -195,7 +195,7 @@ func extractV13(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect
 
 	v := &V13{SingleUse: isDirect}
 
-	fs, err := pdf.ExtractorGet(x, path, dict["F"], file.ExtractSpecification)
+	fs, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	} else if fs == nil {
@@ -203,104 +203,104 @@ func extractV13(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect
 	}
 	v.F = fs
 
-	if id, err := pdf.Optional(x.GetString(path, dict["ID"])); err != nil {
+	if id, err := pdf.Optional(c.String(dict["ID"])); err != nil {
 		return nil, err
 	} else if len(id) > 0 {
 		v.ID = id
 	}
-	if c, err := pdf.Optional(x.GetString(path, dict["Comments"])); err != nil {
+	if c, err := pdf.Optional(c.String(dict["Comments"])); err != nil {
 		return nil, err
 	} else if len(c) > 0 {
 		v.Comments = string(c.AsTextString())
 	}
-	if s, err := readInts(x, path, dict["Size"]); err != nil {
+	if s, err := readInts(c, dict["Size"]); err != nil {
 		return nil, err
 	} else if len(s) == 2 {
 		v.Size = [2]int{s[0], s[1]}
 	}
-	if c, err := readInts(x, path, dict["CropRect"]); err != nil {
+	if c, err := readInts(c, dict["CropRect"]); err != nil {
 		return nil, err
 	} else if len(c) == 4 {
 		v.CropRect = [4]int{c[0], c[1], c[2], c[3]}
 	}
-	if c, err := readNumbers(x, path, dict["CropFixed"]); err != nil {
+	if c, err := readNumbers(c, dict["CropFixed"]); err != nil {
 		return nil, err
 	} else if len(c) == 4 {
 		v.CropFixed = &[4]float64{c[0], c[1], c[2], c[3]}
 	}
-	if p, err := readNumbers(x, path, dict["Position"]); err != nil {
+	if p, err := readNumbers(c, dict["Position"]); err != nil {
 		return nil, err
 	} else if len(p) == 8 {
 		v.Position = [8]float64{p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]}
 	}
-	if r, err := readNumbers(x, path, dict["Resolution"]); err != nil {
+	if r, err := readNumbers(c, dict["Resolution"]); err != nil {
 		return nil, err
 	} else if len(r) == 2 {
 		v.Resolution = &[2]float64{r[0], r[1]}
 	}
-	if ct, err := pdf.Optional(x.GetName(path, dict["ColorType"])); err != nil {
+	if ct, err := pdf.Optional(c.Name(dict["ColorType"])); err != nil {
 		return nil, err
 	} else {
 		v.ColorType = ct
 	}
-	if col, err := pdf.Optional(x.GetArray(path, dict["Color"])); err != nil {
+	if col, err := pdf.Optional(c.Array(dict["Color"])); err != nil {
 		return nil, err
 	} else if len(col) == 5 {
-		var c Color13
+		var col13 Color13
 		for i := range 4 {
-			n, err := pdf.Optional(x.GetNumber(path, col[i]))
+			n, err := pdf.Optional(c.Number(col[i]))
 			if err != nil {
 				return nil, err
 			}
-			c.CMYK[i] = float64(n)
+			col13.CMYK[i] = n
 		}
-		name, err := pdf.Optional(x.GetString(path, col[4]))
+		name, err := pdf.Optional(c.String(col[4]))
 		if err != nil {
 			return nil, err
 		}
-		c.Name = name
-		v.Color = &c
+		col13.Name = name
+		v.Color = &col13
 	}
 	if _, ok := dict["Tint"]; ok {
-		if t, err := pdf.Optional(x.GetNumber(path, dict["Tint"])); err != nil {
+		if t, err := pdf.Optional(c.Number(dict["Tint"])); err != nil {
 			return nil, err
 		} else {
-			tint := float64(t)
+			tint := t
 			v.Tint = &tint
 		}
 	}
-	if o, err := pdf.Optional(x.GetBoolean(path, dict["Overprint"])); err != nil {
+	if o, err := pdf.Optional(c.Boolean(dict["Overprint"])); err != nil {
 		return nil, err
 	} else {
 		v.Overprint = bool(o)
 	}
-	if it, err := readInts(x, path, dict["ImageType"]); err != nil {
+	if it, err := readInts(c, dict["ImageType"]); err != nil {
 		return nil, err
 	} else if len(it) == 2 {
 		v.ImageType = &[2]int{it[0], it[1]}
 	}
-	if gm, err := readInts(x, path, dict["GrayMap"]); err != nil {
+	if gm, err := readInts(c, dict["GrayMap"]); err != nil {
 		return nil, err
 	} else if len(gm) > 0 {
 		v.GrayMap = gm
 	}
 	if _, ok := dict["Transparency"]; ok {
-		if tr, err := pdf.Optional(x.GetBoolean(path, dict["Transparency"])); err != nil {
+		if tr, err := pdf.Optional(c.Boolean(dict["Transparency"])); err != nil {
 			return nil, err
 		} else {
 			b := bool(tr)
 			v.Transparency = &b
 		}
 	}
-	if tags, err := pdf.Optional(x.GetArray(path, dict["Tags"])); err != nil {
+	if tags, err := pdf.Optional(c.Array(dict["Tags"])); err != nil {
 		return nil, err
 	} else if len(tags) >= 2 {
 		for i := 0; i+1 < len(tags); i += 2 {
-			num, err := pdf.Optional(x.GetInteger(path, tags[i]))
+			num, err := pdf.Optional(c.Integer(tags[i]))
 			if err != nil {
 				return nil, err
 			}
-			text, err := pdf.Optional(x.GetString(path, tags[i+1]))
+			text, err := pdf.Optional(c.String(tags[i+1]))
 			if err != nil {
 				return nil, err
 			}

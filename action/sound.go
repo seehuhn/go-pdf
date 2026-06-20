@@ -99,35 +99,35 @@ func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Sound, error) {
-	soundObj, err := pdf.ExtractorGet(x, path, dict["Sound"], sound.Extract)
+func decodeSound(c pdf.Cursor, dict pdf.Dict) (*Sound, error) {
+	soundObj, err := pdf.Decode(c, dict["Sound"], sound.Extract)
 	if err != nil {
 		return nil, err
 	}
 
 	volume := 1.0
 	if dict["Volume"] != nil {
-		v, err := pdf.Optional(x.GetNumber(path, dict["Volume"]))
+		v, err := pdf.Optional(c.Number(dict["Volume"]))
 		if err != nil {
 			return nil, err
 		}
 		volume = v
 	}
 
-	synchronous, err := pdf.Optional(x.GetBoolean(path, dict["Synchronous"]))
+	synchronous, err := pdf.Optional(c.Boolean(dict["Synchronous"]))
 	if err != nil {
 		return nil, err
 	}
-	repeat, err := pdf.Optional(x.GetBoolean(path, dict["Repeat"]))
+	repeat, err := pdf.Optional(c.Boolean(dict["Repeat"]))
 	if err != nil {
 		return nil, err
 	}
-	mix, err := pdf.Optional(x.GetBoolean(path, dict["Mix"]))
+	mix, err := pdf.Optional(c.Boolean(dict["Mix"]))
 	if err != nil {
 		return nil, err
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

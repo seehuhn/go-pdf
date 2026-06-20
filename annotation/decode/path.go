@@ -29,14 +29,14 @@ import (
 // (nil returned with no error) if any entry has a non-conforming shape,
 // so that the encoder's invariants hold for every value returned here.
 // Non-malformed errors (e.g. IO failures) are propagated to the caller.
-func decodePath(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([][]vec.Vec2, error) {
-	pathArray, err := pdf.Optional(x.GetArray(path, obj))
+func decodePath(c pdf.Cursor, obj pdf.Object) ([][]vec.Vec2, error) {
+	pathArray, err := pdf.Optional(c.Array(obj))
 	if err != nil || len(pathArray) == 0 {
 		return nil, err
 	}
 	out := make([][]vec.Vec2, len(pathArray))
 	for i, pathEntry := range pathArray {
-		coords, err := pdf.Optional(pdf.GetFloatArray(x.R, pathEntry))
+		coords, err := pdf.Optional(c.FloatArray(pathEntry))
 		if err != nil {
 			return nil, err
 		}

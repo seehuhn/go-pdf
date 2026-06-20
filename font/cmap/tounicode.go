@@ -73,9 +73,9 @@ func (r ToUnicodeRange) String() string {
 
 // ExtractToUnicode extracts a ToUnicode CMap from a PDF stream.
 // Cycle detection for recursive parent CMap chains is handled by routing
-// parent extraction through [pdf.ExtractorGet].
-func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*ToUnicodeFile, error) {
-	resolved, err := x.Resolve(path, obj)
+// parent extraction through [pdf.Decode].
+func ExtractToUnicode(c pdf.Cursor, obj pdf.Object, _ bool) (*ToUnicodeFile, error) {
+	resolved, err := c.Resolve(obj)
 	if err != nil || resolved == nil {
 		return nil, err
 	}
@@ -86,12 +86,12 @@ func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 		}
 	}
 
-	err = pdf.CheckDictType(x.R, stmObj.Dict, "CMap")
+	err = c.CheckDictType(stmObj.Dict, "CMap")
 	if err != nil {
 		return nil, err
 	}
 
-	body, err := pdf.ReadAll(x.R, path, stmObj, limits.MaxCMapBytes)
+	body, err := c.ReadAll(stmObj, limits.MaxCMapBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func ExtractToUnicode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	}
 
 	if parent := stmObj.Dict["UseCMap"]; parent != nil {
-		parentInfo, err := pdf.ExtractorGet(x, path, parent, ExtractToUnicode)
+		parentInfo, err := pdf.Decode(c, parent, ExtractToUnicode)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}

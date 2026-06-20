@@ -181,25 +181,25 @@ func TestReadMalformed(t *testing.T) {
 		}
 	}
 
-	_, err := ExtractRendition(x, nil, pdf.Dict{"S": pdf.Name("ZZ")}, true)
+	_, err := ExtractRendition(pdf.CursorAt(x, nil), pdf.Dict{"S": pdf.Name("ZZ")}, true)
 	mustErr("rendition unknown subtype", err)
-	_, err = ExtractMediaClip(x, nil, pdf.Dict{"S": pdf.Name("ZZ")}, true)
+	_, err = ExtractMediaClip(pdf.CursorAt(x, nil), pdf.Dict{"S": pdf.Name("ZZ")}, true)
 	mustErr("clip unknown subtype", err)
-	_, err = ExtractMediaOffset(x, nil, pdf.Dict{"S": pdf.Name("ZZ")}, true)
+	_, err = ExtractMediaOffset(pdf.CursorAt(x, nil), pdf.Dict{"S": pdf.Name("ZZ")}, true)
 	mustErr("offset unknown subtype", err)
-	_, err = ExtractMediaDuration(x, nil, pdf.Dict{"S": pdf.Name("ZZ")}, true)
+	_, err = ExtractMediaDuration(pdf.CursorAt(x, nil), pdf.Dict{"S": pdf.Name("ZZ")}, true)
 	mustErr("duration unknown subtype", err)
-	_, err = ExtractSoftwareIdentifier(x, nil, pdf.Dict{}, true)
+	_, err = ExtractSoftwareIdentifier(pdf.CursorAt(x, nil), pdf.Dict{}, true)
 	mustErr("software identifier missing U", err)
-	_, err = ExtractTimespan(x, nil, pdf.Dict{"V": pdf.Number(-1)}, true)
+	_, err = ExtractTimespan(pdf.CursorAt(x, nil), pdf.Dict{"V": pdf.Number(-1)}, true)
 	mustErr("timespan negative", err)
-	_, err = ExtractMinBitDepth(x, nil, pdf.Dict{"V": pdf.Integer(0)}, true)
+	_, err = ExtractMinBitDepth(pdf.CursorAt(x, nil), pdf.Dict{"V": pdf.Integer(0)}, true)
 	mustErr("min bit depth zero", err)
-	_, err = ExtractMinScreenSize(x, nil, pdf.Dict{"V": pdf.Array{pdf.Integer(1)}}, true)
+	_, err = ExtractMinScreenSize(pdf.CursorAt(x, nil), pdf.Dict{"V": pdf.Array{pdf.Integer(1)}}, true)
 	mustErr("min screen size short", err)
 
 	// a version array containing a negative number is dropped (treated as absent)
-	s, err := ExtractSoftwareIdentifier(x, nil, pdf.Dict{
+	s, err := ExtractSoftwareIdentifier(pdf.CursorAt(x, nil), pdf.Dict{
 		"U": pdf.String("x"),
 		"L": pdf.Array{pdf.Integer(-1)},
 	}, true)

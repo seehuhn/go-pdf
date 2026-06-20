@@ -114,9 +114,9 @@ func Encode(rm *pdf.ResourceManager, nodes []*Node) (pdf.Native, error) {
 // Decode reads a navigation node list from PDF format.
 // The doubly-linked list starting at obj is flattened into a slice.
 //
-// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) ([]*Node, error) {
+func Decode(c pdf.Cursor, obj pdf.Object, _ bool) ([]*Node, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -124,7 +124,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) ([]*
 	var nodes []*Node
 
 	for obj != nil {
-		dict, err := x.GetDict(path, obj)
+		dict, err := c.Dict(obj)
 		if err != nil {
 			return nil, pdf.Wrap(err, "navigation node")
 		}
@@ -134,10 +134,10 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) ([]*
 
 		// extend path after resolution, so the next iteration detects cycles
 		if ref, ok := obj.(pdf.Reference); ok {
-			path = &pdf.CycleCheck{Ref: ref, Parent: path}
+			c = pdf.CursorAt(c.Extractor(), &pdf.CycleCheck{Ref: ref, Parent: c.Path()})
 		}
 
-		node, err := decodeNode(x, path, dict)
+		node, err := decodeNode(c, dict)
 		if err != nil {
 			return nil, err
 		}
@@ -150,12 +150,12 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) ([]*
 	return nodes, nil
 }
 
-func decodeNode(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Node, error) {
+func decodeNode(c pdf.Cursor, dict pdf.Dict) (*Node, error) {
 	node := &Node{}
 
 	// NA (optional)
 	if naObj := dict["NA"]; naObj != nil {
-		na, err := pdf.ExtractorGet(x, path, naObj, action.Decode)
+		na, err := pdf.Decode(c, naObj, action.Decode)
 		if err != nil {
 			return nil, pdf.Wrap(err, "NA")
 		}
@@ -164,7 +164,7 @@ func decodeNode(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Node, e
 
 	// PA (optional)
 	if paObj := dict["PA"]; paObj != nil {
-		pa, err := pdf.ExtractorGet(x, path, paObj, action.Decode)
+		pa, err := pdf.Decode(c, paObj, action.Decode)
 		if err != nil {
 			return nil, pdf.Wrap(err, "PA")
 		}
@@ -173,7 +173,7 @@ func decodeNode(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Node, e
 
 	// Dur (optional)
 	if durObj := dict["Dur"]; durObj != nil {
-		dur, err := x.GetNumber(path, durObj)
+		dur, err := c.Number(durObj)
 		if err == nil && dur > 0 {
 			node.Dur = dur
 		}

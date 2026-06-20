@@ -19,13 +19,10 @@ package pdf
 import (
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
-
-	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // Encoder represents a PDF object which is tied to a specific PDF file.
@@ -338,7 +335,7 @@ type Extractor struct {
 	R     Getter
 	mu    sync.Mutex
 	cache map[extractorKey]any
-	wip   map[extractorKey]*pending // decodes in progress (ExtractorGetExclusive)
+	wip   map[extractorKey]*pending // decodes in progress (DecodeExclusive)
 }
 
 type extractorKey struct {
@@ -391,124 +388,6 @@ func (x *Extractor) cacheStoreOrLoad(refs []Reference, tp reflect.Type, res any)
 	return res
 }
 
-// ExtractorGet resolves indirect references and extracts a typed object.
-// The path parameter tracks which references are being resolved on the current
-// call stack to detect cycles.
-func ExtractorGet[T any](x *Extractor, path *CycleCheck, obj Object, extract func(*Extractor, *CycleCheck, Object, bool) (T, error)) (T, error) {
-	var zero T
-	tp := reflect.TypeFor[T]()
-
-	var refs []Reference
-	for {
-		ref, ok := obj.(Reference)
-		if !ok {
-			break
-		}
-		key := extractorKey{ref: ref, tp: tp}
-
-		if v, ok := x.cacheGet(key); ok {
-			// a cached nil interface result (T is an interface type and the
-			// extractor returned nil) is an untyped nil here; the comma-ok form
-			// yields the zero value instead of panicking on the assertion
-			r, _ := v.(T)
-			return r, nil
-		}
-
-		// check for cycle
-		if path.Seen(ref) {
-			return zero, &MalformedFileError{
-				Err: ErrCycle,
-				Loc: []string{"object " + ref.String()},
-			}
-		}
-
-		refs = append(refs, ref)
-		path = &CycleCheck{Ref: ref, Parent: path}
-
-		// reject an adversarially deep acyclic reference chain before the
-		// recursive extractor exhausts the Go call stack
-		if path.depth() > limits.MaxExtractDepth {
-			return zero, &MalformedFileError{
-				Err: ErrDepth,
-				Loc: []string{"object " + ref.String()},
-			}
-		}
-
-		var err error
-		obj, err = x.R.Get(ref, true)
-		if err != nil {
-			return zero, err
-		}
-	}
-
-	isDirect := len(refs) == 0
-	res, err := extract(x, path, obj, isDirect)
-	if err != nil {
-		return zero, err
-	}
-
-	// publish under all refs; adopt a concurrent decoder's result on a race so
-	// callers share one object (see cacheStoreOrLoad)
-	if len(refs) > 0 {
-		// comma-ok so a nil interface result (cached as an untyped nil) does
-		// not panic on the assertion; it yields the zero value instead
-		res, _ = x.cacheStoreOrLoad(refs, tp, res).(T)
-	}
-
-	return res, nil
-}
-
-// ExtractorGetOptional is like [ExtractorGet] but treats a nil result as
-// acceptable rather than as an error.
-func ExtractorGetOptional[T any](x *Extractor, path *CycleCheck, obj Object, extract func(*Extractor, *CycleCheck, Object, bool) (T, error)) (T, error) {
-	return Optional(ExtractorGet(x, path, obj, extract))
-}
-
-// ExtractorGetExclusive is like [ExtractorGet] but runs the extract function at
-// most once per reference: concurrent callers for the same reference wait for
-// the first to finish and share its result.
-//
-// Use this ONLY for decodes that cannot participate in a cross-goroutine
-// reference cycle — that is, a document "sink" such as the interactive form,
-// whose decode never waits on an object that might be waiting on it. For
-// anything that can be mutually referential, use [ExtractorGet], whose
-// load-or-store publishing never waits and so cannot deadlock.
-func ExtractorGetExclusive[T any](x *Extractor, path *CycleCheck, obj Object, extract func(*Extractor, *CycleCheck, Object, bool) (T, error)) (T, error) {
-	var zero T
-	ref, ok := obj.(Reference)
-	if !ok {
-		return extract(x, path, obj, true) // direct object: not shared
-	}
-	key := extractorKey{ref: ref, tp: reflect.TypeFor[T]()}
-
-	x.mu.Lock()
-	if v, ok := x.cache[key]; ok {
-		x.mu.Unlock()
-		return v.(T), nil
-	}
-	if p, ok := x.wip[key]; ok {
-		x.mu.Unlock()
-		<-p.done
-		if p.err != nil {
-			return zero, p.err
-		}
-		return p.val.(T), nil
-	}
-	p := &pending{done: make(chan struct{})}
-	x.wip[key] = p
-	x.mu.Unlock()
-
-	res, err := ExtractorGet(x, path, obj, extract)
-
-	x.mu.Lock()
-	p.val, p.err = res, err
-	delete(x.wip, key)
-	x.mu.Unlock()
-	close(p.done)
-
-	return res, err
-}
-
 // StoreOrLoadPair publishes two typed views of a single PDF object — for
 // example the field half and the widget half of a merged field/widget
 // dictionary — under one object reference, atomically. If the reference is
@@ -516,7 +395,7 @@ func ExtractorGetExclusive[T any](x *Extractor, path *CycleCheck, obj Object, ex
 // existing pair and stores nothing, so every caller shares one consistent pair.
 //
 // The two views are cached under their respective Go types, exactly as
-// [ExtractorGet] would cache them, so a later ExtractorGet for either type finds
+// [Decode] would cache them, so a later Decode for either type finds
 // the published value.
 func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
 	ka := extractorKey{ref: ref, tp: reflect.TypeFor[A]()}
@@ -534,176 +413,4 @@ func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
 		x.cache[kb] = b
 	}
 	return a, b
-}
-
-// Resolve resolves references to indirect objects with cycle detection.
-//
-// If obj is a [Reference], the function reads the corresponding object from
-// the file and returns the result. If obj is not a [Reference], it is
-// returned unchanged. The function recursively follows chains of references
-// until it resolves to a non-reference object.
-//
-// If a reference loop is encountered, the function returns an error of type
-// [MalformedFileError].
-func (x *Extractor) Resolve(path *CycleCheck, obj Object) (Native, error) {
-	if obj == nil {
-		return nil, nil
-	}
-
-	ref, isReference := obj.(Reference)
-	if !isReference {
-		return obj.AsPDF(0), nil
-	}
-
-	for {
-		if path.Seen(ref) {
-			return nil, &MalformedFileError{
-				Err: ErrCycle,
-				Loc: []string{"object " + ref.String()},
-			}
-		}
-
-		path = &CycleCheck{Ref: ref, Parent: path}
-
-		next, err := x.R.Get(ref, true)
-		if err != nil {
-			return nil, err
-		}
-
-		if ref, isReference = next.(Reference); !isReference {
-			return next, nil
-		}
-	}
-}
-
-func extractorResolveAndCast[T Native](x *Extractor, path *CycleCheck, obj Object) (T, error) {
-	var zero T
-	resolved, err := x.Resolve(path, obj)
-	if err != nil {
-		return zero, err
-	}
-
-	if resolved == nil {
-		return zero, nil
-	}
-
-	result, ok := resolved.(T)
-	if !ok {
-		return zero, &MalformedFileError{
-			Err: fmt.Errorf("expected %T but got %T", zero, resolved),
-		}
-	}
-
-	return result, nil
-}
-
-// GetArray resolves any indirect reference and returns the object as an Array.
-// If obj is nil, the function returns nil, nil.
-func (x *Extractor) GetArray(path *CycleCheck, obj Object) (Array, error) {
-	return extractorResolveAndCast[Array](x, path, obj)
-}
-
-// GetBoolean resolves any indirect reference and returns the object as a Boolean.
-// If obj is nil, the function returns false, nil.
-func (x *Extractor) GetBoolean(path *CycleCheck, obj Object) (Boolean, error) {
-	return extractorResolveAndCast[Boolean](x, path, obj)
-}
-
-// GetDict resolves any indirect reference and returns the object as a Dict.
-// If obj is nil, the function returns nil, nil.
-func (x *Extractor) GetDict(path *CycleCheck, obj Object) (Dict, error) {
-	return extractorResolveAndCast[Dict](x, path, obj)
-}
-
-// GetDictTyped resolves any indirect reference and checks that the resulting
-// object is a dictionary. The function also checks that the "Type" entry of
-// the dictionary, if set, is equal to the given type.
-//
-// If the object is nil, the function returns nil, nil.
-func (x *Extractor) GetDictTyped(path *CycleCheck, obj Object, tp Name) (Dict, error) {
-	dict, err := x.GetDict(path, obj)
-	if dict == nil || err != nil {
-		return nil, err
-	}
-
-	haveType, err := x.GetName(path, dict["Type"])
-	if err != nil {
-		return nil, err
-	}
-	if haveType != tp && haveType != "" {
-		return nil, &MalformedFileError{
-			Err: fmt.Errorf("expected dict type %q, got %q", tp, haveType),
-		}
-	}
-
-	return dict, nil
-}
-
-// GetName resolves any indirect reference and returns the object as a Name.
-// If obj is nil, the function returns "", nil.
-func (x *Extractor) GetName(path *CycleCheck, obj Object) (Name, error) {
-	return extractorResolveAndCast[Name](x, path, obj)
-}
-
-// GetReal resolves any indirect reference and returns the object as a Real.
-// If obj is nil, the function returns 0, nil.
-func (x *Extractor) GetReal(path *CycleCheck, obj Object) (Real, error) {
-	return extractorResolveAndCast[Real](x, path, obj)
-}
-
-// GetStream resolves any indirect reference and returns the object as a Stream.
-// If obj is nil, the function returns nil, nil.
-func (x *Extractor) GetStream(path *CycleCheck, obj Object) (*Stream, error) {
-	return extractorResolveAndCast[*Stream](x, path, obj)
-}
-
-// GetString resolves any indirect reference and returns the object as a String.
-// If obj is nil, the function returns "", nil.
-func (x *Extractor) GetString(path *CycleCheck, obj Object) (String, error) {
-	return extractorResolveAndCast[String](x, path, obj)
-}
-
-// GetInteger resolves any indirect reference and returns the object as an Integer.
-// If obj is nil, the function returns 0, nil.
-// Integers are returned as is.
-// Floating point values are silently rounded to the nearest integer.
-// All other object types result in an error.
-func (x *Extractor) GetInteger(path *CycleCheck, obj Object) (Integer, error) {
-	resolved, err := x.Resolve(path, obj)
-	if resolved == nil {
-		return 0, err
-	}
-
-	switch val := resolved.(type) {
-	case Integer:
-		return val, nil
-	case Real:
-		return Integer(math.Round(float64(val))), nil
-	default:
-		return 0, &MalformedFileError{
-			Err: fmt.Errorf("expected Integer but got %T", resolved),
-		}
-	}
-}
-
-// GetNumber resolves any indirect reference and returns the object as a float64.
-// If obj is nil, the function returns 0, nil.
-// Both Integer and Real values are converted to float64.
-// All other object types result in an error.
-func (x *Extractor) GetNumber(path *CycleCheck, obj Object) (float64, error) {
-	resolved, err := x.Resolve(path, obj)
-	if resolved == nil {
-		return 0, err
-	}
-
-	switch val := resolved.(type) {
-	case Integer:
-		return float64(val), nil
-	case Real:
-		return float64(val), nil
-	default:
-		return 0, &MalformedFileError{
-			Err: fmt.Errorf("expected Number but got %T", resolved),
-		}
-	}
 }

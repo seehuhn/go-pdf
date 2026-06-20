@@ -74,7 +74,7 @@ func TestActionListMultipleActions(t *testing.T) {
 
 	// decode and verify
 	x := pdf.NewExtractor(w)
-	decoded, err := Decode(x, nil, obj, false)
+	decoded, err := Decode(pdf.CursorAt(x, nil), obj, false)
 	if err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestNewWindowMode(t *testing.T) {
 			}
 
 			// decode and verify
-			decoded, err := Decode(x, nil, obj, false)
+			decoded, err := Decode(pdf.CursorAt(x, nil), obj, false)
 			if err != nil {
 				t.Fatalf("decode error: %v", err)
 			}
@@ -225,7 +225,7 @@ func TestDecodeActionListNextCycleSelf(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.ExtractorGet(x, nil, ref, Decode)
+	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -257,7 +257,7 @@ func TestDecodeActionListNextCycleMutual(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.ExtractorGet(x, nil, refA, Decode)
+	_, err := pdf.Decode(pdf.CursorAt(x, nil), refA, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -287,7 +287,7 @@ func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.ExtractorGet(x, nil, ref, Decode)
+	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -295,9 +295,9 @@ func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
 
 // TestDecodeActionListNextCycleDeep checks that a /Next chain that loops
 // between two refs neither of which is the entry ref (A → B → C → B) is
-// detected. This is the case the path-extending ExtractorGet wrapper
-// fixed: a plain x.GetDict cycle check only catches refs already on the
-// entry path, so the old code recursed forever between B and C.
+// detected. This is the case the path-extending pdf.Decode wrapper
+// handles: a cycle check that only catches refs already on the entry
+// path would recurse forever between B and C.
 func TestDecodeActionListNextCycleDeep(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 
@@ -330,7 +330,7 @@ func TestDecodeActionListNextCycleDeep(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.ExtractorGet(x, nil, refA, Decode)
+	_, err := pdf.Decode(pdf.CursorAt(x, nil), refA, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -355,7 +355,7 @@ func TestDecodeActionListNextCycleArray(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.ExtractorGet(x, nil, ref, Decode)
+	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -364,7 +364,7 @@ func TestDecodeActionListNextCycleArray(t *testing.T) {
 // TestDecodeActionListNextDeepChainBounded guards against a stack-overflow
 // DoS: a /Next chain of distinct URI actions is acyclic, so the cycle guard
 // never trips, yet recursing one frame per level would exhaust the Go stack.
-// The ExtractorGet depth cap must turn this into a malformed-file error
+// The Decode depth cap must turn this into a malformed-file error
 // rather than a crash.
 func TestDecodeActionListNextDeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
@@ -385,7 +385,7 @@ func TestDecodeActionListNextDeepChainBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := pdf.ExtractorGet(x, nil, refs[0], Decode); !pdf.IsMalformed(err) {
+	if _, err := pdf.Decode(pdf.CursorAt(x, nil), refs[0], Decode); !pdf.IsMalformed(err) {
 		t.Errorf("err = %v, want malformed", err)
 	}
 }

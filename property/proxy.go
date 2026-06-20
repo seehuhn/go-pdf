@@ -32,14 +32,19 @@ type proxyList struct {
 
 // ExtractList extracts a property list from a PDF object.
 // The object must be a dictionary or a reference to a dictionary.
-func ExtractList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (List, error) {
+func ExtractList(c pdf.Cursor, obj pdf.Object, isDirect bool) (List, error) {
+	// for an indirect property list, store the reference (so re-embedding
+	// translates it) and re-anchor the cursor at the parent path, so that
+	// resolving the reference below does not trip its own cycle check
+	path := c.Path()
 	if !isDirect && path != nil {
 		obj = path.Ref
 		path = path.Parent
+		c = pdf.CursorAt(c.Extractor(), path)
 	}
 
 	// validate that the object resolves to a dictionary
-	dict, err := x.GetDict(path, obj)
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +53,7 @@ func ExtractList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 	}
 
 	return &proxyList{
-		inner: opaque.Extract(x, obj),
+		inner: opaque.Extract(c.Extractor(), obj),
 		path:  path,
 	}, nil
 }

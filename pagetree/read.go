@@ -26,6 +26,7 @@ import (
 // FindPages returns a list of all pages in the document.
 // The returned list contains the references to the page dictionaries.
 func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
+	c := pdf.NewCursor(r)
 	meta := r.GetMeta()
 	catalog := meta.Catalog
 	if catalog.Pages == 0 {
@@ -42,14 +43,14 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 		ref := todo[k]
 		todo = todo[:k]
 
-		node, err := pdf.Optional(pdf.GetDict(r, ref))
+		node, err := pdf.Optional(c.Dict(ref))
 		if err != nil {
 			return nil, err
 		}
 		if node == nil {
 			continue
 		}
-		tp, err := pdf.Optional(pdf.GetName(r, node["Type"]))
+		tp, err := pdf.Optional(c.Name(node["Type"]))
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +58,7 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 		case "Page":
 			res = append(res, ref)
 		case "Pages":
-			kids, err := pdf.Optional(pdf.GetArray(r, node["Kids"]))
+			kids, err := pdf.Optional(c.Array(node["Kids"]))
 			if err != nil {
 				return nil, err
 			}
@@ -100,6 +101,7 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 		}
 
 		r := i.r
+		c := pdf.NewCursor(r)
 		meta := r.GetMeta()
 		root := meta.Catalog.Pages
 		if root == 0 {
@@ -131,7 +133,7 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 			ref := todo[k]
 			todo = todo[:k]
 
-			node, err := pdf.GetDict(r, ref)
+			node, err := c.Dict(ref)
 			if err != nil {
 				if pdf.IsMalformed(err) {
 					continue
@@ -139,7 +141,7 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 				i.Err = err
 				return
 			}
-			tp, err := pdf.GetName(r, node["Type"])
+			tp, err := c.Name(node["Type"])
 			if err != nil {
 				if pdf.IsMalformed(err) {
 					continue
@@ -162,7 +164,7 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 				}
 
 			case "Pages":
-				kids, err := pdf.GetArray(r, node["Kids"])
+				kids, err := c.Array(node["Kids"])
 				if err != nil {
 					if pdf.IsMalformed(err) {
 						continue

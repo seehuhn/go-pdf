@@ -27,9 +27,9 @@ import (
 )
 
 // ExtGState extracts an extended graphics state from a PDF file.
-func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*extgstate.ExtGState, error) {
+func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGState, error) {
 
-	dict, err := x.GetDictTyped(path, obj, "ExtGState")
+	dict, err := c.DictTyped(obj, "ExtGState")
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	for key, v := range dict {
 		switch key {
 		case "Font":
-			a, err := x.GetArray(path, v)
+			a, err := c.Array(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -65,14 +65,14 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 				break
 			}
 
-			size, err := x.GetNumber(path, a[1])
+			size, err := c.Number(a[1])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
 				return nil, err
 			}
 
-			F, err := Font(x, path, fontRef, false)
+			F, err := Font(c, fontRef, false)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -83,7 +83,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.TextFontSize = size
 			set |= graphics.StateTextFont
 		case "TK":
-			val, err := x.GetBoolean(path, v)
+			val, err := c.Boolean(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -92,7 +92,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.TextKnockout = bool(val)
 			set |= graphics.StateTextKnockout
 		case "LW":
-			lw, err := x.GetNumber(path, v)
+			lw, err := c.Number(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -101,7 +101,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.LineWidth = lw
 			set |= graphics.StateLineWidth
 		case "LC":
-			lineCap, err := x.GetInteger(path, v)
+			lineCap, err := c.Integer(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -115,7 +115,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.LineCap = graphics.LineCapStyle(lineCap)
 			set |= graphics.StateLineCap
 		case "LJ":
-			lineJoin, err := x.GetInteger(path, v)
+			lineJoin, err := c.Integer(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -129,7 +129,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.LineJoin = graphics.LineJoinStyle(lineJoin)
 			set |= graphics.StateLineJoin
 		case "ML":
-			miterLimit, err := x.GetNumber(path, v)
+			miterLimit, err := c.Number(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -141,7 +141,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.MiterLimit = miterLimit
 			set |= graphics.StateMiterLimit
 		case "D":
-			dashPattern, phase, err := readDash(x.R, v)
+			dashPattern, phase, err := readDash(c, v)
 			if err != nil {
 				return nil, err
 			} else if dashPattern != nil {
@@ -150,7 +150,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 				set |= graphics.StateLineDash
 			}
 		case "RI":
-			ri, err := x.GetName(path, v)
+			ri, err := c.Name(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -159,7 +159,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.RenderingIntent = graphics.RenderingIntent(ri)
 			set |= graphics.StateRenderingIntent
 		case "SA":
-			val, err := x.GetBoolean(path, v)
+			val, err := c.Boolean(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -168,7 +168,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.StrokeAdjustment = bool(val)
 			set |= graphics.StateStrokeAdjustment
 		case "BM":
-			bm, err := extractBlendMode(x, path, v)
+			bm, err := extractBlendMode(c, v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -179,14 +179,14 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 				set |= graphics.StateBlendMode
 			}
 		case "SMask":
-			sMask, err := pdf.ExtractorGetOptional(x, path, v, SoftMaskDict)
+			sMask, err := pdf.DecodeOptional(c, v, SoftMaskDict)
 			if err != nil {
 				return nil, err
 			}
 			res.SoftMask = sMask
 			set |= graphics.StateSoftMask
 		case "CA":
-			ca, err := x.GetNumber(path, v)
+			ca, err := c.Number(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -195,7 +195,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.StrokeAlpha = ca
 			set |= graphics.StateStrokeAlpha
 		case "ca":
-			ca, err := x.GetNumber(path, v)
+			ca, err := c.Number(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -204,7 +204,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.FillAlpha = ca
 			set |= graphics.StateFillAlpha
 		case "AIS":
-			ais, err := x.GetBoolean(path, v)
+			ais, err := c.Boolean(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -213,7 +213,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.AlphaSourceFlag = bool(ais)
 			set |= graphics.StateAlphaSourceFlag
 		case "UseBlackPtComp":
-			val, err := x.GetName(path, v)
+			val, err := c.Name(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -222,7 +222,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.BlackPointCompensation = val
 			set |= graphics.StateBlackPointCompensation
 		case "OP":
-			op, err := x.GetBoolean(path, v)
+			op, err := c.Boolean(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -231,7 +231,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.OverprintStroke = bool(op)
 			set |= graphics.StateOverprint
 		case "op":
-			op, err := x.GetBoolean(path, v)
+			op, err := c.Boolean(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -241,7 +241,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			set |= graphics.StateOverprint
 			overprintFillSet = true
 		case "OPM":
-			opm, err := x.GetInteger(path, v)
+			opm, err := c.Integer(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -266,11 +266,11 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 		case "HT":
 			// the name /Default denotes the device's default halftone,
 			// represented by a nil Halftone with the state bit set
-			if name, _ := pdf.Optional(x.GetName(path, v)); name == "Default" {
+			if name, _ := pdf.Optional(c.Name(v)); name == "Default" {
 				set |= graphics.StateHalftone
 				break
 			}
-			ht, err := pdf.ExtractorGetOptional(x, path, v, halftone.Extract)
+			ht, err := pdf.DecodeOptional(c, v, halftone.Extract)
 			if err != nil {
 				return nil, err
 			}
@@ -281,7 +281,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 				set |= graphics.StateHalftone
 			}
 		case "HTO":
-			a, err := x.GetArray(path, v)
+			a, err := c.Array(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -290,13 +290,13 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			if len(a) != 2 {
 				break
 			}
-			xCoord, err := x.GetNumber(path, a[0])
+			xCoord, err := c.Number(a[0])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
 				return nil, err
 			}
-			yCoord, err := x.GetNumber(path, a[1])
+			yCoord, err := c.Number(a[1])
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -306,7 +306,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.HalftoneOriginY = yCoord
 			set |= graphics.StateHalftoneOrigin
 		case "FL":
-			fl, err := x.GetNumber(path, v)
+			fl, err := c.Number(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -315,7 +315,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 			res.FlatnessTolerance = fl
 			set |= graphics.StateFlatnessTolerance
 		case "SM":
-			sm, err := x.GetNumber(path, v)
+			sm, err := c.Number(v)
 			if pdf.IsMalformed(err) {
 				break
 			} else if err != nil {
@@ -338,7 +338,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 		set |= graphics.StateBlackGeneration
 	}
 	if set&graphics.StateBlackGeneration == 0 && bg2 != nil {
-		fn, err := pdf.ExtractorGet(x, path, bg2, function.Extract)
+		fn, err := pdf.Decode(c, bg2, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
@@ -347,7 +347,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 		}
 	}
 	if set&graphics.StateBlackGeneration == 0 && bg1 != nil {
-		fn, err := pdf.ExtractorGet(x, path, bg1, function.Extract)
+		fn, err := pdf.Decode(c, bg1, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
@@ -363,7 +363,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 		set |= graphics.StateUndercolorRemoval
 	}
 	if set&graphics.StateUndercolorRemoval == 0 && ucr2 != nil {
-		fn, err := pdf.ExtractorGet(x, path, ucr2, function.Extract)
+		fn, err := pdf.Decode(c, ucr2, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
@@ -372,7 +372,7 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 		}
 	}
 	if set&graphics.StateUndercolorRemoval == 0 && ucr1 != nil {
-		fn, err := pdf.ExtractorGet(x, path, ucr1, function.Extract)
+		fn, err := pdf.Decode(c, ucr1, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
@@ -382,16 +382,16 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 	}
 
 	// Handle TransferFunction precedence: TR2 > TR (deprecated in PDF 2.0)
-	if pdf.GetVersion(x.R) < pdf.V2_0 {
+	if c.Version() < pdf.V2_0 {
 		if tr2 != nil {
-			fn, err := parseTransferFunction(x, path, tr2)
+			fn, err := parseTransferFunction(c, tr2)
 			if err != nil {
 				return nil, err
 			}
 			res.TransferFunctions = fn
 			set |= graphics.StateTransferFunction
 		} else if tr1 != nil {
-			fn, err := parseTransferFunction(x, path, tr1)
+			fn, err := parseTransferFunction(c, tr1)
 			if err != nil {
 				return nil, err
 			}
@@ -408,8 +408,8 @@ func ExtGState(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect 
 
 // extractBlendMode extracts a blend mode from a PDF object.
 // Handles both name and array forms (array deprecated in PDF 2.0).
-func extractBlendMode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (graphics.BlendMode, error) {
-	obj, err := x.Resolve(path, obj)
+func extractBlendMode(c pdf.Cursor, obj pdf.Object) (graphics.BlendMode, error) {
+	obj, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +423,7 @@ func extractBlendMode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (g
 	case pdf.Array:
 		result := make(graphics.BlendMode, 0, len(v))
 		for _, elem := range v {
-			name, err := x.GetName(path, elem)
+			name, err := c.Name(elem)
 			if err != nil {
 				continue // skip malformed entries
 			}
@@ -438,66 +438,66 @@ func extractBlendMode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (g
 	}
 }
 
-func readDash(r pdf.Getter, obj pdf.Object) (pat []float64, ph float64, err error) {
+func readDash(c pdf.Cursor, obj pdf.Object) (pat []float64, ph float64, err error) {
 	defer func() {
 		if pdf.IsMalformed(err) {
 			err = nil
 		}
 	}()
 
-	a, err := pdf.GetArray(r, obj)
+	a, err := c.Array(obj)
 	if len(a) != 2 { // either error or malformed
 		return nil, 0, err
 	}
-	dashPattern, err := pdf.GetArray(r, a[0])
+	dashPattern, err := c.Array(a[0])
 	if err != nil {
 		return nil, 0, err
 	}
-	phase, err := pdf.GetNumber(r, a[1])
+	phase, err := c.Number(a[1])
 	if err != nil {
 		return nil, 0, err
 	}
 	pat = make([]float64, len(dashPattern))
 	for i, obj := range dashPattern {
-		x, err := pdf.GetNumber(r, obj)
+		x, err := c.Number(obj)
 		if err != nil {
 			return nil, 0, err
 		}
-		pat[i] = float64(x)
+		pat[i] = x
 	}
-	return pat, float64(phase), nil
+	return pat, phase, nil
 }
 
-func parseTransferFunction(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (graphics.TransferFunctions, error) {
+func parseTransferFunction(c pdf.Cursor, obj pdf.Object) (graphics.TransferFunctions, error) {
 	var zero graphics.TransferFunctions
 
 	// check if it's an array of four or more transfer functions
-	if arr, err := x.GetArray(path, obj); err == nil && len(arr) >= 4 {
+	if arr, err := c.Array(obj); err == nil && len(arr) >= 4 {
 		var result graphics.TransferFunctions
 
 		// parse Red component
-		fn, err := parseSingleTransfer(x, path, arr[0])
+		fn, err := parseSingleTransfer(c, arr[0])
 		if err != nil {
 			return zero, err
 		}
 		result.Red = fn
 
 		// parse Green component
-		fn, err = parseSingleTransfer(x, path, arr[1])
+		fn, err = parseSingleTransfer(c, arr[1])
 		if err != nil {
 			return zero, err
 		}
 		result.Green = fn
 
 		// parse Blue component
-		fn, err = parseSingleTransfer(x, path, arr[2])
+		fn, err = parseSingleTransfer(c, arr[2])
 		if err != nil {
 			return zero, err
 		}
 		result.Blue = fn
 
 		// parse Gray component
-		fn, err = parseSingleTransfer(x, path, arr[3])
+		fn, err = parseSingleTransfer(c, arr[3])
 		if err != nil {
 			return zero, err
 		}
@@ -507,7 +507,7 @@ func parseTransferFunction(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Objec
 	}
 
 	// single transfer function - apply to all components
-	fn, err := parseSingleTransfer(x, path, obj)
+	fn, err := parseSingleTransfer(c, obj)
 	if err != nil {
 		return zero, err
 	}
@@ -519,7 +519,7 @@ func parseTransferFunction(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Objec
 	}, nil
 }
 
-func parseSingleTransfer(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (pdf.Function, error) {
+func parseSingleTransfer(c pdf.Cursor, obj pdf.Object) (pdf.Function, error) {
 	if name, isName := obj.(pdf.Name); isName {
 		switch name {
 		case "Identity":
@@ -531,7 +531,7 @@ func parseSingleTransfer(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 		}
 	}
 
-	fn, err := pdf.ExtractorGet(x, path, obj, function.Extract)
+	fn, err := pdf.Decode(c, obj, function.Extract)
 	if err != nil {
 		return nil, err
 	}

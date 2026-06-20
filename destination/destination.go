@@ -64,10 +64,10 @@ var Unset = math.NaN()
 // (structure destination) entry is ignored. D is the page-based fallback, so
 // the navigable destination is preserved.
 //
-// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Destination, error) {
-	obj, err := x.Resolve(path, obj)
+func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (Destination, error) {
+	obj, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -81,14 +81,14 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Des
 	}
 
 	// Handle dictionary wrapper with D entry
-	if dict, _ := x.GetDict(path, obj); dict != nil {
+	if dict, _ := c.Dict(obj); dict != nil {
 		if dObj := dict["D"]; dObj != nil {
 			obj = dObj
 		}
 	}
 
 	// Must be an array for explicit destination
-	arr, err := x.GetArray(path, obj)
+	arr, err := c.Array(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Des
 	page := Target(arr[0])
 
 	// Second element is the type name
-	typeName, err := pdf.Optional(x.GetName(path, arr[1]))
+	typeName, err := pdf.Optional(c.Name(arr[1]))
 	if err != nil {
 		return nil, err
 	}
@@ -110,9 +110,9 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Des
 		if len(arr) < 5 {
 			return nil, pdf.Error("XYZ destination requires 5 elements")
 		}
-		left := getOptionalNumber(x, path, arr[2])
-		top := getOptionalNumber(x, path, arr[3])
-		zoom := getOptionalNumber(x, path, arr[4])
+		left := getOptionalNumber(c, arr[2])
+		top := getOptionalNumber(c, arr[3])
+		zoom := getOptionalNumber(c, arr[4])
 		return &XYZ{Page: page, Left: left, Top: top, Zoom: zoom}, nil
 
 	case TypeFit:
@@ -122,33 +122,33 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Des
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitH destination requires 3 elements")
 		}
-		top := getOptionalNumber(x, path, arr[2])
+		top := getOptionalNumber(c, arr[2])
 		return &FitH{Page: page, Top: top}, nil
 
 	case TypeFitV:
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitV destination requires 3 elements")
 		}
-		left := getOptionalNumber(x, path, arr[2])
+		left := getOptionalNumber(c, arr[2])
 		return &FitV{Page: page, Left: left}, nil
 
 	case TypeFitR:
 		if len(arr) < 6 {
 			return nil, pdf.Error("FitR destination requires 6 elements")
 		}
-		left, err := pdf.Optional(x.GetNumber(path, arr[2]))
+		left, err := pdf.Optional(c.Number(arr[2]))
 		if err != nil {
 			return nil, err
 		}
-		bottom, err := pdf.Optional(x.GetNumber(path, arr[3]))
+		bottom, err := pdf.Optional(c.Number(arr[3]))
 		if err != nil {
 			return nil, err
 		}
-		right, err := pdf.Optional(x.GetNumber(path, arr[4]))
+		right, err := pdf.Optional(c.Number(arr[4]))
 		if err != nil {
 			return nil, err
 		}
-		top, err := pdf.Optional(x.GetNumber(path, arr[5]))
+		top, err := pdf.Optional(c.Number(arr[5]))
 		if err != nil {
 			return nil, err
 		}
@@ -166,14 +166,14 @@ func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Des
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitBH destination requires 3 elements")
 		}
-		top := getOptionalNumber(x, path, arr[2])
+		top := getOptionalNumber(c, arr[2])
 		return &FitBH{Page: page, Top: top}, nil
 
 	case TypeFitBV:
 		if len(arr) < 3 {
 			return nil, pdf.Error("FitBV destination requires 3 elements")
 		}
-		left := getOptionalNumber(x, path, arr[2])
+		left := getOptionalNumber(c, arr[2])
 		return &FitBV{Page: page, Left: left}, nil
 
 	default:
@@ -432,15 +432,15 @@ func (d *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 // getOptionalNumber reads a number from a PDF object, treating null as Unset
-func getOptionalNumber(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) float64 {
+func getOptionalNumber(c pdf.Cursor, obj pdf.Object) float64 {
 	if obj == nil {
 		return Unset
 	}
-	num, err := pdf.Optional(x.GetNumber(path, obj))
+	num, err := pdf.Optional(c.Number(obj))
 	if err != nil {
 		return Unset
 	}
-	return float64(num)
+	return num
 }
 
 // encodeOptionalNumber converts a float64 to a PDF object, using null for Unset/NaN

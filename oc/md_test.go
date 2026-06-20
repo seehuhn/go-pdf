@@ -165,7 +165,7 @@ func testMembershipRoundTrip(t *testing.T, version pdf.Version, original *Member
 
 	// extract the membership dictionary
 	extractor := pdf.NewExtractor(w)
-	extracted, err := pdf.ExtractorGet(extractor, nil, obj, ExtractMembership)
+	extracted, err := pdf.Decode(pdf.CursorAt(extractor, nil), obj, ExtractMembership)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -280,7 +280,7 @@ func TestMembershipExtractPermissive(t *testing.T) {
 	}
 
 	extractor := pdf.NewExtractor(buf)
-	membership, err := pdf.ExtractorGet(extractor, nil, ref, ExtractMembership)
+	membership, err := pdf.Decode(pdf.CursorAt(extractor, nil), ref, ExtractMembership)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -324,7 +324,7 @@ func TestMembershipSingleOCG(t *testing.T) {
 
 	extractor := pdf.NewExtractor(buf)
 
-	extracted, err := pdf.ExtractorGet(extractor, nil, obj, ExtractMembership)
+	extracted, err := pdf.Decode(pdf.CursorAt(extractor, nil), obj, ExtractMembership)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestMembershipWithNullOCGs(t *testing.T) {
 	rm.Close()
 
 	extractor := pdf.NewExtractor(buf)
-	membership, err := pdf.ExtractorGet(extractor, nil, ref, ExtractMembership)
+	membership, err := pdf.Decode(pdf.CursorAt(extractor, nil), ref, ExtractMembership)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -437,7 +437,7 @@ func FuzzMembershipRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.ExtractorGet(x, nil, obj, ExtractMembership)
+		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractMembership)
 		if err != nil {
 			t.Skip("malformed object")
 		}

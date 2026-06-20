@@ -58,11 +58,11 @@ func swid() *SoftwareIdentifier {
 }
 
 // decodeFunc adapts a typed Extract function to one returning any.
-type decodeFunc func(*pdf.Extractor, *pdf.CycleCheck, pdf.Object, bool) (any, error)
+type decodeFunc func(pdf.Cursor, pdf.Object, bool) (any, error)
 
-func adapt[T any](f func(*pdf.Extractor, *pdf.CycleCheck, pdf.Object, bool) (T, error)) decodeFunc {
-	return func(x *pdf.Extractor, p *pdf.CycleCheck, o pdf.Object, d bool) (any, error) {
-		return f(x, p, o, d)
+func adapt[T any](f func(pdf.Cursor, pdf.Object, bool) (T, error)) decodeFunc {
+	return func(c pdf.Cursor, o pdf.Object, d bool) (any, error) {
+		return f(c, o, d)
 	}
 }
 
@@ -310,7 +310,7 @@ func roundTrip(t *testing.T, version pdf.Version, obj pdf.Embedder, decode decod
 	x := pdf.NewExtractor(w)
 	s := w.GetMeta().Trailer["Quir:E"]
 	_, isRef := s.(pdf.Reference)
-	got, err := decode(x, nil, s, !isRef)
+	got, err := decode(pdf.CursorAt(x, nil), s, !isRef)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -379,7 +379,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 		x := pdf.NewExtractor(r)
 		_, isRef := obj.(pdf.Reference)
-		first, err := ExtractRendition(x, nil, obj, !isRef)
+		first, err := ExtractRendition(pdf.CursorAt(x, nil), obj, !isRef)
 		if err != nil {
 			t.Skip("malformed rendition")
 		}

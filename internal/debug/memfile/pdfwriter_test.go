@@ -49,7 +49,7 @@ func TestWriterReadAfterClose(t *testing.T) {
 	}
 
 	// Now try to read the stream back from the closed writer
-	streamObj, err := pdf.GetStream(writer, ref)
+	streamObj, err := pdf.NewCursor(writer).Stream(ref)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestWriterReadAfterClose(t *testing.T) {
 	}
 
 	// Decode and read the stream content
-	stm, err := pdf.DecodeStream(writer, nil, streamObj, 0)
+	stm, err := pdf.DecodeStream(writer, nil, streamObj)
 	if err != nil {
 		t.Fatal(err)
 	}

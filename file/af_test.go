@@ -76,7 +76,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := property.ExtractList(x, nil, embedded, true)
+	decoded, err := property.ExtractList(pdf.CursorAt(x, nil), embedded, true)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 		t.Fatalf("re-Embed() failed: %v", err)
 	}
 	x2 := pdf.NewExtractor(w2)
-	decoded2, err := property.ExtractList(x2, nil, embedded2, true)
+	decoded2, err := property.ExtractList(pdf.CursorAt(x2, nil), embedded2, true)
 	if err != nil {
 		t.Fatalf("second ExtractList() failed: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestAFRoundTripIndirect(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := property.ExtractList(x, nil, embedded, false)
+	decoded, err := property.ExtractList(pdf.CursorAt(x, nil), embedded, false)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestAFRoundTripIndirect(t *testing.T) {
 		t.Fatalf("re-Embed() failed: %v", err)
 	}
 	x2 := pdf.NewExtractor(w2)
-	decoded2, err := property.ExtractList(x2, nil, embedded2, false)
+	decoded2, err := property.ExtractList(pdf.CursorAt(x2, nil), embedded2, false)
 	if err != nil {
 		t.Fatalf("second ExtractList() failed: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestAFWithoutMCID(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := property.ExtractList(x, nil, embedded, true)
+	decoded, err := property.ExtractList(pdf.CursorAt(x, nil), embedded, true)
 	if err != nil {
 		t.Fatalf("ExtractList() failed: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestAFWithoutMCID(t *testing.T) {
 		t.Fatalf("re-Embed() failed: %v", err)
 	}
 	x2 := pdf.NewExtractor(w2)
-	decoded2, err := property.ExtractList(x2, nil, embedded2, true)
+	decoded2, err := property.ExtractList(pdf.CursorAt(x2, nil), embedded2, true)
 	if err != nil {
 		t.Fatalf("second ExtractList() failed: %v", err)
 	}

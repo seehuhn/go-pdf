@@ -216,7 +216,7 @@ func TestIndirectStreamLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sObj, err := GetStream(r, sRef)
+	sObj, err := NewCursor(r).Stream(sRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestStreamLengthInStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sObj, err := GetStream(r, sRef)
+	sObj, err := NewCursor(r).Stream(sRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestStreamLengthCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = GetStream(r, sRef)
+	_, err = NewCursor(r).Stream(sRef)
 	if err == nil {
 		t.Error("reference loop not detected")
 	}
@@ -422,7 +422,7 @@ func TestStreamLengthCycle2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = GetStream(r, xRef)
+	_, err = NewCursor(r).Stream(xRef)
 	if err == nil {
 		t.Error("reference loop not detected")
 	}

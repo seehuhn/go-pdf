@@ -64,15 +64,15 @@ func (f *Type4) GetDomain() []float64 {
 }
 
 // extractType4 reads a Type 4 function from a PDF stream object.
-func extractType4(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type4, error) {
+func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 	d := stream.Dict
 
-	domain, err := pdf.Optional(getFloatArray(x, path, d["Domain"]))
+	domain, err := pdf.Optional(getFloatArray(c, d["Domain"]))
 	if err != nil {
 		return nil, err
 	}
 
-	rangeArray, err := pdf.Optional(getFloatArray(x, path, d["Range"]))
+	rangeArray, err := pdf.Optional(getFloatArray(c, d["Range"]))
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func extractType4(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	}
 
 	const maxProgramSize = 16 * 1024
-	programBytes, err := pdf.ReadAll(x.R, path, stream, maxProgramSize)
+	programBytes, err := c.ReadAll(stream, maxProgramSize)
 	if err != nil {
 		return nil, err
 	}

@@ -312,12 +312,12 @@ func TestPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	obj, err := GetDict(r, testRef)
+	obj, err := NewCursor(r).Dict(testRef)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	lengthOut, err := GetInteger(r, obj["Length"])
+	lengthOut, err := NewCursor(r).Integer(obj["Length"])
 	if err != nil {
 		t.Fatal(err)
 	}

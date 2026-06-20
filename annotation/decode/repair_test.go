@@ -42,7 +42,7 @@ func TestMarkupDecodeRepair(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var m annotation.Markup
-			if err := decodeMarkup(x, nil, tc.dict, &m); err != nil {
+			if err := decodeMarkup(pdf.CursorAt(x, nil), tc.dict, &m); err != nil {
 				t.Fatal(err)
 			}
 			if m.RT != tc.want {
@@ -61,7 +61,7 @@ func TestFreeTextDecodeRepair(t *testing.T) {
 		"Rect":    &pdf.Rectangle{URx: 100, URy: 50},
 		"IT":      pdf.Name("Bogus"),
 	}
-	ft, err := decodeFreeText(x, nil, dict)
+	ft, err := decodeFreeText(pdf.CursorAt(x, nil), dict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestStampEncodeDefaultIntent(t *testing.T) {
 		"Subtype": pdf.Name("Stamp"),
 		"Rect":    &pdf.Rectangle{URx: 100, URy: 50},
 	}
-	a, err := Annotation(x, nil, dict, false)
+	a, err := Annotation(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
 		t.Fatal(err)
 	}

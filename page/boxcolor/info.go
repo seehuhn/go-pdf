@@ -49,9 +49,9 @@ type Info struct {
 }
 
 // ExtractInfo extracts a box colour information dictionary from a PDF object.
-func ExtractInfo(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Info, error) {
+func ExtractInfo(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Info, error) {
 
-	dict, err := x.GetDict(path, obj)
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -64,25 +64,25 @@ func ExtractInfo(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 	info := &Info{}
 	info.SingleUse = isDirect
 
-	if style, err := pdf.ExtractorGetOptional(x, path, dict["CropBox"], ExtractStyle); err != nil {
+	if style, err := pdf.DecodeOptional(c, dict["CropBox"], ExtractStyle); err != nil {
 		return nil, err
 	} else {
 		info.CropBox = style
 	}
 
-	if style, err := pdf.ExtractorGetOptional(x, path, dict["BleedBox"], ExtractStyle); err != nil {
+	if style, err := pdf.DecodeOptional(c, dict["BleedBox"], ExtractStyle); err != nil {
 		return nil, err
 	} else {
 		info.BleedBox = style
 	}
 
-	if style, err := pdf.ExtractorGetOptional(x, path, dict["TrimBox"], ExtractStyle); err != nil {
+	if style, err := pdf.DecodeOptional(c, dict["TrimBox"], ExtractStyle); err != nil {
 		return nil, err
 	} else {
 		info.TrimBox = style
 	}
 
-	if style, err := pdf.ExtractorGetOptional(x, path, dict["ArtBox"], ExtractStyle); err != nil {
+	if style, err := pdf.DecodeOptional(c, dict["ArtBox"], ExtractStyle); err != nil {
 		return nil, err
 	} else {
 		info.ArtBox = style

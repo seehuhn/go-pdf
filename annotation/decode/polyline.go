@@ -23,22 +23,22 @@ import (
 	"seehuhn.de/go/pdf/measure"
 )
 
-func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.PolyLine, error) {
+func decodePolyline(c pdf.Cursor, dict pdf.Dict) (*annotation.PolyLine, error) {
 	polyline := &annotation.PolyLine{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &polyline.Common, dict); err != nil {
+	if err := decodeCommon(c, &polyline.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &polyline.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &polyline.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract polyline-specific fields
 	// Vertices (required)
-	vertices, err := pdf.GetFloatArray(x.R, dict["Vertices"])
+	vertices, err := c.FloatArray(dict["Vertices"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "Vertices")
 	}
@@ -49,14 +49,14 @@ func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 
 	// LE (optional) - default is [None, None]
 	polyline.LineEndingStyle = [2]annotation.LineEndingStyle{annotation.LineEndingStyleNone, annotation.LineEndingStyleNone}
-	if le, err := pdf.Optional(x.GetArray(path, dict["LE"])); err != nil {
+	if le, err := pdf.Optional(c.Array(dict["LE"])); err != nil {
 		return nil, err
 	} else if len(le) >= 1 {
-		if name, err := x.GetName(path, le[0]); err == nil {
+		if name, err := c.Name(le[0]); err == nil {
 			polyline.LineEndingStyle[0] = annotation.LineEndingStyle(name)
 		}
 		if len(le) >= 2 {
-			if name, err := x.GetName(path, le[1]); err == nil {
+			if name, err := c.Name(le[1]); err == nil {
 				polyline.LineEndingStyle[1] = annotation.LineEndingStyle(name)
 			}
 		} else {
@@ -66,7 +66,7 @@ func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 	}
 
 	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		polyline.BorderStyle = bs
@@ -77,21 +77,21 @@ func decodePolyline(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 	}
 
 	// IC (optional)
-	if ic, err := pdf.Optional(colorenc.Extract(x.R, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(c, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		polyline.FillColor = ic
 	}
 
 	// Measure (optional)
-	if m, err := pdf.ExtractorGetOptional(x, path, dict["Measure"], measure.Extract); err != nil {
+	if m, err := pdf.DecodeOptional(c, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		polyline.Measure = m
 	}
 
 	// Path (optional; PDF 2.0)
-	if p, err := decodePath(x, path, dict["Path"]); err != nil {
+	if p, err := decodePath(c, dict["Path"]); err != nil {
 		return nil, err
 	} else {
 		polyline.Path = p

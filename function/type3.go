@@ -76,8 +76,8 @@ func (f *Type3) GetDomain() []float64 {
 }
 
 // extractType3 reads a Type 3 piecewise defined function from a PDF dictionary.
-func extractType3(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict) (*Type3, error) {
-	domain, err := getFloatArray(x, path, d["Domain"])
+func extractType3(c pdf.Cursor, d pdf.Dict) (*Type3, error) {
+	domain, err := getFloatArray(c, d["Domain"])
 	if err != nil {
 		return nil, err
 	}
@@ -85,24 +85,24 @@ func extractType3(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict) (*Type3, e
 		domain = []float64{0, 1}
 	}
 
-	bounds, err := getFloatArray(x, path, d["Bounds"])
+	bounds, err := getFloatArray(c, d["Bounds"])
 	if err != nil {
 		return nil, err
 	}
 
-	encode, err := getFloatArray(x, path, d["Encode"])
+	encode, err := getFloatArray(c, d["Encode"])
 	if err != nil {
 		return nil, err
 	}
 
-	functionsArray, err := x.GetArray(path, d["Functions"])
+	functionsArray, err := c.Array(d["Functions"])
 	if err != nil {
 		return nil, err
 	}
 
 	functions := make([]pdf.Function, len(functionsArray))
 	for i, funcObj := range functionsArray {
-		fn, err := pdf.ExtractorGet(x, path, funcObj, Extract)
+		fn, err := pdf.Decode(c, funcObj, Extract)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func extractType3(x *pdf.Extractor, path *pdf.CycleCheck, d pdf.Dict) (*Type3, e
 		return nil, errors.New("missing child functions")
 	}
 
-	rnge, err := getFloatArray(x, path, d["Range"])
+	rnge, err := getFloatArray(c, d["Range"])
 	if err != nil {
 		return nil, err
 	}

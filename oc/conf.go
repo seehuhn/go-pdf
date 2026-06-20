@@ -107,144 +107,143 @@ var _ pdf.Embedder = (*Configuration)(nil)
 
 // ExtractConfiguration extracts an optional content configuration dictionary
 // from a PDF object.
-func ExtractConfiguration(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Configuration, error) {
-	r := x.R
-	dict, err := pdf.GetDict(r, obj)
+func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configuration, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing optional content configuration dictionary")
 	}
 
-	c := &Configuration{}
+	cfg := &Configuration{}
 
 	// Name (optional)
-	if name, err := pdf.Optional(pdf.GetTextString(r, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(c.TextString(dict["Name"])); err != nil {
 		return nil, err
 	} else {
-		c.Name = string(name)
+		cfg.Name = string(name)
 	}
 
 	// Creator (optional)
-	if creator, err := pdf.Optional(pdf.GetTextString(r, dict["Creator"])); err != nil {
+	if creator, err := pdf.Optional(c.TextString(dict["Creator"])); err != nil {
 		return nil, err
 	} else {
-		c.Creator = string(creator)
+		cfg.Creator = string(creator)
 	}
 
 	// BaseState (optional, default ON)
-	if bs, err := pdf.Optional(pdf.GetName(r, dict["BaseState"])); err != nil {
+	if bs, err := pdf.Optional(c.Name(dict["BaseState"])); err != nil {
 		return nil, err
 	} else {
 		switch BaseState(bs) {
 		case BaseStateON, BaseStateOFF, BaseStateUnchanged:
-			c.BaseState = BaseState(bs)
+			cfg.BaseState = BaseState(bs)
 		default:
-			c.BaseState = BaseStateON
+			cfg.BaseState = BaseStateON
 		}
 	}
 
 	// ON (optional)
-	c.ON, err = extractGroupArray(x, path, dict["ON"])
+	cfg.ON, err = extractGroupArray(c, dict["ON"])
 	if err != nil {
 		return nil, err
 	}
 
 	// OFF (optional)
-	c.OFF, err = extractGroupArray(x, path, dict["OFF"])
+	cfg.OFF, err = extractGroupArray(c, dict["OFF"])
 	if err != nil {
 		return nil, err
 	}
 
 	// Intent (optional, default "View")
-	intentObj, err := x.Resolve(path, dict["Intent"])
+	intentObj, err := c.Resolve(dict["Intent"])
 	if err != nil {
 		return nil, err
 	}
 	switch intent := intentObj.(type) {
 	case pdf.Array:
-		c.Intent = []pdf.Name{}
+		cfg.Intent = []pdf.Name{}
 		for _, o := range intent {
-			if name, err := pdf.Optional(x.GetName(path, o)); err != nil {
+			if name, err := pdf.Optional(c.Name(o)); err != nil {
 				return nil, err
 			} else if name != "" {
-				c.Intent = append(c.Intent, name)
+				cfg.Intent = append(cfg.Intent, name)
 			}
 		}
 	case pdf.Name:
 		if intent != "" {
-			c.Intent = []pdf.Name{intent}
+			cfg.Intent = []pdf.Name{intent}
 		}
 	}
-	if c.Intent == nil {
-		c.Intent = []pdf.Name{"View"}
+	if cfg.Intent == nil {
+		cfg.Intent = []pdf.Name{"View"}
 	}
 
 	// AS (optional)
-	if asArr, err := pdf.Optional(pdf.GetArray(r, dict["AS"])); err != nil {
+	if asArr, err := pdf.Optional(c.Array(dict["AS"])); err != nil {
 		return nil, err
 	} else {
 		for _, item := range asArr {
-			ua, err := pdf.ExtractorGetOptional(x, path, item, ExtractUsageApplication)
+			ua, err := pdf.DecodeOptional(c, item, ExtractUsageApplication)
 			if err != nil {
 				continue // permissive
 			}
 			if ua != nil {
-				c.AS = append(c.AS, ua)
+				cfg.AS = append(cfg.AS, ua)
 			}
 		}
 	}
 
 	// Order (optional)
-	if orderArr, err := pdf.Optional(pdf.GetArray(r, dict["Order"])); err != nil {
+	if orderArr, err := pdf.Optional(c.Array(dict["Order"])); err != nil {
 		return nil, err
 	} else if len(orderArr) > 0 {
-		c.Order, err = extractOrderItems(x, path, orderArr)
+		cfg.Order, err = extractOrderItems(c, orderArr)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// ListMode (optional, default AllPages)
-	if lm, err := pdf.Optional(pdf.GetName(r, dict["ListMode"])); err != nil {
+	if lm, err := pdf.Optional(c.Name(dict["ListMode"])); err != nil {
 		return nil, err
 	} else {
 		switch ListMode(lm) {
 		case ListModeAllPages, ListModeVisiblePages:
-			c.ListMode = ListMode(lm)
+			cfg.ListMode = ListMode(lm)
 		default:
-			c.ListMode = ListModeAllPages
+			cfg.ListMode = ListModeAllPages
 		}
 	}
 
 	// RBGroups (optional)
-	if rbArr, err := pdf.Optional(pdf.GetArray(r, dict["RBGroups"])); err != nil {
+	if rbArr, err := pdf.Optional(c.Array(dict["RBGroups"])); err != nil {
 		return nil, err
 	} else {
 		for _, item := range rbArr {
-			inner, err := pdf.Optional(pdf.GetArray(r, item))
+			inner, err := pdf.Optional(c.Array(item))
 			if err != nil {
 				continue
 			}
-			groups, err := extractGroupArrayFromArray(x, path, inner)
+			groups, err := extractGroupArrayFromArray(c, inner)
 			if err != nil {
 				continue
 			}
 			if len(groups) > 0 {
-				c.RBGroups = append(c.RBGroups, groups)
+				cfg.RBGroups = append(cfg.RBGroups, groups)
 			}
 		}
 	}
 
 	// Locked (optional, PDF 1.6)
-	c.Locked, err = extractGroupArray(x, path, dict["Locked"])
+	cfg.Locked, err = extractGroupArray(c, dict["Locked"])
 	if err != nil {
 		return nil, err
 	}
 
-	c.SingleUse = isDirect
+	cfg.SingleUse = isDirect
 
-	return c, nil
+	return cfg, nil
 }
 
 // Embed adds the configuration dictionary to a PDF file.
@@ -392,22 +391,22 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // extractGroupArray extracts an array of Group references from a PDF object.
-func extractGroupArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]*Group, error) {
-	arr, err := pdf.Optional(pdf.GetArray(x.R, obj))
+func extractGroupArray(c pdf.Cursor, obj pdf.Object) ([]*Group, error) {
+	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil {
 		return nil, err
 	}
-	return extractGroupArrayFromArray(x, path, arr)
+	return extractGroupArrayFromArray(c, arr)
 }
 
 // extractGroupArrayFromArray extracts Groups from an already-resolved PDF array.
-func extractGroupArrayFromArray(x *pdf.Extractor, path *pdf.CycleCheck, arr pdf.Array) ([]*Group, error) {
+func extractGroupArrayFromArray(c pdf.Cursor, arr pdf.Array) ([]*Group, error) {
 	if len(arr) == 0 {
 		return nil, nil
 	}
 	var groups []*Group
 	for _, item := range arr {
-		group, err := pdf.ExtractorGetOptional(x, path, item, ExtractGroup)
+		group, err := pdf.DecodeOptional(c, item, ExtractGroup)
 		if err != nil {
 			continue // permissive
 		}
@@ -440,18 +439,18 @@ func embedGroupArray(rm *pdf.EmbedHelper, groups []*Group) (pdf.Array, error) {
 const maxOrderItems = 1000
 
 // extractOrderItems extracts Order items from a PDF array.
-func extractOrderItems(x *pdf.Extractor, path *pdf.CycleCheck, arr pdf.Array) ([]OrderItem, error) {
+func extractOrderItems(c pdf.Cursor, arr pdf.Array) ([]OrderItem, error) {
 	remaining := maxOrderItems
-	return doExtractOrderItems(x, path, arr, &remaining)
+	return doExtractOrderItems(c, arr, &remaining)
 }
 
-func doExtractOrderItems(x *pdf.Extractor, path *pdf.CycleCheck, arr pdf.Array, remaining *int) ([]OrderItem, error) {
+func doExtractOrderItems(c pdf.Cursor, arr pdf.Array, remaining *int) ([]OrderItem, error) {
 	var items []OrderItem
 	for _, elem := range arr {
 		if *remaining <= 0 {
 			break
 		}
-		resolved, err := x.Resolve(path, elem)
+		resolved, err := c.Resolve(elem)
 		if err != nil {
 			continue
 		}
@@ -462,12 +461,12 @@ func doExtractOrderItems(x *pdf.Extractor, path *pdf.CycleCheck, arr pdf.Array, 
 			og := &OrderGroup{}
 			start := 0
 			if len(v) > 0 {
-				if label, err := pdf.Optional(pdf.GetTextString(x.R, v[0])); err == nil && label != "" {
+				if label, err := pdf.Optional(c.TextString(v[0])); err == nil && label != "" {
 					og.Label = string(label)
 					start = 1
 				}
 			}
-			children, err := doExtractOrderItems(x, path, v[start:], remaining)
+			children, err := doExtractOrderItems(c, v[start:], remaining)
 			if err != nil {
 				continue
 			}
@@ -475,7 +474,7 @@ func doExtractOrderItems(x *pdf.Extractor, path *pdf.CycleCheck, arr pdf.Array, 
 			items = append(items, og)
 		default:
 			// try to extract as a Group
-			group, err := pdf.ExtractorGetOptional(x, path, elem, ExtractGroup)
+			group, err := pdf.DecodeOptional(c, elem, ExtractGroup)
 			if err != nil {
 				continue
 			}

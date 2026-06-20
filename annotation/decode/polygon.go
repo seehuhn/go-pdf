@@ -23,22 +23,22 @@ import (
 	"seehuhn.de/go/pdf/measure"
 )
 
-func decodePolygon(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Polygon, error) {
+func decodePolygon(c pdf.Cursor, dict pdf.Dict) (*annotation.Polygon, error) {
 	polygon := &annotation.Polygon{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &polygon.Common, dict); err != nil {
+	if err := decodeCommon(c, &polygon.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &polygon.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &polygon.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract polygon-specific fields
 	// Vertices (required)
-	vertices, err := pdf.GetFloatArray(x.R, dict["Vertices"])
+	vertices, err := c.FloatArray(dict["Vertices"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "Vertices")
 	}
@@ -48,7 +48,7 @@ func decodePolygon(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*anno
 	polygon.Vertices = vertices[:len(vertices)&^1]
 
 	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderStyle = bs
@@ -59,28 +59,28 @@ func decodePolygon(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*anno
 	}
 
 	// IC (optional)
-	if ic, err := pdf.Optional(colorenc.Extract(x.R, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(c, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		polygon.FillColor = ic
 	}
 
 	// BE (optional)
-	if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], annotation.ExtractBorderEffect); err != nil {
+	if be, err := pdf.DecodeOptional(c, dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderEffect = be
 	}
 
 	// Measure (optional)
-	if m, err := pdf.ExtractorGetOptional(x, path, dict["Measure"], measure.Extract); err != nil {
+	if m, err := pdf.DecodeOptional(c, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		polygon.Measure = m
 	}
 
 	// Path (optional; PDF 2.0)
-	if p, err := decodePath(x, path, dict["Path"]); err != nil {
+	if p, err := decodePath(c, dict["Path"]); err != nil {
 		return nil, err
 	} else {
 		polygon.Path = p

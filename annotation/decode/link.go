@@ -24,37 +24,37 @@ import (
 	"seehuhn.de/go/pdf/destination"
 )
 
-func decodeLink(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Link, error) {
+func decodeLink(c pdf.Cursor, dict pdf.Dict) (*annotation.Link, error) {
 	link := &annotation.Link{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &link.Common, dict); err != nil {
+	if err := decodeCommon(c, &link.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract link-specific fields
 	if dict["A"] != nil {
-		act, err := pdf.ExtractorGetOptional(x, path, dict["A"], action.Decode)
+		act, err := pdf.DecodeOptional(c, dict["A"], action.Decode)
 		if err != nil {
 			return nil, err
 		}
 		link.Action = act
 	}
 	if dict["Dest"] != nil && link.Action == nil {
-		dest, err := pdf.ExtractorGetOptional(x, path, dict["Dest"], destination.Decode)
+		dest, err := pdf.DecodeOptional(c, dict["Dest"], destination.Decode)
 		if err != nil {
 			return nil, err
 		}
 		link.Destination = dest
 	}
 
-	link.Highlight = decodeHighlight(x, path, dict["H"])
+	link.Highlight = decodeHighlight(c, dict["H"])
 
 	if pa, ok := dict["PA"].(pdf.Reference); ok {
 		link.Backup = pa
 	}
 
-	if quadPoints, err := pdf.GetFloatArray(x.R, dict["QuadPoints"]); err == nil && len(quadPoints) >= 8 {
+	if quadPoints, err := c.FloatArray(dict["QuadPoints"]); err == nil && len(quadPoints) >= 8 {
 		// process floats in groups of 8, each group becomes 4 Vec2 points
 		numCompleteQuads := len(quadPoints) / 8
 		points := make([]vec.Vec2, numCompleteQuads*4)
@@ -67,7 +67,7 @@ func decodeLink(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotat
 		link.QuadPoints = points
 	}
 
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		link.BorderStyle = bs

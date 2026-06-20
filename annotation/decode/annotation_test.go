@@ -78,7 +78,7 @@ func TestRoundTripDict(t *testing.T) {
 			t.Run(fmt.Sprintf("dict-%d", i), func(t *testing.T) {
 				// make sure Decode does not crash or hang
 				x := pdf.NewExtractor(mock.Getter)
-				a, err := Annotation(x, nil, dict, false)
+				a, err := Annotation(pdf.CursorAt(x, nil), dict, false)
 				if err != nil {
 					t.Error(err)
 					return
@@ -133,7 +133,7 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 annotation.Annotation) {
 
 	// read back
 	x := pdf.NewExtractor(buf)
-	a2, err := Annotation(x, nil, dict, false)
+	a2, err := Annotation(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestOpacity(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dict, err := pdf.GetDict(rm.Out, embedded)
+			dict, err := pdf.NewCursor(rm.Out).Dict(embedded)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -336,7 +336,7 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("missing annotation")
 		}
 		x := pdf.NewExtractor(r)
-		annot, err := Annotation(x, nil, obj, false)
+		annot, err := Annotation(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("broken annotation")
 		}

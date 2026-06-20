@@ -46,7 +46,7 @@ func TestExtractStreamOversize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := ExtractStream(pdf.NewExtractor(w), nil, ref, "Type1", "FontFile")
+	s, err := ExtractStream(pdf.NewCursor(w), ref, "Type1", "FontFile")
 	if err != nil {
 		t.Fatal(err)
 	}

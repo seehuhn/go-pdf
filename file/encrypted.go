@@ -47,8 +47,8 @@ type EncryptedPayload struct {
 var _ pdf.Embedder = (*EncryptedPayload)(nil)
 
 // ExtractEncryptedPayload extracts an encrypted payload dictionary from a PDF object.
-func ExtractEncryptedPayload(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*EncryptedPayload, error) {
-	dict, err := x.GetDictTyped(path, obj, "EncryptedPayload")
+func ExtractEncryptedPayload(c pdf.Cursor, obj pdf.Object, _ bool) (*EncryptedPayload, error) {
+	dict, err := c.DictTyped(obj, "EncryptedPayload")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -58,7 +58,7 @@ func ExtractEncryptedPayload(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obj
 	ep := &EncryptedPayload{}
 
 	// Subtype (required)
-	if subtype, err := x.GetName(path, dict["Subtype"]); err != nil {
+	if subtype, err := c.Name(dict["Subtype"]); err != nil {
 		return nil, err
 	} else if subtype == "" {
 		return nil, pdf.Errorf("missing required Subtype in encrypted payload dictionary")
@@ -67,7 +67,7 @@ func ExtractEncryptedPayload(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obj
 	}
 
 	// Version (optional)
-	if version, err := pdf.Optional(pdf.GetTextString(x.R, dict["Version"])); err != nil {
+	if version, err := pdf.Optional(c.TextString(dict["Version"])); err != nil {
 		return nil, err
 	} else {
 		ep.Version = string(version)

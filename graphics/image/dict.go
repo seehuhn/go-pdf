@@ -163,8 +163,8 @@ type Dict struct {
 }
 
 // ExtractDict extracts an image dictionary from a PDF stream.
-func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Dict, error) {
-	stream, err := x.GetStream(path, obj)
+func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
+	stream, err := c.Stream(obj)
 	if err != nil {
 		return nil, err
 	} else if stream == nil {
@@ -173,17 +173,17 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	dict := stream.Dict
 
 	// Check Type and Subtype
-	typeName, _ := x.GetDictTyped(path, obj, "XObject")
+	typeName, _ := c.DictTyped(obj, "XObject")
 	if typeName == nil {
 		// Type is optional, but if present must be XObject
-		if t, err := pdf.Optional(x.GetName(path, dict["Type"])); err != nil {
+		if t, err := pdf.Optional(c.Name(dict["Type"])); err != nil {
 			return nil, err
 		} else if t != "" && t != "XObject" {
 			return nil, pdf.Errorf("invalid Type %q for image XObject", t)
 		}
 	}
 
-	subtypeName, err := pdf.Optional(x.GetName(path, dict["Subtype"]))
+	subtypeName, err := pdf.Optional(c.Name(dict["Subtype"]))
 	if err != nil {
 		return nil, err
 	}
@@ -191,17 +191,17 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		return nil, pdf.Errorf("invalid Subtype %q for image XObject", subtypeName)
 	}
 
-	if isImageMask, err := x.GetBoolean(path, dict["ImageMask"]); err == nil && isImageMask {
+	if isImageMask, err := c.Boolean(dict["ImageMask"]); err == nil && isImageMask {
 		return nil, pdf.Error("use ExtractImageMask for image masks")
 	}
 
-	filters, err := pdf.Optional(pdf.GetFilters(x.R, path, dict))
+	filters, err := pdf.Optional(c.Filters(dict))
 	if err != nil {
 		return nil, err
 	}
 	hasJPX := false
 	for _, f := range filters {
-		name, _, err := f.Info(pdf.GetVersion(x.R))
+		name, _, err := f.Info(c.Version())
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +212,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// Extract required fields
-	width, err := x.GetInteger(path, dict["Width"])
+	width, err := c.Integer(dict["Width"])
 	if err != nil {
 		return nil, fmt.Errorf("missing or invalid Width: %w", err)
 	}
@@ -223,7 +223,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		return nil, pdf.Errorf("image width %d exceeds limit", width)
 	}
 
-	height, err := x.GetInteger(path, dict["Height"])
+	height, err := c.Integer(dict["Height"])
 	if err != nil {
 		return nil, fmt.Errorf("missing or invalid Height: %w", err)
 	}
@@ -244,7 +244,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Extract ColorSpace (required for images, Pattern not allowed)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := color.ExtractSpace(x, path, csObj, false)
+		cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
 		}
@@ -262,7 +262,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// img.BitsPerComponent == 0 for JPX.
 	if hasJPX {
 		img.BitsPerComponent = 0
-	} else if bpc, err := pdf.Optional(x.GetInteger(path, dict["BitsPerComponent"])); err != nil {
+	} else if bpc, err := pdf.Optional(c.Integer(dict["BitsPerComponent"])); err != nil {
 		return nil, err
 	} else if bpc != 0 {
 		switch bpc {
@@ -296,20 +296,20 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// Extract optional fields
-	if intent, err := pdf.Optional(x.GetName(path, dict["Intent"])); err != nil {
+	if intent, err := pdf.Optional(c.Name(dict["Intent"])); err != nil {
 		return nil, err
 	} else if intent != "" {
 		img.Intent = graphics.RenderingIntent(intent)
 	}
 
 	// Mask can either be an image mask or a color key mask array.
-	maskObj, err := pdf.Resolve(x.R, dict["Mask"])
+	maskObj, err := c.Resolve(dict["Mask"])
 	if err != nil {
 		return nil, err
 	}
 	switch maskObj := maskObj.(type) {
 	case *pdf.Stream: // image mask stream
-		if maskImg, err := pdf.ExtractorGetOptional(x, path, maskObj, ExtractMask); err != nil {
+		if maskImg, err := pdf.DecodeOptional(c, maskObj, ExtractMask); err != nil {
 			return nil, err
 		} else {
 			img.MaskImage = maskImg
@@ -335,7 +335,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		maskColors := make([]uint16, len(maskObj))
 		valid := true
 		for i, val := range maskObj {
-			num, err := x.GetInteger(path, val)
+			num, err := c.Integer(val)
 			if err != nil || num < 0 || num > 0xFFFF {
 				valid = false
 				break
@@ -365,13 +365,13 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 		// honor a Decode array with at least 2*ncomp entries, ignoring any
 		// surplus; a shorter array falls back to the default
 		n := 2 * img.ColorSpace.Channels()
-		if decodeArray, err := pdf.Optional(x.GetArray(path, dict["Decode"])); err != nil {
+		if decodeArray, err := pdf.Optional(c.Array(dict["Decode"])); err != nil {
 			return nil, err
 		} else if len(decodeArray) >= n {
 			decode := make([]float64, n)
 			valid := true
 			for i := range decode {
-				num, err := x.GetNumber(path, decodeArray[i])
+				num, err := c.Number(decodeArray[i])
 				if pdf.IsMalformed(err) {
 					valid = false
 					break
@@ -390,17 +390,17 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// Extract Interpolate
-	if interp, err := x.GetBoolean(path, dict["Interpolate"]); err == nil {
+	if interp, err := c.Boolean(dict["Interpolate"]); err == nil {
 		img.Interpolate = bool(interp)
 	}
 
 	// extract alternates (Table 89); drop the whole list if it exceeds
 	// MaxAlternates rather than silently truncate
-	if alts, err := pdf.Optional(x.GetArray(path, dict["Alternates"])); err != nil {
+	if alts, err := pdf.Optional(c.Array(dict["Alternates"])); err != nil {
 		return nil, err
 	} else if len(alts) <= limits.MaxAlternates {
 		for i, altObj := range alts {
-			alt, err := pdf.ExtractorGetOptional(x, path, altObj, ExtractAlternate)
+			alt, err := pdf.DecodeOptional(c, altObj, ExtractAlternate)
 			if err != nil {
 				return nil, fmt.Errorf("invalid Alternates[%d]: %w", i, err)
 			}
@@ -412,7 +412,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Extract SMask (soft-mask image)
 	if smaskObj, ok := dict["SMask"]; ok {
-		smask, err := pdf.ExtractorGetOptional(x, path, smaskObj, ExtractSoftMask)
+		smask, err := pdf.DecodeOptional(c, smaskObj, ExtractSoftMask)
 		if err != nil {
 			return nil, fmt.Errorf("invalid SMask: %w", err)
 		}
@@ -423,7 +423,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	// Per spec §8.9.5.1 the entry is only meaningful for JPXDecode
 	// images; drop it for any other filter so that round-trip via
 	// [Dict.Embed] does not fail its consistency check.
-	if smd, err := pdf.Optional(x.GetInteger(path, dict["SMaskInData"])); err != nil {
+	if smd, err := pdf.Optional(c.Integer(dict["SMaskInData"])); err != nil {
 		return nil, err
 	} else if hasJPX && (smd == 1 || smd == 2) {
 		img.SMaskInData = int(smd)
@@ -434,7 +434,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// Extract Name (deprecated in PDF 2.0)
-	if name, err := pdf.Optional(x.GetName(path, dict["Name"])); err != nil {
+	if name, err := pdf.Optional(c.Name(dict["Name"])); err != nil {
 		return nil, err
 	} else {
 		img.Name = name
@@ -442,7 +442,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Extract Metadata
 	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := pdf.ExtractMetadataStream(x, path, metaObj, false)
+		meta, err := pdf.Decode(c, metaObj, pdf.ExtractMetadataStream)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Metadata: %w", err)
 		}
@@ -450,7 +450,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// OC (optional)
-	if oc, err := pdf.ExtractorGetOptional(x, path, dict["OC"], oc.ExtractConditional); err != nil {
+	if oc, err := pdf.DecodeOptional(c, dict["OC"], oc.ExtractConditional); err != nil {
 		return nil, err
 	} else {
 		img.OptionalContent = oc
@@ -458,7 +458,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Extract Measure
 	if measureObj, ok := dict["Measure"]; ok {
-		m, err := pdf.ExtractorGet(x, path, measureObj, measure.Extract)
+		m, err := pdf.Decode(c, measureObj, measure.Extract)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Measure: %w", err)
 		}
@@ -466,7 +466,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// Extract PtData
-	if ptData, err := pdf.ExtractorGetOptional(x, path, dict["PtData"], measure.ExtractPtData); err != nil {
+	if ptData, err := pdf.DecodeOptional(c, dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		img.PtData = ptData
@@ -474,7 +474,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Extract StructParent
 	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(x.GetInteger(path, dict["StructParent"])); err != nil {
+		if key, err := pdf.Optional(c.Integer(dict["StructParent"])); err != nil {
 			return nil, err
 		} else if key >= 0 && uint64(key) <= math.MaxUint {
 			img.StructParent.Set(uint(key))
@@ -483,12 +483,12 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// Extract AssociatedFiles (AF); drop the whole list if it exceeds
 	// MaxAssociatedFiles rather than silently truncate
-	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
+	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
 		return nil, err
 	} else if afArray != nil && len(afArray) <= limits.MaxAssociatedFiles {
 		img.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := pdf.DecodeOptional(c, afObj, file.ExtractSpecification); err != nil {
 				return nil, err
 			} else if spec != nil {
 				img.AssociatedFiles = append(img.AssociatedFiles, spec)
@@ -497,7 +497,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 	}
 
 	// Extract WebCaptureID (ID)
-	if webID, err := pdf.ExtractorGetOptional(x, path, dict["ID"], webcapture.ExtractIdentifier); err != nil {
+	if webID, err := pdf.DecodeOptional(c, dict["ID"], webcapture.ExtractIdentifier); err != nil {
 		return nil, err
 	} else if webID != nil {
 		img.WebCaptureID = webID
@@ -505,7 +505,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool)
 
 	// lazily read from the original stream, preserving the encoding
 	img.Data = &streamData{
-		inner:    opaque.ExtractStream(x, stream),
+		inner:    opaque.ExtractStream(c.Extractor(), stream),
 		isJPX:    hasJPX,
 		maxBytes: ImageDataLimit(img.Width, img.Height, img.BitsPerComponent, img.ColorSpace),
 	}

@@ -50,7 +50,7 @@ func TestStreamReader(t *testing.T) {
 	}
 
 	srcX := pdf.NewExtractor(src)
-	stream, err := srcX.GetStream(nil, ref)
+	stream, err := pdf.CursorAt(srcX, nil).Stream(ref)
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 	}
 
 	srcX := pdf.NewExtractor(src)
-	srcStream, err := srcX.GetStream(nil, streamRef)
+	srcStream, err := pdf.CursorAt(srcX, nil).Stream(streamRef)
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 
 	// verify the dest stream
 	dstX := pdf.NewExtractor(dst)
-	dstStream, err := dstX.GetStream(nil, dstRef)
+	dstStream, err := pdf.CursorAt(dstX, nil).Stream(dstRef)
 	if err != nil {
 		t.Fatalf("dst GetStream: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 	if dstProfileRef == innerRef {
 		t.Error("dst reused source Profile reference; expected translation")
 	}
-	dstProfile, err := dstX.GetDict(nil, dstProfileRef)
+	dstProfile, err := pdf.CursorAt(dstX, nil).Dict(dstProfileRef)
 	if err != nil {
 		t.Fatalf("dst Profile GetDict: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 	}
 
 	// Body bytes must be unchanged.
-	rc, err := pdf.DecodeStream(dst, nil, dstStream, 0)
+	rc, err := pdf.DecodeStream(dst, nil, dstStream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 	}
 	srcX := pdf.NewExtractor(r)
 	srcStreamRef := r.GetMeta().Trailer["Quir:E"]
-	srcStream, err := srcX.GetStream(nil, srcStreamRef)
+	srcStream, err := pdf.CursorAt(srcX, nil).Stream(srcStreamRef)
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
@@ -239,11 +239,11 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 	// the destination is unencrypted; reading the stream must yield the
 	// original plaintext body (decrypted from the source on the way out).
 	dstX := pdf.NewExtractor(dst)
-	dstStream, err := dstX.GetStream(nil, dstRef)
+	dstStream, err := pdf.CursorAt(dstX, nil).Stream(dstRef)
 	if err != nil {
 		t.Fatalf("dst GetStream: %v", err)
 	}
-	rc, err := pdf.DecodeStream(dst, nil, dstStream, 0)
+	rc, err := pdf.DecodeStream(dst, nil, dstStream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestStreamWriteAtRejectsForbiddenKeys(t *testing.T) {
 	}
 
 	srcX := pdf.NewExtractor(src)
-	stream, err := srcX.GetStream(nil, streamRef)
+	stream, err := pdf.CursorAt(srcX, nil).Stream(streamRef)
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}

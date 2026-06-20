@@ -51,7 +51,7 @@ func TestGetFiltersJBIG2GlobalsCycleSelf(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stream, err := pdf.GetStream(w, refA)
+	stream, err := pdf.NewCursor(w).Stream(refA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestGetFiltersJBIG2GlobalsCycleMutual(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stream, err := pdf.GetStream(w, refA)
+	stream, err := pdf.NewCursor(w).Stream(refA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestGetFiltersJBIG2GlobalsValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stream, err := pdf.GetStream(w, refA)
+	stream, err := pdf.NewCursor(w).Stream(refA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestGetFiltersChainTooLong(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stream, err := pdf.GetStream(w, ref)
+	stream, err := pdf.NewCursor(w).Stream(ref)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -121,7 +121,7 @@ func roundTripMovie(t *testing.T, version pdf.Version, m *Movie) {
 	stored := w.GetMeta().Trailer["Quir:E"]
 	_, isDirect := stored.(pdf.Reference)
 	isDirect = !isDirect
-	got, err := Extract(x, nil, stored, isDirect)
+	got, err := Extract(pdf.CursorAt(x, nil), stored, isDirect)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -239,7 +239,7 @@ func FuzzMovieRoundTrip(f *testing.F) {
 		x := pdf.NewExtractor(r)
 		_, isDirect := objPDF.(pdf.Reference)
 		isDirect = !isDirect
-		first, err := Extract(x, nil, objPDF, isDirect)
+		first, err := Extract(pdf.CursorAt(x, nil), objPDF, isDirect)
 		if err != nil {
 			t.Skip("malformed movie dictionary")
 		}
@@ -265,7 +265,7 @@ func FuzzMovieRoundTrip(f *testing.F) {
 		stored := w.GetMeta().Trailer["Quir:E"]
 		_, isDirect2 := stored.(pdf.Reference)
 		isDirect2 = !isDirect2
-		second, err := Extract(x2, nil, stored, isDirect2)
+		second, err := Extract(pdf.CursorAt(x2, nil), stored, isDirect2)
 		if err != nil {
 			t.Fatalf("second extract: %v", err)
 		}

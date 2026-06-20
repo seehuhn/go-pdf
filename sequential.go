@@ -182,7 +182,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		return opt.ErrorHandling != ErrorHandlingRecover
 	}
 
-	catalogDict, err := GetDict(r, trailer["Root"])
+	catalogDict, err := NewCursor(r).Dict(trailer["Root"])
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	}
 
 	x := NewExtractor(r)
-	r.meta.Catalog, err = ExtractorGet(x, nil, catalogDict, DecodeCatalog)
+	r.meta.Catalog, err = Decode(CursorAt(x, nil), catalogDict, DecodeCatalog)
 	if shouldExit(err) {
 		return nil, err
 	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
@@ -214,7 +214,7 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		r.meta.Catalog.Metadata.Plaintext = true
 	}
 
-	r.meta.Info, err = ExtractorGet(x, nil, trailer["Info"], ExtractInfo)
+	r.meta.Info, err = Decode(CursorAt(x, nil), trailer["Info"], ExtractInfo)
 	if shouldExit(err) {
 		return nil, err
 	}

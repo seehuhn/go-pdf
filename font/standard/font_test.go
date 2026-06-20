@@ -104,18 +104,18 @@ func TestLigatures(t *testing.T) {
 					t.Errorf("font %d: ligature %q: unexpected GIDs: %d %d %d",
 						i, lig, gg.Seq[0].GID, gg.Seq[1].GID, gg.Seq[2].GID)
 				}
-				if string(gg.Seq[0].Text) != string(rr[0]) {
+				if gg.Seq[0].Text != string(rr[0]) {
 					t.Errorf("font %d: ligature %q: unexpected glyph for %q[0]: %q",
 						i, lig, lig, gg.Seq[0].Text)
 				}
 
-				if string(gg.Seq[1].Text) != "=" {
+				if gg.Seq[1].Text != "=" {
 					// test is broken
 					t.Fatalf("font %d: ligature %q: unexpected glyph for %q[1]: %q",
 						i, lig, lig, gg.Seq[1].Text)
 				}
 
-				if string(gg.Seq[2].Text) != string(rr[2:]) {
+				if gg.Seq[2].Text != string(rr[2:]) {
 					t.Errorf("font %d: ligature %q: unexpected glyph for %q[2]: %q",
 						i, lig, lig, gg.Seq[2].Text)
 				}

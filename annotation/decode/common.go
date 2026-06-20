@@ -30,14 +30,14 @@ import (
 )
 
 // decodeCommon extracts fields common to all annotations from a PDF dictionary.
-func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Common, dict pdf.Dict) error {
+func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error {
 	// Rect (required)
-	if rect, err := pdf.GetRectangle(x.R, dict["Rect"]); err == nil && rect != nil {
+	if rect, err := c.Rectangle(dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect
 	}
 
 	// Contents (optional)
-	if contents, err := pdf.GetTextString(x.R, dict["Contents"]); err == nil && contents != "" {
+	if contents, err := c.TextString(dict["Contents"]); err == nil && contents != "" {
 		common.Contents = string(contents)
 	}
 
@@ -47,44 +47,44 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Com
 	}
 
 	// NM (optional)
-	if nm, err := pdf.GetTextString(x.R, dict["NM"]); err == nil && nm != "" {
+	if nm, err := c.TextString(dict["NM"]); err == nil && nm != "" {
 		common.Name = string(nm)
 	}
 
 	// M (optional)
-	if m, err := pdf.GetTextString(x.R, dict["M"]); err == nil && m != "" {
+	if m, err := c.TextString(dict["M"]); err == nil && m != "" {
 		common.LastModified = string(m)
 	}
 
 	// F (optional)
-	if f, err := x.GetInteger(path, dict["F"]); err == nil && f != 0 {
+	if f, err := c.Integer(dict["F"]); err == nil && f != 0 {
 		common.Flags = annotation.Flags(f)
 	}
 
 	// AP (optional)
-	if ap, err := pdf.ExtractorGetOptional(x, path, dict["AP"], appearance.ExtractDict); err != nil {
+	if ap, err := pdf.DecodeOptional(c, dict["AP"], appearance.ExtractDict); err != nil {
 		return err
 	} else {
 		common.Appearance = ap
 	}
 
 	// AS (optional)
-	if as, err := x.GetName(path, dict["AS"]); err == nil && as != "" {
+	if as, err := c.Name(dict["AS"]); err == nil && as != "" {
 		common.AppearanceState = as
 	}
 
 	// Border (optional)
-	if border, err := pdf.ExtractorGetOptional(x, path, dict["Border"], annotation.ExtractBorder); err != nil {
+	if border, err := pdf.DecodeOptional(c, dict["Border"], annotation.ExtractBorder); err != nil {
 		return err
 	} else {
 		common.Border = border
 	}
 
 	// C (optional)
-	if c, err := x.GetArray(path, dict["C"]); err == nil && c != nil {
-		colors := make([]float64, len(c))
-		for i, col := range c {
-			if num, err := x.GetNumber(path, col); err == nil {
+	if cArr, err := c.Array(dict["C"]); err == nil && cArr != nil {
+		colors := make([]float64, len(cArr))
+		for i, col := range cArr {
+			if num, err := c.Number(col); err == nil {
 				colors[i] = num
 			}
 		}
@@ -102,7 +102,7 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Com
 
 	// StructParent (optional)
 	if dict["StructParent"] != nil {
-		if key, err := pdf.Optional(x.GetInteger(path, dict["StructParent"])); err != nil {
+		if key, err := pdf.Optional(c.Integer(dict["StructParent"])); err != nil {
 			return err
 		} else if key >= 0 && uint64(key) <= math.MaxUint {
 			common.StructParent.Set(uint(key))
@@ -110,19 +110,19 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Com
 	}
 
 	// OC (optional)
-	if oc, err := pdf.ExtractorGetOptional(x, path, dict["OC"], oc.ExtractConditional); err != nil {
+	if oc, err := pdf.DecodeOptional(c, dict["OC"], oc.ExtractConditional); err != nil {
 		return err
 	} else {
 		common.OptionalContent = oc
 	}
 
 	// AF (optional)
-	if afArray, err := pdf.Optional(x.GetArray(path, dict["AF"])); err != nil {
+	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
 		return err
 	} else if afArray != nil {
 		common.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.ExtractorGetOptional(x, path, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := pdf.DecodeOptional(c, afObj, file.ExtractSpecification); err != nil {
 				return err
 			} else if spec != nil {
 				common.AssociatedFiles = append(common.AssociatedFiles, spec)
@@ -132,14 +132,14 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Com
 
 	// CA (optional) - default value is 1.0
 	if dict["CA"] != nil {
-		if ca, err := x.GetNumber(path, dict["CA"]); err == nil {
+		if ca, err := c.Number(dict["CA"]); err == nil {
 			common.StrokingTransparency = 1 - ca
 		}
 	}
 
 	// ca (optional) - if not present, defaults to the same value as CA
 	if dict["ca"] != nil {
-		if ca, err := x.GetNumber(path, dict["ca"]); err == nil {
+		if ca, err := c.Number(dict["ca"]); err == nil {
 			common.NonStrokingTransparency = 1 - ca
 		}
 	} else {
@@ -147,12 +147,12 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Com
 	}
 
 	// BM (optional)
-	if bm, err := x.GetName(path, dict["BM"]); err == nil && bm != "" {
+	if bm, err := c.Name(dict["BM"]); err == nil && bm != "" {
 		common.BlendMode = bm
 	}
 
 	// Lang (optional)
-	if lang, err := pdf.GetTextString(x.R, dict["Lang"]); err == nil && lang != "" {
+	if lang, err := c.TextString(dict["Lang"]); err == nil && lang != "" {
 		if tag, err := language.Parse(string(lang)); err == nil {
 			common.Lang = tag
 		}
@@ -164,8 +164,8 @@ func decodeCommon(x *pdf.Extractor, path *pdf.CycleCheck, common *annotation.Com
 // decodeHighlight reads an annotation's /H entry, supplying the default for
 // a missing entry and normalising the deprecated "T" (toggle) mode to
 // [annotation.HighlightPush].
-func decodeHighlight(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) annotation.Highlight {
-	h, _ := x.GetName(path, obj)
+func decodeHighlight(c pdf.Cursor, obj pdf.Object) annotation.Highlight {
+	h, _ := c.Name(obj)
 	switch h {
 	case "":
 		return annotation.HighlightInvert

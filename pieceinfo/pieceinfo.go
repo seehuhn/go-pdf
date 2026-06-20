@@ -89,10 +89,9 @@ func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Extract reads a page-piece dictionary from a PDF object.
 // Returns nil if obj is nil.
-func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*PieceInfo, error) {
+func Extract(c pdf.Cursor, obj pdf.Object, isDirect bool) (*PieceInfo, error) {
 
-	r := x.R
-	dict, err := pdf.GetDict(r, obj)
+	dict, err := c.Dict(obj)
 	if dict == nil {
 		return nil, err
 	}
@@ -103,12 +102,12 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 	}
 
 	for key, val := range dict {
-		dataDict, _ := pdf.GetDict(r, val)
+		dataDict, _ := c.Dict(val)
 		if dataDict == nil {
 			continue // skip malformed entries
 		}
 
-		lastModified, err := pdf.GetDate(r, dataDict["LastModified"])
+		lastModified, err := c.Date(dataDict["LastModified"])
 		if err != nil {
 			continue // skip entries without valid LastModified
 		}
@@ -120,7 +119,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 
 		var data Data
 		if exists {
-			data, err = handler(r, privateObj)
+			data, err = handler(c.Getter(), privateObj)
 			if err != nil {
 				if errors.Is(err, ErrDiscard) {
 					continue // skip this entry
@@ -132,7 +131,7 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bo
 				lastModified: time.Time(lastModified),
 			}
 			if privateObj != nil {
-				u.private = opaque.Extract(x, privateObj)
+				u.private = opaque.Extract(c.Extractor(), privateObj)
 			}
 			data = u
 		}

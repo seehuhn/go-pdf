@@ -247,7 +247,7 @@ func TestType3ApplyWithBoundaries(t *testing.T) {
 // TestExtractType3DeepChainBounded guards against a stack-overflow DoS: a
 // chain of distinct Type 3 stitching functions, each whose /Functions holds
 // the next, is acyclic, so the cycle guard never trips, yet recursing one
-// frame per level would exhaust the Go stack. The ExtractorGet depth cap must
+// frame per level would exhaust the Go stack. The Decode depth cap must
 // turn this into a malformed-file error rather than a crash.
 func TestExtractType3DeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
@@ -283,7 +283,7 @@ func TestExtractType3DeepChainBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := Extract(x, nil, refs[0], false); !pdf.IsMalformed(err) {
+	if _, err := Extract(pdf.CursorAt(x, nil), refs[0], false); !pdf.IsMalformed(err) {
 		t.Errorf("err = %v, want malformed", err)
 	}
 }

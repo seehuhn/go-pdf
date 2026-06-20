@@ -23,13 +23,13 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeFreeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.FreeText, error) {
+func decodeFreeText(c pdf.Cursor, dict pdf.Dict) (*annotation.FreeText, error) {
 	f := &annotation.FreeText{}
 
-	if err := decodeCommon(x, path, &f.Common, dict); err != nil {
+	if err := decodeCommon(c, &f.Common, dict); err != nil {
 		return nil, err
 	}
-	if err := decodeMarkup(x, path, dict, &f.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &f.Markup); err != nil {
 		return nil, err
 	}
 
@@ -41,7 +41,7 @@ func decodeFreeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 		f.Intent = ""
 	}
 
-	if da, err := pdf.Optional(pdf.GetString(x.R, dict["DA"])); err != nil {
+	if da, err := pdf.Optional(c.String(dict["DA"])); err != nil {
 		return nil, err
 	} else {
 		f.DefaultAppearance = string(da)
@@ -51,25 +51,25 @@ func decodeFreeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 		f.DefaultAppearance = "/Helvetica 12 Tf 0 0 0 rg"
 	}
 
-	if q, err := pdf.Optional(x.GetInteger(path, dict["Q"])); err != nil {
+	if q, err := pdf.Optional(c.Integer(dict["Q"])); err != nil {
 		return nil, err
 	} else if q >= 0 && q <= 2 {
 		f.Align = pdf.TextAlign(q)
 	}
 
-	if ds, err := pdf.Optional(pdf.GetTextString(x.R, dict["DS"])); err != nil {
+	if ds, err := pdf.Optional(c.TextString(dict["DS"])); err != nil {
 		return nil, err
 	} else {
 		f.DefaultStyle = string(ds)
 	}
 
-	if cl, err := pdf.Optional(x.GetArray(path, dict["CL"])); err != nil {
+	if cl, err := pdf.Optional(c.Array(dict["CL"])); err != nil {
 		return nil, err
 	} else if f.Intent == annotation.FreeTextIntentCallout && (len(cl) == 4 || len(cl) == 6) {
 		points := make([]vec.Vec2, len(cl)/2)
 		for i := range len(points) {
-			if px, err := x.GetNumber(path, cl[i*2]); err == nil {
-				if py, err := x.GetNumber(path, cl[i*2+1]); err == nil {
+			if px, err := c.Number(cl[i*2]); err == nil {
+				if py, err := c.Number(cl[i*2+1]); err == nil {
 					points[i] = vec.Vec2{X: px, Y: py}
 				}
 			}
@@ -77,18 +77,18 @@ func decodeFreeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 		f.CalloutLine = points
 	}
 
-	if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], annotation.ExtractBorderEffect); err != nil {
+	if be, err := pdf.DecodeOptional(c, dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
 	} else {
 		f.BorderEffect = be
 	}
 
-	if rd, err := pdf.Optional(x.GetArray(path, dict["RD"])); err != nil {
+	if rd, err := pdf.Optional(c.Array(dict["RD"])); err != nil {
 		return nil, err
 	} else if len(rd) == 4 {
 		a := make([]float64, 4)
 		for i, diff := range rd {
-			num, _ := x.GetNumber(path, diff)
+			num, _ := c.Number(diff)
 			a[i] = max(num, 0)
 		}
 		if a[0]+a[2] < f.Rect.Dx() && a[1]+a[3] < f.Rect.Dy() {
@@ -96,7 +96,7 @@ func decodeFreeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 		}
 	}
 
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		f.BorderStyle = bs
@@ -107,7 +107,7 @@ func decodeFreeText(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*ann
 	}
 
 	if f.Intent == annotation.FreeTextIntentCallout {
-		if le, err := pdf.Optional(x.GetName(path, dict["LE"])); err != nil {
+		if le, err := pdf.Optional(c.Name(dict["LE"])); err != nil {
 			return nil, err
 		} else if le != "" {
 			f.LineEndingStyle = annotation.LineEndingStyle(le)

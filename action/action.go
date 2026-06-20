@@ -57,60 +57,60 @@ const (
 
 // Decode reads an action from a PDF object.
 //
-// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func Decode(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (pdf.Action, error) {
-	dict, err := x.GetDictTyped(path, obj, "Action")
+func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (pdf.Action, error) {
+	dict, err := c.DictTyped(obj, "Action")
 	if err != nil {
 		return nil, err
 	}
 
-	actionType, err := x.GetName(path, dict["S"])
+	actionType, err := c.Name(dict["S"])
 	if err != nil {
 		return nil, err
 	}
 
 	switch actionType {
 	case TypeGoTo:
-		return decodeGoTo(x, path, dict)
+		return decodeGoTo(c, dict)
 	case TypeGoToR:
-		return decodeGoToR(x, path, dict)
+		return decodeGoToR(c, dict)
 	case TypeGoToE:
-		return decodeGoToE(x, path, dict)
+		return decodeGoToE(c, dict)
 	case TypeGoToDp:
-		return decodeGoToDp(x, path, dict)
+		return decodeGoToDp(c, dict)
 	case TypeLaunch:
-		return decodeLaunch(x, path, dict)
+		return decodeLaunch(c, dict)
 	case TypeThread:
-		return decodeThread(x, path, dict)
+		return decodeThread(c, dict)
 	case TypeURI:
-		return decodeURI(x, path, dict)
+		return decodeURI(c, dict)
 	case TypeSound:
-		return decodeSound(x, path, dict)
+		return decodeSound(c, dict)
 	case TypeMovie:
-		return decodeMovie(x, path, dict)
+		return decodeMovie(c, dict)
 	case TypeHide:
-		return decodeHide(x, path, dict)
+		return decodeHide(c, dict)
 	case TypeNamed:
-		return decodeNamed(x, path, dict)
+		return decodeNamed(c, dict)
 	case TypeSubmitForm:
-		return decodeSubmitForm(x, path, dict)
+		return decodeSubmitForm(c, dict)
 	case TypeResetForm:
-		return decodeResetForm(x, path, dict)
+		return decodeResetForm(c, dict)
 	case TypeImportData:
-		return decodeImportData(x, path, dict)
+		return decodeImportData(c, dict)
 	case TypeSetOCGState:
-		return decodeSetOCGState(x, path, dict)
+		return decodeSetOCGState(c, dict)
 	case TypeRendition:
-		return decodeRendition(x, path, dict)
+		return decodeRendition(c, dict)
 	case TypeTrans:
-		return decodeTrans(x, path, dict)
+		return decodeTrans(c, dict)
 	case TypeGoTo3DView:
-		return decodeGoTo3DView(x, path, dict)
+		return decodeGoTo3DView(c, dict)
 	case TypeJavaScript:
-		return decodeJavaScript(x, path, dict)
+		return decodeJavaScript(c, dict)
 	case TypeRichMediaExecute:
-		return decodeRichMediaExecute(x, path, dict)
+		return decodeRichMediaExecute(c, dict)
 	default:
 		return nil, pdf.Error("unknown action type: " + string(actionType))
 	}
@@ -144,20 +144,20 @@ func (al ActionList) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 // DecodeActionList reads an action list from a PDF object.
 // Handles both single dictionary and array formats.
 //
-// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func DecodeActionList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (ActionList, error) {
+func DecodeActionList(c pdf.Cursor, obj pdf.Object, _ bool) (ActionList, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
 	// try single action dictionary first
-	dict, err := x.GetDict(path, obj)
+	dict, err := c.Dict(obj)
 	if err == nil && dict != nil {
 		// The dict has already been resolved; any indirect ref it came
-		// from was added to path by the outer ExtractorGet, so calling
+		// from was added to path by the outer Decode, so calling
 		// Decode directly preserves cycle detection.
-		action, err := Decode(x, path, dict, false)
+		action, err := Decode(c, dict, false)
 		if err != nil {
 			return nil, err
 		}
@@ -165,14 +165,14 @@ func DecodeActionList(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	}
 
 	// array of actions
-	arr, err := x.GetArray(path, obj)
+	arr, err := c.Array(obj)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(ActionList, 0, len(arr))
 	for _, item := range arr {
-		action, err := pdf.ExtractorGet(x, path, item, Decode)
+		action, err := pdf.Decode(c, item, Decode)
 		if err != nil {
 			return nil, err
 		}

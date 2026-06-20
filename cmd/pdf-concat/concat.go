@@ -162,7 +162,7 @@ func (c *Concat) Append(fname string) error {
 	}
 
 	meta := r.GetMeta()
-	outlineTree, _ := pdf.ExtractorGetOptional(pdf.NewExtractor(r), nil, r.GetMeta().Catalog.Outlines, outline.Decode)
+	outlineTree, _ := pdf.DecodeOptional(pdf.NewCursor(r), r.GetMeta().Catalog.Outlines, outline.Decode)
 
 	var title string
 	if meta.Info != nil && meta.Info.Title != "" {
@@ -241,15 +241,16 @@ type preparedField struct {
 // the font resources renamed to avoid a collision, to be applied to the fields'
 // /DA strings. Pages must be copied after this, and finishForm called afterwards.
 func (c *Concat) prepareForm(r *pdf.Reader, cp *pdf.Copier) ([]preparedField, map[pdf.Name]pdf.Name, error) {
-	acro, _ := pdf.GetDict(r, r.GetMeta().Catalog.AcroForm)
+	cur := pdf.NewCursor(r)
+	acro, _ := cur.Dict(r.GetMeta().Catalog.AcroForm)
 	if acro == nil {
 		return nil, nil, nil
 	}
 
 	// merge /DR /Font, renaming on a collision so no input's font is lost
 	var fontRename map[pdf.Name]pdf.Name
-	if dr, _ := pdf.GetDict(r, acro["DR"]); dr != nil {
-		if fonts, _ := pdf.GetDict(r, dr["Font"]); fonts != nil {
+	if dr, _ := cur.Dict(acro["DR"]); dr != nil {
+		if fonts, _ := cur.Dict(dr["Font"]); fonts != nil {
 			if c.drFonts == nil {
 				c.drFonts = pdf.Dict{}
 			}
@@ -279,25 +280,25 @@ func (c *Concat) prepareForm(r *pdf.Reader, cp *pdf.Copier) ([]preparedField, ma
 		}
 	}
 	if c.formDA == nil {
-		if da, _ := pdf.GetString(r, acro["DA"]); da != nil {
+		if da, _ := cur.String(acro["DA"]); da != nil {
 			c.formDA = da // a self-contained string needs no copying
 		}
 	}
 	if c.formQ == nil {
 		if _, ok := acro["Q"]; ok {
-			if q, err := pdf.GetInteger(r, acro["Q"]); err == nil {
+			if q, err := cur.Integer(acro["Q"]); err == nil {
 				c.formQ = q
 			}
 		}
 	}
-	if na, _ := pdf.GetBoolean(r, acro["NeedAppearances"]); na {
+	if na, _ := cur.Boolean(acro["NeedAppearances"]); na {
 		c.formNeedAppearances = true
 	}
-	if sf, _ := pdf.GetInteger(r, acro["SigFlags"]); sf != 0 {
+	if sf, _ := cur.Integer(acro["SigFlags"]); sf != 0 {
 		c.formSigFlags |= sf
 	}
 
-	fields, _ := pdf.GetArray(r, acro["Fields"])
+	fields, _ := cur.Array(acro["Fields"])
 	if c.usedNames == nil {
 		c.usedNames = map[string]bool{}
 	}
@@ -308,11 +309,11 @@ func (c *Concat) prepareForm(r *pdf.Reader, cp *pdf.Copier) ([]preparedField, ma
 		if !ok {
 			continue
 		}
-		fieldDict, _ := pdf.GetDict(r, ref)
+		fieldDict, _ := cur.Dict(ref)
 		if fieldDict == nil {
 			continue
 		}
-		name, _ := pdf.GetTextString(r, fieldDict["T"])
+		name, _ := cur.TextString(fieldDict["T"])
 
 		newRef := c.w.Alloc()
 		cp.Redirect(ref, newRef)
@@ -504,8 +505,7 @@ func copyDestination(cp *pdf.Copier, rm *pdf.ResourceManager,
 	if err != nil {
 		return nil, err
 	}
-	x := pdf.NewExtractor(rm.Out)
-	return pdf.ExtractorGet(x, nil, copied, destination.Decode)
+	return pdf.Decode(pdf.NewCursor(rm.Out), copied, destination.Decode)
 }
 
 // copyAction copies an action, translating page references.
@@ -519,6 +519,5 @@ func copyAction(cp *pdf.Copier, rm *pdf.ResourceManager,
 	if err != nil {
 		return nil, err
 	}
-	x := pdf.NewExtractor(rm.Out)
-	return pdf.ExtractorGet(x, nil, copied, action.Decode)
+	return pdf.Decode(pdf.NewCursor(rm.Out), copied, action.Decode)
 }

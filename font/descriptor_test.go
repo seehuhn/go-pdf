@@ -58,7 +58,7 @@ func TestRoundTrip(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	fdDict := fd1.AsDict()
 
-	fd2, err := ExtractDescriptor(data, fdDict)
+	fd2, err := ExtractDescriptor(pdf.NewCursor(data), fdDict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,11 +118,11 @@ func FuzzFontDescriptor(f *testing.F) {
 		if err != nil {
 			t.Skip()
 		}
-		fdDict, err := pdf.GetDictTyped(r, pdf.NewReference(1, 0), "FontDescriptor")
+		fdDict, err := pdf.NewCursor(r).DictTyped(pdf.NewReference(1, 0), "FontDescriptor")
 		if err != nil {
 			t.Skip()
 		}
-		fd1, _ := ExtractDescriptor(r, fdDict)
+		fd1, _ := ExtractDescriptor(pdf.NewCursor(r), fdDict, false)
 		if fd1 == nil {
 			t.Skip()
 		}
@@ -130,7 +130,7 @@ func FuzzFontDescriptor(f *testing.F) {
 		data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 		fdDict = fd1.AsDict()
 
-		fd2, err := ExtractDescriptor(data, fdDict)
+		fd2, err := ExtractDescriptor(pdf.NewCursor(data), fdDict, false)
 		if err != nil {
 			t.Fatal(err)
 		}

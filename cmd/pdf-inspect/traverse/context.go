@@ -134,7 +134,7 @@ func (c *fileCtx) Next() []Step {
 			Match: regexp.MustCompile(`^catalog$`),
 			Desc:  "`catalog`",
 			Next: func(key string) (Context, error) {
-				obj, err := pdf.GetDict(c.r, meta.Trailer["Root"])
+				obj, err := pdf.NewCursor(c.r).Dict(meta.Trailer["Root"])
 				if err != nil {
 					return nil, err
 				}
@@ -145,7 +145,7 @@ func (c *fileCtx) Next() []Step {
 			Match: regexp.MustCompile(`^info$`),
 			Desc:  "`info`",
 			Next: func(key string) (Context, error) {
-				obj, err := pdf.GetDict(c.r, meta.Trailer["Info"])
+				obj, err := pdf.NewCursor(c.r).Dict(meta.Trailer["Info"])
 				if err != nil {
 					return nil, err
 				}
@@ -189,7 +189,7 @@ func (c *fileCtx) Next() []Step {
 			Match: regexp.MustCompile(`^.+$`),
 			Desc:  "catalog key",
 			Next: func(key string) (Context, error) {
-				obj, err := pdf.GetDict(c.r, meta.Trailer["Root"])
+				obj, err := pdf.NewCursor(c.r).Dict(meta.Trailer["Root"])
 				if err != nil {
 					return nil, err
 				}

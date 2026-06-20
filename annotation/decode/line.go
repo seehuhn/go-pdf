@@ -23,31 +23,31 @@ import (
 	"seehuhn.de/go/pdf/measure"
 )
 
-func decodeLine(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Line, error) {
+func decodeLine(c pdf.Cursor, dict pdf.Dict) (*annotation.Line, error) {
 	line := &annotation.Line{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &line.Common, dict); err != nil {
+	if err := decodeCommon(c, &line.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &line.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &line.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract line-specific fields
 	// L (required)
-	if l, err := x.GetArray(path, dict["L"]); err == nil && len(l) == 4 {
+	if l, err := c.Array(dict["L"]); err == nil && len(l) == 4 {
 		for i, coord := range l {
-			if num, err := x.GetNumber(path, coord); err == nil {
+			if num, err := c.Number(coord); err == nil {
 				line.Coords[i] = num
 			}
 		}
 	}
 
 	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		line.BorderStyle = bs
@@ -59,14 +59,14 @@ func decodeLine(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotat
 
 	// LE (optional; PDF 1.4) - default is [None, None]
 	line.LineEndingStyle = [2]annotation.LineEndingStyle{annotation.LineEndingStyleNone, annotation.LineEndingStyleNone}
-	if le, err := pdf.Optional(x.GetArray(path, dict["LE"])); err != nil {
+	if le, err := pdf.Optional(c.Array(dict["LE"])); err != nil {
 		return nil, err
 	} else if len(le) >= 1 {
-		if name, err := x.GetName(path, le[0]); err == nil {
+		if name, err := c.Name(le[0]); err == nil {
 			line.LineEndingStyle[0] = annotation.LineEndingStyle(name)
 		}
 		if len(le) >= 2 {
-			if name, err := x.GetName(path, le[1]); err == nil {
+			if name, err := c.Name(le[1]); err == nil {
 				line.LineEndingStyle[1] = annotation.LineEndingStyle(name)
 			}
 		} else {
@@ -76,25 +76,25 @@ func decodeLine(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotat
 	}
 
 	// IC (optional; PDF 1.4)
-	if ic, err := pdf.Optional(colorenc.Extract(x.R, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(c, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		line.FillColor = ic
 	}
 
 	// Cap (optional)
-	if cap, err := x.GetBoolean(path, dict["Cap"]); err == nil {
+	if cap, err := c.Boolean(dict["Cap"]); err == nil {
 		line.Caption = bool(cap)
 	}
 
 	if line.Caption {
 		// CP (optional)
-		if cp, err := x.GetName(path, dict["CP"]); err == nil && cp == "Top" {
+		if cp, err := c.Name(dict["CP"]); err == nil && cp == "Top" {
 			line.CaptionAbove = true
 		}
 
 		// CO (optional)
-		if co, err := pdf.Optional(pdf.GetFloatArray(x.R, dict["CO"])); err != nil {
+		if co, err := pdf.Optional(c.FloatArray(dict["CO"])); err != nil {
 			return nil, err
 		} else if len(co) == 2 {
 			line.CaptionOffset = co
@@ -102,28 +102,28 @@ func decodeLine(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotat
 	}
 
 	// LL (optional)
-	if ll, err := pdf.Optional(x.GetNumber(path, dict["LL"])); err != nil {
+	if ll, err := pdf.Optional(c.Number(dict["LL"])); err != nil {
 		return nil, err
 	} else {
 		line.LL = ll
 	}
 
 	// LLE (optional)
-	if lle, err := pdf.Optional(x.GetNumber(path, dict["LLE"])); err != nil {
+	if lle, err := pdf.Optional(c.Number(dict["LLE"])); err != nil {
 		return nil, err
 	} else {
 		line.LLE = max(lle, 0)
 	}
 
 	// LLO (optional)
-	if llo, err := pdf.Optional(x.GetNumber(path, dict["LLO"])); err != nil {
+	if llo, err := pdf.Optional(c.Number(dict["LLO"])); err != nil {
 		return nil, err
 	} else {
 		line.LLO = max(llo, 0)
 	}
 
 	// Measure (optional)
-	if m, err := pdf.ExtractorGetOptional(x, path, dict["Measure"], measure.Extract); err != nil {
+	if m, err := pdf.DecodeOptional(c, dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		line.Measure = m

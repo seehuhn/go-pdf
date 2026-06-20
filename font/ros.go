@@ -25,8 +25,8 @@ import (
 )
 
 // ExtractCIDSystemInfo extracts a CIDSystemInfo object from a PDF file.
-func ExtractCIDSystemInfo(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*cid.SystemInfo, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractCIDSystemInfo(c pdf.Cursor, obj pdf.Object, _ bool) (*cid.SystemInfo, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -37,12 +37,12 @@ func ExtractCIDSystemInfo(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 	}
 
 	var registry, ordering string
-	s, e1 := x.GetString(path, dict["Registry"])
+	s, e1 := c.String(dict["Registry"])
 	registry = string(s)
-	s, e2 := x.GetString(path, dict["Ordering"])
+	s, e2 := c.String(dict["Ordering"])
 	ordering = string(s)
 
-	supplement, e3 := x.GetInteger(path, dict["Supplement"])
+	supplement, e3 := c.Integer(dict["Supplement"])
 	if supplement < 0 || supplement > math.MaxInt32 {
 		supplement = 0
 	}

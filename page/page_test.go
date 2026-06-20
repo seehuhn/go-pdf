@@ -210,7 +210,7 @@ func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 
 	// Decode using extractor directly from writer
 	x := pdf.NewExtractor(w)
-	p2, err := Decode(x, nil, dict, false)
+	p2, err := Decode(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -330,7 +330,7 @@ func TestSource_Deduplication(t *testing.T) {
 	w1.Close()
 
 	// decode back to get a Source
-	decoded, err := Decode(pdf.NewExtractor(w1), nil, dict, false)
+	decoded, err := Decode(pdf.NewCursor(w1), dict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -495,7 +495,7 @@ func TestPage_Decode_ClipsBoxes(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	p, err := Decode(x, nil, dict, false)
+	p, err := Decode(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -531,7 +531,7 @@ func TestPage_Decode_ClipsToNil(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	p, err := Decode(x, nil, dict, false)
+	p, err := Decode(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -578,7 +578,7 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			p2, err := Decode(x, nil, dict, false)
+			p2, err := Decode(pdf.CursorAt(x, nil), dict, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -586,7 +586,7 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 			if len(p2.Annots) != 1 {
 				t.Fatalf("got %d annotations, want 1", len(p2.Annots))
 			}
-			a, err := pdf.ExtractorGet(x, nil, annotRef, decode.Annotation)
+			a, err := pdf.Decode(pdf.CursorAt(x, nil), annotRef, decode.Annotation)
 			if err != nil {
 				t.Fatalf("failed to get annotation by reference: %v", err)
 			}
@@ -681,7 +681,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	p, err := Decode(x, nil, pageDict, false)
+	p, err := Decode(pdf.CursorAt(x, nil), pageDict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -697,7 +697,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 	type hasMarkup interface {
 		GetMarkup() *annotation.Markup
 	}
-	reply, err := pdf.ExtractorGet(x, nil, replyRef, decode.Annotation)
+	reply, err := pdf.Decode(pdf.CursorAt(x, nil), replyRef, decode.Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -706,7 +706,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 			t.Errorf("on-page reply: InReplyTo = %v, want %v", irt, textRef)
 		}
 	}
-	orphan, err := pdf.ExtractorGet(x, nil, orphanRef, decode.Annotation)
+	orphan, err := pdf.Decode(pdf.CursorAt(x, nil), orphanRef, decode.Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -749,7 +749,7 @@ func TestAnnotEncodeWithoutReservedRef(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	p2, err := Decode(x, nil, dict, false)
+	p2, err := Decode(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -827,7 +827,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		p, err := Decode(x, nil, obj, false)
+		p, err := Decode(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("malformed page")
 		}

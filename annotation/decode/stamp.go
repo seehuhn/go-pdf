@@ -21,17 +21,16 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeStamp(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Stamp, error) {
-	r := x.R
+func decodeStamp(c pdf.Cursor, dict pdf.Dict) (*annotation.Stamp, error) {
 	stamp := &annotation.Stamp{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &stamp.Common, dict); err != nil {
+	if err := decodeCommon(c, &stamp.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &stamp.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &stamp.Markup); err != nil {
 		return nil, err
 	}
 
@@ -40,7 +39,7 @@ func decodeStamp(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annota
 	}
 
 	if stamp.Intent == annotation.StampIntentStamp {
-		if icon, err := pdf.Optional(pdf.GetName(r, dict["Name"])); err != nil {
+		if icon, err := pdf.Optional(c.Name(dict["Name"])); err != nil {
 			return nil, err
 		} else if icon != "" {
 			stamp.Icon = annotation.StampIcon(icon)

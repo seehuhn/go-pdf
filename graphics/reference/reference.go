@@ -113,8 +113,8 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // ExtractDict reads a reference dictionary from a PDF file.
-func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Dict, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractDict(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Dict, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -123,7 +123,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 
 	d := &Dict{SingleUse: isDirect}
 
-	fs, err := pdf.ExtractorGet(x, path, dict["F"], file.ExtractSpecification)
+	fs, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	} else if fs == nil {
@@ -132,7 +132,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 	d.F = fs
 
 	// Page is an integer page index or a text-string page label.
-	pageObj, err := pdf.Resolve(x.R, dict["Page"])
+	pageObj, err := c.Resolve(dict["Page"])
 	if err != nil {
 		return nil, err
 	}
@@ -145,14 +145,14 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		d.PageLabel = string(p.AsTextString())
 	}
 
-	if idArray, err := pdf.Optional(x.GetArray(path, dict["ID"])); err != nil {
+	if idArray, err := pdf.Optional(c.Array(dict["ID"])); err != nil {
 		return nil, err
 	} else if len(idArray) == 2 {
-		id0, err := pdf.Optional(x.GetString(path, idArray[0]))
+		id0, err := pdf.Optional(c.String(idArray[0]))
 		if err != nil {
 			return nil, err
 		}
-		id1, err := pdf.Optional(x.GetString(path, idArray[1]))
+		id1, err := pdf.Optional(c.String(idArray[1]))
 		if err != nil {
 			return nil, err
 		}

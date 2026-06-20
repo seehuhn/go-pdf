@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
-	"os"
 
 	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/internal/limits"
@@ -54,198 +52,35 @@ func Resolve(r Getter, obj Object) (Native, error) {
 	return resolve(r, obj, true)
 }
 
-const maxRefDepth = 16
-
 // maxFilterChainLength bounds the number of entries in a stream's
 // /Filter array.  Legitimate PDFs rarely exceed two or three; the cap
 // blocks malformed inputs that stack hundreds of decoders to amplify
 // per-wrapper overhead.
 const maxFilterChainLength = 8
 
+// resolve follows indirect references until it reaches a non-reference object.
+// See [resolvePath] for the cycle and depth bounds.  Pass canObjStm=false to
+// forbid reading from an object stream (used while resolving stream lengths).
 func resolve(r Getter, obj Object, canObjStm bool) (Native, error) {
-	if obj == nil {
-		return nil, nil
-	}
-
-	ref, isReference := obj.(Reference)
-	if !isReference {
-		// TODO(voss): which options should be used here?
-		return obj.AsPDF(0), nil
-	}
-
-	origRef := ref
-
-	count := 0
-	for {
-		count++
-		if count > maxRefDepth {
-			return nil, &MalformedFileError{
-				Err: errors.New("too many levels of indirection"),
-				Loc: []string{"object " + origRef.String()},
-			}
-		}
-
-		next, err := r.Get(ref, canObjStm)
-		if err != nil {
-			return nil, err
-		}
-		ref, isReference = next.(Reference)
-		if !isReference {
-			return next, nil
-		}
-	}
+	n, _, err := resolvePath(r, nil, obj, canObjStm)
+	return n, err
 }
 
-func resolveAndCast[T Native](r Getter, obj Object) (x T, err error) {
-	resolved, err := Resolve(r, obj)
+// getInteger resolves an integer, reading from object streams if needed.
+func getInteger(r Getter, obj Object) (Integer, error) {
+	resolved, err := resolve(r, obj, true)
 	if err != nil {
-		return x, err
-	}
-
-	if resolved == nil {
-		return x, nil
-	}
-
-	var isCorrectType bool
-	x, isCorrectType = resolved.(T)
-	if isCorrectType {
-		return x, nil
-	}
-
-	return x, &MalformedFileError{
-		Err: fmt.Errorf("expected %T but got %T", x, resolved),
-	}
-}
-
-// Helper functions for getting objects of a specific type.  Each of these
-// functions calls Resolve on the object before attempting to convert it to the
-// desired type.  If the object is `null`, a zero object is returned witout
-// error.  If the object is of the wrong type, an error is returned.
-//
-// The signature of these functions is
-//
-//	func GetT(r Getter, obj Object) (x T, err error)
-//
-// where T is the type of the object to be returned.
-var (
-	GetArray   = resolveAndCast[Array]
-	GetBoolean = resolveAndCast[Boolean]
-	GetDict    = resolveAndCast[Dict]
-	GetName    = resolveAndCast[Name]
-	GetReal    = resolveAndCast[Real]
-	GetStream  = resolveAndCast[*Stream]
-	GetString  = resolveAndCast[String]
-)
-
-// GetInteger resolves any indirect reference and returns the object as an
-// Integer.  If the object is `null`, the function returns 0, nil.
-// Integers are returned as is.
-// Floating point values are silently rounded to the nearest integer.
-// All other object types result in an error.
-func GetInteger(r Getter, obj Object) (Integer, error) {
-	resolved, err := Resolve(r, obj)
-	if resolved == nil {
 		return 0, err
 	}
-
-	switch x := resolved.(type) {
-	case Integer:
-		return x, nil
-	case Real:
-		return Integer(math.Round(float64(x))), nil
-	default:
-		return 0, &MalformedFileError{
-			Err: fmt.Errorf("expected Integer but got %T", resolved),
-		}
-	}
+	return asInteger(resolved)
 }
 
 func getIntegerNoObjStm(r Getter, obj Object) (Integer, error) {
-	obj, err := resolve(r, obj, false)
+	resolved, err := resolve(r, obj, false)
 	if err != nil {
 		return 0, err
 	}
-	if x, isCorrectType := obj.(Integer); isCorrectType {
-		return x, nil
-	}
-	return 0, &MalformedFileError{
-		Err: fmt.Errorf("expected Integer but got %T", obj),
-	}
-}
-
-// GetFloatArray resolves any indirect reference and returns the object as a
-// slice of float64 values. Each array element is converted to float64 using
-// GetNumber.
-//
-// If the object is `null`, the function returns `nil, nil`.
-func GetFloatArray(r Getter, obj Object) ([]float64, error) {
-	array, err := GetArray(r, obj)
-	if err != nil {
-		return nil, err
-	}
-	if array == nil {
-		return nil, nil
-	}
-
-	result := make([]float64, len(array))
-	for i, item := range array {
-		num, err := GetNumber(r, item)
-		if err != nil {
-			return nil, fmt.Errorf("array element %d: %w", i, err)
-		}
-		result[i] = float64(num)
-	}
-
-	return result, nil
-}
-
-// GetDictTyped resolves any indirect reference and checks that the resulting
-// object is a dictionary.  The function also checks that the "Type" entry of
-// the dictionary, if set, is equal to the given type.
-//
-// If the object is `null`, the function returns `nil, nil`.
-func GetDictTyped(r Getter, obj Object, tp Name) (Dict, error) {
-	dict, err := GetDict(r, obj)
-	if dict == nil || err != nil {
-		return nil, err
-	}
-	err = CheckDictType(r, dict, tp)
-	if err != nil {
-		return nil, err
-	}
-
-	return dict, nil
-}
-
-// CheckDictType checks that the "Type" entry of the dictionary, if present, is
-// equal to the given type.
-func CheckDictType(r Getter, obj Dict, wantType Name) error {
-	haveType, err := GetName(r, obj["Type"])
-	if err != nil {
-		return err
-	}
-	if haveType != wantType && haveType != "" {
-		return &MalformedFileError{
-			Err: fmt.Errorf("expected dict type %q, got %q", wantType, haveType),
-		}
-	}
-	return nil
-}
-
-// GetStreamReader returns an io.Reader which returns the decoded
-// contents of a PDF stream.
-//
-// If ref is nil, the function returns an error which wraps os.ErrNotExist.
-//
-// This is a convenience function, combining [GetStream] and [DecodeStream].
-func GetStreamReader(r Getter, path *CycleCheck, ref Object) (io.ReadCloser, error) {
-	stm, err := GetStream(r, ref)
-	if err != nil {
-		return nil, err
-	} else if stm == nil {
-		return nil, fmt.Errorf("no stream found: %w", os.ErrNotExist)
-	}
-	return DecodeStream(r, path, stm, 0)
+	return asInteger(resolved)
 }
 
 // RawStreamReader returns a reader for the raw stream data after decryption
@@ -379,7 +214,7 @@ func filterChainStartsWithCrypt(r Getter, filter Object) (bool, error) {
 // layer would otherwise have transformed them (e.g. flate emitting
 // [io.ErrUnexpectedEOF]), because a sticky source-error tracker promotes
 // the original error at the top of the stack.
-func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.ReadCloser, error) {
+func DecodeStream(r Getter, path *CycleCheck, x *Stream) (io.ReadCloser, error) {
 	filters, err := GetFilters(r, path, x.Dict)
 	if err != nil {
 		return nil, err
@@ -412,10 +247,7 @@ func DecodeStream(r Getter, path *CycleCheck, x *Stream, numFilters int) (io.Rea
 		}
 	}
 
-	for i, fi := range filters {
-		if numFilters > 0 && i >= numFilters {
-			break
-		}
+	for _, fi := range filters {
 		out, err = fi.Decode(v, out, budget)
 		if err != nil {
 			return nil, src.promote(err)

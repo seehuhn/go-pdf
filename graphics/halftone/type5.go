@@ -54,13 +54,13 @@ type Type5 struct {
 var _ graphics.Halftone = (*Type5)(nil)
 
 // extractType5 reads a Type 5 halftone from a PDF dictionary.
-func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type5, error) {
+func extractType5(c pdf.Cursor, dict pdf.Dict) (*Type5, error) {
 	h := &Type5{}
 
-	if err := rejectNestedType5(x, path, dict["Default"], "Default"); err != nil {
+	if err := rejectNestedType5(c, dict["Default"], "Default"); err != nil {
 		return nil, err
 	}
-	if ht, err := pdf.ExtractorGet(x, path, dict["Default"], Extract); err != nil {
+	if ht, err := pdf.Decode(c, dict["Default"], Extract); err != nil {
 		return nil, err
 	} else if ht != nil {
 		h.Default = ht
@@ -75,10 +75,10 @@ func extractType5(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type5
 			continue
 		}
 
-		if err := rejectNestedType5(x, path, val, fmt.Sprintf("colorant %q", colorant)); err != nil {
+		if err := rejectNestedType5(c, val, fmt.Sprintf("colorant %q", colorant)); err != nil {
 			return nil, err
 		}
-		if ht, err := pdf.ExtractorGet(x, path, val, Extract); err != nil {
+		if ht, err := pdf.Decode(c, val, Extract); err != nil {
 			return nil, err
 		} else if ht != nil {
 			h.Colorants[colorant] = ht

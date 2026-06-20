@@ -93,7 +93,7 @@ func TestEncryptedPayloadRoundTrip(t *testing.T) {
 
 					// Extract it back
 					x := pdf.NewExtractor(buf)
-					extracted, err := ExtractEncryptedPayload(x, nil, obj, false)
+					extracted, err := ExtractEncryptedPayload(pdf.CursorAt(x, nil), obj, false)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -152,7 +152,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 			// Missing Subtype
 		}
 
-		_, err := ExtractEncryptedPayload(x, nil, dict, false)
+		_, err := ExtractEncryptedPayload(pdf.CursorAt(x, nil), dict, false)
 		if err == nil {
 			t.Error("expected error for missing Subtype")
 		}

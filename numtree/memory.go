@@ -40,7 +40,8 @@ func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 		return nil, nil
 	}
 
-	node, err := pdf.GetDict(r, root)
+	c := pdf.NewCursor(r)
+	node, err := c.Dict(root)
 	if node == nil {
 		return nil, err
 	}
@@ -53,12 +54,12 @@ func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 	if ref, ok := root.(pdf.Reference); ok {
 		seen[ref] = true
 	}
-	extractFromNode(r, node, seen, tree.Data, 0)
+	extractFromNode(c, node, seen, tree.Data, 0)
 
 	return tree, nil
 }
 
-func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Integer]pdf.Object, depth int) {
+func extractFromNode(c pdf.Cursor, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Integer]pdf.Object, depth int) {
 	// skip subtrees deeper than the cap; over-deep input is treated as
 	// malformed and silently truncated, leaving a partial map
 	if depth >= limits.MaxNumberTreeDepth {
@@ -67,14 +68,14 @@ func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, d
 
 	// leaf node with Nums
 	if nums, ok := node["Nums"]; ok {
-		arr, err := pdf.GetArray(r, nums)
+		arr, err := c.Array(nums)
 		if err != nil {
 			return
 		}
 
 		// extract key-value pairs from Nums array
 		for i := 0; i+1 < len(arr); i += 2 {
-			keyObj, err := pdf.GetInteger(r, arr[i])
+			keyObj, err := c.Integer(arr[i])
 			if err != nil {
 				continue
 			}
@@ -85,7 +86,7 @@ func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, d
 
 	// intermediate node with Kids
 	if kids, ok := node["Kids"]; ok {
-		arr, err := pdf.GetArray(r, kids)
+		arr, err := c.Array(kids)
 		if err != nil {
 			return
 		}
@@ -97,11 +98,11 @@ func extractFromNode(r pdf.Getter, node pdf.Dict, seen map[pdf.Reference]bool, d
 				}
 				seen[ref] = true
 			}
-			childNode, err := pdf.GetDict(r, kid)
+			childNode, err := c.Dict(kid)
 			if err != nil {
 				continue
 			}
-			extractFromNode(r, childNode, seen, data, depth+1)
+			extractFromNode(c, childNode, seen, data, depth+1)
 		}
 	}
 }

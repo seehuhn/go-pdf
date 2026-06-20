@@ -26,7 +26,7 @@ import (
 // Catalog represents a PDF Document Catalog.  The only required field in this
 // structure is Pages, which specifies the root of the page tree.
 //
-// Use [DecodeCatalog] (typically via [ExtractorGet]) to read a catalog from a
+// Use [DecodeCatalog] (typically via [Decode]) to read a catalog from a
 // PDF file and [Catalog.Encode] to produce its dictionary form for writing.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
@@ -162,8 +162,8 @@ type Catalog struct {
 // The Metadata stream, if present, is decoded eagerly so that the
 // returned [Catalog.Metadata] field is populated with a typed
 // [*MetadataStream].
-func DecodeCatalog(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Catalog, error) {
-	dict, err := x.GetDictTyped(path, obj, "Catalog")
+func DecodeCatalog(c Cursor, obj Object, _ bool) (*Catalog, error) {
+	dict, err := c.DictTyped(obj, "Catalog")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -205,8 +205,8 @@ func DecodeCatalog(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Catalog
 		}
 	}
 
-	pageLayout, _ := x.GetName(path, dict["PageLayout"])
-	pageMode, _ := x.GetName(path, dict["PageMode"])
+	pageLayout, _ := c.Name(dict["PageLayout"])
+	pageMode, _ := c.Name(dict["PageMode"])
 
 	var outlines Reference
 	if ref, ok := dict["Outlines"].(Reference); ok {
@@ -220,16 +220,16 @@ func DecodeCatalog(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Catalog
 
 	var lang language.Tag
 	if dict["Lang"] != nil {
-		langStr, err := GetTextString(x.R, dict["Lang"])
+		langStr, err := c.TextString(dict["Lang"])
 		if err == nil && langStr != "" {
 			lang, _ = language.Parse(string(langStr))
 		}
 	}
 
-	needsRendering, _ := x.GetBoolean(path, dict["NeedsRendering"])
+	needsRendering, _ := c.Boolean(dict["NeedsRendering"])
 
 	// Metadata stream (eager decode; PDF 1.4)
-	metadata, err := ExtractorGetOptional(x, path, dict["Metadata"], ExtractMetadataStream)
+	metadata, err := DecodeOptional(c, dict["Metadata"], ExtractMetadataStream)
 	if err != nil {
 		return nil, err
 	}

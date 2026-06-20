@@ -60,7 +60,7 @@ func roundTripIconFit(t *testing.T, version pdf.Version, data *IconFit) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.ExtractorGet(x, nil, ref, ExtractIconFit)
+	decoded, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractIconFit)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -115,7 +115,7 @@ func FuzzIconFitRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, _ := pdf.ExtractorGet(x, nil, objPDF, ExtractIconFit)
+		objGo, _ := pdf.Decode(pdf.CursorAt(x, nil), objPDF, ExtractIconFit)
 		if objGo == nil {
 			t.Skip("no icon fit dictionary")
 		}

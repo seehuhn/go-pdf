@@ -39,16 +39,16 @@ func clamp01(v float64) float64 {
 // The number of array elements selects the colour space: 1 for DeviceGray,
 // 3 for DeviceRGB, and 4 for DeviceCMYK. A missing object or an empty array
 // yields a nil colour. Component values are clamped to the range 0.0 to 1.0.
-func Extract(r pdf.Getter, obj pdf.Object) (color.Color, error) {
-	c, _ := pdf.GetArray(r, obj)
-	if c == nil {
+func Extract(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
+	a, _ := c.Array(obj)
+	if a == nil {
 		return nil, nil
 	}
 
-	colors := make([]float64, len(c))
-	for i, colorVal := range c {
-		if num, err := pdf.GetNumber(r, colorVal); err == nil {
-			colors[i] = clamp01(float64(num))
+	colors := make([]float64, len(a))
+	for i, colorVal := range a {
+		if num, err := c.Number(colorVal); err == nil {
+			colors[i] = clamp01(num)
 		}
 	}
 
@@ -106,24 +106,24 @@ func Encode(c color.Color) (pdf.Array, error) {
 // [color.Color]. A missing object or an empty array yields a nil colour;
 // arrays of any other length are rejected. Component values are clamped to
 // the range 0.0 to 1.0.
-func ExtractRGB(r pdf.Getter, obj pdf.Object) (color.Color, error) {
-	c, _ := pdf.GetArray(r, obj)
-	if c == nil {
+func ExtractRGB(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
+	a, _ := c.Array(obj)
+	if a == nil {
 		return nil, nil
 	}
 
-	if len(c) == 0 {
+	if len(a) == 0 {
 		return nil, nil
 	}
 
-	if len(c) != 3 {
-		return nil, pdf.Errorf("color array must have 3 components for RGB, got %d", len(c))
+	if len(a) != 3 {
+		return nil, pdf.Errorf("color array must have 3 components for RGB, got %d", len(a))
 	}
 
 	colors := make([]float64, 3)
-	for i, colorVal := range c {
-		if num, err := pdf.GetNumber(r, colorVal); err == nil {
-			colors[i] = clamp01(float64(num))
+	for i, colorVal := range a {
+		if num, err := c.Number(colorVal); err == nil {
+			colors[i] = clamp01(num)
 		}
 	}
 

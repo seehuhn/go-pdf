@@ -22,22 +22,21 @@ import (
 	"seehuhn.de/go/pdf/annotation/colorenc"
 )
 
-func decodeRedact(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Redact, error) {
-	r := x.R
+func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 	redact := &annotation.Redact{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &redact.Common, dict); err != nil {
+	if err := decodeCommon(c, &redact.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &redact.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &redact.Markup); err != nil {
 		return nil, err
 	}
 
 	// QuadPoints (optional)
-	if quadPoints, err := pdf.GetFloatArray(r, dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
+	if quadPoints, err := c.FloatArray(dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
 		// Validate that we have a multiple of 8 points (each quadrilateral needs 8 coordinates)
 		if len(quadPoints)%8 == 0 {
 			redact.QuadPoints = quadPoints
@@ -45,7 +44,7 @@ func decodeRedact(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annot
 	}
 
 	// IC (optional) - RGB color components
-	if ic, err := pdf.Optional(colorenc.ExtractRGB(r, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.ExtractRGB(c, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		redact.FillColor = ic
@@ -57,17 +56,17 @@ func decodeRedact(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annot
 	}
 
 	// OverlayText (optional)
-	if overlayText, err := pdf.GetTextString(r, dict["OverlayText"]); err == nil {
+	if overlayText, err := c.TextString(dict["OverlayText"]); err == nil {
 		redact.OverlayText = string(overlayText)
 	}
 
 	// Repeat (optional) - default false
-	if repeat, err := pdf.GetBoolean(r, dict["Repeat"]); err == nil {
+	if repeat, err := c.Boolean(dict["Repeat"]); err == nil {
 		redact.Repeat = bool(repeat)
 	}
 
 	// DA (required if OverlayText present)
-	if da, err := pdf.GetString(r, dict["DA"]); err == nil {
+	if da, err := c.String(dict["DA"]); err == nil {
 		redact.DefaultAppearance = string(da)
 	}
 
@@ -78,7 +77,7 @@ func decodeRedact(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annot
 	}
 
 	// Q (optional) - default 0 (left-justified)
-	if q, err := pdf.Optional(pdf.GetInteger(r, dict["Q"])); err != nil {
+	if q, err := pdf.Optional(c.Integer(dict["Q"])); err != nil {
 		return nil, err
 	} else if q >= 0 && q <= 2 {
 		redact.Align = pdf.TextAlign(q)

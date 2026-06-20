@@ -110,18 +110,19 @@ func listFonts(fname string) error {
 		return err
 	}
 	fontMap := make(map[pdf.Reference]bool)
+	c := pdf.NewCursor(r)
 	for pageNo := range numPages {
 		_, pageDict, err := pagetree.GetPage(r, pageNo)
 		if err != nil {
 			return err
 		}
 
-		resourcesDict, err := pdf.GetDict(r, pageDict["Resources"])
+		resourcesDict, err := c.Dict(pageDict["Resources"])
 		if err != nil {
 			return err
 		}
 
-		fontDict, err := pdf.GetDict(r, resourcesDict["Font"])
+		fontDict, err := c.Dict(resourcesDict["Font"])
 		if err != nil {
 			return err
 		}
@@ -141,7 +142,7 @@ func listFonts(fname string) error {
 	fmt.Printf("%d fonts on %d pages\n", len(allFonts), numPages)
 	x := pdf.NewExtractor(r)
 	for _, fontRef := range allFonts {
-		d, err := extract.Dict(x, nil, fontRef, false)
+		d, err := extract.Dict(pdf.CursorAt(x, nil), fontRef, false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: %s: %v\n", fontRef, err)
 			continue

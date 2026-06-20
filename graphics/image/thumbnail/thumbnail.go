@@ -67,8 +67,8 @@ type Thumbnail struct {
 }
 
 // ExtractThumbnail reads a thumbnail image from a PDF object.
-func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Thumbnail, error) {
-	stm, err := x.GetStream(path, obj)
+func ExtractThumbnail(c pdf.Cursor, obj pdf.Object, _ bool) (*Thumbnail, error) {
+	stm, err := c.Stream(obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -78,10 +78,10 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	dict := stm.Dict
 
 	// Check Type and Subtype
-	if err := pdf.CheckDictType(x.R, dict, "XObject"); err != nil {
+	if err := c.CheckDictType(dict, "XObject"); err != nil {
 		return nil, err
 	}
-	if subtypeName, err := pdf.Optional(x.GetName(path, dict["Subtype"])); err != nil {
+	if subtypeName, err := pdf.Optional(c.Name(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, pdf.Errorf("invalid Subtype %q for thumbnail", subtypeName)
@@ -90,7 +90,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	thumb := &Thumbnail{}
 
 	// width (required)
-	width, err := x.GetInteger(path, dict["Width"])
+	width, err := c.Integer(dict["Width"])
 	if err != nil {
 		return nil, err
 	} else if width <= 0 {
@@ -101,7 +101,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	thumb.Width = int(width)
 
 	// height (required)
-	height, err := x.GetInteger(path, dict["Height"])
+	height, err := c.Integer(dict["Height"])
 	if err != nil {
 		return nil, err
 	} else if height <= 0 {
@@ -115,7 +115,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	}
 
 	// color space (required)
-	cs, err := color.ExtractSpace(x, path, dict["ColorSpace"], false)
+	cs, err := pdf.Decode(c, dict["ColorSpace"], color.ExtractSpace)
 	if err != nil {
 		return nil, err
 	} else if cs == nil {
@@ -129,7 +129,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	thumb.ColorSpace = cs
 
 	// bits per component (required)
-	bpc, err := x.GetInteger(path, dict["BitsPerComponent"])
+	bpc, err := c.Integer(dict["BitsPerComponent"])
 	if err != nil {
 		return nil, err
 	} else if !isValidBitsPerComponent(int(bpc)) {
@@ -144,12 +144,12 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	}
 
 	// decode array (optional)
-	if decodeArray, err := pdf.Optional(x.GetArray(path, dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(c.Array(dict["Decode"])); err != nil {
 		return nil, err
 	} else if decodeArray != nil && len(decodeArray) == 2*cs.Channels() {
 		decode := make([]float64, len(decodeArray))
 		for i, val := range decodeArray {
-			num, err := x.GetNumber(path, val)
+			num, err := c.Number(val)
 			if err != nil {
 				// ignore malformed decode array
 				decode = nil
@@ -161,7 +161,7 @@ func ExtractThumbnail(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 	}
 
 	thumb.Source = &thumbnailStreamData{
-		inner:    opaque.ExtractStream(x, stm),
+		inner:    opaque.ExtractStream(c.Extractor(), stm),
 		maxBytes: limits.ImageDataLimit(thumb.Width, thumb.Height, thumb.ColorSpace.Channels(), thumb.BitsPerComponent),
 	}
 

@@ -29,7 +29,7 @@ import (
 // FromFile represents a number tree that allows reading values from a PDF file
 // without holding the entire tree in memory.
 type FromFile struct {
-	r    pdf.Getter
+	cur  pdf.Cursor
 	root pdf.Object
 }
 
@@ -39,7 +39,7 @@ func ExtractFromFile(r pdf.Getter, root pdf.Object) (*FromFile, error) {
 	if root == nil {
 		return nil, nil
 	}
-	return &FromFile{r: r, root: root}, nil
+	return &FromFile{cur: pdf.NewCursor(r), root: root}, nil
 }
 
 var _ pdf.NumberTree = (*FromFile)(nil)
@@ -55,7 +55,7 @@ func (t *FromFile) Lookup(key pdf.Integer) (pdf.Object, error) {
 		return nil, ErrKeyNotFound
 	}
 
-	node, err := pdf.GetDict(t.r, t.root)
+	node, err := t.cur.Dict(t.root)
 	if err != nil || node == nil {
 		return nil, ErrKeyNotFound
 	}
@@ -74,14 +74,14 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 
 	// leaf node with Nums
 	if nums, ok := node["Nums"]; ok {
-		arr, err := pdf.GetArray(t.r, nums)
+		arr, err := t.cur.Array(nums)
 		if err != nil {
 			return nil, ErrKeyNotFound
 		}
 
 		// search through Nums array (key-value pairs)
 		for i := 0; i+1 < len(arr); i += 2 {
-			keyObj, err := pdf.GetInteger(t.r, arr[i])
+			keyObj, err := t.cur.Integer(arr[i])
 			if err != nil {
 				continue
 			}
@@ -94,7 +94,7 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 
 	// intermediate node with Kids
 	if kids, ok := node["Kids"]; ok {
-		arr, err := pdf.GetArray(t.r, kids)
+		arr, err := t.cur.Array(kids)
 		if err != nil {
 			return nil, ErrKeyNotFound
 		}
@@ -107,7 +107,7 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 				}
 				seen[ref] = true
 			}
-			childNode, err := pdf.GetDict(t.r, kid)
+			childNode, err := t.cur.Dict(kid)
 			if err != nil {
 				continue
 			}
@@ -117,16 +117,16 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 				continue
 			}
 
-			limitsArr, err := pdf.GetArray(t.r, limits)
+			limitsArr, err := t.cur.Array(limits)
 			if err != nil || len(limitsArr) != 2 {
 				continue
 			}
 
-			minKey, err := pdf.GetInteger(t.r, limitsArr[0])
+			minKey, err := t.cur.Integer(limitsArr[0])
 			if err != nil {
 				continue
 			}
-			maxKey, err := pdf.GetInteger(t.r, limitsArr[1])
+			maxKey, err := t.cur.Integer(limitsArr[1])
 			if err != nil {
 				continue
 			}
@@ -147,7 +147,7 @@ func (t *FromFile) All() iter.Seq2[pdf.Integer, pdf.Object] {
 			return
 		}
 
-		node, err := pdf.GetDict(t.r, t.root)
+		node, err := t.cur.Dict(t.root)
 		if err != nil {
 			return
 		}
@@ -169,14 +169,14 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yie
 
 	// check if this is a leaf node with Nums
 	if nums, ok := node["Nums"]; ok {
-		arr, err := pdf.GetArray(t.r, nums)
+		arr, err := t.cur.Array(nums)
 		if err != nil {
 			return true
 		}
 
 		// yield all key-value pairs from Nums array
 		for i := 0; i+1 < len(arr); i += 2 {
-			keyObj, err := pdf.GetInteger(t.r, arr[i])
+			keyObj, err := t.cur.Integer(arr[i])
 			if err != nil {
 				continue
 			}
@@ -189,7 +189,7 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yie
 
 	// check if this is an intermediate node with Kids
 	if kids, ok := node["Kids"]; ok {
-		arr, err := pdf.GetArray(t.r, kids)
+		arr, err := t.cur.Array(kids)
 		if err != nil {
 			return true
 		}
@@ -202,7 +202,7 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yie
 				}
 				seen[ref] = true
 			}
-			childNode, err := pdf.GetDict(t.r, kid)
+			childNode, err := t.cur.Dict(kid)
 			if err != nil {
 				continue
 			}

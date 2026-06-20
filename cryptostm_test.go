@@ -97,24 +97,24 @@ func testEncryptedStreamMultipleReads(t *testing.T, version Version) {
 
 	// Navigate to the page's Contents stream
 	pagesRef := r.GetMeta().Catalog.Pages
-	pages, err := GetDict(r, pagesRef)
+	pages, err := NewCursor(r).Dict(pagesRef)
 	if err != nil {
 		t.Fatal(err)
 	}
-	kids, err := GetArray(r, pages["Kids"])
+	kids, err := NewCursor(r).Array(pages["Kids"])
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(kids) == 0 {
 		t.Fatal("no pages found")
 	}
-	page, err := GetDict(r, kids[0])
+	page, err := NewCursor(r).Dict(kids[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Get the Contents stream
-	stream, err := GetStream(r, page["Contents"])
+	stream, err := NewCursor(r).Stream(page["Contents"])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func testEncryptedStreamMultipleReads(t *testing.T, version Version) {
 
 	// Read the stream multiple times - this should work with the new architecture
 	for i := range 3 {
-		decoded, err := DecodeStream(r, nil, stream, 0)
+		decoded, err := DecodeStream(r, nil, stream)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
 		}
@@ -194,19 +194,19 @@ func TestEncryptedStreamWithFilters(t *testing.T) {
 
 	// Navigate to the page's Contents stream
 	pagesRef := r.GetMeta().Catalog.Pages
-	pages, err := GetDict(r, pagesRef)
+	pages, err := NewCursor(r).Dict(pagesRef)
 	if err != nil {
 		t.Fatal(err)
 	}
-	kids, err := GetArray(r, pages["Kids"])
+	kids, err := NewCursor(r).Array(pages["Kids"])
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := GetDict(r, kids[0])
+	page, err := NewCursor(r).Dict(kids[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := GetStream(r, page["Contents"])
+	stream, err := NewCursor(r).Stream(page["Contents"])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestEncryptedStreamWithFilters(t *testing.T) {
 	// Read the stream twice - the filter chain (crypt + flate) should work
 	// correctly both times
 	for i := range 2 {
-		decoded, err := DecodeStream(r, nil, stream, 0)
+		decoded, err := DecodeStream(r, nil, stream)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
 		}
@@ -275,19 +275,19 @@ func TestUnencryptedStreamMultipleReads(t *testing.T) {
 
 	// Navigate to the page's Contents stream
 	pagesRef := r.GetMeta().Catalog.Pages
-	pages, err := GetDict(r, pagesRef)
+	pages, err := NewCursor(r).Dict(pagesRef)
 	if err != nil {
 		t.Fatal(err)
 	}
-	kids, err := GetArray(r, pages["Kids"])
+	kids, err := NewCursor(r).Array(pages["Kids"])
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := GetDict(r, kids[0])
+	page, err := NewCursor(r).Dict(kids[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := GetStream(r, page["Contents"])
+	stream, err := NewCursor(r).Stream(page["Contents"])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +302,7 @@ func TestUnencryptedStreamMultipleReads(t *testing.T) {
 
 	// Read multiple times
 	for i := range 3 {
-		decoded, err := DecodeStream(r, nil, stream, 0)
+		decoded, err := DecodeStream(r, nil, stream)
 		if err != nil {
 			t.Fatalf("DecodeStream failed on read %d: %v", i+1, err)
 		}
@@ -385,15 +385,15 @@ func TestCopierEncryptedStream(t *testing.T) {
 
 			// navigate to the stream
 			pagesRef := srcR.GetMeta().Catalog.Pages
-			pages, err := GetDict(srcR, pagesRef)
+			pages, err := NewCursor(srcR).Dict(pagesRef)
 			if err != nil {
 				t.Fatal(err)
 			}
-			kids, err := GetArray(srcR, pages["Kids"])
+			kids, err := NewCursor(srcR).Array(pages["Kids"])
 			if err != nil {
 				t.Fatal(err)
 			}
-			page, err := GetDict(srcR, kids[0])
+			page, err := NewCursor(srcR).Dict(kids[0])
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -423,19 +423,19 @@ func TestCopierEncryptedStream(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			dPages, err := GetDict(dstR, dstR.GetMeta().Catalog.Pages)
+			dPages, err := NewCursor(dstR).Dict(dstR.GetMeta().Catalog.Pages)
 			if err != nil {
 				t.Fatal(err)
 			}
-			dKids, err := GetArray(dstR, dPages["Kids"])
+			dKids, err := NewCursor(dstR).Array(dPages["Kids"])
 			if err != nil {
 				t.Fatal(err)
 			}
-			dPage, err := GetDict(dstR, dKids[0])
+			dPage, err := NewCursor(dstR).Dict(dKids[0])
 			if err != nil {
 				t.Fatal(err)
 			}
-			stream, err := GetStream(dstR, dPage["Contents"])
+			stream, err := NewCursor(dstR).Stream(dPage["Contents"])
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -511,12 +511,12 @@ func testEncryptedStreamWithIdentityCrypt(t *testing.T, version Version) {
 		t.Fatal(err)
 	}
 
-	stream, err := GetStream(r, streamRef)
+	stream, err := NewCursor(r).Stream(streamRef)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	decoded, err := DecodeStream(r, nil, stream, 0)
+	decoded, err := DecodeStream(r, nil, stream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -630,11 +630,11 @@ func TestCopyEncryptedStreamWithIdentityCrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dstStream, err := GetStream(dstR, dstStreamRef)
+	dstStream, err := NewCursor(dstR).Stream(dstStreamRef)
 	if err != nil {
 		t.Fatal(err)
 	}
-	decoded, err := DecodeStream(dstR, nil, dstStream, 0)
+	decoded, err := DecodeStream(dstR, nil, dstStream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -686,7 +686,7 @@ func TestRawStreamReaderRejectsNonIdentityCrypt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := GetStream(r, streamRef)
+	stream, err := NewCursor(r).Stream(streamRef)
 	if err != nil {
 		t.Fatal(err)
 	}

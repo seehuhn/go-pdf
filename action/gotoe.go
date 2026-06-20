@@ -101,8 +101,8 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeGoToE(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToE, error) {
-	dest, err := pdf.ExtractorGet(x, path, dict["D"], destination.Decode)
+func decodeGoToE(c pdf.Cursor, dict pdf.Dict) (*GoToE, error) {
+	dest, err := pdf.Decode(c, dict["D"], destination.Decode)
 	if err != nil {
 		return nil, err
 	}
@@ -110,14 +110,14 @@ func decodeGoToE(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToE,
 		return nil, pdf.Error("GoToE action missing D entry")
 	}
 
-	f, err := pdf.ExtractorGet(x, path, dict["F"], file.ExtractSpecification)
+	f, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
 
 	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {
-		nw, _ := pdf.Optional(x.GetBoolean(path, dict["NewWindow"]))
+		nw, _ := pdf.Optional(c.Boolean(dict["NewWindow"]))
 		if nw {
 			newWindow = NewWindowNew
 		} else {
@@ -127,13 +127,13 @@ func decodeGoToE(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*GoToE,
 
 	var target Target
 	if dict["T"] != nil {
-		target, err = pdf.ExtractorGet(x, path, dict["T"], DecodeTarget)
+		target, err = pdf.Decode(c, dict["T"], DecodeTarget)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

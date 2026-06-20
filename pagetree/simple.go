@@ -29,13 +29,14 @@ import (
 // The value is obtained from the /Count attribute of the root page tree node.
 // If the PDF file is malformed, the value may not be accurate.
 func NumPages(r pdf.Getter) (int, error) {
+	c := pdf.NewCursor(r)
 	catalog := r.GetMeta().Catalog
-	pageTreeNode, err := pdf.GetDict(r, catalog.Pages)
+	pageTreeNode, err := c.Dict(catalog.Pages)
 	if err != nil {
 		return 0, err
 	}
 
-	count, err := pdf.GetInteger(r, pageTreeNode["Count"])
+	count, err := c.Integer(pageTreeNode["Count"])
 	if err != nil {
 		return 0, err
 	}
@@ -52,6 +53,7 @@ func NumPages(r pdf.Getter) (int, error) {
 // Inheritable attributes are copied from the parent nodes.
 // The /Parent attribute is removed from the returned dictionary.
 func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
+	c := pdf.NewCursor(r)
 	if pageNo < 0 {
 		numPages, err := NumPages(r)
 		if err == nil {
@@ -82,13 +84,13 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 			}
 			seen[ref] = true
 		}
-		pageTreeNode, err := pdf.GetDict(r, obj)
+		pageTreeNode, err := c.Dict(obj)
 		if err != nil {
 			return 0, nil, err
 		}
 
 		// traverse the tree
-		tp, err := pdf.GetName(r, pageTreeNode["Type"])
+		tp, err := c.Name(pageTreeNode["Type"])
 		if err != nil {
 			return 0, nil, err
 		}
@@ -110,7 +112,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 			return ref, pageTreeNode, nil
 
 		case "Pages":
-			count, err := pdf.GetInteger(r, pageTreeNode["Count"])
+			count, err := c.Integer(pageTreeNode["Count"])
 			if err != nil {
 				return 0, nil, err
 			}
@@ -123,7 +125,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 					}
 				}
 
-				kids, err = pdf.GetArray(r, pageTreeNode["Kids"])
+				kids, err = c.Array(pageTreeNode["Kids"])
 				if err != nil {
 					return 0, nil, err
 				}

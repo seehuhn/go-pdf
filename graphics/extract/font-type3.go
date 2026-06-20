@@ -31,8 +31,8 @@ import (
 )
 
 // extractFontType3 reads a Type 3 font dictionary from a PDF file.
-func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*dict.Type3, error) {
-	fontDict, err := x.GetDictTyped(path, obj, "Font")
+func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
+	fontDict, err := c.DictTyped(obj, "Font")
 	if err != nil {
 		return nil, err
 	} else if fontDict == nil {
@@ -40,7 +40,7 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 			Err: errors.New("missing font dictionary"),
 		}
 	}
-	subtype, err := x.GetName(path, fontDict["Subtype"])
+	subtype, err := c.Name(fontDict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
@@ -50,16 +50,15 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 
 	d := &dict.Type3{}
 
-	d.Name, _ = x.GetName(path, fontDict["Name"])
+	d.Name, _ = c.Name(fontDict["Name"])
 
-	fdDict, err := x.GetDictTyped(path, fontDict["FontDescriptor"], "FontDescriptor")
-	if pdf.IsReadError(err) {
+	fd, err := pdf.DecodeOptional(c, fontDict["FontDescriptor"], font.ExtractDescriptor)
+	if err != nil {
 		return nil, err
 	}
-	fd, _ := font.ExtractDescriptor(x.R, fdDict)
 	d.Descriptor = fd
 
-	enc, err := encoding.ExtractType3(x, path, fontDict["Encoding"], false)
+	enc, err := pdf.Decode(c, fontDict["Encoding"], encoding.ExtractType3)
 	if err != nil {
 		return nil, err
 	}
@@ -69,12 +68,12 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 	if fd != nil {
 		defaultWidth = fd.MissingWidth
 	}
-	getSimpleWidths(d.Width[:], x.R, fontDict, defaultWidth)
+	getSimpleWidths(d.Width[:], c, fontDict, defaultWidth)
 
-	d.ToUnicode, _ = cmap.ExtractToUnicode(x, path, fontDict["ToUnicode"], false)
+	d.ToUnicode, _ = pdf.Decode(c, fontDict["ToUnicode"], cmap.ExtractToUnicode)
 
 	// Extract CharProcs - parse each content stream
-	charProcsDict, err := x.GetDict(path, fontDict["CharProcs"])
+	charProcsDict, err := c.Dict(fontDict["CharProcs"])
 	if err != nil {
 		return nil, pdf.Wrap(err, "CharProcs")
 	}
@@ -83,12 +82,12 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 	// font dict, page dict — the last is unavailable here).  Stored on
 	// d.Resources below, and used as the per-glyph fallback in the loop.
 	if fontDict["Resources"] != nil {
-		d.Resources, _ = pdf.ExtractorGet(x, path, fontDict["Resources"], Resources)
+		d.Resources, _ = pdf.Decode(c, fontDict["Resources"], Resources)
 	}
 
 	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
 	for name, obj := range charProcsDict {
-		stm, err := x.GetStream(path, obj)
+		stm, err := c.Stream(obj)
 		if err != nil {
 			continue // permissive: skip malformed CharProcs
 		}
@@ -100,7 +99,7 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		// back to the font-level dict; nil when neither is present.
 		var foundRes *content.Resources
 		if stm.Dict["Resources"] != nil {
-			foundRes, _ = pdf.ExtractorGet(x, path, stm.Dict["Resources"], Resources)
+			foundRes, _ = pdf.Decode(c, stm.Dict["Resources"], Resources)
 		} else if d.Resources != nil {
 			foundRes = d.Resources
 		}
@@ -108,7 +107,7 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		// store a reader factory closure so each iteration re-opens the PDF stream
 		glyphStm := stm // capture for closure
 		stream := content.NewScanner(func() (io.ReadCloser, error) {
-			return pdf.DecodeStream(x.R, path, glyphStm, 0)
+			return c.StreamReader(glyphStm)
 		})
 
 		// Cheap shape check: a Type 3 glyph procedure must start with
@@ -135,14 +134,14 @@ func extractFontType3(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 	}
 	d.CharProcs = charProcs
 
-	fontBBox, _ := pdf.GetRectangle(x.R, fontDict["FontBBox"])
+	fontBBox, _ := c.Rectangle(fontDict["FontBBox"])
 	if fontBBox != nil && !fontBBox.IsZero() {
 		d.FontBBox = fontBBox
 	}
 
-	d.FontMatrix, _ = pdf.GetMatrix(x.R, fontDict["FontMatrix"])
+	d.FontMatrix, _ = c.Matrix(fontDict["FontMatrix"])
 
-	repairType3(d, x.R)
+	repairType3(d, c.Getter())
 
 	return d, nil
 }

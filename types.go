@@ -968,7 +968,7 @@ func (x *Stream) AsPDF(opt OutputOptions) Native {
 // pick maxBytes based on what is reasonable for the kind of stream
 // being read; see package limits for shared values.
 func ReadAll(r Getter, path *CycleCheck, s *Stream, maxBytes int64) ([]byte, error) {
-	in, err := DecodeStream(r, path, s, 0)
+	in, err := DecodeStream(r, path, s)
 	if err != nil {
 		return nil, err
 	}

@@ -73,7 +73,7 @@ type List interface {
 // This only works for property lists that have been extracted from a PDF file.
 //
 // Once Go allows generic methods, this function can be made a method of List.
-func ListGet[T any](l List, extract func(*pdf.Extractor, *pdf.CycleCheck, pdf.Object, bool) (T, error)) (T, error) {
+func ListGet[T any](l List, extract func(pdf.Cursor, pdf.Object, bool) (T, error)) (T, error) {
 	p, ok := l.(*proxyList)
 	if !ok {
 		var zero T

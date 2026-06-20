@@ -149,7 +149,7 @@ func TestAuthentication(t *testing.T) {
 				if r.GetMeta().Permissions != PermCopy {
 					t.Errorf("expected PermCopy, got %v", r.GetMeta().Permissions)
 				}
-				dec, err := GetTextString(r, ref)
+				dec, err := NewCursor(r).TextString(ref)
 				if err != nil {
 					t.Error(err)
 				}
@@ -169,7 +169,7 @@ func TestAuthentication(t *testing.T) {
 				if r.GetMeta().Permissions != PermAll {
 					t.Errorf("expected PermAll, got %v", r.GetMeta().Permissions)
 				}
-				dec, err := GetTextString(r, ref)
+				dec, err := NewCursor(r).TextString(ref)
 				if err != nil {
 					t.Error(err)
 				}

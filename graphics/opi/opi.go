@@ -45,8 +45,8 @@ type Dict interface {
 
 // Extract reads an OPI version dictionary (the value of an XObject's OPI entry)
 // and returns the OPI dictionary it contains.
-func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Dict, error) {
-	dict, err := x.GetDict(path, obj)
+func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (Dict, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -54,14 +54,14 @@ func Extract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (Di
 	}
 
 	if _, ok := dict["1.3"]; ok {
-		v, err := pdf.ExtractorGet(x, path, dict["1.3"], extractV13)
+		v, err := pdf.Decode(c, dict["1.3"], extractV13)
 		if err != nil {
 			return nil, err
 		}
 		return v, nil
 	}
 	if _, ok := dict["2.0"]; ok {
-		v, err := pdf.ExtractorGet(x, path, dict["2.0"], extractV20)
+		v, err := pdf.Decode(c, dict["2.0"], extractV20)
 		if err != nil {
 			return nil, err
 		}
@@ -85,31 +85,31 @@ func embedVersion(rm *pdf.EmbedHelper, version pdf.Name, inner pdf.Dict, singleU
 }
 
 // readNumbers resolves obj to an array and returns its elements as float64.
-func readNumbers(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]float64, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
+func readNumbers(c pdf.Cursor, obj pdf.Object) ([]float64, error) {
+	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil || arr == nil {
 		return nil, err
 	}
 	out := make([]float64, 0, len(arr))
 	for _, el := range arr {
-		v, err := pdf.Optional(x.GetNumber(path, el))
+		v, err := pdf.Optional(c.Number(el))
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, float64(v))
+		out = append(out, v)
 	}
 	return out, nil
 }
 
 // readInts resolves obj to an array and returns its elements as int.
-func readInts(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]int, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
+func readInts(c pdf.Cursor, obj pdf.Object) ([]int, error) {
+	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil || arr == nil {
 		return nil, err
 	}
 	out := make([]int, 0, len(arr))
 	for _, el := range arr {
-		v, err := pdf.Optional(x.GetInteger(path, el))
+		v, err := pdf.Optional(c.Integer(el))
 		if err != nil {
 			return nil, err
 		}

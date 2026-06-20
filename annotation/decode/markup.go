@@ -24,9 +24,9 @@ import (
 )
 
 // decodeMarkup extracts fields common to all markup annotations from a PDF dictionary.
-func decodeMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, markup *annotation.Markup) error {
+func decodeMarkup(c pdf.Cursor, dict pdf.Dict, markup *annotation.Markup) error {
 	// T (optional)
-	if t, err := pdf.Optional(pdf.GetTextString(x.R, dict["T"])); err != nil {
+	if t, err := pdf.Optional(c.TextString(dict["T"])); err != nil {
 		return err
 	} else {
 		markup.User = string(t)
@@ -43,7 +43,7 @@ func decodeMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, markup 
 	}
 
 	// CreationDate (optional)
-	if creationDate, err := pdf.Optional(pdf.GetDate(x.R, dict["CreationDate"])); err != nil {
+	if creationDate, err := pdf.Optional(c.Date(dict["CreationDate"])); err != nil {
 		return err
 	} else if !creationDate.IsZero() {
 		markup.CreationDate = time.Time(creationDate)
@@ -55,7 +55,7 @@ func decodeMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, markup 
 	}
 
 	// Subj (optional)
-	if subj, err := pdf.Optional(pdf.GetTextString(x.R, dict["Subj"])); err != nil {
+	if subj, err := pdf.Optional(c.TextString(dict["Subj"])); err != nil {
 		return err
 	} else {
 		markup.Subject = string(subj)
@@ -64,14 +64,14 @@ func decodeMarkup(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict, markup 
 	// RT (optional); only "R" and "Group" are valid, and RT is meaningless
 	// without IRT — snap anything else to the default so the annotation can be
 	// written back
-	if rt, err := pdf.Optional(x.GetName(path, dict["RT"])); err != nil {
+	if rt, err := pdf.Optional(c.Name(dict["RT"])); err != nil {
 		return err
 	} else if (rt == "R" || rt == "Group") && markup.InReplyTo != 0 {
 		markup.RT = rt
 	}
 
 	// IT (optional; per spec, IT equal to Subtype means no explicit intent)
-	if it, err := pdf.Optional(x.GetName(path, dict["IT"])); err != nil {
+	if it, err := pdf.Optional(c.Name(dict["IT"])); err != nil {
 		return err
 	} else if it != dict["Subtype"] {
 		markup.Intent = it

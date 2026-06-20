@@ -43,9 +43,8 @@ var _ pdf.Embedder = (*Properties)(nil)
 
 // ExtractProperties extracts an optional content properties dictionary
 // from a PDF object.
-func ExtractProperties(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Properties, error) {
-	r := x.R
-	dict, err := pdf.GetDict(r, obj)
+func ExtractProperties(c pdf.Cursor, obj pdf.Object, _ bool) (*Properties, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -55,7 +54,7 @@ func ExtractProperties(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _
 	p := &Properties{}
 
 	// OCGs (required)
-	p.OCGs, err = extractGroupArray(x, path, dict["OCGs"])
+	p.OCGs, err = extractGroupArray(c, dict["OCGs"])
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +63,7 @@ func ExtractProperties(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _
 	}
 
 	// D (required)
-	p.D, err = pdf.ExtractorGetOptional(x, path, dict["D"], ExtractConfiguration)
+	p.D, err = pdf.DecodeOptional(c, dict["D"], ExtractConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -85,11 +84,11 @@ func ExtractProperties(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _
 	}
 
 	// Configs (optional)
-	if configsArr, err := pdf.Optional(pdf.GetArray(r, dict["Configs"])); err != nil {
+	if configsArr, err := pdf.Optional(c.Array(dict["Configs"])); err != nil {
 		return nil, err
 	} else {
 		for _, item := range configsArr {
-			config, err := pdf.ExtractorGetOptional(x, path, item, ExtractConfiguration)
+			config, err := pdf.DecodeOptional(c, item, ExtractConfiguration)
 			if err != nil {
 				continue // permissive
 			}

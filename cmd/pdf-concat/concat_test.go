@@ -79,11 +79,11 @@ func TestConcatMergesForms(t *testing.T) {
 	}
 	defer r.Close()
 
-	acro, err := pdf.GetDict(r, r.GetMeta().Catalog.AcroForm)
+	acro, err := pdf.NewCursor(r).Dict(r.GetMeta().Catalog.AcroForm)
 	if err != nil || acro == nil {
 		t.Fatalf("no merged AcroForm: %v", err)
 	}
-	fields, err := pdf.GetArray(r, acro["Fields"])
+	fields, err := pdf.NewCursor(r).Array(acro["Fields"])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,13 +93,13 @@ func TestConcatMergesForms(t *testing.T) {
 
 	names := map[string]bool{}
 	for _, el := range fields {
-		fd, err := pdf.GetDict(r, el)
+		fd, err := pdf.NewCursor(r).Dict(el)
 		if err != nil {
 			t.Fatal(err)
 		}
-		name, _ := pdf.GetTextString(r, fd["T"])
+		name, _ := pdf.NewCursor(r).TextString(fd["T"])
 		names[string(name)] = true
-		if subtype, _ := pdf.GetName(r, fd["Subtype"]); subtype != "Widget" {
+		if subtype, _ := pdf.NewCursor(r).Name(fd["Subtype"]); subtype != "Widget" {
 			t.Errorf("field %q is not a merged widget (Subtype=%q)", name, subtype)
 		}
 	}

@@ -297,7 +297,7 @@ func parseType6Patches(data []byte, s *Type6) ([]Type6Patch, error) {
 }
 
 // extractType6 reads a Type 6 (Coons patch mesh) shading from a PDF stream.
-func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*Type6, error) {
+func extractType6(c pdf.Cursor, stream *pdf.Stream) (*Type6, error) {
 	d := stream.Dict
 	s := &Type6{}
 
@@ -308,7 +308,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := color.ExtractSpace(x, path, csObj, false)
+	cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 			Err: fmt.Errorf("missing /BitsPerCoordinate entry"),
 		}
 	}
-	bpc, err := x.GetInteger(path, bpcObj)
+	bpc, err := c.Integer(bpcObj)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 			Err: fmt.Errorf("missing /BitsPerComponent entry"),
 		}
 	}
-	bpcomp, err := x.GetInteger(path, bpcompObj)
+	bpcomp, err := c.Integer(bpcompObj)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +363,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 			Err: fmt.Errorf("missing /BitsPerFlag entry"),
 		}
 	}
-	bpf, err := x.GetInteger(path, bpfObj)
+	bpf, err := c.Integer(bpfObj)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +384,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 			Err: fmt.Errorf("missing /Decode entry"),
 		}
 	}
-	decode, err := pdf.GetFloatArray(x.R, decodeObj)
+	decode, err := c.FloatArray(decodeObj)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 
 	// Read optional Function
 	if fnObj, ok := d["Function"]; ok {
-		if fn, err := pdf.ExtractorGetOptional(x, path, fnObj, function.Extract); err != nil {
+		if fn, err := pdf.DecodeOptional(c, fnObj, function.Extract); err != nil {
 			return nil, err
 		} else if fn != nil {
 			s.F = fn
@@ -425,7 +425,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 
 	// Read optional Background
 	if bgObj, ok := d["Background"]; ok {
-		if bg, err := pdf.Optional(pdf.GetFloatArray(x.R, bgObj)); err != nil {
+		if bg, err := pdf.Optional(c.FloatArray(bgObj)); err != nil {
 			return nil, err
 		} else if len(bg) > 0 {
 			if len(bg) != cs.Channels() {
@@ -437,7 +437,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 
 	// Read optional BBox
 	if bboxObj, ok := d["BBox"]; ok {
-		if bbox, err := pdf.Optional(pdf.GetRectangle(x.R, bboxObj)); err != nil {
+		if bbox, err := pdf.Optional(c.Rectangle(bboxObj)); err != nil {
 			return nil, err
 		} else {
 			s.BBox = bbox
@@ -446,7 +446,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 
 	// Read optional AntiAlias
 	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(x.GetBoolean(path, aaObj)); err != nil {
+		if aa, err := pdf.Optional(c.Boolean(aaObj)); err != nil {
 			return nil, err
 		} else {
 			s.AntiAlias = bool(aa)
@@ -454,7 +454,7 @@ func extractType6(x *pdf.Extractor, path *pdf.CycleCheck, stream *pdf.Stream) (*
 	}
 
 	// Read stream data to extract patches
-	data, err := pdf.ReadAll(x.R, path, stream, limits.MaxShadingBytes)
+	data, err := c.ReadAll(stream, limits.MaxShadingBytes)
 	if err != nil {
 		return nil, err
 	}

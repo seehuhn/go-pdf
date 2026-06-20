@@ -198,22 +198,22 @@ type FloatingWindowParameters struct {
 
 // ExtractFloatingWindowParameters reads a floating window parameters
 // dictionary.
-func ExtractFloatingWindowParameters(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*FloatingWindowParameters, error) {
-	dict, err := x.GetDictTyped(path, obj, "FWParams")
+func ExtractFloatingWindowParameters(c pdf.Cursor, obj pdf.Object, isDirect bool) (*FloatingWindowParameters, error) {
+	dict, err := c.DictTyped(obj, "FWParams")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
 		return nil, pdf.Error("missing floating window parameters dictionary")
 	}
 
-	arr, err := pdf.Optional(x.GetArray(path, dict["D"]))
+	arr, err := pdf.Optional(c.Array(dict["D"]))
 	if err != nil {
 		return nil, err
 	} else if len(arr) < 2 {
 		return nil, pdf.Error("invalid floating window dimensions")
 	}
-	w, errW := pdf.Optional(x.GetInteger(path, arr[0]))
-	h, errH := pdf.Optional(x.GetInteger(path, arr[1]))
+	w, errW := pdf.Optional(c.Integer(arr[0]))
+	h, errH := pdf.Optional(c.Integer(arr[1]))
 	if errW != nil {
 		return nil, errW
 	}
@@ -230,45 +230,45 @@ func ExtractFloatingWindowParameters(x *pdf.Extractor, path *pdf.CycleCheck, obj
 		SingleUse: isDirect,
 	}
 
-	if rt, err := pdf.Optional(x.GetInteger(path, dict["RT"])); err != nil {
+	if rt, err := pdf.Optional(c.Integer(dict["RT"])); err != nil {
 		return nil, err
 	} else if WindowRelativeTo(rt).isValid() {
 		f.RelativeTo = WindowRelativeTo(rt)
 	}
 	if dict["P"] != nil {
-		if p, err := pdf.Optional(x.GetInteger(path, dict["P"])); err != nil {
+		if p, err := pdf.Optional(c.Integer(dict["P"])); err != nil {
 			return nil, err
 		} else {
 			f.Position = windowPositionFromPDF(p)
 		}
 	}
 	if dict["O"] != nil {
-		if o, err := pdf.Optional(x.GetInteger(path, dict["O"])); err != nil {
+		if o, err := pdf.Optional(c.Integer(dict["O"])); err != nil {
 			return nil, err
 		} else {
 			f.Offscreen = offscreenActionFromPDF(o)
 		}
 	}
 	if dict["T"] != nil {
-		if t, err := pdf.Optional(x.GetBoolean(path, dict["T"])); err != nil {
+		if t, err := pdf.Optional(c.Boolean(dict["T"])); err != nil {
 			return nil, err
 		} else {
 			f.TitleBar.Set(bool(t))
 		}
 	}
 	if dict["UC"] != nil {
-		if uc, err := pdf.Optional(x.GetBoolean(path, dict["UC"])); err != nil {
+		if uc, err := pdf.Optional(c.Boolean(dict["UC"])); err != nil {
 			return nil, err
 		} else {
 			f.UserCanClose.Set(bool(uc))
 		}
 	}
-	if r, err := pdf.Optional(x.GetInteger(path, dict["R"])); err != nil {
+	if r, err := pdf.Optional(c.Integer(dict["R"])); err != nil {
 		return nil, err
 	} else if Resizable(r).isValid() {
 		f.Resizable = Resizable(r)
 	}
-	if tt, err := extractMultiLangText(x, path, dict["TT"]); err != nil {
+	if tt, err := extractMultiLangText(c, dict["TT"]); err != nil {
 		return nil, err
 	} else {
 		f.Title = tt

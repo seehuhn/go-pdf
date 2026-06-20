@@ -58,12 +58,12 @@ type Info struct {
 // ExtractInfo reads an Info dictionary from a PDF file.
 //
 // If obj is nil, the function returns nil.
-func ExtractInfo(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Info, error) {
+func ExtractInfo(c Cursor, obj Object, _ bool) (*Info, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
-	dict, err := x.GetDict(path, obj)
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -74,50 +74,50 @@ func ExtractInfo(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Info, err
 	info := &Info{}
 
 	// text string fields
-	if title, err := Optional(GetTextString(x.R, dict["Title"])); err != nil {
+	if title, err := Optional(c.TextString(dict["Title"])); err != nil {
 		return nil, err
 	} else {
 		info.Title = title
 	}
 
-	if author, err := Optional(GetTextString(x.R, dict["Author"])); err != nil {
+	if author, err := Optional(c.TextString(dict["Author"])); err != nil {
 		return nil, err
 	} else {
 		info.Author = author
 	}
 
-	if subject, err := Optional(GetTextString(x.R, dict["Subject"])); err != nil {
+	if subject, err := Optional(c.TextString(dict["Subject"])); err != nil {
 		return nil, err
 	} else {
 		info.Subject = subject
 	}
 
-	if keywords, err := Optional(GetTextString(x.R, dict["Keywords"])); err != nil {
+	if keywords, err := Optional(c.TextString(dict["Keywords"])); err != nil {
 		return nil, err
 	} else {
 		info.Keywords = keywords
 	}
 
-	if creator, err := Optional(GetTextString(x.R, dict["Creator"])); err != nil {
+	if creator, err := Optional(c.TextString(dict["Creator"])); err != nil {
 		return nil, err
 	} else {
 		info.Creator = creator
 	}
 
-	if producer, err := Optional(GetTextString(x.R, dict["Producer"])); err != nil {
+	if producer, err := Optional(c.TextString(dict["Producer"])); err != nil {
 		return nil, err
 	} else {
 		info.Producer = producer
 	}
 
 	// date fields
-	if creationDate, err := Optional(GetDate(x.R, dict["CreationDate"])); err != nil {
+	if creationDate, err := Optional(c.Date(dict["CreationDate"])); err != nil {
 		return nil, err
 	} else {
 		info.CreationDate = creationDate
 	}
 
-	if modDate, err := Optional(GetDate(x.R, dict["ModDate"])); err != nil {
+	if modDate, err := Optional(c.Date(dict["ModDate"])); err != nil {
 		return nil, err
 	} else {
 		info.ModDate = modDate
@@ -125,7 +125,7 @@ func ExtractInfo(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Info, err
 
 	// trapped field
 	if trappedObj := dict["Trapped"]; trappedObj != nil {
-		if name, err := x.GetName(path, trappedObj); err == nil {
+		if name, err := c.Name(trappedObj); err == nil {
 			switch name {
 			case "True":
 				info.Trapped.Set(true)
@@ -147,7 +147,7 @@ func ExtractInfo(x *Extractor, path *CycleCheck, obj Object, _ bool) (*Info, err
 		if standardKeys[key] {
 			continue
 		}
-		if ts, err := GetTextString(x.R, val); err == nil && len(ts) > 0 {
+		if ts, err := c.TextString(val); err == nil && len(ts) > 0 {
 			if info.Custom == nil {
 				info.Custom = make(map[string]string)
 			}

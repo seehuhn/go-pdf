@@ -432,7 +432,7 @@ func (r *Reader) extractMarkedContent(tag pdf.Name, propArg pdf.Object) (*graphi
 	} else {
 		// Inline property dictionary
 		var err error
-		list, err = property.ExtractList(r.x, nil, propArg, true)
+		list, err = property.ExtractList(pdf.CursorAt(r.x, nil), propArg, true)
 		if err != nil {
 			return nil, err
 		}

@@ -100,11 +100,11 @@ func TestFilterChaining(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			stmObj, err := GetStream(r, ref)
+			stmObj, err := NewCursor(r).Stream(ref)
 			if err != nil {
 				t.Fatal(err)
 			}
-			in, err := DecodeStream(r, nil, stmObj, 0)
+			in, err := DecodeStream(r, nil, stmObj)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -210,7 +210,7 @@ func filterRoundTrip(t *testing.T, version Version, f Filter) Filter {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stream, err := GetStream(r, ref)
+	stream, err := NewCursor(r).Stream(ref)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -26,30 +26,30 @@ import (
 )
 
 // deepExtract recursively follows the /Next reference of each dict via
-// ExtractorGet, so the call stack grows one frame per indirect-reference
+// pdf.Decode, so the call stack grows one frame per indirect-reference
 // level — the shape every real recursive extractor (color spaces, functions,
 // actions, fields, ...) has.  It returns the chain length it managed to walk.
-func deepExtract(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (int, error) {
-	dict, err := x.GetDict(path, obj)
+func deepExtract(c pdf.Cursor, obj pdf.Object, _ bool) (int, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return 0, err
 	}
 	if dict["Next"] == nil {
 		return 0, nil
 	}
-	n, err := pdf.ExtractorGet(x, path, dict["Next"], deepExtract)
+	n, err := pdf.Decode(c, dict["Next"], deepExtract)
 	if err != nil {
 		return 0, err
 	}
 	return n + 1, nil
 }
 
-// TestExtractorGetDepthBounded guards against a stack-overflow DoS: a chain of
+// TestDecodeDepthBounded guards against a stack-overflow DoS: a chain of
 // distinct indirect objects is acyclic, so the cycle guard never trips, yet a
 // recursive extractor following it would exhaust the Go call stack.  The depth
-// cap in ExtractorGet must turn this into a malformed-file error rather than a
+// cap in pdf.Decode must turn this into a malformed-file error rather than a
 // crash.
-func TestExtractorGetDepthBounded(t *testing.T) {
+func TestDecodeDepthBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
 
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
@@ -70,7 +70,7 @@ func TestExtractorGetDepthBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.ExtractorGet(x, nil, refs[0], deepExtract)
+	_, err := pdf.Decode(pdf.CursorAt(x, nil), refs[0], deepExtract)
 	if !pdf.IsMalformed(err) {
 		t.Errorf("err = %v, want malformed", err)
 	}

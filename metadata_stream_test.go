@@ -51,7 +51,7 @@ func TestMetadataRoundTrip(t *testing.T) {
 		t.Fatalf("rm close: %v", err)
 	}
 
-	extracted, err := pdf.ExtractMetadataStream(pdf.NewExtractor(pdfData), nil, ref, false)
+	extracted, err := pdf.ExtractMetadataStream(pdf.NewCursor(pdfData), ref, false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestMetadataRoundTripPadded(t *testing.T) {
 		t.Fatalf("rm close: %v", err)
 	}
 
-	extracted, err := pdf.ExtractMetadataStream(pdf.NewExtractor(pdfData), nil, ref, false)
+	extracted, err := pdf.ExtractMetadataStream(pdf.NewCursor(pdfData), ref, false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -100,11 +100,11 @@ func TestMetadataRoundTripPadded(t *testing.T) {
 		t.Errorf("PadToLength on read: got %d, want %d", extracted.Data.PadToLength, padTo)
 	}
 
-	stream, err := pdf.GetStream(pdfData, ref)
+	stream, err := pdf.NewCursor(pdfData).Stream(ref)
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	body, err := pdf.DecodeStream(pdfData, nil, stream, 0)
+	body, err := pdf.DecodeStream(pdfData, nil, stream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -139,11 +139,11 @@ func TestMetadataUnpaddedTrailer(t *testing.T) {
 		t.Fatalf("rm close: %v", err)
 	}
 
-	stream, err := pdf.GetStream(pdfData, ref)
+	stream, err := pdf.NewCursor(pdfData).Stream(ref)
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	body, err := pdf.DecodeStream(pdfData, nil, stream, 0)
+	body, err := pdf.DecodeStream(pdfData, nil, stream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -193,22 +193,22 @@ func TestMetadataCatalogPlaintext(t *testing.T) {
 	}
 
 	// /Encrypt /EncryptMetadata must be false
-	encDict, _ := pdf.GetDict(r, r.GetMeta().Trailer["Encrypt"])
+	encDict, _ := pdf.NewCursor(r).Dict(r.GetMeta().Trailer["Encrypt"])
 	if v, ok := encDict["EncryptMetadata"].(pdf.Boolean); !ok || bool(v) {
 		t.Errorf("/EncryptMetadata: got %v, want Boolean(false)", encDict["EncryptMetadata"])
 	}
 
 	// catalog metadata stream has no /Filter /Crypt entry
-	catalogDict, _ := pdf.GetDict(r, r.GetMeta().Trailer["Root"])
+	catalogDict, _ := pdf.NewCursor(r).Dict(r.GetMeta().Trailer["Root"])
 	metaRef, _ := catalogDict["Metadata"].(pdf.Reference)
 	if metaRef == 0 {
 		t.Fatal("catalog has no /Metadata entry")
 	}
-	stream, err := pdf.GetStream(r, metaRef)
+	stream, err := pdf.NewCursor(r).Stream(metaRef)
 	if err != nil {
 		t.Fatalf("GetStream metadata: %v", err)
 	}
-	// no filter at all on the catalog metadata stream — the encrypt-dict
+	// no filter at all on the catalog metadata stream â the encrypt-dict
 	// flag exempts it from encryption, and unpadded plaintext metadata is
 	// stored raw so external scanners can find the <?xpacket markers
 	filters, err := pdf.GetFilters(r, nil, stream.Dict)
@@ -220,7 +220,7 @@ func TestMetadataCatalogPlaintext(t *testing.T) {
 	}
 
 	// raw on-disk bytes must contain the XMP packet markers
-	body, err := pdf.DecodeStream(r, nil, stream, 0)
+	body, err := pdf.DecodeStream(r, nil, stream)
 	if err != nil {
 		t.Fatalf("DecodeStream: %v", err)
 	}
@@ -315,7 +315,7 @@ func TestMetadataNonCatalogStreamEncrypted(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	// raw file bytes must NOT contain the XMP packet markers — the stream
+	// raw file bytes must NOT contain the XMP packet markers â the stream
 	// is encrypted on disk because /EncryptMetadata only exempts the
 	// catalog metadata stream
 	if bytes.Contains(mf.Data, []byte(`<?xpacket begin=`)) {
@@ -329,7 +329,7 @@ func TestMetadataNonCatalogStreamEncrypted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReader: %v", err)
 	}
-	got, err := pdf.ExtractMetadataStream(pdf.NewExtractor(r), nil, ref, false)
+	got, err := pdf.ExtractMetadataStream(pdf.NewCursor(r), ref, false)
 	if err != nil {
 		t.Fatalf("ExtractMetadataStream: %v", err)
 	}
@@ -392,7 +392,7 @@ func TestMetadataNonCatalogPlaintext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReader: %v", err)
 	}
-	stream, err := pdf.GetStream(r, ref)
+	stream, err := pdf.NewCursor(r).Stream(ref)
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
@@ -481,7 +481,7 @@ func TestMetadataPlaintextRoundTrip(t *testing.T) {
 			t.Fatalf("NewReader: %v", err)
 		}
 		x := pdf.NewExtractor(r)
-		md, err := pdf.ExtractMetadataStream(x, nil, ref, false)
+		md, err := pdf.ExtractMetadataStream(pdf.CursorAt(x, nil), ref, false)
 		if err != nil {
 			t.Fatalf("ExtractMetadataStream: %v", err)
 		}
@@ -570,7 +570,7 @@ func TestMetadataPlaintextUnencryptedRoundTrip(t *testing.T) {
 			}
 
 			extracted, err := pdf.ExtractMetadataStream(
-				pdf.NewExtractor(pdfData), nil, ref, false)
+				pdf.NewCursor(pdfData), ref, false)
 			if err != nil {
 				t.Fatalf("extract: %v", err)
 			}

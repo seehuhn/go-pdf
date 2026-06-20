@@ -53,9 +53,9 @@ type ItemValue struct {
 }
 
 // ExtractItemDict extracts a collection item dictionary from a PDF object.
-func ExtractItemDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*ItemDict, error) {
+func ExtractItemDict(c pdf.Cursor, obj pdf.Object, isDirect bool) (*ItemDict, error) {
 
-	dict, err := x.GetDictTyped(path, obj, "CollectionItem")
+	dict, err := c.DictTyped(obj, "CollectionItem")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -73,7 +73,7 @@ func ExtractItemDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isD
 			continue
 		}
 
-		itemValue, err := pdf.Optional(extractItemValue(x, path, value))
+		itemValue, err := pdf.Optional(extractItemValue(c, value))
 		if err != nil {
 			return nil, err
 		} else if itemValue != nil {
@@ -85,8 +85,8 @@ func ExtractItemDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isD
 }
 
 // extractItemValue extracts a single item value from a PDF object.
-func extractItemValue(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*ItemValue, error) {
-	resolved, err := x.Resolve(path, obj)
+func extractItemValue(c pdf.Cursor, obj pdf.Object) (*ItemValue, error) {
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -100,13 +100,13 @@ func extractItemValue(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 
 	// Check if it's a dictionary (subitem)
 	if dict, ok := resolved.(pdf.Dict); ok {
-		if err := pdf.CheckDictType(x.R, dict, "CollectionSubitem"); err != nil {
+		if err := c.CheckDictType(dict, "CollectionSubitem"); err != nil {
 			return nil, nil // Not a subitem dictionary, ignore
 		}
 
 		// Extract prefix from subitem dictionary
 		if prefixObj := dict["P"]; prefixObj != nil {
-			if prefixStr, err := pdf.Optional(pdf.GetTextString(x.R, prefixObj)); err != nil {
+			if prefixStr, err := pdf.Optional(c.TextString(prefixObj)); err != nil {
 				return nil, err
 			} else {
 				prefix = string(prefixStr)
@@ -120,7 +120,7 @@ func extractItemValue(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 		}
 
 		// Resolve the D entry
-		if resolved, err := x.Resolve(path, data); err != nil {
+		if resolved, err := c.Resolve(data); err != nil {
 			return nil, err
 		} else {
 			data = resolved
@@ -138,7 +138,7 @@ func extractItemValue(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (*
 	switch v := data.(type) {
 	case pdf.String:
 		// Try as date first, then as text string
-		if dateObj, err := pdf.GetDate(x.R, v); err == nil && !dateObj.IsZero() {
+		if dateObj, err := c.Date(v); err == nil && !dateObj.IsZero() {
 			val = time.Time(dateObj)
 		} else {
 			val = string(v.AsTextString())

@@ -95,7 +95,7 @@ func TestRoundTrip_CrossSegmentText(t *testing.T) {
 
 	// Decode and verify the page has two segments and the combined
 	// iteration yields the expected operator sequence.
-	decoded, err := Decode(pdf.NewExtractor(w1), nil, dict, false)
+	decoded, err := Decode(pdf.NewCursor(w1), dict, false)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestRoundTrip_CrossSegmentArgsAndTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	decoded, err := Decode(pdf.NewExtractor(w1), nil, dict, false)
+	decoded, err := Decode(pdf.NewCursor(w1), dict, false)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestEncode_MixedContents_AllowsCrossStreamPairs(t *testing.T) {
 	rm1.Close()
 	w1.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")})
 	w1.Close()
-	decoded, err := Decode(pdf.NewExtractor(w1), nil, dict, false)
+	decoded, err := Decode(pdf.NewCursor(w1), dict, false)
 	if err != nil {
 		t.Fatal(err)
 	}

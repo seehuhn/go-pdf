@@ -21,18 +21,17 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodePrinterMark(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.PrinterMark, error) {
-	r := x.R
+func decodePrinterMark(c pdf.Cursor, dict pdf.Dict) (*annotation.PrinterMark, error) {
 	printerMark := &annotation.PrinterMark{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &printerMark.Common, dict); err != nil {
+	if err := decodeCommon(c, &printerMark.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract printer's mark-specific fields
 	// MN (optional)
-	if mn, err := pdf.GetName(r, dict["MN"]); err == nil && mn != "" {
+	if mn, err := c.Name(dict["MN"]); err == nil && mn != "" {
 		printerMark.MN = mn
 	}
 

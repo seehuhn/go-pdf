@@ -114,7 +114,7 @@ func roundTripTest(t *testing.T, version pdf.Version, nodes1 []*Node) {
 	}
 
 	x := pdf.NewExtractor(w)
-	nodes2, err := Decode(x, nil, encoded, false)
+	nodes2, err := Decode(pdf.CursorAt(x, nil), encoded, false)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -184,7 +184,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		nodes, err := Decode(x, nil, obj, false)
+		nodes, err := Decode(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("malformed navigation nodes")
 		}

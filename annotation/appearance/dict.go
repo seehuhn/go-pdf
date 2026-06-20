@@ -63,8 +63,8 @@ var _ pdf.Embedder = (*Dict)(nil)
 // ExtractDict reads an annotation appearance dictionary from the PDF object obj.
 // If obj is absent or resolves to null, ExtractDict returns (nil, nil); callers
 // can treat the missing entry as "no appearance".
-func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Dict, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractDict(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Dict, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		SingleUse: isDirect,
 	}
 
-	N, err := x.Resolve(path, dict["N"])
+	N, err := c.Resolve(dict["N"])
 	if err != nil {
 		return nil, err
 	}
@@ -85,14 +85,14 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		res.NormalMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range N {
 			state := key
-			formObj, err := pdf.ExtractorGet(x, path, obj, extract.Form)
+			formObj, err := pdf.Decode(c, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.NormalMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := pdf.ExtractorGet(x, path, N, extract.Form)
+		formObj, err := pdf.Decode(c, N, extract.Form)
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +103,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 
 	// absent or malformed /R falls back to the normal appearance (N is always
 	// a dict or stream, validated above), so the result round-trips
-	R, _ := x.Resolve(path, dict["R"])
+	R, _ := c.Resolve(dict["R"])
 	switch R.(type) {
 	case pdf.Dict, *pdf.Stream:
 	default:
@@ -114,14 +114,14 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		res.RollOverMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range R {
 			state := key
-			formObj, err := pdf.ExtractorGet(x, path, obj, extract.Form)
+			formObj, err := pdf.Decode(c, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.RollOverMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := pdf.ExtractorGet(x, path, R, extract.Form)
+		formObj, err := pdf.Decode(c, R, extract.Form)
 		if err != nil {
 			return nil, err
 		}
@@ -129,7 +129,7 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 	}
 
 	// absent or malformed /D falls back to the normal appearance, as for /R
-	D, _ := x.Resolve(path, dict["D"])
+	D, _ := c.Resolve(dict["D"])
 	switch D.(type) {
 	case pdf.Dict, *pdf.Stream:
 	default:
@@ -140,14 +140,14 @@ func ExtractDict(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirec
 		res.DownMap = make(map[pdf.Name]*form.Form)
 		for key, obj := range D {
 			state := key
-			formObj, err := pdf.ExtractorGet(x, path, obj, extract.Form)
+			formObj, err := pdf.Decode(c, obj, extract.Form)
 			if err != nil {
 				return nil, err
 			}
 			res.DownMap[state] = formObj
 		}
 	case *pdf.Stream:
-		formObj, err := pdf.ExtractorGet(x, path, D, extract.Form)
+		formObj, err := pdf.Decode(c, D, extract.Form)
 		if err != nil {
 			return nil, err
 		}

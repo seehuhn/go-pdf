@@ -122,7 +122,7 @@ func (f *filterCrypt) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.Re
 }
 
 func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo, Perm, error) {
-	enc, err := GetDict(r, encObj)
+	enc, err := NewCursor(r).Dict(encObj)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -132,13 +132,13 @@ func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo,
 
 	res := &encryptInfo{}
 
-	filter, err := GetName(r, enc["Filter"])
+	filter, err := NewCursor(r).Name(enc["Filter"])
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// version of the encryption/decryption algorithm
-	V, err := GetInteger(r, enc["V"])
+	V, err := NewCursor(r).Integer(enc["V"])
 	if err != nil {
 		return nil, 0, err
 	}

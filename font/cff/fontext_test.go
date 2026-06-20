@@ -53,7 +53,7 @@ func TestEmbedSimple(t *testing.T) {
 
 	// step 2: read back the font and verify that everything is as expected
 	x := pdf.NewExtractor(w)
-	dictObj, err := extract.Dict(x, nil, ref, false)
+	dictObj, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -197,8 +197,8 @@ func (a *Annotation) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 // DecodeAnnotation reads an annotation's additional-actions dictionary from
 // a PDF object.
-func DecodeAnnotation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*Annotation, error) {
-	dict, err := x.GetDict(path, obj)
+func DecodeAnnotation(c pdf.Cursor, obj pdf.Object, _ bool) (*Annotation, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -208,61 +208,61 @@ func DecodeAnnotation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ 
 
 	a := &Annotation{}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["E"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["E"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.Enter = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["X"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["X"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.Exit = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["D"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["D"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.Down = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["U"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["U"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.Up = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["Fo"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["Fo"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.Focus = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["Bl"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["Bl"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.Blur = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["PO"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["PO"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.PageOpen = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["PC"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["PC"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.PageClose = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["PV"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["PV"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.PageVisible = act
 	}
 
-	if act, err := pdf.ExtractorGetOptional(x, path, dict["PI"], action.Decode); err != nil {
+	if act, err := pdf.DecodeOptional(c, dict["PI"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		a.PageInvisible = act

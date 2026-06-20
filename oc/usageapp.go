@@ -90,10 +90,9 @@ type UsageApplication struct {
 var _ pdf.Embedder = (*UsageApplication)(nil)
 
 // ExtractUsageApplication extracts a usage application dictionary from a PDF object.
-func ExtractUsageApplication(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*UsageApplication, error) {
+func ExtractUsageApplication(c pdf.Cursor, obj pdf.Object, isDirect bool) (*UsageApplication, error) {
 
-	r := x.R
-	dict, err := pdf.GetDict(r, obj)
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -103,7 +102,7 @@ func ExtractUsageApplication(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obj
 	ua := &UsageApplication{}
 
 	// extract Event (required)
-	if event, err := pdf.Optional(pdf.GetName(r, dict["Event"])); err != nil {
+	if event, err := pdf.Optional(c.Name(dict["Event"])); err != nil {
 		return nil, err
 	} else {
 		switch Event(event) {
@@ -116,12 +115,12 @@ func ExtractUsageApplication(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obj
 	}
 
 	// extract OCGs (optional, normalized to nil if empty)
-	if arr, err := pdf.Optional(pdf.GetArray(r, dict["OCGs"])); err != nil {
+	if arr, err := pdf.Optional(c.Array(dict["OCGs"])); err != nil {
 		return nil, err
 	} else if len(arr) > 0 {
 		var ocgs []*Group
 		for _, item := range arr {
-			if group, err := pdf.ExtractorGetOptional(x, path, item, ExtractGroup); err != nil {
+			if group, err := pdf.DecodeOptional(c, item, ExtractGroup); err != nil {
 				return nil, err
 			} else if group != nil {
 				ocgs = append(ocgs, group)
@@ -133,12 +132,12 @@ func ExtractUsageApplication(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obj
 	}
 
 	// extract Category (required)
-	arr, err := pdf.Optional(pdf.GetArray(r, dict["Category"]))
+	arr, err := pdf.Optional(c.Array(dict["Category"]))
 	if err != nil {
 		return nil, err
 	}
 	for _, item := range arr {
-		if name, err := pdf.Optional(pdf.GetName(r, item)); err != nil {
+		if name, err := pdf.Optional(c.Name(item)); err != nil {
 			return nil, err
 		} else if name != "" {
 			ua.Category = append(ua.Category, Category(name))

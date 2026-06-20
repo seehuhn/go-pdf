@@ -251,8 +251,8 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 }
 
 // ExtractSoftMask extracts a soft-mask image from a PDF stream.
-func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (*SoftMask, error) {
-	stm, err := x.GetStream(path, obj)
+func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
+	stm, err := c.Stream(obj)
 	if err != nil {
 		return nil, err
 	} else if stm == nil {
@@ -261,10 +261,10 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	dict := stm.Dict
 
 	// Check Type and Subtype
-	if err := pdf.CheckDictType(x.R, dict, "XObject"); err != nil {
+	if err := c.CheckDictType(dict, "XObject"); err != nil {
 		return nil, err
 	}
-	if subtypeName, err := pdf.Optional(x.GetName(path, dict["Subtype"])); err != nil {
+	if subtypeName, err := pdf.Optional(c.Name(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtypeName != "Image" && subtypeName != "" {
 		return nil, pdf.Errorf("invalid Subtype %q for soft mask XObject", subtypeName)
@@ -272,7 +272,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 
 	// validate ColorSpace is DeviceGray (required for soft masks)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := color.ExtractSpace(x, path, csObj, false)
+		cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +289,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	delete(dict, "SMaskInData")
 
 	// extract required fields
-	width, err := x.GetInteger(path, dict["Width"])
+	width, err := c.Integer(dict["Width"])
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +300,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		return nil, pdf.Errorf("soft mask width %d exceeds limit", width)
 	}
 
-	height, err := x.GetInteger(path, dict["Height"])
+	height, err := c.Integer(dict["Height"])
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		return nil, pdf.Error("soft mask pixel count exceeds limit")
 	}
 
-	bpc, err := x.GetInteger(path, dict["BitsPerComponent"])
+	bpc, err := c.Integer(dict["BitsPerComponent"])
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	}
 
 	// Extract Decode array
-	if decodeArray, err := pdf.Optional(x.GetArray(path, dict["Decode"])); err != nil {
+	if decodeArray, err := pdf.Optional(c.Array(dict["Decode"])); err != nil {
 		return nil, err
 	} else if decodeArray != nil {
 		if len(decodeArray) != 2 {
@@ -342,7 +342,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 		}
 		softMask.Decode = make([]float64, 2)
 		for i, val := range decodeArray {
-			if num, err := x.GetNumber(path, val); err != nil {
+			if num, err := c.Number(val); err != nil {
 				return nil, fmt.Errorf("invalid Decode[%d]: %w", i, err)
 			} else {
 				softMask.Decode[i] = num
@@ -351,7 +351,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	}
 
 	// Extract Interpolate
-	if interp, err := x.GetBoolean(path, dict["Interpolate"]); err == nil {
+	if interp, err := c.Boolean(dict["Interpolate"]); err == nil {
 		softMask.Interpolate = bool(interp)
 	}
 
@@ -360,12 +360,12 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	// than allocate up to maxArrayLen floats from an attacker-controlled
 	// array.  Parity with the actual parent ncomp is validated by the
 	// writer in (*Dict).check and defensively by renderers.
-	if matteArray, err := pdf.Optional(x.GetArray(path, dict["Matte"])); err != nil {
+	if matteArray, err := pdf.Optional(c.Array(dict["Matte"])); err != nil {
 		return nil, err
 	} else if matteArray != nil && len(matteArray) <= limits.MaxImageChannels {
 		softMask.Matte = make([]float64, len(matteArray))
 		for i, val := range matteArray {
-			if num, err := x.GetNumber(path, val); err != nil {
+			if num, err := c.Number(val); err != nil {
 				return nil, fmt.Errorf("invalid Matte[%d]: %w", i, err)
 			} else {
 				softMask.Matte[i] = num
@@ -374,7 +374,7 @@ func ExtractSoftMask(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ b
 	}
 
 	softMask.Source = &streamData{
-		inner:    opaque.ExtractStream(x, stm),
+		inner:    opaque.ExtractStream(c.Extractor(), stm),
 		maxBytes: ImageDataLimit(softMask.Width, softMask.Height, softMask.BitsPerComponent, color.SpaceDeviceGray),
 	}
 

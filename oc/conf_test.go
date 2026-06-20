@@ -304,7 +304,7 @@ func testConfigurationRoundTrip(t *testing.T, version pdf.Version, data *Configu
 	}
 
 	extractor := pdf.NewExtractor(w)
-	extracted, err := pdf.ExtractorGet(extractor, nil, obj, ExtractConfiguration)
+	extracted, err := pdf.Decode(pdf.CursorAt(extractor, nil), obj, ExtractConfiguration)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -442,7 +442,7 @@ func FuzzConfigurationRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.ExtractorGet(x, nil, obj, ExtractConfiguration)
+		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractConfiguration)
 		if err != nil {
 			t.Skip("malformed object")
 		}

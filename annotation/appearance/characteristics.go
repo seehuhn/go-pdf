@@ -87,8 +87,8 @@ var _ pdf.Embedder = (*Characteristics)(nil)
 // ExtractCharacteristics reads an appearance characteristics dictionary from
 // the PDF object obj. If obj is absent or resolves to null,
 // ExtractCharacteristics returns (nil, nil).
-func ExtractCharacteristics(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Characteristics, error) {
-	dict, err := x.GetDict(path, obj)
+func ExtractCharacteristics(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Characteristics, error) {
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -98,67 +98,67 @@ func ExtractCharacteristics(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Obje
 
 	res := &Characteristics{SingleUse: isDirect}
 
-	if r, err := pdf.Optional(x.GetInteger(path, dict["R"])); err != nil {
+	if r, err := pdf.Optional(c.Integer(dict["R"])); err != nil {
 		return nil, err
 	} else if r%90 == 0 {
 		res.Rotation = int(r)
 	}
 
-	if bc, err := pdf.Optional(colorenc.Extract(x.R, dict["BC"])); err != nil {
+	if bc, err := pdf.Optional(colorenc.Extract(c, dict["BC"])); err != nil {
 		return nil, err
 	} else {
 		res.BorderColor = bc
 	}
 
-	if bg, err := pdf.Optional(colorenc.Extract(x.R, dict["BG"])); err != nil {
+	if bg, err := pdf.Optional(colorenc.Extract(c, dict["BG"])); err != nil {
 		return nil, err
 	} else {
 		res.BackgroundColor = bg
 	}
 
-	if ca, err := pdf.Optional(pdf.GetTextString(x.R, dict["CA"])); err != nil {
+	if ca, err := pdf.Optional(c.TextString(dict["CA"])); err != nil {
 		return nil, err
 	} else {
 		res.Caption = string(ca)
 	}
 
-	if rc, err := pdf.Optional(pdf.GetTextString(x.R, dict["RC"])); err != nil {
+	if rc, err := pdf.Optional(c.TextString(dict["RC"])); err != nil {
 		return nil, err
 	} else {
 		res.RolloverCaption = string(rc)
 	}
 
-	if ac, err := pdf.Optional(pdf.GetTextString(x.R, dict["AC"])); err != nil {
+	if ac, err := pdf.Optional(c.TextString(dict["AC"])); err != nil {
 		return nil, err
 	} else {
 		res.DownCaption = string(ac)
 	}
 
-	if f, err := pdf.ExtractorGetOptional(x, path, dict["I"], extract.Form); err != nil {
+	if f, err := pdf.DecodeOptional(c, dict["I"], extract.Form); err != nil {
 		return nil, err
 	} else {
 		res.Icon = f
 	}
 
-	if f, err := pdf.ExtractorGetOptional(x, path, dict["RI"], extract.Form); err != nil {
+	if f, err := pdf.DecodeOptional(c, dict["RI"], extract.Form); err != nil {
 		return nil, err
 	} else {
 		res.RolloverIcon = f
 	}
 
-	if f, err := pdf.ExtractorGetOptional(x, path, dict["IX"], extract.Form); err != nil {
+	if f, err := pdf.DecodeOptional(c, dict["IX"], extract.Form); err != nil {
 		return nil, err
 	} else {
 		res.DownIcon = f
 	}
 
-	if fit, err := pdf.ExtractorGetOptional(x, path, dict["IF"], ExtractIconFit); err != nil {
+	if fit, err := pdf.DecodeOptional(c, dict["IF"], ExtractIconFit); err != nil {
 		return nil, err
 	} else {
 		res.IconFit = fit
 	}
 
-	if tp, err := pdf.Optional(x.GetInteger(path, dict["TP"])); err != nil {
+	if tp, err := pdf.Optional(c.Integer(dict["TP"])); err != nil {
 		return nil, err
 	} else if tp >= 0 && tp <= 6 {
 		res.TextPosition = TextPosition(tp)

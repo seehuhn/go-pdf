@@ -22,24 +22,23 @@ import (
 	"seehuhn.de/go/pdf/sound"
 )
 
-func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Sound, error) {
-	r := x.R
+func decodeSound(c pdf.Cursor, dict pdf.Dict) (*annotation.Sound, error) {
 	a := &annotation.Sound{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &a.Common, dict); err != nil {
+	if err := decodeCommon(c, &a.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &a.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &a.Markup); err != nil {
 		return nil, err
 	}
 
 	// Sound (required): without a usable Sound the annotation cannot be
 	// written back, so reject it; the page decoder drops annotations that
 	// fail to decode, matching the permissive-reader policy.
-	s, err := pdf.ExtractorGet(x, path, dict["Sound"], sound.Extract)
+	s, err := pdf.Decode(c, dict["Sound"], sound.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +48,7 @@ func decodeSound(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annota
 	a.Sound = s
 
 	// Name (optional) - default to "Speaker" if not specified
-	if name, err := pdf.GetName(r, dict["Name"]); err == nil && name != "" {
+	if name, err := c.Name(dict["Name"]); err == nil && name != "" {
 		a.Icon = annotation.SoundIcon(name)
 	} else {
 		a.Icon = annotation.SoundIconSpeaker

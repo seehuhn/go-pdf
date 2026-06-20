@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/pdf/optional"
 )
 
@@ -156,7 +157,7 @@ func infoRoundTripTest(t *testing.T, version pdf.Version, original *pdf.Info) {
 	}
 
 	x := pdf.NewExtractor(w)
-	extracted, err := pdf.ExtractorGet(x, nil, embedded, pdf.ExtractInfo)
+	extracted, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,8 +168,8 @@ func infoRoundTripTest(t *testing.T, version pdf.Version, original *pdf.Info) {
 }
 
 func TestExtractInfoNil(t *testing.T) {
-	x := pdf.NewExtractor(nil)
-	info, err := pdf.ExtractorGet(x, nil, nil, pdf.ExtractInfo)
+	x := pdf.NewExtractor(mock.Getter)
+	info, err := pdf.Decode(pdf.CursorAt(x, nil), nil, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +227,7 @@ func FuzzInfoRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		info, err := pdf.ExtractorGet(x, nil, obj, pdf.ExtractInfo)
+		info, err := pdf.Decode(pdf.CursorAt(x, nil), obj, pdf.ExtractInfo)
 		if err != nil {
 			t.Skip("malformed info")
 		}

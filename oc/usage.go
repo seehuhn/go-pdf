@@ -63,9 +63,9 @@ type Usage struct {
 var _ pdf.Embedder = (*Usage)(nil)
 
 // ExtractUsage extracts a usage dictionary from a PDF object.
-func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*Usage, error) {
+func ExtractUsage(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usage, error) {
 
-	dict, err := x.GetDict(path, obj)
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -75,18 +75,18 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	usage := &Usage{}
 
 	// extract CreatorInfo dictionary
-	if creatorDict, err := pdf.Optional(x.GetDict(path, dict["CreatorInfo"])); err != nil {
+	if creatorDict, err := pdf.Optional(c.Dict(dict["CreatorInfo"])); err != nil {
 		return nil, err
 	} else if creatorDict != nil {
 		info := &UsageCreator{}
 
-		if creator, err := pdf.Optional(pdf.GetTextString(x.R, creatorDict["Creator"])); err != nil {
+		if creator, err := pdf.Optional(c.TextString(creatorDict["Creator"])); err != nil {
 			return nil, err
 		} else if creator != "" {
 			info.Creator = string(creator)
 		}
 
-		if subtype, err := pdf.Optional(x.GetName(path, creatorDict["Subtype"])); err != nil {
+		if subtype, err := pdf.Optional(c.Name(creatorDict["Subtype"])); err != nil {
 			return nil, err
 		} else if subtype != "" {
 			info.Subtype = subtype
@@ -109,10 +109,10 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	}
 
 	// extract Language dictionary
-	if langDict, err := pdf.Optional(x.GetDict(path, dict["Language"])); err != nil {
+	if langDict, err := pdf.Optional(c.Dict(dict["Language"])); err != nil {
 		return nil, err
 	} else if langDict != nil {
-		if langStr, err := pdf.Optional(pdf.GetTextString(x.R, langDict["Lang"])); err != nil {
+		if langStr, err := pdf.Optional(c.TextString(langDict["Lang"])); err != nil {
 			return nil, err
 		} else if langStr != "" {
 			// parse language tag; the writer requires a non-root tag
@@ -120,7 +120,7 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 			if err == nil && !tag.IsRoot() {
 				info := &UsageLanguage{Lang: tag}
 
-				if preferred, err := pdf.Optional(x.GetName(path, langDict["Preferred"])); err != nil {
+				if preferred, err := pdf.Optional(c.Name(langDict["Preferred"])); err != nil {
 					return nil, err
 				} else if preferred == "ON" {
 					info.Preferred = true
@@ -133,12 +133,12 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	}
 
 	// extract Export dictionary
-	if exportDict, err := pdf.Optional(x.GetDict(path, dict["Export"])); err != nil {
+	if exportDict, err := pdf.Optional(c.Dict(dict["Export"])); err != nil {
 		return nil, err
 	} else if exportDict != nil {
 		info := &UsageExport{}
 
-		if state, err := pdf.Optional(x.GetName(path, exportDict["ExportState"])); err != nil {
+		if state, err := pdf.Optional(c.Name(exportDict["ExportState"])); err != nil {
 			return nil, err
 		} else {
 			info.ExportState = parseStateRec(state)
@@ -151,18 +151,18 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	}
 
 	// extract Zoom dictionary
-	if zoomDict, err := pdf.Optional(x.GetDict(path, dict["Zoom"])); err != nil {
+	if zoomDict, err := pdf.Optional(c.Dict(dict["Zoom"])); err != nil {
 		return nil, err
 	} else if zoomDict != nil {
 		info := &UsageZoom{}
 
-		if min, err := pdf.Optional(x.GetNumber(path, zoomDict["min"])); err != nil {
+		if min, err := pdf.Optional(c.Number(zoomDict["min"])); err != nil {
 			return nil, err
 		} else if min > 0 && min <= math.MaxFloat32 {
 			info.Min = min
 		}
 
-		if max, err := pdf.Optional(x.GetNumber(path, zoomDict["max"])); err != nil {
+		if max, err := pdf.Optional(c.Number(zoomDict["max"])); err != nil {
 			return nil, err
 		} else if max < 0 {
 			// negative max is malformed; discard the entire Zoom dict
@@ -180,18 +180,18 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	}
 
 	// extract Print dictionary
-	if printDict, err := pdf.Optional(x.GetDict(path, dict["Print"])); err != nil {
+	if printDict, err := pdf.Optional(c.Dict(dict["Print"])); err != nil {
 		return nil, err
 	} else if printDict != nil {
 		info := &UsagePrint{}
 
-		if subtype, err := pdf.Optional(x.GetName(path, printDict["Subtype"])); err != nil {
+		if subtype, err := pdf.Optional(c.Name(printDict["Subtype"])); err != nil {
 			return nil, err
 		} else if subtype != "" {
 			info.Subtype = PrintSubtype(subtype)
 		}
 
-		if state, err := pdf.Optional(x.GetName(path, printDict["PrintState"])); err != nil {
+		if state, err := pdf.Optional(c.Name(printDict["PrintState"])); err != nil {
 			return nil, err
 		} else {
 			info.PrintState = parseStateRec(state)
@@ -201,12 +201,12 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	}
 
 	// extract View dictionary
-	if viewDict, err := pdf.Optional(x.GetDict(path, dict["View"])); err != nil {
+	if viewDict, err := pdf.Optional(c.Dict(dict["View"])); err != nil {
 		return nil, err
 	} else if viewDict != nil {
 		info := &UsageView{}
 
-		if state, err := pdf.Optional(x.GetName(path, viewDict["ViewState"])); err != nil {
+		if state, err := pdf.Optional(c.Name(viewDict["ViewState"])); err != nil {
 			return nil, err
 		} else {
 			info.ViewState = parseStateRec(state)
@@ -219,7 +219,7 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	}
 
 	// extract User dictionary
-	if userDict, err := pdf.Optional(x.GetDict(path, dict["User"])); err != nil {
+	if userDict, err := pdf.Optional(c.Dict(dict["User"])); err != nil {
 		return nil, err
 	} else if userDict != nil {
 		info := &UsageUser{}
@@ -227,7 +227,7 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 		// Type must be one of Ind/Ttl/Org (8.11.4.4); ignore any other value
 		// so a permissively-read User dict round-trips through the strict
 		// writer (a User with no valid Type is dropped below)
-		if userType, err := pdf.Optional(x.GetName(path, userDict["Type"])); err != nil {
+		if userType, err := pdf.Optional(c.Name(userDict["Type"])); err != nil {
 			return nil, err
 		} else {
 			switch UserType(userType) {
@@ -238,16 +238,16 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 
 		// Name can be either a text string or an array of text strings
 		nameObj := userDict["Name"]
-		if arr, err := x.GetArray(path, nameObj); err == nil && arr != nil {
+		if arr, err := c.Array(nameObj); err == nil && arr != nil {
 			info.Name = make([]string, 0, len(arr))
 			for _, item := range arr {
-				if str, err := pdf.Optional(pdf.GetTextString(x.R, item)); err != nil {
+				if str, err := pdf.Optional(c.TextString(item)); err != nil {
 					return nil, err
 				} else if str != "" {
 					info.Name = append(info.Name, string(str))
 				}
 			}
-		} else if str, err := pdf.Optional(pdf.GetTextString(x.R, nameObj)); err != nil {
+		} else if str, err := pdf.Optional(c.TextString(nameObj)); err != nil {
 			return nil, err
 		} else if str != "" {
 			info.Name = []string{string(str)}
@@ -260,12 +260,12 @@ func ExtractUsage(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDire
 	}
 
 	// extract PageElement dictionary
-	if pageDict, err := pdf.Optional(x.GetDict(path, dict["PageElement"])); err != nil {
+	if pageDict, err := pdf.Optional(c.Dict(dict["PageElement"])); err != nil {
 		return nil, err
 	} else if pageDict != nil {
 		// Subtype must be one of the defined values (8.11.4.4); ignore any
 		// other so the result round-trips through the strict writer
-		if subtype, err := pdf.Optional(x.GetName(path, pageDict["Subtype"])); err != nil {
+		if subtype, err := pdf.Optional(c.Name(pageDict["Subtype"])); err != nil {
 			return nil, err
 		} else {
 			switch PageElement(subtype) {

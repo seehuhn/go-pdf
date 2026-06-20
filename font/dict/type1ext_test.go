@@ -73,12 +73,12 @@ func TestType1Embedding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fontDict, err := pdf.GetDictTyped(r, fontRef, "Font")
+	fontDict, err := pdf.NewCursor(r).DictTyped(fontRef, "Font")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = pdf.GetName(r, fontDict["Encoding"])
+	_, err = pdf.NewCursor(r).Name(fontDict["Encoding"])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestType1Embedding(t *testing.T) {
 
 	// step 3: extract the font file and check
 	x := pdf.NewExtractor(r)
-	parsedDict, err := extract.Dict(x, nil, fontDict, false)
+	parsedDict, err := extract.Dict(pdf.CursorAt(x, nil), fontDict, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func TestType1Embedding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pg, err := pdf.ExtractorGet(x, nil, pageDict, page.Decode)
+	pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageDict, page.Decode)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -240,7 +240,7 @@ func rectilinearRoundTripTest(t *testing.T, version pdf.Version, data *Rectiline
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.ExtractorGet(x, nil, embedded, Extract)
+	decoded, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, Extract)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -307,7 +307,7 @@ func FuzzRectilinearRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := pdf.ExtractorGet(x, nil, objPDF, Extract)
+		objGo, err := pdf.Decode(pdf.CursorAt(x, nil), objPDF, Extract)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

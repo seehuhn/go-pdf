@@ -57,8 +57,8 @@ type SoftwareIdentifier struct {
 }
 
 // ExtractSoftwareIdentifier reads a software identifier dictionary.
-func ExtractSoftwareIdentifier(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, isDirect bool) (*SoftwareIdentifier, error) {
-	dict, err := x.GetDictTyped(path, obj, "SoftwareIdentifier")
+func ExtractSoftwareIdentifier(c pdf.Cursor, obj pdf.Object, isDirect bool) (*SoftwareIdentifier, error) {
+	dict, err := c.DictTyped(obj, "SoftwareIdentifier")
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
@@ -67,7 +67,7 @@ func ExtractSoftwareIdentifier(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.O
 
 	s := &SoftwareIdentifier{SingleUse: isDirect}
 
-	u, err := pdf.Optional(x.GetString(path, dict["U"]))
+	u, err := pdf.Optional(c.String(dict["U"]))
 	if err != nil {
 		return nil, err
 	} else if len(u) == 0 {
@@ -75,33 +75,33 @@ func ExtractSoftwareIdentifier(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.O
 	}
 	s.URI = string(u)
 
-	if low, err := pdf.Optional(extractVersionArray(x, path, dict["L"])); err != nil {
+	if low, err := pdf.Optional(extractVersionArray(c, dict["L"])); err != nil {
 		return nil, err
 	} else {
 		s.Low = low
 	}
-	if high, err := pdf.Optional(extractVersionArray(x, path, dict["H"])); err != nil {
+	if high, err := pdf.Optional(extractVersionArray(c, dict["H"])); err != nil {
 		return nil, err
 	} else {
 		s.High = high
 	}
 
-	if li, err := pdf.Optional(x.GetBoolean(path, dict["LI"])); err != nil {
+	if li, err := pdf.Optional(c.Boolean(dict["LI"])); err != nil {
 		return nil, err
 	} else if dict["LI"] != nil {
 		s.LowExclusive = !bool(li)
 	}
-	if hi, err := pdf.Optional(x.GetBoolean(path, dict["HI"])); err != nil {
+	if hi, err := pdf.Optional(c.Boolean(dict["HI"])); err != nil {
 		return nil, err
 	} else if dict["HI"] != nil {
 		s.HighExclusive = !bool(hi)
 	}
 
-	if os, err := pdf.Optional(x.GetArray(path, dict["OS"])); err != nil {
+	if os, err := pdf.Optional(c.Array(dict["OS"])); err != nil {
 		return nil, err
 	} else {
 		for _, elem := range os {
-			name, err := pdf.Optional(x.GetString(path, elem))
+			name, err := pdf.Optional(c.String(elem))
 			if err != nil {
 				return nil, err
 			}
@@ -114,8 +114,8 @@ func ExtractSoftwareIdentifier(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.O
 
 // extractVersionArray reads a version array, returning nil if the value is
 // missing, empty, or contains a negative subversion number.
-func extractVersionArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) ([]int, error) {
-	arr, err := x.GetArray(path, obj)
+func extractVersionArray(c pdf.Cursor, obj pdf.Object) ([]int, error) {
+	arr, err := c.Array(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func extractVersionArray(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object)
 	}
 	out := make([]int, 0, len(arr))
 	for _, elem := range arr {
-		n, err := pdf.Optional(x.GetInteger(path, elem))
+		n, err := pdf.Optional(c.Integer(elem))
 		if err != nil {
 			return nil, err
 		}

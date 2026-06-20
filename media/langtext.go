@@ -38,8 +38,8 @@ type MultiLangText []LangText
 // extractMultiLangText reads a multi-language text array.  Pairs consist of a
 // language identifier followed by the corresponding text.  A trailing
 // unpaired element is ignored.
-func extractMultiLangText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object) (MultiLangText, error) {
-	arr, err := pdf.Optional(x.GetArray(path, obj))
+func extractMultiLangText(c pdf.Cursor, obj pdf.Object) (MultiLangText, error) {
+	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil {
 		return nil, err
 	}
@@ -48,11 +48,11 @@ func extractMultiLangText(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object
 	}
 	var out MultiLangText
 	for i := 0; i+1 < len(arr); i += 2 {
-		lang, err := pdf.Optional(pdf.GetTextString(x.R, arr[i]))
+		lang, err := pdf.Optional(c.TextString(arr[i]))
 		if err != nil {
 			return nil, err
 		}
-		text, err := pdf.Optional(pdf.GetTextString(x.R, arr[i+1]))
+		text, err := pdf.Optional(c.TextString(arr[i+1]))
 		if err != nil {
 			return nil, err
 		}

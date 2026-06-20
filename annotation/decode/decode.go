@@ -23,10 +23,10 @@ import (
 
 // Annotation reads an annotation from a PDF file.
 //
-// Always invoke this via [pdf.ExtractorGet] so that indirect references are
+// Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func Annotation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) (annotation.Annotation, error) {
-	dict, err := x.GetDictTyped(path, obj, "Annot")
+func Annotation(c pdf.Cursor, obj pdf.Object, _ bool) (annotation.Annotation, error) {
+	dict, err := c.DictTyped(obj, "Annot")
 	if err != nil {
 		return nil, err
 	}
@@ -36,68 +36,68 @@ func Annotation(x *pdf.Extractor, path *pdf.CycleCheck, obj pdf.Object, _ bool) 
 	// return the widget half, so the page's /Annots and the field tree's /Kids
 	// share one object. The field's inheritable attributes are flattened against
 	// the context reconstructed from its /Parent chain, matching the field tree.
-	if path != nil && isMergedFieldDict(dict) {
-		_, w, err := decodeMergedField(x, path, path.Ref, dict, inheritedFromChain(x, dict))
+	if p := c.Path(); p != nil && isMergedFieldDict(dict) {
+		_, w, err := decodeMergedField(c, p.Ref, dict, inheritedFromChain(c, dict))
 		return w, err
 	}
 
-	subtype, err := x.GetName(path, dict["Subtype"])
+	subtype, err := c.Name(dict["Subtype"])
 	if err != nil {
 		return nil, err
 	}
 
 	switch subtype {
 	case "Text":
-		return decodeText(x, path, dict)
+		return decodeText(c, dict)
 	case "Link":
-		return decodeLink(x, path, dict)
+		return decodeLink(c, dict)
 	case "FreeText":
-		return decodeFreeText(x, path, dict)
+		return decodeFreeText(c, dict)
 	case "Line":
-		return decodeLine(x, path, dict)
+		return decodeLine(c, dict)
 	case "Square":
-		return decodeSquare(x, path, dict)
+		return decodeSquare(c, dict)
 	case "Circle":
-		return decodeCircle(x, path, dict)
+		return decodeCircle(c, dict)
 	case "Polygon":
-		return decodePolygon(x, path, dict)
+		return decodePolygon(c, dict)
 	case "PolyLine":
-		return decodePolyline(x, path, dict)
+		return decodePolyline(c, dict)
 	case "Highlight", "Underline", "Squiggly", "StrikeOut":
-		return decodeTextMarkup(x, path, dict, subtype)
+		return decodeTextMarkup(c, dict, subtype)
 	case "Caret":
-		return decodeCaret(x, path, dict)
+		return decodeCaret(c, dict)
 	case "Stamp":
-		return decodeStamp(x, path, dict)
+		return decodeStamp(c, dict)
 	case "Ink":
-		return decodeInk(x, path, dict)
+		return decodeInk(c, dict)
 	case "Popup":
-		return decodePopup(x, path, dict)
+		return decodePopup(c, dict)
 	case "FileAttachment":
-		return decodeFileAttachment(x, path, dict)
+		return decodeFileAttachment(c, dict)
 	case "Sound":
-		return decodeSound(x, path, dict)
+		return decodeSound(c, dict)
 	case "Movie":
-		return decodeMovie(x, path, dict)
+		return decodeMovie(c, dict)
 	case "Screen":
-		return decodeScreen(x, path, dict)
+		return decodeScreen(c, dict)
 	case "Widget":
-		return decodeWidgetBody(x, path, dict)
+		return decodeWidgetBody(c, dict)
 	case "PrinterMark":
-		return decodePrinterMark(x, path, dict)
+		return decodePrinterMark(c, dict)
 	case "TrapNet":
-		return decodeTrapNet(x, path, dict)
+		return decodeTrapNet(c, dict)
 	case "Watermark":
-		return decodeWatermark(x, path, dict)
+		return decodeWatermark(c, dict)
 	case "3D":
-		return decodeAnnot3D(x, path, dict)
+		return decodeAnnot3D(c, dict)
 	case "Redact":
-		return decodeRedact(x, path, dict)
+		return decodeRedact(c, dict)
 	case "Projection":
-		return decodeProjection(x, path, dict)
+		return decodeProjection(c, dict)
 	case "RichMedia":
-		return decodeRichMedia(x, path, dict)
+		return decodeRichMedia(c, dict)
 	default:
-		return decodeCustom(x, path, dict)
+		return decodeCustom(c, dict)
 	}
 }

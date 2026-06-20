@@ -22,23 +22,22 @@ import (
 	"seehuhn.de/go/pdf/annotation/colorenc"
 )
 
-func decodeSquare(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Square, error) {
-	r := x.R
+func decodeSquare(c pdf.Cursor, dict pdf.Dict) (*annotation.Square, error) {
 	square := &annotation.Square{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &square.Common, dict); err != nil {
+	if err := decodeCommon(c, &square.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &square.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &square.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract square-specific fields
 	// BS (optional)
-	if bs, err := pdf.ExtractorGetOptional(x, path, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		square.BorderStyle = bs
@@ -50,21 +49,21 @@ func decodeSquare(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annot
 
 	// BE (optional): a border effect is meaningful only together with a
 	// border style, so drop it when BS is absent (the writer requires BS)
-	if be, err := pdf.ExtractorGetOptional(x, path, dict["BE"], annotation.ExtractBorderEffect); err != nil {
+	if be, err := pdf.DecodeOptional(c, dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
 	} else if square.BorderStyle != nil {
 		square.BorderEffect = be
 	}
 
 	// IC (optional)
-	if ic, err := pdf.Optional(colorenc.Extract(r, dict["IC"])); err != nil {
+	if ic, err := pdf.Optional(colorenc.Extract(c, dict["IC"])); err != nil {
 		return nil, err
 	} else {
 		square.FillColor = ic
 	}
 
 	// RD (optional)
-	if rd, err := pdf.GetFloatArray(r, dict["RD"]); err == nil && len(rd) == 4 {
+	if rd, err := c.FloatArray(dict["RD"]); err == nil && len(rd) == 4 {
 		for i := range rd {
 			rd[i] = max(rd[i], 0)
 		}

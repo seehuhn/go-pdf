@@ -58,10 +58,10 @@ type Type1 struct {
 var _ graphics.Halftone = (*Type1)(nil)
 
 // extractType1 reads a Type 1 halftone from a PDF dictionary.
-func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type1, error) {
+func extractType1(c pdf.Cursor, dict pdf.Dict) (*Type1, error) {
 	h := &Type1{}
 
-	if freq, err := x.GetNumber(path, dict["Frequency"]); err != nil {
+	if freq, err := c.Number(dict["Frequency"]); err != nil {
 		return nil, err
 	} else if freq > 0 {
 		h.Frequency = freq
@@ -70,14 +70,14 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type1
 	}
 
 	// Angle is not technically required, but we can default to 0.
-	if angle, err := pdf.Optional(x.GetNumber(path, dict["Angle"])); err != nil {
+	if angle, err := pdf.Optional(c.Number(dict["Angle"])); err != nil {
 		return nil, err
 	} else {
 		h.Angle = angle
 	}
 
 	// SpotFunction is not technically optional, but we can default to SimpleDot.
-	if spotObj, err := pdf.Resolve(x.R, dict["SpotFunction"]); err != nil {
+	if spotObj, err := c.Resolve(dict["SpotFunction"]); err != nil {
 		return nil, err
 	} else {
 		switch spot := spotObj.(type) {
@@ -87,7 +87,7 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type1
 			}
 		case pdf.Array:
 			for _, elem := range spot {
-				if x, err := pdf.Optional(x.GetName(path, elem)); err == nil {
+				if x, err := pdf.Optional(c.Name(elem)); err == nil {
 					if fn, ok := nameToSpot[x]; ok {
 						h.SpotFunction = fn
 						break
@@ -95,13 +95,13 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type1
 				}
 			}
 		case pdf.Dict:
-			spotFunc, err := function.Extract(x, path, spot, false)
+			spotFunc, err := function.Extract(c, spot, false)
 			if err != nil {
 				return nil, err
 			}
 			h.SpotFunction = spotFunc
 		case *pdf.Stream:
-			spotFunc, err := function.Extract(x, path, spot, false)
+			spotFunc, err := function.Extract(c, spot, false)
 			if err != nil {
 				return nil, err
 			}
@@ -115,19 +115,19 @@ func extractType1(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Type1
 	}
 
 	if accurateScreens, ok := dict["AccurateScreens"]; ok {
-		accurate, err := x.GetBoolean(path, accurateScreens)
+		accurate, err := c.Boolean(accurateScreens)
 		if err != nil {
 			return nil, err
 		}
 		h.AccurateScreens = bool(accurate)
 	}
 
-	if tf, err := pdf.Resolve(x.R, dict["TransferFunction"]); err != nil {
+	if tf, err := c.Resolve(dict["TransferFunction"]); err != nil {
 		return nil, err
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.Optional(function.Extract(x, path, tf, false)); err != nil {
+		if F, err := pdf.Optional(function.Extract(c, tf, false)); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F

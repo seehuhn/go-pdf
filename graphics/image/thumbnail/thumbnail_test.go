@@ -302,7 +302,7 @@ func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *thumbnail.Thum
 
 	// extract back using the writer as getter
 	x := pdf.NewExtractor(w)
-	decoded, err := thumbnail.ExtractThumbnail(x, nil, ref, false)
+	decoded, err := thumbnail.ExtractThumbnail(pdf.CursorAt(x, nil), ref, false)
 	if err != nil {
 		t.Fatalf("failed to extract thumbnail: %v", err)
 	}
@@ -369,7 +369,7 @@ func TestExtractThumbnailRejectsHugeDecodedBuffer(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := thumbnail.ExtractThumbnail(x, nil, ref, false); err == nil {
+	if _, err := thumbnail.ExtractThumbnail(pdf.CursorAt(x, nil), ref, false); err == nil {
 		t.Fatal("expected error for oversized decoded float64 buffer")
 	}
 }
@@ -506,7 +506,7 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		thumb, err := thumbnail.ExtractThumbnail(x, nil, objPDF, false)
+		thumb, err := thumbnail.ExtractThumbnail(pdf.CursorAt(x, nil), objPDF, false)
 		if err != nil {
 			t.Skip("malformed thumbnail")
 		}

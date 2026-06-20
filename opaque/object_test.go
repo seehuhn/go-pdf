@@ -17,6 +17,7 @@
 package opaque
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -116,7 +117,7 @@ func TestExtractRoundTripCrossFile(t *testing.T) {
 	// reference (not equal to the source's innerRef) and that its
 	// payload survived the copy.
 	dstX := pdf.NewExtractor(dst)
-	dstOuter, err := dstX.GetDict(nil, dstRef)
+	dstOuter, err := pdf.CursorAt(dstX, nil).Dict(dstRef)
 	if err != nil {
 		t.Fatalf("dst GetDict outer: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestExtractRoundTripCrossFile(t *testing.T) {
 	if dstInnerRef == innerRef {
 		t.Error("dst /Inner reused the source-file reference; refs should be translated")
 	}
-	dstInner, err := dstX.GetDict(nil, dstInnerRef)
+	dstInner, err := pdf.CursorAt(dstX, nil).Dict(dstInnerRef)
 	if err != nil {
 		t.Fatalf("dst GetDict inner: %v", err)
 	}
@@ -199,7 +200,7 @@ func TestEmbedDedup(t *testing.T) {
 
 	// Sanity: the destination's reference resolves to the expected dict.
 	dstX := pdf.NewExtractor(dst)
-	got, err := dstX.GetDict(nil, refA)
+	got, err := pdf.CursorAt(dstX, nil).Dict(refA)
 	if err != nil {
 		t.Fatalf("dst GetDict: %v", err)
 	}
@@ -227,8 +228,8 @@ func TestObjectAs(t *testing.T) {
 	}
 
 	// extract reads a dict and returns its /N value.
-	extract := func(x *pdf.Extractor, _ *pdf.CycleCheck, obj pdf.Object, _ bool) (int, error) {
-		dict, err := x.GetDict(nil, obj)
+	extract := func(c pdf.Cursor, obj pdf.Object, _ bool) (int, error) {
+		dict, err := c.Dict(obj)
 		if err != nil {
 			return 0, err
 		}
@@ -290,6 +291,13 @@ func TestEqualCycle(t *testing.T) {
 
 	if cyclic.Equal(other) {
 		t.Error("cyclic.Equal(other) = true, want false")
+	}
+
+	// the cycle must be caught by precise reference tracking, not merely
+	// by the recursion depth cap
+	_, err := deepResolve(pdf.CursorAt(srcX, nil), 0, aRef)
+	if !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("deepResolve: got %v, want ErrCycle", err)
 	}
 }
 

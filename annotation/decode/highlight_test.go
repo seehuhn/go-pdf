@@ -50,7 +50,7 @@ func TestDecodeHighlight(t *testing.T) {
 				}
 
 				x := pdf.NewExtractor(mock.Getter)
-				a, err := Annotation(x, nil, dict, false)
+				a, err := Annotation(pdf.CursorAt(x, nil), dict, false)
 				if err != nil {
 					t.Fatal(err)
 				}

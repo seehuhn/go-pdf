@@ -44,13 +44,13 @@ func TestOCGPointerIdentity(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	// path 1: extract as *Group (simulates OCProperties extraction)
-	group1, err := pdf.ExtractorGet(x, nil, ocgRef, ExtractGroup)
+	group1, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
 	if err != nil {
 		t.Fatalf("extract Group: %v", err)
 	}
 
 	// path 2: extract as property.List, then re-extract as *Group via ListGet
-	props, err := pdf.ExtractorGet(x, nil, ocgRef, property.ExtractList)
+	props, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, property.ExtractList)
 	if err != nil {
 		t.Fatalf("extract List: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestVEGroupPointerIdentity(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	// extract as *Group (simulates OCProperties)
-	group1, err := pdf.ExtractorGet(x, nil, ocgRef, ExtractGroup)
+	group1, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestVEGroupPointerIdentity(t *testing.T) {
 	}
 
 	// extract the OCMD
-	md, err := ExtractMembership(x, nil, ocmdDict, true)
+	md, err := ExtractMembership(pdf.CursorAt(x, nil), ocmdDict, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
 
 	x := pdf.NewExtractor(w)
 
-	group1, err := pdf.ExtractorGet(x, nil, ocgRef, ExtractGroup)
+	group1, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
 		"Type": pdf.Name("OCMD"),
 		"OCGs": ocgRef,
 	}
-	md, err := ExtractMembership(x, nil, ocmdDict, true)
+	md, err := ExtractMembership(pdf.CursorAt(x, nil), ocmdDict, true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -93,7 +93,7 @@ func testTargetRoundTrip(t *testing.T, version pdf.Version, target Target) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := DecodeTarget(x, nil, encoded, false)
+	decoded, err := DecodeTarget(pdf.CursorAt(x, nil), encoded, false)
 	if err != nil {
 		t.Fatalf("decode error: %v", err)
 	}
@@ -162,7 +162,7 @@ func FuzzTargetRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		target, err := DecodeTarget(x, nil, obj, false)
+		target, err := DecodeTarget(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("malformed target")
 		}
@@ -241,7 +241,7 @@ func TestDecodeTargetCycleSelf(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.ExtractorGet(x, nil, ref, DecodeTarget)
+	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, DecodeTarget)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -265,7 +265,7 @@ func TestDecodeTargetCycleMutual(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.ExtractorGet(x, nil, refA, DecodeTarget)
+	_, err := pdf.Decode(pdf.CursorAt(x, nil), refA, DecodeTarget)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -274,7 +274,7 @@ func TestDecodeTargetCycleMutual(t *testing.T) {
 // TestDecodeTargetDeepChainBounded guards against a stack-overflow DoS: a /T
 // target chain of distinct dictionaries is acyclic, so the cycle guard never
 // trips, yet recursing one frame per level would exhaust the Go stack. The
-// ExtractorGet depth cap must turn this into a malformed-file error rather
+// Decode depth cap must turn this into a malformed-file error rather
 // than a crash.
 func TestDecodeTargetDeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
@@ -295,7 +295,7 @@ func TestDecodeTargetDeepChainBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := pdf.ExtractorGet(x, nil, refs[0], DecodeTarget); !pdf.IsMalformed(err) {
+	if _, err := pdf.Decode(pdf.CursorAt(x, nil), refs[0], DecodeTarget); !pdf.IsMalformed(err) {
 		t.Errorf("err = %v, want malformed", err)
 	}
 }

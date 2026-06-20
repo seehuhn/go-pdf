@@ -101,17 +101,17 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
-func decodeLaunch(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Launch, error) {
-	f, err := pdf.ExtractorGet(x, path, dict["F"], file.ExtractSpecification)
+func decodeLaunch(c pdf.Cursor, dict pdf.Dict) (*Launch, error) {
+	f, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
 
-	win, _ := x.GetDict(path, dict["Win"])
+	win, _ := c.Dict(dict["Win"])
 
 	newWindow := NewWindowDefault
 	if dict["NewWindow"] != nil {
-		nw, _ := pdf.Optional(x.GetBoolean(path, dict["NewWindow"]))
+		nw, _ := pdf.Optional(c.Boolean(dict["NewWindow"]))
 		if nw {
 			newWindow = NewWindowNew
 		} else {
@@ -119,7 +119,7 @@ func decodeLaunch(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*Launc
 		}
 	}
 
-	next, err := pdf.ExtractorGet(x, path, dict["Next"], DecodeActionList)
+	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

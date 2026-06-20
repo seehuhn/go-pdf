@@ -130,7 +130,7 @@ func testGroupRoundTrip(t *testing.T, version pdf.Version, original *Group) {
 
 	// extract the group
 	extractor := pdf.NewExtractor(w)
-	extracted, err := ExtractGroup(extractor, nil, ref, false)
+	extracted, err := ExtractGroup(pdf.CursorAt(extractor, nil), ref, false)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -271,7 +271,7 @@ func FuzzGroupRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := ExtractGroup(x, nil, obj, false)
+		data, err := ExtractGroup(pdf.CursorAt(x, nil), obj, false)
 		if err != nil {
 			t.Skip("malformed object")
 		}

@@ -21,11 +21,11 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeAnnot3D(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Annot3D, error) {
+func decodeAnnot3D(c pdf.Cursor, dict pdf.Dict) (*annotation.Annot3D, error) {
 	annot3D := &annotation.Annot3D{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &annot3D.Common, dict); err != nil {
+	if err := decodeCommon(c, &annot3D.Common, dict); err != nil {
 		return nil, err
 	}
 
@@ -43,43 +43,43 @@ func decodeAnnot3D(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*anno
 
 	// 3DA (optional)
 	if dict["3DA"] != nil {
-		if threeDa, err := x.GetDict(path, dict["3DA"]); err == nil {
+		if threeDa, err := c.Dict(dict["3DA"]); err == nil {
 			activation := &annotation.Annot3DActivation{
 				TB: true, // default value
 			}
 
 			// A (optional) - default XA
-			if a, err := x.GetName(path, threeDa["A"]); err == nil {
+			if a, err := c.Name(threeDa["A"]); err == nil {
 				activation.A = a
 			}
 
 			// AIS (optional) - default L
-			if ais, err := x.GetName(path, threeDa["AIS"]); err == nil {
+			if ais, err := c.Name(threeDa["AIS"]); err == nil {
 				activation.AIS = ais
 			}
 
 			// D (optional) - default PI
-			if d, err := x.GetName(path, threeDa["D"]); err == nil {
+			if d, err := c.Name(threeDa["D"]); err == nil {
 				activation.D = d
 			}
 
 			// DIS (optional) - default U
-			if dis, err := x.GetName(path, threeDa["DIS"]); err == nil {
+			if dis, err := c.Name(threeDa["DIS"]); err == nil {
 				activation.DIS = dis
 			}
 
 			// TB (optional, PDF 1.7) - default true
-			if tb, err := x.GetBoolean(path, threeDa["TB"]); err == nil {
+			if tb, err := c.Boolean(threeDa["TB"]); err == nil {
 				activation.TB = bool(tb)
 			}
 
 			// NP (optional, PDF 1.7) - default false
-			if np, err := x.GetBoolean(path, threeDa["NP"]); err == nil {
+			if np, err := c.Boolean(threeDa["NP"]); err == nil {
 				activation.NP = bool(np)
 			}
 
 			// Style (optional, PDF 2.0) - default Embedded
-			if style, err := x.GetName(path, threeDa["Style"]); err == nil {
+			if style, err := c.Name(threeDa["Style"]); err == nil {
 				activation.Style = style
 			}
 
@@ -89,7 +89,7 @@ func decodeAnnot3D(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*anno
 			}
 
 			// Transparent (optional, PDF 2.0) - default false
-			if transparent, err := x.GetBoolean(path, threeDa["Transparent"]); err == nil {
+			if transparent, err := c.Boolean(threeDa["Transparent"]); err == nil {
 				activation.Transparent = bool(transparent)
 			}
 
@@ -100,13 +100,13 @@ func decodeAnnot3D(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*anno
 	// 3DI (optional) - default true
 	annot3D.I = true // default value
 	if dict["3DI"] != nil {
-		if threeDI, err := x.GetBoolean(path, dict["3DI"]); err == nil {
+		if threeDI, err := c.Boolean(dict["3DI"]); err == nil {
 			annot3D.I = bool(threeDI)
 		}
 	}
 
 	// 3DB (optional)
-	if threeDB, err := pdf.GetFloatArray(x.R, dict["3DB"]); err == nil && len(threeDB) == 4 {
+	if threeDB, err := c.FloatArray(dict["3DB"]); err == nil && len(threeDB) == 4 {
 		annot3D.B = &pdf.Rectangle{
 			LLx: threeDB[0],
 			LLy: threeDB[1],

@@ -21,27 +21,27 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-func decodeCaret(x *pdf.Extractor, path *pdf.CycleCheck, dict pdf.Dict) (*annotation.Caret, error) {
+func decodeCaret(c pdf.Cursor, dict pdf.Dict) (*annotation.Caret, error) {
 	caret := &annotation.Caret{}
 
 	// Extract common annotation fields
-	if err := decodeCommon(x, path, &caret.Common, dict); err != nil {
+	if err := decodeCommon(c, &caret.Common, dict); err != nil {
 		return nil, err
 	}
 
 	// Extract markup annotation fields
-	if err := decodeMarkup(x, path, dict, &caret.Markup); err != nil {
+	if err := decodeMarkup(c, dict, &caret.Markup); err != nil {
 		return nil, err
 	}
 
 	// Extract caret-specific fields
 	// RD (optional)
-	if rd, err := pdf.GetFloatArray(x.R, dict["RD"]); err == nil && len(rd) == 4 {
+	if rd, err := c.FloatArray(dict["RD"]); err == nil && len(rd) == 4 {
 		caret.Margin = rd
 	}
 
 	// Sy (optional)
-	if sy, err := x.GetName(path, dict["Sy"]); err == nil && sy != "" {
+	if sy, err := c.Name(dict["Sy"]); err == nil && sy != "" {
 		caret.Symbol = sy
 	}
 	if caret.Symbol == "" {
