@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,26 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package numtree
-
-import (
-	"errors"
-
-	"seehuhn.de/go/pdf"
-)
-
-// Size returns the number of entries in the number tree,
-// without reading the entire tree into memory.
-func Size(r pdf.Getter, root pdf.Object) (int, error) {
-	tree, err := ExtractFromFile(r, root)
-	if err != nil {
-		return 0, err
-	}
-	count := 0
-	for range tree.All() {
-		count++
-	}
-	return count, nil
-}
-
-var ErrKeyNotFound = errors.New("key not found")
+// Package pdftree implements the shared B-tree machinery behind PDF name trees
+// and number trees (PDF 32000-2 sections 7.9.6 and 7.9.7).
+//
+// The two kinds of tree differ only in their key type and in how keys are
+// stored in the file.  That variation is captured by the unexported codec
+// interface, with [NameCodec] and [NumCodec] as its two instantiations.  The
+// seehuhn.de/go/pdf/nametree and seehuhn.de/go/pdf/numtree packages are thin
+// facades over this core.
+package pdftree

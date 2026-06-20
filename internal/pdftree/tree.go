@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,18 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package nametree
+package pdftree
 
 import (
+	"cmp"
 	"errors"
 
 	"seehuhn.de/go/pdf"
 )
 
-// Size returns the number of entries in the name tree,
-// without reading the entire tree into memory.
-func Size(r pdf.Getter, root pdf.Object) (int, error) {
-	tree, err := ExtractFromFile(r, root)
+// ErrKeyNotFound is returned by Lookup when the key is absent from the tree.
+var ErrKeyNotFound = errors.New("key not found")
+
+// Size returns the number of entries in the tree, without reading the entire
+// tree into memory.
+func Size[K cmp.Ordered, C codec[K]](r pdf.Getter, root pdf.Object) (int, error) {
+	tree, err := ExtractFromFile[K, C](r, root)
 	if err != nil {
 		return 0, err
 	}
@@ -35,5 +39,3 @@ func Size(r pdf.Getter, root pdf.Object) (int, error) {
 	}
 	return count, nil
 }
-
-var ErrKeyNotFound = errors.New("key not found")

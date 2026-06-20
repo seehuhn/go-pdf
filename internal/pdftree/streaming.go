@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,35 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package numtree
+package pdftree
 
 import (
+	"cmp"
 	"errors"
 	"iter"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/limits"
 )
 
-// PDF 2.0 sections: 7.9.7
-
-// FromFile represents a number tree that allows reading values from a PDF file
-// without holding the entire tree in memory.
-type FromFile struct {
+// FromFile represents a tree that allows reading values from a PDF file without
+// holding the entire tree in memory.
+type FromFile[K cmp.Ordered, C codec[K]] struct {
 	cur  pdf.Cursor
 	root pdf.Object
 }
 
-// ExtractFromFile creates a new FromFile number tree that reads from a PDF document.
+// ExtractFromFile creates a FromFile tree that reads from a PDF document.
 // If root is nil, it returns nil.
-func ExtractFromFile(r pdf.Getter, root pdf.Object) (*FromFile, error) {
+func ExtractFromFile[K cmp.Ordered, C codec[K]](r pdf.Getter, root pdf.Object) (*FromFile[K, C], error) {
 	if root == nil {
 		return nil, nil
 	}
-	return &FromFile{cur: pdf.NewCursor(r), root: root}, nil
+	return &FromFile[K, C]{cur: pdf.NewCursor(r), root: root}, nil
 }
-
-var _ pdf.NumberTree = (*FromFile)(nil)
 
 // Lookup returns the value for key, or [ErrKeyNotFound] if the key is absent.
 //
@@ -50,7 +46,7 @@ var _ pdf.NumberTree = (*FromFile)(nil)
 // avoid scanning every leaf.  Children whose Limits entry is missing or
 // malformed are skipped, so in a malformed tree Lookup may return
 // [ErrKeyNotFound] for keys that [FromFile.All] would yield.
-func (t *FromFile) Lookup(key pdf.Integer) (pdf.Object, error) {
+func (t *FromFile[K, C]) Lookup(key K) (pdf.Object, error) {
 	if t == nil {
 		return nil, ErrKeyNotFound
 	}
@@ -67,25 +63,27 @@ func (t *FromFile) Lookup(key pdf.Integer) (pdf.Object, error) {
 	return t.lookupInNode(node, seen, key, 0)
 }
 
-func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key pdf.Integer, depth int) (pdf.Object, error) {
-	if depth >= limits.MaxNumberTreeDepth {
-		return nil, &pdf.MalformedFileError{Err: errors.New("number tree nesting depth exceeded")}
+func (t *FromFile[K, C]) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key K, depth int) (pdf.Object, error) {
+	var kc C
+
+	if depth >= kc.maxDepth() {
+		return nil, &pdf.MalformedFileError{Err: errors.New("tree nesting depth exceeded")}
 	}
 
-	// leaf node with Nums
-	if nums, ok := node["Nums"]; ok {
-		arr, err := t.cur.Array(nums)
+	// leaf node
+	if entries, ok := node[kc.leafKey()]; ok {
+		arr, err := t.cur.Array(entries)
 		if err != nil {
 			return nil, ErrKeyNotFound
 		}
 
-		// search through Nums array (key-value pairs)
+		// search through the key-value pairs
 		for i := 0; i+1 < len(arr); i += 2 {
-			keyObj, err := t.cur.Integer(arr[i])
+			k, err := kc.decode(t.cur, arr[i])
 			if err != nil {
 				continue
 			}
-			if keyObj == key {
+			if k == key {
 				return arr[i+1], nil
 			}
 		}
@@ -122,11 +120,11 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 				continue
 			}
 
-			minKey, err := t.cur.Integer(limitsArr[0])
+			minKey, err := kc.decode(t.cur, limitsArr[0])
 			if err != nil {
 				continue
 			}
-			maxKey, err := t.cur.Integer(limitsArr[1])
+			maxKey, err := kc.decode(t.cur, limitsArr[1])
 			if err != nil {
 				continue
 			}
@@ -141,8 +139,8 @@ func (t *FromFile) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool, key 
 	return nil, ErrKeyNotFound
 }
 
-func (t *FromFile) All() iter.Seq2[pdf.Integer, pdf.Object] {
-	return func(yield func(pdf.Integer, pdf.Object) bool) {
+func (t *FromFile[K, C]) All() iter.Seq2[K, pdf.Object] {
+	return func(yield func(K, pdf.Object) bool) {
 		if t == nil {
 			return
 		}
@@ -160,34 +158,36 @@ func (t *FromFile) All() iter.Seq2[pdf.Integer, pdf.Object] {
 	}
 }
 
-func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yield func(pdf.Integer, pdf.Object) bool, depth int) bool {
+func (t *FromFile[K, C]) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yield func(K, pdf.Object) bool, depth int) bool {
+	var kc C
+
 	// skip subtrees deeper than the cap; over-deep input is treated as
 	// malformed and silently truncated, the iterator continues elsewhere
-	if depth >= limits.MaxNumberTreeDepth {
+	if depth >= kc.maxDepth() {
 		return true
 	}
 
-	// check if this is a leaf node with Nums
-	if nums, ok := node["Nums"]; ok {
-		arr, err := t.cur.Array(nums)
+	// leaf node
+	if entries, ok := node[kc.leafKey()]; ok {
+		arr, err := t.cur.Array(entries)
 		if err != nil {
 			return true
 		}
 
-		// yield all key-value pairs from Nums array
+		// yield all key-value pairs
 		for i := 0; i+1 < len(arr); i += 2 {
-			keyObj, err := t.cur.Integer(arr[i])
+			k, err := kc.decode(t.cur, arr[i])
 			if err != nil {
 				continue
 			}
-			if !yield(keyObj, arr[i+1]) {
+			if !yield(k, arr[i+1]) {
 				return false
 			}
 		}
 		return true
 	}
 
-	// check if this is an intermediate node with Kids
+	// intermediate node with Kids
 	if kids, ok := node["Kids"]; ok {
 		arr, err := t.cur.Array(kids)
 		if err != nil {
@@ -216,7 +216,7 @@ func (t *FromFile) yieldFromNode(node pdf.Dict, seen map[pdf.Reference]bool, yie
 	return true
 }
 
-func (t *FromFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	ref, err := Write(rm.Out(), t.All())
+func (t *FromFile[K, C]) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	ref, err := Write[K, C](rm.Out(), t.All())
 	return ref, err
 }

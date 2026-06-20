@@ -1,5 +1,5 @@
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2025  Jochen Voss <voss@seehuhn.de>
+// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,28 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-package numtree
+package pdftree
 
 import (
+	"cmp"
 	"iter"
 	"slices"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/limits"
 )
 
-// PDF 2.0 sections: 7.9.7
-
-// InMemory represents a number tree held entirely in memory.
-type InMemory struct {
-	Data map[pdf.Integer]pdf.Object
+// InMemory represents a tree held entirely in memory.
+type InMemory[K cmp.Ordered, C codec[K]] struct {
+	Data map[K]pdf.Object
 }
 
-var _ pdf.NumberTree = (*InMemory)(nil)
-
-// ExtractInMemory reads a number tree from a PDF document into memory.
-// If obj is nil, it returns nil.
-func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
+// ExtractInMemory reads a tree from a PDF document into memory.
+// If root is nil, it returns nil.
+func ExtractInMemory[K cmp.Ordered, C codec[K]](r pdf.Getter, root pdf.Object) (*InMemory[K, C], error) {
 	if root == nil {
 		return nil, nil
 	}
@@ -46,40 +42,42 @@ func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 		return nil, err
 	}
 
-	tree := &InMemory{
-		Data: make(map[pdf.Integer]pdf.Object),
+	tree := &InMemory[K, C]{
+		Data: make(map[K]pdf.Object),
 	}
 
 	seen := map[pdf.Reference]bool{}
 	if ref, ok := root.(pdf.Reference); ok {
 		seen[ref] = true
 	}
-	extractFromNode(c, node, seen, tree.Data, 0)
+	extractFromNode[K, C](c, node, seen, tree.Data, 0)
 
 	return tree, nil
 }
 
-func extractFromNode(c pdf.Cursor, node pdf.Dict, seen map[pdf.Reference]bool, data map[pdf.Integer]pdf.Object, depth int) {
+func extractFromNode[K cmp.Ordered, C codec[K]](c pdf.Cursor, node pdf.Dict, seen map[pdf.Reference]bool, data map[K]pdf.Object, depth int) {
+	var kc C
+
 	// skip subtrees deeper than the cap; over-deep input is treated as
 	// malformed and silently truncated, leaving a partial map
-	if depth >= limits.MaxNumberTreeDepth {
+	if depth >= kc.maxDepth() {
 		return
 	}
 
-	// leaf node with Nums
-	if nums, ok := node["Nums"]; ok {
-		arr, err := c.Array(nums)
+	// leaf node
+	if entries, ok := node[kc.leafKey()]; ok {
+		arr, err := c.Array(entries)
 		if err != nil {
 			return
 		}
 
-		// extract key-value pairs from Nums array
+		// extract key-value pairs
 		for i := 0; i+1 < len(arr); i += 2 {
-			keyObj, err := c.Integer(arr[i])
+			key, err := kc.decode(c, arr[i])
 			if err != nil {
 				continue
 			}
-			data[keyObj] = arr[i+1]
+			data[key] = arr[i+1]
 		}
 		return
 	}
@@ -102,12 +100,12 @@ func extractFromNode(c pdf.Cursor, node pdf.Dict, seen map[pdf.Reference]bool, d
 			if err != nil {
 				continue
 			}
-			extractFromNode(c, childNode, seen, data, depth+1)
+			extractFromNode[K, C](c, childNode, seen, data, depth+1)
 		}
 	}
 }
 
-func (t *InMemory) Lookup(key pdf.Integer) (pdf.Object, error) {
+func (t *InMemory[K, C]) Lookup(key K) (pdf.Object, error) {
 	if t == nil || t.Data == nil {
 		return nil, ErrKeyNotFound
 	}
@@ -119,19 +117,17 @@ func (t *InMemory) Lookup(key pdf.Integer) (pdf.Object, error) {
 	return value, nil
 }
 
-func (t *InMemory) All() iter.Seq2[pdf.Integer, pdf.Object] {
-	return func(yield func(pdf.Integer, pdf.Object) bool) {
+func (t *InMemory[K, C]) All() iter.Seq2[K, pdf.Object] {
+	return func(yield func(K, pdf.Object) bool) {
 		if t == nil || t.Data == nil {
 			return
 		}
 
-		// collect keys and sort them numerically
-		keys := make([]pdf.Integer, 0, len(t.Data))
+		// collect keys and sort them
+		keys := make([]K, 0, len(t.Data))
 		for key := range t.Data {
 			keys = append(keys, key)
 		}
-
-		// sort numerically
 		slices.Sort(keys)
 
 		// yield in sorted order
@@ -143,8 +139,8 @@ func (t *InMemory) All() iter.Seq2[pdf.Integer, pdf.Object] {
 	}
 }
 
-// Embed adds the number tree to a PDF file.
-func (t *InMemory) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	ref, err := Write(rm.Out(), t.All())
+// Embed adds the tree to a PDF file.
+func (t *InMemory[K, C]) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	ref, err := Write[K, C](rm.Out(), t.All())
 	return ref, err
 }
