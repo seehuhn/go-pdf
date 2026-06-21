@@ -32,6 +32,11 @@ type FileInfo struct {
 	PDFEnd        int64
 	HeaderVersion string
 	Sections      []*FileSection
+
+	// objIndex maps each indirect reference to its FileObject.  It is built
+	// once by indexObjects so findObject runs in constant time; resolving an
+	// indirect /Length for every object would otherwise be O(N²).
+	objIndex map[Reference]*FileObject
 }
 
 // FileSection contains information about the part of the PDF file
@@ -68,6 +73,8 @@ func SequentialScan(r io.ReaderAt, size int64) (*FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fi.indexObjects()
 
 	err = fi.checkObjects()
 	if err != nil {
@@ -376,18 +383,21 @@ func (fi *FileInfo) checkObjects() error {
 	return nil
 }
 
-func (fi *FileInfo) findObject(ref Reference) *FileObject {
-	// If an object is defined repeatedly, we use the last definition.
-	for i := len(fi.Sections) - 1; i >= 0; i-- {
-		sec := fi.Sections[i]
-		for j := len(sec.Objects) - 1; j >= 0; j-- {
-			obj := sec.Objects[j]
-			if obj.Reference == ref {
-				return obj
-			}
+// indexObjects builds fi.objIndex.  Objects are added in scan order, so when
+// a reference is defined more than once the last definition overwrites the
+// earlier ones and wins, matching the resolution order PDF readers use.
+func (fi *FileInfo) indexObjects() {
+	index := make(map[Reference]*FileObject)
+	for _, section := range fi.Sections {
+		for _, obj := range section.Objects {
+			index[obj.Reference] = obj
 		}
 	}
-	return nil
+	fi.objIndex = index
+}
+
+func (fi *FileInfo) findObject(ref Reference) *FileObject {
+	return fi.objIndex[ref]
 }
 
 func (fi *FileInfo) makeSafeGetInt() getIntFn {
