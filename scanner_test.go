@@ -291,6 +291,27 @@ func TestReadStreamDataLengthRecovery(t *testing.T) {
 	}
 }
 
+// TestReadStreamDataBrokenLength checks that a present but wrong /Length is
+// recovered by scanning for the endstream keyword, giving the real extent.
+func TestReadStreamDataBrokenLength(t *testing.T) {
+	const content = "some bytes"
+	// /Length 2 is wrong; the real extent ends at the endstream keyword
+	body := "<< /Length 2 >>stream\n" + content + "\nendstream\n"
+
+	s := testScanner(body)
+	obj, err := s.ReadObject()
+	if err != nil {
+		t.Fatalf("ReadObject: %v", err)
+	}
+	stream, ok := obj.(*Stream)
+	if !ok {
+		t.Fatalf("got %T, want *Stream", obj)
+	}
+	if int(stream.length) != len(content) {
+		t.Errorf("length = %d, want %d", stream.length, len(content))
+	}
+}
+
 func TestSkipWhiteSpace(t *testing.T) {
 	cases := []string{
 		"",

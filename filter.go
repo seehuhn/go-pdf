@@ -580,26 +580,32 @@ func (f FilterCCITTFax) Encode(v Version, w io.WriteCloser) (io.WriteCloser, err
 	}, nil
 }
 
-// ccittMaxDecodeBytes bounds the decoded output of a single CCITTFax stream.
-// A tiny Group-4 stream with a large /Columns and no /Rows limit can otherwise
-// expand without limit for consumers that drain the raw stream.  The cap
-// matches the image-size ceiling [limits.MaxImageBytes], so it never truncates
-// a valid image (the image path rejects anything larger up front).  It is a
-// variable so tests can lower it.
-var ccittMaxDecodeBytes int64 = limits.MaxImageBytes
-
 // Decode implements the [Filter] interface.
 func (f FilterCCITTFax) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
 	params := f.toParams()
 	if err := budget.Charge(ccittfax.BufferBytes(params)); err != nil {
 		return asMalformedFilter(nil, err)
 	}
+
+	// Bound the decoded output to what a valid image of this width can hold.
+	// CCITTFax is 1 bit/pixel, so a tiny Group 4 stream with a large /Columns
+	// and no /Rows limit could otherwise expand without limit for a consumer
+	// that drains the raw stream.  A conforming image has at most
+	// [limits.MaxImageHeight] rows and [limits.MaxImagePixels] pixels, so this
+	// cap never truncates a valid image.  The max(1, ...) keeps the bound
+	// self-contained: a width above [limits.MaxImagePixels] would otherwise
+	// floor the row count to zero, which the reader reads as "no limit".
+	cols := max(params.Columns, 1)
+	geoMax := max(1, min(limits.MaxImageHeight, limits.MaxImagePixels/cols))
+	if params.MaxRows <= 0 || params.MaxRows > geoMax {
+		params.MaxRows = geoMax
+	}
+
 	reader, err := ccittfax.NewReader(r, params)
 	if err != nil {
 		return asMalformedFilter(nil, err)
 	}
-	bounded := io.LimitReader(reader, ccittMaxDecodeBytes)
-	return asMalformedFilter(io.NopCloser(bounded), nil)
+	return asMalformedFilter(io.NopCloser(reader), nil)
 }
 
 func (f FilterCCITTFax) validate(_ Version) error {

@@ -765,16 +765,15 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		}
 	}()
 
-	// /Length is required, but real-world PDFs (and fuzz mutations) omit
-	// it.  Treat a missing entry as "unknown" and recover by scanning
-	// ahead for endstream below.
-	_, hasLength := dict["Length"]
-	length, err := s.getInt(dict["Length"])
-	if err != nil {
-		return nil, Wrap(err, "reading Length")
-	} else if length < 0 {
-		return nil, &MalformedFileError{
-			Err: errors.New("stream with negative length"),
+	// /Length is required, but real-world PDFs (and fuzz mutations) omit it,
+	// give an indirect length that cannot be resolved, or give a plainly wrong
+	// value.  Resolve a candidate here; a missing or unusable one is treated as
+	// unknown and the stream extent is recovered by scanning for endstream.
+	lengthObj, hasLength := dict["Length"]
+	declared := int64(-1)
+	if hasLength {
+		if n, err := s.getInt(lengthObj); err == nil && n >= 0 {
+			declared = int64(n)
 		}
 	}
 
@@ -814,8 +813,8 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	}
 
 	var l int64
-	if hasLength {
-		l = int64(length)
+	if declared >= 0 && endstreamAt(origReader, start+declared) {
+		l = declared
 		err = s.Discard(l)
 		if err != nil {
 			return nil, err
@@ -829,10 +828,10 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 			return nil, err
 		}
 	} else {
-		// recover by scanning forward for a spec-conformant
-		// EOL+endstream (PDF 7.3.8.2); matching only when preceded by
-		// an EOL byte avoids cutting streams whose content contains
-		// the substring "endstream"
+		// missing or unusable /Length: recover by scanning forward for a
+		// spec-conformant EOL+endstream (PDF 7.3.8.2); matching only when
+		// preceded by an EOL byte avoids cutting streams whose content
+		// contains the substring "endstream"
 		eolPos, _, err := s.Find(endstreamPat)
 		if err != nil {
 			return nil, err
@@ -879,6 +878,33 @@ func trimTrailingEOL(r io.ReaderAt, start, length int64) int64 {
 		length--
 	}
 	return length
+}
+
+// endstreamAt reports whether the bytes at absolute offset pos, after any run
+// of PDF whitespace, begin with the "endstream" keyword.  ReadStreamData uses
+// it to confirm a declared /Length before trusting it; a length that fails
+// this check is treated as broken and the stream extent is recovered by
+// scanning for endstream instead.
+func endstreamAt(r io.ReaderAt, pos int64) bool {
+	var buf [64]byte
+	for {
+		n, _ := r.ReadAt(buf[:], pos)
+		i := 0
+		for i < n && class[buf[i]] == space {
+			i++
+		}
+		if i < n {
+			pos += int64(i)
+			break
+		}
+		if n < len(buf) {
+			return false // reached EOF inside the whitespace run
+		}
+		pos += int64(n)
+	}
+	var kw [9]byte // len("endstream")
+	n, _ := r.ReadAt(kw[:], pos)
+	return n == len(kw) && string(kw[:]) == "endstream"
 }
 
 func (s *scanner) ReadHeaderVersion() (Version, error) {

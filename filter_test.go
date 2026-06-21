@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/membudget"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // All filter types currently implemented by this library.
@@ -636,33 +637,68 @@ func TestFilterLZWRequiresPredictor(t *testing.T) {
 }
 
 // TestFilterCCITTFaxOutputBounded checks that a highly amplifying CCITTFax
-// stream (large Columns, no Rows limit) cannot produce unbounded output: the
-// decoded reader stops at the decode cap instead of expanding a tiny input
-// into gigabytes for a consumer that drains the raw stream.  The cap is
-// lowered here so the test stays fast; the drain is itself bounded so a missing
-// cap fails quickly rather than running for minutes.
+// stream (large Columns, no Rows limit) cannot produce output disproportionate
+// to its input.  A conforming image of this width holds at most
+// limits.MaxImagePixels pixels at 1 bit/pixel, so decoding stops at that bound
+// instead of expanding a tiny input into gigabytes for a consumer that drains
+// the raw stream.
 func TestFilterCCITTFaxOutputBounded(t *testing.T) {
-	const capBytes = 1 << 20 // 1 MiB
-	defer func(old int64) { ccittMaxDecodeBytes = old }(ccittMaxDecodeBytes)
-	ccittMaxDecodeBytes = capBytes
-
-	// repeated Group-4 pass codes over a very wide row; with no Rows limit the
-	// decoder would otherwise turn this ~4 KiB input into ~1 GiB
-	input := bytes.Repeat([]byte{0x11}, 4096)
+	// a tiny input that, unbounded, would decode without limit
+	input := bytes.Repeat([]byte{0xff}, 2048)
 	f := FilterCCITTFax{K: -1, Columns: 1 << 20, Rows: 0}
 
-	r, err := f.Decode(V2_0, bytes.NewReader(input), membudget.New(1<<30))
+	budget := membudget.New(limits.StreamBudget(int64(len(input))))
+	r, err := f.Decode(V2_0, bytes.NewReader(input), budget)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	defer r.Close()
 
-	// bound the drain at 2x the cap so a regression (no cap) fails fast
-	n, err := io.Copy(io.Discard, io.LimitReader(r, 2*capBytes))
+	// the most a valid image of this width can decode to
+	wantMax := int64((1<<20)/8) * (limits.MaxImagePixels / (1 << 20))
+
+	// drain with a generous ceiling so that, if the bound regresses, the test
+	// fails fast rather than running for minutes
+	canary := 2 * wantMax
+	n, err := io.Copy(io.Discard, io.LimitReader(r, canary))
 	if err != nil {
 		t.Fatalf("drain: %v", err)
 	}
-	if n != capBytes {
-		t.Errorf("decoded output %d bytes, want it truncated to the cap %d", n, int64(capBytes))
+	if n > wantMax {
+		t.Errorf("decoded output %d bytes, want bounded by %d", n, wantMax)
+	}
+}
+
+// TestFilterCCITTFaxNotTruncated checks that the output bound does not truncate
+// a legitimate CCITTFax stream whose decoded size is proportional to its input.
+func TestFilterCCITTFaxNotTruncated(t *testing.T) {
+	f := FilterCCITTFax{K: -1, Columns: 64, Rows: 64}
+
+	var encoded bytes.Buffer
+	w, err := f.Encode(V2_0, withDummyClose{&encoded})
+	if err != nil {
+		t.Fatalf("encode setup: %v", err)
+	}
+	const wantBytes = (64 / 8) * 64 // 64x64 all-white bitmap
+	if _, err := w.Write(bytes.Repeat([]byte{0xff}, wantBytes)); err != nil {
+		t.Fatalf("encode write: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("encode close: %v", err)
+	}
+
+	budget := membudget.New(limits.StreamBudget(int64(encoded.Len())))
+	r, err := f.Decode(V2_0, bytes.NewReader(encoded.Bytes()), budget)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	defer r.Close()
+
+	n, err := io.Copy(io.Discard, r)
+	if err != nil {
+		t.Fatalf("drain: %v", err)
+	}
+	if n != wantBytes {
+		t.Errorf("decoded output %d bytes, want %d", n, wantBytes)
 	}
 }

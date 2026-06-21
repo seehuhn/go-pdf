@@ -78,15 +78,11 @@ func SequentialScan(r io.ReaderAt, size int64) (*FileInfo, error) {
 }
 
 func (fi *FileInfo) Read(objInfo *FileObject) (Object, error) {
-	var getInt getIntFn
-	if objInfo.Type == "Stream" {
-		getInt = fi.makeSafeGetInt()
-	}
-	obj, _, err := fi.doRead(objInfo, getInt)
+	obj, _, err := fi.doRead(objInfo, fi.makeSafeGetInt(), false)
 	return obj, err
 }
 
-func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn) (Object, int64, error) {
+func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn, scalarOnly bool) (Object, int64, error) {
 	if objInfo == nil {
 		return nil, 0, nil
 	}
@@ -95,6 +91,7 @@ func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn) (Object, int64,
 	s := newScanner(sr, getInt, nil)
 	s.fileReader = fi.R
 	s.filePos = objInfo.ObjStart
+	s.scalarOnly = scalarOnly
 
 	x, ref, err := s.ReadIndirectObject()
 	if err != nil {
@@ -319,7 +316,11 @@ scanLoop:
 func (fi *FileInfo) checkObjects() error {
 	for _, section := range fi.Sections {
 		for _, objInfo := range section.Objects {
-			x, endPos, err := fi.doRead(objInfo, dummyGetInt)
+			// Resolve indirect /Length values so a stream whose length is an
+			// indirect reference is classified as a stream (and kept) rather
+			// than marked broken.  makeSafeGetInt bounds recursion and detects
+			// cycles, so this stays safe on malformed input.
+			x, endPos, err := fi.doRead(objInfo, fi.makeSafeGetInt(), false)
 			if err != nil {
 				if IsMalformed(err) {
 					objInfo.Broken = true
@@ -401,11 +402,14 @@ func (fi *FileInfo) makeSafeGetInt() getIntFn {
 			}
 
 			if seen[ref] || len(seen) > 8 {
-				return 0, errors.New("circular reference")
+				return 0, &MalformedFileError{Err: errors.New("circular reference")}
 			}
 			seen[ref] = true
 
-			x, _, err := fi.doRead(fi.findObject(ref), getInt)
+			// resolve in scalar-only mode: a /Length must be an integer, and
+			// refusing composites stops the scanner before it reads a stream
+			// body, keeping the cost of resolution proportional to the input
+			x, _, err := fi.doRead(fi.findObject(ref), getInt, true)
 			if err != nil {
 				return 0, err
 			}
@@ -416,9 +420,9 @@ func (fi *FileInfo) makeSafeGetInt() getIntFn {
 		case Integer:
 			return x, nil
 		case nil:
-			return 0, errors.New("expected integer, got null")
+			return 0, &MalformedFileError{Err: errors.New("expected integer, got null")}
 		default:
-			return 0, fmt.Errorf("expected integer, got %T", obj)
+			return 0, &MalformedFileError{Err: fmt.Errorf("expected integer, got %T", obj)}
 		}
 	}
 	return getInt
@@ -486,7 +490,7 @@ func (fi *FileInfo) readTrailer(sect *FileSection) (Dict, error) {
 	}
 
 	sr := io.NewSectionReader(fi.R, sect.TrailerPos, fi.FileSize-sect.TrailerPos)
-	s := newScanner(sr, dummyGetInt, nil)
+	s := newScanner(sr, fi.makeSafeGetInt(), nil)
 	s.filePos = sect.TrailerPos
 
 	err := s.SkipString("trailer")
@@ -507,16 +511,6 @@ func countLeadingSpaces(s string) int64 {
 		n++
 	}
 	return n
-}
-
-// dummyGetInt is a dummy function that implements the getInt function.
-// It can be used if we don't care about the the contents of streams,
-// but only want to read the stream dictionary.
-func dummyGetInt(o Object) (Integer, error) {
-	if i, ok := o.(Integer); ok {
-		return i, nil
-	}
-	return 0, nil
 }
 
 var (

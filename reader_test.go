@@ -336,9 +336,18 @@ func TestStreamLengthCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewCursor(r).Stream(sRef)
-	if err == nil {
-		t.Error("reference loop not detected")
+	// the /Length is a broken reference cycle; the reader must not hang or
+	// overflow, and recovers the stream extent by scanning for endstream
+	sObj, err := NewCursor(r).Stream(sRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sData, err := io.ReadAll(sObj.NewReader())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sData) != "123456" {
+		t.Errorf("wrong stream data: got %q, want %q", sData, "123456")
 	}
 }
 
@@ -429,10 +438,11 @@ func TestStreamLengthCycle2(t *testing.T) {
 }
 
 // TestStreamLengthStreamCycle checks that a regular stream whose indirect
-// /Length resolves, through a cycle, to a stream object yields a malformed
-// file error instead of recursing without bound.  Unlike the reference-chain
-// cycles in TestStreamLengthCycle, resolving the length here re-enters the
-// stream reader, which the maxRefDepth guard does not catch.
+// /Length resolves, through a cycle, to a stream object is read without
+// recursing without bound.  Resolving the length here would re-enter the stream
+// reader, which the maxRefDepth guard does not catch; the unresolvable length
+// is instead treated as broken and the extent recovered by scanning for
+// endstream.
 func TestStreamLengthStreamCycle(t *testing.T) {
 	// build returns a PDF in which objects 1..len(targets) are all streams;
 	// stream i declares "/Length (targets[i-1]) 0 R", so every /Length
@@ -479,12 +489,21 @@ func TestStreamLengthStreamCycle(t *testing.T) {
 				t.Fatalf("NewReader: %v", err)
 			}
 			// reading the stream resolves its cyclic /Length; this must
-			// fail gracefully rather than overflow the stack
-			_, err = r.Get(NewReference(1, 0), true)
-			if err == nil {
-				t.Error("cyclic stream /Length not detected")
-			} else if !IsMalformed(err) {
-				t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+			// recover gracefully rather than overflow the stack
+			obj, err := r.Get(NewReference(1, 0), true)
+			if err != nil {
+				t.Fatalf("Get: %v", err)
+			}
+			stm, ok := obj.(*Stream)
+			if !ok {
+				t.Fatalf("got %T, want *Stream", obj)
+			}
+			content, err := io.ReadAll(stm.NewReader())
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			if string(content) != "XX" {
+				t.Errorf("content = %q, want %q", content, "XX")
 			}
 		})
 	}
