@@ -26,6 +26,9 @@ import (
 // with the given color space and bits per component.
 // The returned array has 2*cs.Channels() entries, with pairs
 // [Dmin, Dmax] for each channel.
+//
+// bpc must be a valid image bit depth (1, 2, 4, 8, or 16); callers that
+// read bpc from a file must validate it first.
 func DefaultDecode(cs color.Space, bpc int) []float64 {
 	var n int
 	if cs != nil {

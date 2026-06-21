@@ -544,6 +544,14 @@ func (s *scanner) ScanToken() (pdf.Native, error) {
 // checking both the abbreviated and full key names.
 // Returns -1 if the key is not found or the value is not a valid integer.
 func getInlineImageInt(dict pdf.Dict, abbrev, full pdf.Name) int {
+	v, _ := getInlineImageIntOK(dict, abbrev, full)
+	return v
+}
+
+// getInlineImageIntOK is like getInlineImageInt but also reports whether the
+// key was present, distinguishing an absent key from one whose value is not a
+// valid integer (both yield -1).
+func getInlineImageIntOK(dict pdf.Dict, abbrev, full pdf.Name) (int, bool) {
 	var val pdf.Object
 	if v, ok := dict[abbrev]; ok {
 		val = v // abbreviated key takes precedence per spec
@@ -551,15 +559,15 @@ func getInlineImageInt(dict pdf.Dict, abbrev, full pdf.Name) int {
 		val = v
 	}
 	if val == nil {
-		return -1
+		return -1, false
 	}
 	switch v := val.(type) {
 	case pdf.Integer:
-		return int(v)
+		return int(v), true
 	case pdf.Real:
-		return int(v)
+		return int(v), true
 	}
-	return -1
+	return -1, true
 }
 
 // getInlineImageFilter extracts the filter name(s) from an inline image dictionary.

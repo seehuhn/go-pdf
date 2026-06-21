@@ -261,6 +261,7 @@ func (d *Dict) Load() (*Data, error) {
 
 // readSamples reads n color component values for pixel (x, y) from raw image
 // data, applying the Decode mapping to produce color space values.
+// bpc is assumed to be one of the supported depths (1, 2, 4, 8, or 16).
 func readSamples(data []byte, width, n, bpc, x, y int, decode, values []float64) {
 	switch bpc {
 	case 8:

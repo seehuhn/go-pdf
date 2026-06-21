@@ -247,7 +247,19 @@ func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 	if isImageMask(dict) {
 		channels, bpc = 1, 1
 	} else {
-		bpc = getInlineImageInt(dict, "BPC", "BitsPerComponent")
+		var present bool
+		bpc, present = getInlineImageIntOK(dict, "BPC", "BitsPerComponent")
+		if present {
+			// validate an explicitly-present bit depth against the same
+			// whitelist as image XObjects
+			if err := checkInlineBPC(bpc); err != nil {
+				return err
+			}
+		} else {
+			// match the renderer's default so the byte-count cap below is
+			// computed against the depth that will actually be decoded
+			bpc = 8
+		}
 		if cs := InlineImageColorSpace(dict, res); cs != nil {
 			channels = cs.Channels()
 		}
@@ -261,6 +273,16 @@ func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 		return &pdf.MalformedFileError{Err: errors.New("inline image decoded data exceeds size limit")}
 	}
 	return nil
+}
+
+// checkInlineBPC reports whether bpc is a bit depth allowed for image samples,
+// matching the whitelist enforced for image XObjects.
+func checkInlineBPC(bpc int) error {
+	switch bpc {
+	case 1, 2, 4, 8, 16:
+		return nil
+	}
+	return &pdf.MalformedFileError{Err: fmt.Errorf("invalid inline image BitsPerComponent %d", bpc)}
 }
 
 // inlineImageSizeLimit computes the per-image decoded-size cap for an inline
@@ -278,7 +300,10 @@ func inlineImageSizeLimit(dict pdf.Dict, res *Resources) int64 {
 		return limits.ImageDataLimit(width, height, 1, 1)
 	}
 
-	bpc := getInlineImageInt(dict, "BPC", "BitsPerComponent")
+	bpc, present := getInlineImageIntOK(dict, "BPC", "BitsPerComponent")
+	if !present {
+		bpc = 8 // default when BPC is absent, matching the renderer
+	}
 	if bpc <= 0 {
 		return limits.MaxImageBytes
 	}

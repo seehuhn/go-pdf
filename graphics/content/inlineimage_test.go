@@ -19,6 +19,7 @@ package content
 import (
 	"bytes"
 	"compress/zlib"
+	"fmt"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -163,6 +164,63 @@ func TestDecodeInlineImageRejectsHugeDecodedBuffer(t *testing.T) {
 	}
 	if _, err := DecodeInlineImage(op, nil); err == nil {
 		t.Fatal("expected error for oversized decoded float64 buffer")
+	}
+}
+
+func TestDecodeInlineImageRejectsInvalidBPC(t *testing.T) {
+	// A negative or non-whitelisted BPC must be rejected so it never reaches
+	// the sample decoder.  A negative BPC over an Indexed colour space would
+	// otherwise drive a negative shift count in image.DefaultDecode and panic.
+	for _, bpc := range []pdf.Integer{-1, 0, 3, 5, 7, 32} {
+		t.Run(fmt.Sprintf("bpc%d", bpc), func(t *testing.T) {
+			dict := pdf.Dict{
+				"W":   pdf.Integer(1),
+				"H":   pdf.Integer(1),
+				"BPC": bpc,
+				"CS":  pdf.Array{pdf.Name("I"), pdf.Name("RGB"), pdf.Integer(1), pdf.String([]byte{0, 0, 0, 0xff, 0xff, 0xff})},
+			}
+			op := Operator{
+				Name: OpInlineImage,
+				Args: []pdf.Object{dict, pdf.String([]byte{0})},
+			}
+			if _, err := DecodeInlineImage(op, nil); err == nil {
+				t.Errorf("expected error for BPC %d", bpc)
+			}
+		})
+	}
+}
+
+func TestDecodeInlineImageAcceptsValidBPC(t *testing.T) {
+	// valid bit depths, and a missing BPC (defaulted downstream), must decode
+	for _, dict := range []pdf.Dict{
+		{"W": pdf.Integer(1), "H": pdf.Integer(1), "BPC": pdf.Integer(1), "CS": pdf.Name("G")},
+		{"W": pdf.Integer(1), "H": pdf.Integer(1), "BPC": pdf.Integer(8), "CS": pdf.Name("RGB")},
+		{"W": pdf.Integer(1), "H": pdf.Integer(1), "BPC": pdf.Integer(16), "CS": pdf.Name("RGB")},
+		{"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("RGB")}, // missing BPC
+	} {
+		op := Operator{
+			Name: OpInlineImage,
+			Args: []pdf.Object{dict, pdf.String([]byte{0, 0, 0, 0, 0, 0})},
+		}
+		if _, err := DecodeInlineImage(op, nil); err != nil {
+			t.Errorf("unexpected error for %v: %v", dict, err)
+		}
+	}
+}
+
+func TestDecodeInlineImageMaskIgnoresBPC(t *testing.T) {
+	// image masks are implicitly 1 bpc and must decode regardless of BPC
+	dict := pdf.Dict{
+		"W":  pdf.Integer(1),
+		"H":  pdf.Integer(1),
+		"IM": pdf.Boolean(true),
+	}
+	op := Operator{
+		Name: OpInlineImage,
+		Args: []pdf.Object{dict, pdf.String([]byte{0})},
+	}
+	if _, err := DecodeInlineImage(op, nil); err != nil {
+		t.Fatal(err)
 	}
 }
 
