@@ -634,3 +634,35 @@ func TestFilterLZWRequiresPredictor(t *testing.T) {
 		})
 	}
 }
+
+// TestFilterCCITTFaxOutputBounded checks that a highly amplifying CCITTFax
+// stream (large Columns, no Rows limit) cannot produce unbounded output: the
+// decoded reader stops at the decode cap instead of expanding a tiny input
+// into gigabytes for a consumer that drains the raw stream.  The cap is
+// lowered here so the test stays fast; the drain is itself bounded so a missing
+// cap fails quickly rather than running for minutes.
+func TestFilterCCITTFaxOutputBounded(t *testing.T) {
+	const capBytes = 1 << 20 // 1 MiB
+	defer func(old int64) { ccittMaxDecodeBytes = old }(ccittMaxDecodeBytes)
+	ccittMaxDecodeBytes = capBytes
+
+	// repeated Group-4 pass codes over a very wide row; with no Rows limit the
+	// decoder would otherwise turn this ~4 KiB input into ~1 GiB
+	input := bytes.Repeat([]byte{0x11}, 4096)
+	f := FilterCCITTFax{K: -1, Columns: 1 << 20, Rows: 0}
+
+	r, err := f.Decode(V2_0, bytes.NewReader(input), membudget.New(1<<30))
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	defer r.Close()
+
+	// bound the drain at 2x the cap so a regression (no cap) fails fast
+	n, err := io.Copy(io.Discard, io.LimitReader(r, 2*capBytes))
+	if err != nil {
+		t.Fatalf("drain: %v", err)
+	}
+	if n != capBytes {
+		t.Errorf("decoded output %d bytes, want it truncated to the cap %d", n, int64(capBytes))
+	}
+}

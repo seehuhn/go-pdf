@@ -17,6 +17,7 @@
 package jbig2
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -472,5 +473,102 @@ func TestMultiInstanceAggregation(t *testing.T) {
 
 	if diff := cmp.Diff(expected.Pix, got.Pix); diff != "" {
 		t.Errorf("multi-instance aggregation round-trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// TestSymbolDictRefAggLinearScaling guards against the O(N^2) symbol-list
+// rebuild in the refinement/aggregation symbol-dictionary decoder.  Before the
+// combined-slice fix, each decoded symbol allocated and copied a fresh
+// "all symbols so far" slice, so the bytes allocated during decode grew with
+// N^2.  We decode a single-instance-refinement dictionary at two sizes and
+// assert the allocation growth stays close to linear; reverting the fix makes
+// the doubling ratio jump from ~2 to ~4 and trips the threshold below.
+func TestSymbolDictRefAggLinearScaling(t *testing.T) {
+	// distinct content per index, so the encoded segments do not compress
+	// below the decoder's symbol-count-vs-data-length sanity bound
+	makeVaried := func(seed, w, h int) *bitmap.Bitmap {
+		bm := bitmap.New(w, h)
+		s := uint32(seed)*2654435761 + 1
+		for y := range h {
+			for x := range w {
+				s = s*1103515245 + 12345
+				if s&0x10000 != 0 {
+					bm.SetPixel(x, y, true)
+				}
+			}
+		}
+		return bm
+	}
+
+	allocFor := func(n int) uint64 {
+		refs := make([]*bitmap.Bitmap, n)
+		syms := make([]*bitmap.Bitmap, n)
+		for i := range n {
+			refs[i] = makeVaried(i, 8, 8)
+			syms[i] = makeVaried(i+1<<20, 8, 8)
+		}
+		stream, err := buildHuffRefAggStream(huffRefAggTestCase{
+			sdrTemplate: 1,
+			symbols:     syms,
+			refSymbols:  refs,
+		})
+		if err != nil {
+			t.Fatalf("encode failed: %v", err)
+		}
+
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+
+		d := &decoder{
+			segments: make(map[uint32]segmentResult),
+			pool:     bitmapPool{budget: membudget.New(1 << 30)},
+		}
+		if err := d.processStream(stream); err != nil {
+			t.Fatalf("decode failed: %v", err)
+		}
+		runtime.ReadMemStats(&after)
+		return after.TotalAlloc - before.TotalAlloc
+	}
+
+	const n = 3000
+	a1 := allocFor(n)
+	a2 := allocFor(2 * n)
+
+	ratio := float64(a2) / float64(a1)
+	if ratio > 3.0 {
+		t.Errorf("symbol-dict decode allocation scales super-linearly: "+
+			"%d bytes at N=%d, %d bytes at N=%d (ratio %.2f, want <3)",
+			a1, n, a2, 2*n, ratio)
+	}
+}
+
+// TestGrowSymIDTable checks that the incrementally maintained symbol-ID table
+// is identical to one built from scratch for every symbol count, across the
+// code-length boundaries.  This is what lets the decoder reuse and extend the
+// table instead of rebuilding it per symbol (O(N) vs O(N^2)).
+func TestGrowSymIDTable(t *testing.T) {
+	var tbl *huffTable
+	codeLen := 0
+	for numSyms := 1; numSyms <= 600; numSyms++ {
+		tbl, codeLen = growSymIDTable(tbl, codeLen, numSyms)
+
+		want := make([]huffLine, numSyms)
+		for k := range numSyms {
+			want[k] = huffLine{RangeLow: int32(k), PrefLen: symCodeLen(numSyms)}
+		}
+		fresh := &huffTable{Lines: want}
+		fresh.assignCodes()
+
+		if codeLen != symCodeLen(numSyms) {
+			t.Fatalf("numSyms=%d: code length %d, want %d",
+				numSyms, codeLen, symCodeLen(numSyms))
+		}
+		if diff := cmp.Diff(fresh.Lines, tbl.Lines[:numSyms]); diff != "" {
+			t.Fatalf("numSyms=%d: lines mismatch (-want +got):\n%s", numSyms, diff)
+		}
+		if diff := cmp.Diff(fresh.codes, tbl.codes[:numSyms]); diff != "" {
+			t.Fatalf("numSyms=%d: codes mismatch (-want +got):\n%s", numSyms, diff)
+		}
 	}
 }

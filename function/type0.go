@@ -207,6 +207,9 @@ func (f *Type0) validate() error {
 	if m <= 0 || n <= 0 {
 		return newInvalidFunctionError(0, "Shape", "invalid shape (%d, %d)", m, n)
 	}
+	if m > limits.MaxFunctionInputDim {
+		return newInvalidFunctionError(0, "Domain", "input dimension %d exceeds limit", m)
+	}
 
 	if len(f.Domain) != 2*m {
 		return newInvalidFunctionError(0, "Domain", "invalid length %d != %d", len(f.Domain), 2*m)

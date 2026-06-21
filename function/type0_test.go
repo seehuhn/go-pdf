@@ -475,3 +475,41 @@ func TestSampleTableBytes(t *testing.T) {
 		})
 	}
 }
+
+// TestType0InputDimLimit checks that validate() rejects a sampled function
+// whose input dimension exceeds limits.MaxFunctionInputDim.  Such a function
+// would interpolate over 2^m corners per evaluation; padding the extra
+// dimensions with Size 1 keeps the sample table tiny, so the table-size cap
+// alone does not catch it.
+func TestType0InputDimLimit(t *testing.T) {
+	// build an m-input, 1-output linear function with Size[0]=2 and every
+	// other dimension Size 1 (so the table is just 2 samples regardless of m)
+	build := func(m int) *Type0 {
+		domain := make([]float64, 2*m)
+		encode := make([]float64, 2*m)
+		size := make([]int, m)
+		for i := range m {
+			domain[2*i], domain[2*i+1] = 0, 1
+			size[i] = 1
+			encode[2*i], encode[2*i+1] = 0, float64(size[i]-1)
+		}
+		size[0] = 2
+		encode[1] = 1
+		return &Type0{
+			Domain:        domain,
+			Range:         []float64{0, 1},
+			Size:          size,
+			BitsPerSample: 8,
+			Encode:        encode,
+			Decode:        []float64{0, 1},
+			Samples:       []byte{0x00, 0xFF},
+		}
+	}
+
+	if err := build(limits.MaxFunctionInputDim).validate(); err != nil {
+		t.Errorf("m=%d (at limit): unexpected error %v", limits.MaxFunctionInputDim, err)
+	}
+	if err := build(limits.MaxFunctionInputDim + 1).validate(); err == nil {
+		t.Errorf("m=%d (over limit): expected error, got nil", limits.MaxFunctionInputDim+1)
+	}
+}

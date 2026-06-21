@@ -198,6 +198,14 @@ const (
 	// function's sample table.
 	MaxSampleBytes = 16 << 20
 
+	// MaxFunctionInputDim caps the number of input dimensions m of a
+	// Type 0 sampled function.  Evaluation interpolates over 2^m sample
+	// corners, so an unbounded m (admitted by the sample-table cap alone
+	// when input dimensions use Size 1) would let a small function consume
+	// time exponential in m on every call.  Real sampled functions use
+	// m <= 4; this leaves generous headroom.
+	MaxFunctionInputDim = 8
+
 	// MaxShadingBytes caps the decoded byte count of a Type 4-7
 	// shading stream.
 	MaxShadingBytes = 16 << 20

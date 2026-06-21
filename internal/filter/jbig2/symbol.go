@@ -109,10 +109,16 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 
 	// arithmetic symbol dictionary decoding
 	dec := newMQDecoder(data[offset:])
-	newSymbols, err := d.pool.allocPointers(sdNumNewSyms)
+	// combined holds inputSymbols ++ newSymbols in one backing array, built
+	// once and indexed directly; newSymbols is a view into its tail.  This
+	// keeps reference lookups O(1) per symbol (§6.5.8.2.2) instead of
+	// rebuilding the combined list on every decoded symbol.
+	combined, err := d.pool.allocPointers(sdNumInSyms + sdNumNewSyms)
 	if err != nil {
 		return nil, err
 	}
+	copy(combined, inputSymbols)
+	newSymbols := combined[sdNumInSyms:]
 
 	iadh := &intCtx{}
 	iadw := &intCtx{}
@@ -190,13 +196,11 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 					rdy := iardy.decode(dec)
 
 					// look up reference symbol
-					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+nDecoded)
-					copy(allSyms, inputSymbols)
-					copy(allSyms[len(inputSymbols):], newSymbols[:nDecoded])
-					if symID >= len(allSyms) {
+					total := sdNumInSyms + nDecoded
+					if symID < 0 || symID >= total {
 						return nil, fmt.Errorf("symbol ID %d out of range", symID)
 					}
-					refSym := allSyms[symID]
+					refSym := combined[symID]
 
 					rp := &refinementParams{
 						Width:     iSymWidth,
@@ -218,9 +222,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 					if refAggNInst > maxAggInstances {
 						return nil, fmt.Errorf("REFAGGNINST %d exceeds limit", refAggNInst)
 					}
-					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+nDecoded)
-					copy(allSyms, inputSymbols)
-					copy(allSyms[len(inputSymbols):], newSymbols[:nDecoded])
+					allSyms := combined[:sdNumInSyms+nDecoded]
 					codeLen := symCodeLen(len(allSyms))
 
 					tp := &textRegionParams{
@@ -259,11 +261,7 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 	if sdNumExSyms > sdNumInSyms+sdNumNewSyms {
 		sdNumExSyms = sdNumInSyms + sdNumNewSyms
 	}
-	allSyms := make([]*bitmap.Bitmap, sdNumInSyms+sdNumNewSyms)
-	copy(allSyms, inputSymbols)
-	copy(allSyms[sdNumInSyms:], newSymbols)
-
-	exported := decodeExportFlags(allSyms, sdNumExSyms, func() int {
+	exported := decodeExportFlags(combined, sdNumExSyms, func() int {
 		return int(iaex.decode(dec))
 	})
 	return exported, nil
@@ -306,6 +304,33 @@ func symCodeLen(n int) int {
 		return 1
 	}
 	return bits.Len(uint(n - 1))
+}
+
+// growSymIDTable returns the symbol-ID Huffman table for an inline aggregation
+// text region covering numSyms symbols (§6.5.8.2.3).  Line k encodes index k
+// with a fixed-length code, so assignCodes gives line k the code k; this lets
+// the table grow in place when the code length is unchanged and be rebuilt only
+// when it grows.  Across one dictionary the code length grows O(log numSyms)
+// times, so the cumulative cost is O(numSyms) total rather than O(numSyms^2)
+// overall.
+// prev is the table from the previous call (nil on the first), prevCodeLen the
+// code length it was built for; the returned int is the new code length.
+func growSymIDTable(prev *huffTable, prevCodeLen, numSyms int) (*huffTable, int) {
+	cl := symCodeLen(numSyms)
+	if prev == nil || cl != prevCodeLen {
+		lines := make([]huffLine, numSyms)
+		for k := range numSyms {
+			lines[k] = huffLine{RangeLow: int32(k), PrefLen: cl}
+		}
+		t := &huffTable{Lines: lines}
+		t.assignCodes()
+		return t, cl
+	}
+	for k := len(prev.Lines); k < numSyms; k++ {
+		prev.Lines = append(prev.Lines, huffLine{RangeLow: int32(k), PrefLen: cl})
+		prev.codes = append(prev.codes, uint32(k))
+	}
+	return prev, cl
 }
 
 // decodeSymbolDictHuffman decodes a Huffman-coded symbol dictionary.
@@ -382,10 +407,16 @@ func (d *decoder) decodeSymbolDictHuffman(
 	}
 
 	hr := newHuffReader(data)
-	newSymbols, err := d.pool.allocPointers(sdNumNewSyms)
+	// combined holds inputSymbols ++ newSymbols in one backing array, built
+	// once and indexed directly; newSymbols is a view into its tail.  This
+	// keeps reference lookups O(1) per symbol (§6.5.8.2.2) instead of
+	// rebuilding the combined list on every decoded symbol.
+	combined, err := d.pool.allocPointers(sdNumInSyms + sdNumNewSyms)
 	if err != nil {
 		return nil, err
 	}
+	copy(combined, inputSymbols)
+	newSymbols := combined[sdNumInSyms:]
 	newSymWidths, err := d.pool.allocInts(sdNumNewSyms)
 	if err != nil {
 		return nil, err
@@ -393,6 +424,12 @@ func (d *decoder) decodeSymbolDictHuffman(
 
 	var hcHeight int64
 	nDecoded := 0
+
+	// symbol-ID table for the inline aggregation text region (§6.5.8.2.3),
+	// maintained across the whole dictionary by growSymIDTable so its total
+	// construction cost is O(numSyms) overall rather than O(numSyms^2).
+	var symIDTable *huffTable
+	symIDCodeLen := 0
 
 	for nDecoded < sdNumNewSyms {
 		if hr.err != nil || hr.eof {
@@ -527,13 +564,11 @@ func (d *decoder) decodeSymbolDictHuffman(
 					hr.align()
 
 					// look up reference symbol
-					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+i)
-					copy(allSyms, inputSymbols)
-					copy(allSyms[len(inputSymbols):], newSymbols[:i])
-					if symID >= len(allSyms) {
+					total := sdNumInSyms + i
+					if symID < 0 || symID >= total {
 						return nil, fmt.Errorf("symbol ID %d out of range", symID)
 					}
-					refSym := allSyms[symID]
+					refSym := combined[symID]
 
 					// decode refinement region from bounded data
 					startOff := hr.offset()
@@ -566,19 +601,8 @@ func (d *decoder) decodeSymbolDictHuffman(
 					if refAggNInst > maxAggInstances {
 						return nil, fmt.Errorf("REFAGGNINST %d exceeds limit", refAggNInst)
 					}
-					allSyms := make([]*bitmap.Bitmap, len(inputSymbols)+i)
-					copy(allSyms, inputSymbols)
-					copy(allSyms[len(inputSymbols):], newSymbols[:i])
-
-					// build symbol ID Huffman table
-					numSyms := len(allSyms)
-					symIDCodeLen := symCodeLen(numSyms)
-					lines := make([]huffLine, numSyms)
-					for k := range numSyms {
-						lines[k] = huffLine{RangeLow: int32(k), PrefLen: symIDCodeLen}
-					}
-					symIDTable := &huffTable{Lines: lines}
-					symIDTable.assignCodes()
+					allSyms := combined[:sdNumInSyms+i]
+					symIDTable, symIDCodeLen = growSymIDTable(symIDTable, symIDCodeLen, len(allSyms))
 
 					tp := &textRegionHuffParams{
 						Width:        iSymWidth,
@@ -613,11 +637,7 @@ func (d *decoder) decodeSymbolDictHuffman(
 	if sdNumExSyms > sdNumInSyms+sdNumNewSyms {
 		sdNumExSyms = sdNumInSyms + sdNumNewSyms
 	}
-	allSyms := make([]*bitmap.Bitmap, sdNumInSyms+sdNumNewSyms)
-	copy(allSyms, inputSymbols)
-	copy(allSyms[sdNumInSyms:], newSymbols)
-
-	exported := decodeExportFlags(allSyms, sdNumExSyms, func() int {
+	exported := decodeExportFlags(combined, sdNumExSyms, func() int {
 		if hr.eof {
 			return -1
 		}

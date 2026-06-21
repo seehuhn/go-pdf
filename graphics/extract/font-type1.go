@@ -100,16 +100,9 @@ func extractFontType1(c pdf.Cursor, obj pdf.Object) (*dict.Type1, error) {
 	}
 	d.Descriptor = fd
 
-	for _, key := range []pdf.Name{"FontFile", "FontFile3"} {
-		if fontFile, err := pdf.DecodeOptional(c, fdDict[key],
-			func(c pdf.Cursor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
-				return glyphdata.ExtractStream(c, obj, "Type1", key)
-			}); err != nil {
-			return nil, err
-		} else if fontFile != nil {
-			d.FontFile = fontFile
-			break
-		}
+	d.FontFile, err = glyphdata.ExtractFontFile(c, fdDict, "Type1")
+	if err != nil {
+		return nil, err
 	}
 
 	isNonSymbolic := fd != nil && !fd.IsSymbolic

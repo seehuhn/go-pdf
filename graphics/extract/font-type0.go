@@ -134,13 +134,9 @@ func extractFontCIDType0(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType0, erro
 	}
 	d.VMetrics = w2
 
-	if fontFile, err := pdf.DecodeOptional(c, fdDict["FontFile3"],
-		func(c pdf.Cursor, obj pdf.Object, _ bool) (*glyphdata.Stream, error) {
-			return glyphdata.ExtractStream(c, obj, "Type0", "FontFile3")
-		}); err != nil {
+	d.FontFile, err = glyphdata.ExtractFontFile(c, fdDict, "Type0")
+	if err != nil {
 		return nil, err
-	} else if fontFile != nil {
-		d.FontFile = fontFile
 	}
 
 	repairCIDType0(d)

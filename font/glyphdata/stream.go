@@ -57,11 +57,48 @@ type Lengths struct {
 
 var _ pdf.Embedder = (*Stream)(nil)
 
-// ExtractStream extracts a font file stream from a PDF file.
+// ExtractFontFile extracts the embedded font program referenced by a font
+// descriptor dictionary, or returns nil for an external font.
+//
+// The dictType parameter specifies the font dictionary type ("Type1",
+// "TrueType" or "Type0"); it determines which FontFile keys may hold the
+// program and in what order they take precedence. fdDict may be nil.
+func ExtractFontFile(c pdf.Cursor, fdDict pdf.Dict, dictType pdf.Name) (*Stream, error) {
+	for _, key := range fontFileKeys(dictType) {
+		s, err := pdf.DecodeOptional(c, fdDict[key],
+			func(c pdf.Cursor, obj pdf.Object, _ bool) (*Stream, error) {
+				return extractStream(c, obj, dictType, key)
+			})
+		if err != nil {
+			return nil, err
+		}
+		if s != nil {
+			return s, nil
+		}
+	}
+	return nil, nil
+}
+
+// fontFileKeys returns the font descriptor keys that may hold the font program
+// for a given font dictionary type, in order of precedence.
+func fontFileKeys(dictType pdf.Name) []pdf.Name {
+	switch dictType {
+	case "Type1":
+		return []pdf.Name{"FontFile", "FontFile3"}
+	case "TrueType":
+		return []pdf.Name{"FontFile2", "FontFile3"}
+	case "Type0":
+		return []pdf.Name{"FontFile3"}
+	default:
+		return nil
+	}
+}
+
+// extractStream extracts a font file stream from a PDF file.
 //
 // The dictType parameter specifies the font dictionary type (e.g., "Type1", "TrueType", "Type0").
 // The fdKey parameter specifies the font descriptor key ("FontFile", "FontFile2" or "FontFile3").
-func ExtractStream(c pdf.Cursor, obj pdf.Object, dictType, fdKey pdf.Name) (*Stream, error) {
+func extractStream(c pdf.Cursor, obj pdf.Object, dictType, fdKey pdf.Name) (*Stream, error) {
 	stm, err := pdf.Optional(c.Stream(obj))
 	if err != nil {
 		return nil, err

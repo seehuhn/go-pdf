@@ -580,6 +580,14 @@ func (f FilterCCITTFax) Encode(v Version, w io.WriteCloser) (io.WriteCloser, err
 	}, nil
 }
 
+// ccittMaxDecodeBytes bounds the decoded output of a single CCITTFax stream.
+// A tiny Group-4 stream with a large /Columns and no /Rows limit can otherwise
+// expand without limit for consumers that drain the raw stream.  The cap
+// matches the image-size ceiling [limits.MaxImageBytes], so it never truncates
+// a valid image (the image path rejects anything larger up front).  It is a
+// variable so tests can lower it.
+var ccittMaxDecodeBytes int64 = limits.MaxImageBytes
+
 // Decode implements the [Filter] interface.
 func (f FilterCCITTFax) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
 	params := f.toParams()
@@ -590,7 +598,8 @@ func (f FilterCCITTFax) Decode(_ Version, r io.Reader, budget *membudget.Budget)
 	if err != nil {
 		return asMalformedFilter(nil, err)
 	}
-	return asMalformedFilter(io.NopCloser(reader), nil)
+	bounded := io.LimitReader(reader, ccittMaxDecodeBytes)
+	return asMalformedFilter(io.NopCloser(bounded), nil)
 }
 
 func (f FilterCCITTFax) validate(_ Version) error {
