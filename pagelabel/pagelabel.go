@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/numtree"
 )
 
@@ -199,7 +200,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 
 		st, err := c.Integer(dict["St"])
 		if err == nil && st >= 1 {
-			lr.Start = int(st)
+			lr.Start = int(min(st, limits.MaxPageLabelStart))
 		}
 
 		l.ranges = append(l.ranges, lr)

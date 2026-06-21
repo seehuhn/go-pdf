@@ -17,12 +17,14 @@
 package pagelabel
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestFormatDecimal(t *testing.T) {
@@ -65,6 +67,9 @@ func TestFormatRoman(t *testing.T) {
 		{1000, "m"},
 		{1994, "mcmxciv"},
 		{3999, "mmmcmxcix"},
+		{0, "0"},         // below range: decimal fallback
+		{4000, "4000"},   // above range: decimal fallback
+		{12000, "12000"}, // above range: decimal fallback
 	}
 	for _, tc := range tests {
 		got := formatRoman(tc.n)
@@ -93,6 +98,30 @@ func TestFormatAlpha(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("formatAlpha(%d) = %q, want %q", tc.n, got, tc.want)
 		}
+	}
+}
+
+// TestFormatAlphaCap guards against the page-label amplification attack: a
+// large value must not produce a string longer than the cap.  At the boundary
+// the formatter switches from repeated letters to a decimal fallback.
+func TestFormatAlphaCap(t *testing.T) {
+	limit := limits.MaxPageLabelLength
+
+	// largest value still rendered as repeated letters (repeat == limit)
+	maxAlpha := limit * 26
+	if got := formatAlpha(maxAlpha); got != strings.Repeat("z", limit) {
+		t.Errorf("formatAlpha(%d) = %d chars, want %d 'z'", maxAlpha, len(got), limit)
+	}
+
+	// one past the boundary: decimal fallback
+	if got := formatAlpha(maxAlpha + 1); got != formatDecimal(maxAlpha+1) {
+		t.Errorf("formatAlpha(%d) = %q, want decimal fallback", maxAlpha+1, got)
+	}
+
+	// a hostile /St value must not allocate a multi-megabyte string
+	huge := 260_000_000
+	if got := formatAlpha(huge); got != formatDecimal(huge) || len(got) > 16 {
+		t.Errorf("formatAlpha(%d) produced %d bytes; amplification not bounded", huge, len(got))
 	}
 }
 
@@ -223,6 +252,66 @@ func TestExtract(t *testing.T) {
 	}
 	if got := labels.Format(7); got != "A-8" {
 		t.Errorf("Format(7) = %q, want %q", got, "A-8")
+	}
+}
+
+// TestExtractClampStart checks that a hostile /St value is clamped on read,
+// so neither the stored value nor the formatted label grows without bound.
+func TestExtractClampStart(t *testing.T) {
+	obj := pdf.Dict{
+		"Nums": pdf.Array{
+			pdf.Integer(0),
+			pdf.Dict{"S": pdf.Name("a"), "St": pdf.Integer(26_000_000_000_000)},
+		},
+	}
+
+	labels, err := Extract(mock.Getter, obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, rng := labels.GetRange(0)
+	if rng.Start != limits.MaxPageLabelStart {
+		t.Errorf("Start = %d, want clamped to %d", rng.Start, limits.MaxPageLabelStart)
+	}
+
+	// the formatted label must be bounded, not a multi-gigabyte string
+	if got := labels.Format(0); len(got) > 32 {
+		t.Errorf("Format(0) produced %d bytes; amplification not bounded", len(got))
+	}
+}
+
+// TestRoundTripClampedStart checks that a clamped start value survives
+// Extract → Embed → Extract unchanged, so read/write parity holds.
+func TestRoundTripClampedStart(t *testing.T) {
+	entries := func(yield func(int, Range) bool) {
+		yield(0, Range{LowerAlpha, "", limits.MaxPageLabelStart})
+	}
+	labels, err := New(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+	ref, err := rm.Embed(labels)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	labels2, err := Extract(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, r2 := labels2.GetRange(0)
+	if r2.Start != limits.MaxPageLabelStart {
+		t.Errorf("round trip: Start = %d, want %d", r2.Start, limits.MaxPageLabelStart)
 	}
 }
 

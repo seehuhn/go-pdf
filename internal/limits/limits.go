@@ -297,3 +297,25 @@ const (
 	// stays far below this; only a degenerate or malicious chain reaches it.
 	MaxExtractDepth = 256
 )
+
+const (
+	// MaxPageLabelLength caps the number of characters in the numeric
+	// portion of a formatted page label (PDF 32000-2 §12.4.2).  The
+	// alphabetic styles (/S /a, /S /A) render value n as a single letter
+	// repeated ⌈n/26⌉ times, so the output length grows linearly with the
+	// attacker-controlled start value /St; without this cap a tiny page
+	// label declaration forces a multi-gigabyte string allocation.  Beyond
+	// this length the formatter falls back to decimal, which is logarithmic
+	// in n.  A label longer than this is never useful for display; 1024
+	// leaves vast headroom over any real alphabetic-labelled document.  See
+	// [MaxPageLabelStart], which bounds the stored start value on read.
+	MaxPageLabelLength = 1024
+
+	// MaxPageLabelStart is the absolute upper bound applied to a page
+	// label's /St start value when reading from a file.  No real document
+	// numbers pages beyond this, so a larger value is treated as malformed
+	// and clamped.  This bounds the integer stored in the data model and
+	// serialized across API and IPC boundaries; the actual string
+	// allocation is bounded independently by [MaxPageLabelLength].
+	MaxPageLabelStart = 1_000_000_000
+)

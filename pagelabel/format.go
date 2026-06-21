@@ -19,6 +19,8 @@ package pagelabel
 import (
 	"strconv"
 	"strings"
+
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // formatDecimal converts an integer to a decimal string.
@@ -70,6 +72,10 @@ func formatAlpha(n int) string {
 		return formatDecimal(n)
 	}
 	repeat := (n-1)/26 + 1
+	if repeat > limits.MaxPageLabelLength {
+		// amplification guard: fall back to decimal
+		return formatDecimal(n)
+	}
 	letter := 'a' + rune((n-1)%26)
 	return strings.Repeat(string(letter), repeat)
 }
