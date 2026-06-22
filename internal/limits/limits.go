@@ -127,6 +127,19 @@ func StreamBudget(rawLen int64) int64 {
 	return StreamBudgetBase + add
 }
 
+// ShadingBudget returns the memory budget for holding the decoded vertices or
+// patches of a mesh shading whose stream is rawLen decoded bytes.  The budget
+// is sized as [StreamBudgetBase] + [MaxShadingExpansion]·rawLen, so the 8 MiB
+// floor admits small meshes regardless of bit packing while the expansion
+// slope keeps retained memory proportional to the input.  rawLen is bounded by
+// [MaxShadingBytes], so the product stays well inside int64.
+func ShadingBudget(rawLen int64) int64 {
+	if rawLen < 0 {
+		rawLen = 0
+	}
+	return StreamBudgetBase + MaxShadingExpansion*rawLen
+}
+
 const (
 	// XRefEntriesBase is the number of cross-reference entries allowed
 	// regardless of stream size, so small files with an xref stream are
@@ -209,6 +222,15 @@ const (
 	// MaxShadingBytes caps the decoded byte count of a Type 4-7
 	// shading stream.
 	MaxShadingBytes = 16 << 20
+
+	// MaxShadingExpansion is the per-byte slope of [ShadingBudget]: how many
+	// bytes of in-memory vertex/patch storage each decoded stream byte may
+	// fund.  A single vertex/patch can be packed into as few as a handful of
+	// bits but expands to tens or hundreds of bytes in memory, so the byte cap
+	// alone does not bound the allocation.  The factor is set to admit
+	// realistic meshes (an 8-bit vertex expands by roughly 14x) with margin,
+	// while still keeping retained memory proportional to the input.
+	MaxShadingExpansion = 32
 
 	// MaxICCProfileBytes caps the decoded byte count of an ICC color
 	// profile stream.

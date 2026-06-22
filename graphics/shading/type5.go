@@ -22,6 +22,7 @@ import (
 	"math"
 	"slices"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
@@ -275,7 +276,8 @@ func extractType5(c pdf.Cursor, stream *pdf.Stream) (*Type5, error) {
 	}
 
 	// Parse vertices from binary data
-	vertices, err := parseType5Vertices(data, s)
+	budget := membudget.New(limits.ShadingBudget(int64(len(data))))
+	vertices, err := parseType5Vertices(data, s, budget)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +287,7 @@ func extractType5(c pdf.Cursor, stream *pdf.Stream) (*Type5, error) {
 }
 
 // parseType5Vertices parses vertex data from binary stream data.
-func parseType5Vertices(data []byte, s *Type5) ([]Type5Vertex, error) {
+func parseType5Vertices(data []byte, s *Type5, budget *membudget.Budget) ([]Type5Vertex, error) {
 	numComponents := s.ColorSpace.Channels()
 	numValues := numComponents
 	if s.F != nil {
@@ -303,17 +305,23 @@ func parseType5Vertices(data []byte, s *Type5) ([]Type5Vertex, error) {
 	numVertices := totalBits / vertexBits
 
 	if numVertices == 0 {
-		return nil, fmt.Errorf("insufficient data: need at least %d bits per vertex, got %d total bits", vertexBits, totalBits)
+		return nil, pdf.Errorf("insufficient data: need at least %d bits per vertex, got %d total bits", vertexBits, totalBits)
 	}
 
 	// Validate lattice completeness
 	if numVertices%s.VerticesPerRow != 0 {
-		return nil, fmt.Errorf("invalid lattice: %d vertices is not a multiple of %d vertices per row", numVertices, s.VerticesPerRow)
+		return nil, pdf.Errorf("invalid lattice: %d vertices is not a multiple of %d vertices per row", numVertices, s.VerticesPerRow)
 	}
 
 	numRows := numVertices / s.VerticesPerRow
 	if numRows < 2 {
-		return nil, fmt.Errorf("invalid lattice: need at least 2 rows for triangulation, got %d", numRows)
+		return nil, pdf.Errorf("invalid lattice: need at least 2 rows for triangulation, got %d", numRows)
+	}
+
+	// charge the in-memory vertex storage against the budget
+	perVertex := int(type5VertexSize) + numValues*8
+	if err := budget.ChargeN(numVertices, perVertex); err != nil {
+		return nil, &pdf.MalformedFileError{Err: fmt.Errorf("shading vertex data exceeds memory limit: %w", err)}
 	}
 
 	vertices := make([]Type5Vertex, numVertices)

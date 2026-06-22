@@ -22,6 +22,7 @@ import (
 	"math"
 	"slices"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
@@ -287,7 +288,8 @@ func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 	}
 
 	// Parse vertices from binary data
-	vertices, err := parseType4Vertices(data, s)
+	budget := membudget.New(limits.ShadingBudget(int64(len(data))))
+	vertices, err := parseType4Vertices(data, s, budget)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +299,7 @@ func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 }
 
 // parseType4Vertices parses vertex data from binary stream data.
-func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
+func parseType4Vertices(data []byte, s *Type4, budget *membudget.Budget) ([]Type4Vertex, error) {
 	numComponents := s.ColorSpace.Channels()
 	numValues := numComponents
 	if s.F != nil {
@@ -311,10 +313,17 @@ func parseType4Vertices(data []byte, s *Type4) ([]Type4Vertex, error) {
 	vertexBytes := (vertexBits + 7) / 8
 
 	if len(data)%vertexBytes != 0 {
-		return nil, fmt.Errorf("invalid stream data length: %d bytes is not a multiple of %d", len(data), vertexBytes)
+		return nil, pdf.Errorf("invalid stream data length: %d bytes is not a multiple of %d", len(data), vertexBytes)
 	}
 
 	numVertices := len(data) / vertexBytes
+
+	// charge the in-memory vertex storage against the budget
+	perVertex := int(type4VertexSize) + numValues*8
+	if err := budget.ChargeN(numVertices, perVertex); err != nil {
+		return nil, &pdf.MalformedFileError{Err: fmt.Errorf("shading vertex data exceeds memory limit: %w", err)}
+	}
+
 	vertices := make([]Type4Vertex, numVertices)
 
 	// bit extraction helper

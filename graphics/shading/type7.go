@@ -23,6 +23,7 @@ import (
 	"slices"
 
 	"seehuhn.de/go/geom/vec"
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
@@ -585,9 +586,10 @@ func extractType7(c pdf.Cursor, stream *pdf.Stream) (*Type7, error) {
 	}
 
 	// Parse patches from binary data
-	patches, err := parseType7Patches(data, s)
+	budget := membudget.New(limits.ShadingBudget(int64(len(data))))
+	patches, err := parseType7Patches(data, s, budget)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse patches: %w", err)
+		return nil, err
 	}
 	s.Patches = patches
 
@@ -595,7 +597,7 @@ func extractType7(c pdf.Cursor, stream *pdf.Stream) (*Type7, error) {
 }
 
 // parseType7Patches parses patch data from binary stream data.
-func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
+func parseType7Patches(data []byte, s *Type7, budget *membudget.Budget) ([]Type7Patch, error) {
 	numComponents := s.ColorSpace.Channels()
 	numColorValues := numComponents
 	if s.F != nil {
@@ -604,6 +606,9 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 
 	patches := []Type7Patch{}
 	bitOffset := 0
+
+	// in-memory cost of one patch, charged against the budget as patches accrue
+	perPatch := type7PatchSize + 4*(24+int64(numColorValues)*8)
 
 	// bit extraction helper (same as Type4/5/6)
 	extractBits := func(data []byte, bitOffset, numBits int) uint32 {
@@ -680,12 +685,12 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 		} else {
 			// Connected patch: read 24 coordinates (12 explicit points) + 2 corner colors
 			if len(patches) == 0 {
-				return nil, fmt.Errorf("connected patch (flag=%d) with no previous patch", flag)
+				return nil, pdf.Errorf("connected patch (flag=%d) with no previous patch", flag)
 			}
 
 			conn, ok := type7EdgeConnections[flag]
 			if !ok {
-				return nil, fmt.Errorf("invalid edge flag: %d", flag)
+				return nil, pdf.Errorf("invalid edge flag: %d", flag)
 			}
 
 			prevPatch := patches[len(patches)-1]
@@ -728,6 +733,9 @@ func parseType7Patches(data []byte, s *Type7) ([]Type7Patch, error) {
 			}
 		}
 
+		if err := budget.Charge(int(perPatch)); err != nil {
+			return nil, &pdf.MalformedFileError{Err: fmt.Errorf("shading patch data exceeds memory limit: %w", err)}
+		}
 		patches = append(patches, patch)
 	}
 

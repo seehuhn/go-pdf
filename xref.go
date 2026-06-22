@@ -94,13 +94,19 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 						Err: errInvalidXref,
 					}
 				}
-				s, err = r.scannerFrom(int64(zStart)+r.headerOffset, false)
-				if err != nil {
-					return nil, nil, err
-				}
-				_, ref, err = r.readXRefStream(xref, s)
-				if err != nil {
-					return nil, nil, Wrap(err, "XRefStm")
+				// decode each distinct cross-reference stream at most once;
+				// a /Prev chain may share one /XRefStm across all its tables
+				stmStart := int64(zStart) + r.headerOffset
+				if !seen[stmStart] {
+					seen[stmStart] = true
+					s, err = r.scannerFrom(stmStart, false)
+					if err != nil {
+						return nil, nil, err
+					}
+					_, ref, err = r.readXRefStream(xref, s)
+					if err != nil {
+						return nil, nil, Wrap(err, "XRefStm")
+					}
 				}
 			}
 		default:

@@ -106,9 +106,8 @@ func BenchmarkReader(b *testing.B) {
 	blockSize := 1019
 	buf := make([]byte, blockSize)
 
-	b.ResetTimer()
 	b.SetBytes(int64(blockSize))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		io.ReadFull(r, buf)
 	}
 }
@@ -119,9 +118,8 @@ func BenchmarkReaderStdLib(b *testing.B) {
 	blockSize := 1019
 	buf := make([]byte, blockSize)
 
-	b.ResetTimer()
 	b.SetBytes(int64(blockSize))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		io.ReadFull(r, buf)
 	}
 }
@@ -135,9 +133,8 @@ func BenchmarkWriter(b *testing.B) {
 		buf[i] = byte(7 * i)
 	}
 
-	b.ResetTimer()
 	b.SetBytes(int64(blockSize))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		w.Write(buf)
 	}
 }
@@ -151,9 +148,8 @@ func BenchmarkWriterStdLib(b *testing.B) {
 		buf[i] = byte(7 * i)
 	}
 
-	b.ResetTimer()
 	b.SetBytes(int64(blockSize))
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		w.Write(buf)
 	}
 }

@@ -68,3 +68,30 @@ func TestMaxXRefEntries(t *testing.T) {
 		t.Error("bound does not grow with input size")
 	}
 }
+
+func TestShadingBudget(t *testing.T) {
+	cases := []struct {
+		name   string
+		rawLen int64
+		want   int64
+	}{
+		{"negative", -1, StreamBudgetBase},
+		{"zero", 0, StreamBudgetBase},
+		{"small", 1000, StreamBudgetBase + MaxShadingExpansion*1000},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ShadingBudget(tc.rawLen); got != tc.want {
+				t.Errorf("ShadingBudget(%d) = %d, want %d", tc.rawLen, got, tc.want)
+			}
+		})
+	}
+
+	// the floor admits small inputs and the bound grows with the input size
+	if ShadingBudget(0) != StreamBudgetBase {
+		t.Error("budget floor is not StreamBudgetBase")
+	}
+	if ShadingBudget(1<<20) <= ShadingBudget(0) {
+		t.Error("bound does not grow with input size")
+	}
+}
