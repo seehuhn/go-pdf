@@ -34,6 +34,12 @@ weight = 100
   PDF 2.0 (§7.6.4.3.3) calls for SASLprep (RFC 4013) by name, so
   replacements have to implement that algorithm; inlining a minimal
   SASLprep under `internal/` is the most direct option.
+- review the best-effort revision-5 (deprecated Adobe AES-256 extension) read
+  support in `crypto.go`. R=5 uses a plain SHA-256 password hash (`hashRev`)
+  instead of Algorithm 2.B (revision 6); it is currently tested only for
+  self-consistency, not against real Adobe Extension Level 3 files.  Validate
+  decryption against such files and decide whether to keep, harden, or drop
+  R=5 support.
 - test that we don't write numbers like `0.6000000000000001` in content streams
 - By more systematic about the use of pdf.MalformedFileError, and in
   particular the `Loc` field there.

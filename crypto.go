@@ -122,7 +122,8 @@ func (f *filterCrypt) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.Re
 }
 
 func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo, Perm, error) {
-	enc, err := NewCursor(r).Dict(encObj)
+	c := NewCursor(r)
+	enc, err := c.Dict(encObj)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -132,13 +133,13 @@ func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo,
 
 	res := &encryptInfo{}
 
-	filter, err := NewCursor(r).Name(enc["Filter"])
+	filter, err := c.Name(enc["Filter"])
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// version of the encryption/decryption algorithm
-	V, err := NewCursor(r).Integer(enc["V"])
+	V, err := c.Integer(enc["V"])
 	if err != nil {
 		return nil, 0, err
 	}
@@ -160,40 +161,63 @@ func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo,
 			Cipher: cipherRC4,
 			Length: 40, // default
 		}
-		if obj, ok := enc["Length"].(Integer); ok && (V == 2 || V == 3) {
-			if obj < 40 || obj > 128 || obj%8 != 0 {
+		if _, ok := enc["Length"]; ok {
+			length, err := c.Integer(enc["Length"])
+			if err != nil {
+				return nil, 0, err
+			}
+			if length < 40 || length > 128 || length%8 != 0 {
 				return nil, 0, &MalformedFileError{
-					Err: fmt.Errorf("invalid Length=%d", obj),
+					Err: fmt.Errorf("invalid Length=%d", length),
 				}
 			}
-			cf.Length = int(obj)
+			cf.Length = int(length)
 		}
 		res.stmF = cf
 		res.strF = cf
 		res.efF = cf
 		keyBytes = cf.Length / 8
 	case 4, 5:
-		var CF Dict
-		if obj, ok := enc["CF"].(Dict); ok {
-			CF = obj
+		// /CF crypt-filter dictionary; a malformed one is ignored (a needed
+		// but missing entry is caught later in getCryptFilter), but a genuine
+		// read error is propagated
+		CF, err := Optional(c.Dict(enc["CF"]))
+		if err != nil {
+			return nil, 0, err
 		}
-		if obj, ok := enc["StmF"].(Name); ok {
-			cf, err := getCryptFilter(obj, CF)
+		// StmF/StrF/EFF name the stream, string and embedded-file crypt
+		// filters.  As with /CF above, a malformed selector is ignored and a
+		// genuine read error propagated; an absent selector then leaves the
+		// default (Identity for StmF/StrF, StmF for EFF).
+		stmFName, err := Optional(c.Name(enc["StmF"]))
+		if err != nil {
+			return nil, 0, err
+		}
+		if stmFName != "" {
+			cf, err := getCryptFilter(stmFName, CF)
 			if err != nil {
 				return nil, 0, Wrap(err, "StmF")
 			}
 			res.stmF = cf
 		}
-		if obj, ok := enc["StrF"].(Name); ok {
-			cf, err := getCryptFilter(obj, CF)
+		strFName, err := Optional(c.Name(enc["StrF"]))
+		if err != nil {
+			return nil, 0, err
+		}
+		if strFName != "" {
+			cf, err := getCryptFilter(strFName, CF)
 			if err != nil {
 				return nil, 0, Wrap(err, "StrF")
 			}
 			res.strF = cf
 		}
 		res.efF = res.stmF // default
-		if obj, ok := enc["EFF"].(Name); ok {
-			cf, err := getCryptFilter(obj, CF)
+		effName, err := Optional(c.Name(enc["EFF"]))
+		if err != nil {
+			return nil, 0, err
+		}
+		if effName != "" {
+			cf, err := getCryptFilter(effName, CF)
 			if err != nil {
 				return nil, 0, Wrap(err, "EFF")
 			}
@@ -213,7 +237,7 @@ func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo,
 
 	switch filter {
 	case "Standard":
-		sec, err := openStdSecHandler(enc, keyBytes, r.meta.ID[0])
+		sec, err := openStdSecHandler(c, enc, V, keyBytes, r.meta.ID[0])
 		if err != nil {
 			return nil, 0, Wrap(err, "standard security handler")
 		}
@@ -564,46 +588,59 @@ type stdSecHandler struct {
 
 // openStdSecHandler creates a new stdSecHandler from the encryption dictionary
 // and the document ID.  This is used when reading existing PDF documents.
-func openStdSecHandler(enc Dict, keyBytes int, ID []byte) (*stdSecHandler, error) {
-	R, ok := enc["R"].(Integer)
-	if !ok || R < 2 || R == 5 || R > 6 {
+func openStdSecHandler(c Cursor, enc Dict, V Integer, keyBytes int, ID []byte) (*stdSecHandler, error) {
+	R, err := c.Integer(enc["R"])
+	if err != nil {
+		return nil, err
+	}
+	if R < 2 || R > 6 {
 		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.R")}
 	}
 	ouLength := 32
-	if R == 6 {
+	if R >= 5 {
 		ouLength = 48
 	}
 
-	// V has already been checked when this function is called, so we know
-	// it is present and valid.
-	V := enc["V"].(Integer)
-
-	// V=5 (256-bit AES) requires R=6 and vice versa; any other pairing
-	// has no defined key-derivation algorithm.
-	if (V == 5) != (R == 6) {
+	// V=5 (256-bit AES) requires R=5 or R=6 and vice versa; any other
+	// pairing has no defined key-derivation algorithm.  R=5 is the
+	// deprecated Adobe extension, R=6 the ISO 32000-2 revision.
+	if (V == 5) != (R == 5 || R == 6) {
 		return nil, &MalformedFileError{Err: errors.New("inconsistent Encrypt.V/R")}
 	}
 
-	O, ok := enc["O"].(String)
+	O, err := c.String(enc["O"])
+	if err != nil {
+		return nil, err
+	}
 	O = tryCrop(O, ouLength)
-	if !ok || len(O) != ouLength {
+	if len(O) != ouLength {
 		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.O")}
 	}
 
-	U, ok := enc["U"].(String)
+	U, err := c.String(enc["U"])
+	if err != nil {
+		return nil, err
+	}
 	U = tryCrop(U, ouLength)
-	if !ok || len(U) != ouLength {
+	if len(U) != ouLength {
 		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.U")}
 	}
 
-	P, ok := enc["P"].(Integer)
-	if !ok {
+	if _, ok := enc["P"]; !ok {
 		return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.P")}
+	}
+	P, err := c.Integer(enc["P"])
+	if err != nil {
+		return nil, err
 	}
 
 	emd := true
-	if obj, ok := enc["EncryptMetadata"].(Boolean); ok && V >= 4 {
-		emd = bool(obj)
+	if _, ok := enc["EncryptMetadata"]; ok && V >= 4 {
+		b, err := c.Boolean(enc["EncryptMetadata"])
+		if err != nil {
+			return nil, err
+		}
+		emd = bool(b)
 	}
 
 	sec := &stdSecHandler{
@@ -618,21 +655,30 @@ func openStdSecHandler(enc Dict, keyBytes int, ID []byte) (*stdSecHandler, error
 		unencryptedMetadata: !emd,
 	}
 
-	if R == 6 {
-		OE, ok := enc["OE"].(String)
-		if !ok || len(OE) != 32 {
+	if R >= 5 {
+		OE, err := c.String(enc["OE"])
+		if err != nil {
+			return nil, err
+		}
+		if len(OE) != 32 {
 			return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.OE")}
 		}
 		sec.OE = []byte(OE)
 
-		UE, ok := enc["UE"].(String)
-		if !ok || len(UE) != 32 {
+		UE, err := c.String(enc["UE"])
+		if err != nil {
+			return nil, err
+		}
+		if len(UE) != 32 {
 			return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.UE")}
 		}
 		sec.UE = []byte(UE)
 
-		Perms, ok := enc["Perms"].(String)
-		if !ok || len(Perms) != 16 {
+		Perms, err := c.String(enc["Perms"])
+		if err != nil {
+			return nil, err
+		}
+		if len(Perms) != 16 {
 			return nil, &MalformedFileError{Err: errors.New("invalid Encrypt.Perms")}
 		}
 		sec.Perms = []byte(Perms)
@@ -756,7 +802,7 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 		}
 		l := min(sec.keyBytes+5, 16)
 		return h.Sum(nil)[:l], nil
-	case 6:
+	case 5, 6:
 		return sec.key, nil
 	default:
 		panic("invalid R")
@@ -766,7 +812,7 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 // authenticate tries the given password as both owner and user password.
 // On success it sets sec.key and returns the corresponding permissions.
 func (sec *stdSecHandler) authenticate(passwd string) (Perm, error) {
-	if sec.R < 6 {
+	if sec.R < 5 {
 		padded, err := padPasswd(passwd)
 		if err != nil {
 			return 0, err
@@ -819,6 +865,20 @@ func (sec *stdSecHandler) computeFileEncyptionKey(paddedUserPwd []byte) []byte {
 	}
 
 	return key[:sec.keyBytes]
+}
+
+// hashRev computes the revision-dependent password hash.  Revision 6 uses
+// Algorithm 2.B ([slowHash]); the deprecated revision 5 (Adobe extension)
+// uses a single SHA-256 of the same input.
+func hashRev(R int, passwd, salt, U []byte) []byte {
+	if R == 5 {
+		h := sha256.New()
+		h.Write(passwd)
+		h.Write(salt)
+		h.Write(U)
+		return h.Sum(nil)
+	}
+	return slowHash(passwd, salt, U)
 }
 
 // Algorithm 2.B: Computing a hash (revision 6 and later)
@@ -1098,12 +1158,12 @@ func (sec *stdSecHandler) computePerms(fileEncryptionKey []byte) ([]byte, error)
 
 // Algorithm 11: Authenticating the user password (Security handlers of revision 6)
 func (sec *stdSecHandler) authenticateUser6(utf8Passwd []byte) error {
-	hash := slowHash(utf8Passwd, sec.U[32:40], nil)
+	hash := hashRev(sec.R, utf8Passwd, sec.U[32:40], nil)
 	if subtle.ConstantTimeCompare(hash, sec.U[:32]) != 1 {
 		return &AuthenticationError{sec.ID}
 	}
 
-	key := slowHash(utf8Passwd, sec.U[40:48], nil) // user key salt
+	key := hashRev(sec.R, utf8Passwd, sec.U[40:48], nil) // user key salt
 	c, _ := aes.NewCipher(key)
 	cbc := cipher.NewCBCDecrypter(c, zero16)
 	fileEncryptionKey := make([]byte, 32)
@@ -1120,12 +1180,12 @@ func (sec *stdSecHandler) authenticateUser6(utf8Passwd []byte) error {
 
 // Algorithm 12: Authenticating the owner password (Security handlers of revision 6)
 func (sec *stdSecHandler) authenticateOwner6(utf8Passwd []byte) error {
-	hash := slowHash(utf8Passwd, sec.O[32:40], sec.U)
+	hash := hashRev(sec.R, utf8Passwd, sec.O[32:40], sec.U)
 	if subtle.ConstantTimeCompare(hash, sec.O[:32]) != 1 {
 		return &AuthenticationError{sec.ID}
 	}
 
-	key := slowHash(utf8Passwd, sec.O[40:48], sec.U) // owner key salt
+	key := hashRev(sec.R, utf8Passwd, sec.O[40:48], sec.U) // owner key salt
 	c, _ := aes.NewCipher(key)
 	cbc := cipher.NewCBCDecrypter(c, zero16)
 	fileEncryptionKey := make([]byte, 32)
