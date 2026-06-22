@@ -27,7 +27,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
@@ -35,18 +34,15 @@ import (
 
 var keepTempFiles = false
 
-// Render can be used in unit tests to render a PDF page to an image.
+// RenderImage renders a single PDF page to an image using the ghostscript
+// command-line tool.  It returns ErrNoGhostscript if ghostscript is not
+// available.
 //
-// This calls the ghostscript command-line tool to render the PDF page to a PNG
-// image.  The image is returned as a Go image.Image object.
-//
-// This function can be used to verify that Ghostscript's idea of PDF matches
-// our own.
-func Render(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) image.Image {
-	t.Helper()
-
+// This is intended for use in code generators (see go:generate directives),
+// which may compare ghostscript's idea of a PDF page against our own.
+func RenderImage(pdfWidth, pdfHeight float64, v pdf.Version, f func(page *document.Page) error) (image.Image, error) {
 	if !isAvailable() {
-		t.Skip("ghostscript not found")
+		return nil, ErrNoGhostscript
 	}
 
 	paper := &pdf.Rectangle{
@@ -55,17 +51,13 @@ func Render(t *testing.T, pdfWidth, pdfHeight float64, v pdf.Version, f func(pag
 	}
 	r, err := newGSRenderer(paper, v)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	err = f(r.Page)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	img, err := r.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return img
+	return r.Close()
 }
 
 type gsRenderer struct {
