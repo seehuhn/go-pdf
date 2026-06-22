@@ -832,7 +832,6 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("malformed page")
 		}
 
-		// Round-trip test
 		roundTripTest(t, pdf.V1_7, p)
 	})
 }

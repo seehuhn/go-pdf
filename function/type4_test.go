@@ -706,28 +706,23 @@ func FuzzType4(f *testing.F) {
 }
 
 func TestType4StackOverflow(t *testing.T) {
-	// build a program: "dup 2 copy 4 copy 8 copy ... 256 copy"
-	// each copy doubles the stack, so after 256 copy we'd have 512 elements
-	program := "dup 2 copy 4 copy 8 copy 16 copy 32 copy 64 copy 128 copy 256 copy"
+	// A stack-bomb program: each "copy" doubles the stack, so without a guard
+	// it would build 512 elements, all equal to the input 0.5, leaving 0.5 on
+	// top.  The VM must instead detect the overflow, after which Apply yields
+	// range-clipped zeros.  Asserting the output is 0 (not 0.5) confirms both
+	// that Apply survives a malicious program and that the overflow guard fires
+	// (were it removed, the program would run and Apply would return 0.5).
 	fn := &Type4{
 		Domain:  []float64{0, 1},
 		Range:   []float64{0, 1},
-		Program: program,
+		Program: "dup 2 copy 4 copy 8 copy 16 copy 32 copy 64 copy 128 copy 256 copy",
 	}
 
-	// Apply should not panic; the VM returns a stack overflow error
-	// which Apply handles by returning zeros clipped to range
 	result := make([]float64, 1)
 	fn.Apply(result, 0.5)
 
-	// verify the VM itself returns a stack overflow error
-	code, err := compile(program)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = execute(code, []value{realVal(0.5)})
-	if err != errStackOverflow {
-		t.Errorf("expected stack overflow error, got %v", err)
+	if result[0] != 0 {
+		t.Errorf("stack-bomb output = %v, want 0 (overflow should be caught)", result[0])
 	}
 }
 

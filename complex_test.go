@@ -148,7 +148,7 @@ func TestTextString_AsPDF(t *testing.T) {
 	}
 }
 
-func TestTextString_Roundtrip(t *testing.T) {
+func TestTextString_RoundTrip(t *testing.T) {
 	tests := []struct {
 		name string
 		text TextString
@@ -205,7 +205,7 @@ func TestTextString_Roundtrip(t *testing.T) {
 				enc := tt.text.AsPDF(opt).(String)
 				out := enc.AsTextString()
 				if out != tt.text {
-					t.Errorf("Roundtrip failed for %q with option %v:\nencoded: % x\ndecoded: %q",
+					t.Errorf("round-trip failed for %q with option %v:\nencoded: % x\ndecoded: %q",
 						tt.text, opt, enc, out)
 				}
 			}

@@ -17,6 +17,7 @@
 package function
 
 import (
+	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -25,220 +26,157 @@ import (
 )
 
 func TestType3BoundaryHandling(t *testing.T) {
-	// Test cases based on PDF specification Section 7.10.4
+	// These cases exercise the half-open interval logic of the stitching
+	// function (PDF 32000-1:2008, section 7.10.4), including the special case
+	// where XMin equals Bounds[0] and the first interval degenerates to a
+	// single point.  Each sub-function is a probe with two outputs that report,
+	// through the public Apply: out[0] is the selected function index (a
+	// constant per function, so it jumps discontinuously at a boundary and
+	// pins down the selection even there) and out[1] is the encoded input (the
+	// position of x within its subdomain, mapped to [0, 1]).  Comparing these
+	// against the independently known boundary rules verifies that Apply
+	// selects the right function and subdomain.
 	tests := []struct {
-		name       string
-		function   *Type3
-		testInputs []struct {
+		name   string
+		xMin   float64
+		xMax   float64
+		bounds []float64
+		inputs []struct {
 			input          float64
 			expectedFunc   int        // which function should be selected (0-indexed)
 			expectedDomain [2]float64 // expected subdomain boundaries
 		}
 	}{
 		{
-			name: "Normal case: k=2, XMin < Bounds[0] < XMax",
-			function: &Type3{
-				XMin: 0,
-				XMax: 2,
-				Functions: []pdf.Function{
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
-					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
-				},
-				Bounds: []float64{1.0},
-				Encode: []float64{0, 1, 0, 1},
-			},
-			testInputs: []struct {
+			name:   "k=2, XMin < Bounds[0] < XMax",
+			xMin:   0,
+			xMax:   2,
+			bounds: []float64{1.0},
+			inputs: []struct {
 				input          float64
 				expectedFunc   int
 				expectedDomain [2]float64
 			}{
 				{0.0, 0, [2]float64{0, 1}},   // left boundary of first interval [0, 1)
 				{0.5, 0, [2]float64{0, 1}},   // inside first interval
-				{0.999, 0, [2]float64{0, 1}}, // just before boundary (should be in first interval)
-				{1.0, 1, [2]float64{1, 2}},   // exactly at boundary (should be in second interval) [1, 2]
+				{0.999, 0, [2]float64{0, 1}}, // just before boundary (still first interval)
+				{1.0, 1, [2]float64{1, 2}},   // exactly at boundary -> second interval [1, 2]
 				{1.5, 1, [2]float64{1, 2}},   // inside second interval
-				{2.0, 1, [2]float64{1, 2}},   // right boundary of last interval (should be included)
+				{2.0, 1, [2]float64{1, 2}},   // right boundary of last interval (included)
 			},
 		},
 		{
-			name: "Special case: k=2, XMin = Bounds[0]",
-			function: &Type3{
-				XMin: 0,
-				XMax: 2,
-				Functions: []pdf.Function{
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
-					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
-				},
-				Bounds: []float64{0.0}, // XMin = Bounds[0]
-				Encode: []float64{0, 1, 0, 1},
-			},
-			testInputs: []struct {
+			name:   "k=2, XMin = Bounds[0]",
+			xMin:   0,
+			xMax:   2,
+			bounds: []float64{0.0},
+			inputs: []struct {
 				input          float64
 				expectedFunc   int
 				expectedDomain [2]float64
 			}{
-				{0.0, 0, [2]float64{0, 0}},   // Special case: first interval [0, 0] (closed on both sides)
-				{0.001, 1, [2]float64{0, 2}}, // Second interval (0, 2] (open on left)
-				{1.0, 1, [2]float64{0, 2}},   // Inside second interval
-				{2.0, 1, [2]float64{0, 2}},   // Right boundary included in last interval
+				{0.0, 0, [2]float64{0, 0}},   // first interval [0, 0] (single point)
+				{0.001, 1, [2]float64{0, 2}}, // second interval (0, 2] (open on left)
+				{1.0, 1, [2]float64{0, 2}},   // inside second interval
+				{2.0, 1, [2]float64{0, 2}},   // right boundary included in last interval
 			},
 		},
 		{
-			name: "Three functions: k=3, normal boundaries",
-			function: &Type3{
-				XMin: 0,
-				XMax: 3,
-				Functions: []pdf.Function{
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
-					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{0}, N: 1},
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 2},
-				},
-				Bounds: []float64{1.0, 2.0},
-				Encode: []float64{0, 1, 0, 1, 0, 1},
-			},
-			testInputs: []struct {
+			name:   "k=3, normal boundaries",
+			xMin:   0,
+			xMax:   3,
+			bounds: []float64{1.0, 2.0},
+			inputs: []struct {
 				input          float64
 				expectedFunc   int
 				expectedDomain [2]float64
 			}{
-				{0.0, 0, [2]float64{0, 1}},   // First interval [0, 1)
-				{0.999, 0, [2]float64{0, 1}}, // Just before first boundary
-				{1.0, 1, [2]float64{1, 2}},   // Exactly at first boundary -> second interval [1, 2)
-				{1.5, 1, [2]float64{1, 2}},   // Inside second interval
-				{1.999, 1, [2]float64{1, 2}}, // Just before second boundary
-				{2.0, 2, [2]float64{2, 3}},   // Exactly at second boundary -> third interval [2, 3]
-				{2.5, 2, [2]float64{2, 3}},   // Inside third interval
-				{3.0, 2, [2]float64{2, 3}},   // Right boundary of last interval (included)
+				{0.0, 0, [2]float64{0, 1}},   // first interval [0, 1)
+				{0.999, 0, [2]float64{0, 1}}, // just before first boundary
+				{1.0, 1, [2]float64{1, 2}},   // exactly at first boundary -> second interval [1, 2)
+				{1.5, 1, [2]float64{1, 2}},   // inside second interval
+				{1.999, 1, [2]float64{1, 2}}, // just before second boundary
+				{2.0, 2, [2]float64{2, 3}},   // exactly at second boundary -> third interval [2, 3]
+				{2.5, 2, [2]float64{2, 3}},   // inside third interval
+				{3.0, 2, [2]float64{2, 3}},   // right boundary of last interval (included)
 			},
 		},
 		{
-			name: "Single function: k=1, no bounds",
-			function: &Type3{
-				XMin: 0,
-				XMax: 1,
-				Functions: []pdf.Function{
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{1}, N: 1},
-				},
-				Bounds: []float64{}, // No bounds for single function
-				Encode: []float64{0, 1},
-			},
-			testInputs: []struct {
+			name:   "k=1, no bounds",
+			xMin:   0,
+			xMax:   1,
+			bounds: []float64{},
+			inputs: []struct {
 				input          float64
 				expectedFunc   int
 				expectedDomain [2]float64
 			}{
-				{0.0, 0, [2]float64{0, 1}}, // Left boundary
-				{0.5, 0, [2]float64{0, 1}}, // Middle
-				{1.0, 0, [2]float64{0, 1}}, // Right boundary
+				{0.0, 0, [2]float64{0, 1}}, // left boundary
+				{0.5, 0, [2]float64{0, 1}}, // middle
+				{1.0, 0, [2]float64{0, 1}}, // right boundary
 			},
 		},
 		{
-			name: "Special case: k=3, XMin = Bounds[0]",
-			function: &Type3{
-				XMin: 0,
-				XMax: 3,
-				Functions: []pdf.Function{
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0.2}, C1: []float64{0.2}, N: 1},
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0.5}, C1: []float64{0.5}, N: 1},
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0.9}, C1: []float64{0.9}, N: 1}},
-				Bounds: []float64{0.0, 2.0}, // XMin = Bounds[0]
-				Encode: []float64{0, 1, 0, 1, 0, 1},
-			},
-			testInputs: []struct {
+			name:   "k=3, XMin = Bounds[0]",
+			xMin:   0,
+			xMax:   3,
+			bounds: []float64{0.0, 2.0},
+			inputs: []struct {
 				input          float64
 				expectedFunc   int
 				expectedDomain [2]float64
 			}{
-				{0.0, 0, [2]float64{0, 0}},   // First interval [0, 0]
-				{0.001, 1, [2]float64{0, 2}}, // Second interval (0, 2)
-				{2.0, 2, [2]float64{2, 3}},   // Third interval [2, 3]
+				{0.0, 0, [2]float64{0, 0}},   // first interval [0, 0]
+				{0.001, 1, [2]float64{0, 2}}, // second interval (0, 2)
+				{2.0, 2, [2]float64{2, 3}},   // third interval [2, 3]
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, test := range tt.testInputs {
-				actualFunc, a, b := tt.function.findSubdomain(test.input)
-
-				if actualFunc != test.expectedFunc {
-					t.Errorf("input %.3f: expected function %d, got %d",
-						test.input, test.expectedFunc, actualFunc)
+			// build k probe sub-functions: out[0] = function index (constant),
+			// out[1] = encoded input (Encode maps each subdomain to [0, 1])
+			k := len(tt.bounds) + 1
+			funcs := make([]pdf.Function, k)
+			encode := make([]float64, 0, 2*k)
+			for i := range funcs {
+				funcs[i] = &Type2{
+					XMin: 0, XMax: 1,
+					C0: []float64{float64(i), 0},
+					C1: []float64{float64(i), 1},
+					N:  1,
 				}
-
-				if [2]float64{a, b} != test.expectedDomain {
-					t.Errorf("input %.3f: expected domain [%.3f, %.3f], got [%.3f, %.3f]",
-						test.input, test.expectedDomain[0], test.expectedDomain[1],
-						a, b)
-				}
+				encode = append(encode, 0, 1)
 			}
-		})
-	}
-}
-
-func TestType3ApplyWithBoundaries(t *testing.T) {
-	// Test that Apply method correctly handles boundary values
-	// This tests the complete workflow including encoding
-
-	tests := []struct {
-		name     string
-		function *Type3
-		input    float64
-		// We'll verify the function selection is correct by checking
-		// which underlying Type2 function gets used
-	}{
-		{
-			name: "Boundary value at 1.0 should use second function",
-			function: &Type3{
-				XMin: 0,
-				XMax: 2,
-				Functions: []pdf.Function{
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0}, C1: []float64{0}, N: 1}, // Always returns 0
-					&Type2{XMin: 0, XMax: 1, C0: []float64{1}, C1: []float64{1}, N: 1}, // Always returns 1
-				},
-				Bounds: []float64{1.0},
-				Encode: []float64{0, 1, 0, 1},
-			},
-			input: 1.0,
-			// If findSubdomain is correct, x=1.0 should select function 1 (returns 1.0)
-			// If incorrect, it might select function 0 (returns 0.0)
-		},
-		{
-			name: "Special case XMin = Bounds[0], test boundary",
-			function: &Type3{
-				XMin: 0,
-				XMax: 1,
-				Functions: []pdf.Function{
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0.5}, C1: []float64{0.5}, N: 1}, // Always returns 0.5
-					&Type2{XMin: 0, XMax: 1, C0: []float64{0.8}, C1: []float64{0.8}, N: 1}, // Always returns 0.8
-				},
-				Bounds: []float64{0.0}, // XMin = Bounds[0]
-				Encode: []float64{0, 1, 0, 1},
-			},
-			input: 0.0,
-			// In special case, x=0.0 should be in first interval [0,0] and use function 0
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := make([]float64, 1)
-			tt.function.Apply(result, tt.input)
-
-			// For the first test case, we expect result[0] = 1.0 if boundary handling is correct
-			// For the second test case, we expect result[0] = 0.5 if special case is handled correctly
-			expectedResult := map[string]float64{
-				"Boundary value at 1.0 should use second function": 1.0,
-				"Special case XMin = Bounds[0], test boundary":     0.5,
-			}[tt.name]
-
-			if len(result) != 1 {
-				t.Fatalf("expected 1 output, got %d", len(result))
+			f := &Type3{
+				XMin:      tt.xMin,
+				XMax:      tt.xMax,
+				Functions: funcs,
+				Bounds:    tt.bounds,
+				Encode:    encode,
 			}
 
-			if result[0] != expectedResult {
-				t.Errorf("input %.3f: expected %.3f, got %.3f (this indicates incorrect function selection)",
-					tt.input, expectedResult, result[0])
+			for _, tc := range tt.inputs {
+				out := make([]float64, 2)
+				f.Apply(out, tc.input)
+
+				if got := int(out[0]); got != tc.expectedFunc {
+					t.Errorf("input %.3f: selected function %d, want %d",
+						tc.input, got, tc.expectedFunc)
+				}
+
+				// expected position of x within its subdomain, mapped to [0, 1];
+				// a degenerate single-point subdomain encodes to the low end
+				a, b := tc.expectedDomain[0], tc.expectedDomain[1]
+				var wantEncoded float64
+				if b > a {
+					wantEncoded = (tc.input - a) / (b - a)
+				}
+				if math.Abs(out[1]-wantEncoded) > 1e-9 {
+					t.Errorf("input %.3f: encoded input %.6f, want %.6f (subdomain [%.3f, %.3f])",
+						tc.input, out[1], wantEncoded, a, b)
+				}
 			}
 		})
 	}

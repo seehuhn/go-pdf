@@ -63,24 +63,35 @@ func TestUnknownLastModified(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
-	// clear registry for test
-	registryMu.Lock()
-	registry = make(map[pdf.Name]func(r pdf.Getter, private pdf.Object) (Data, error))
-	registryMu.Unlock()
+	// A registered handler must be used by Extract for matching subtypes, in
+	// place of the default "unknown" handler.  The handler below reports a
+	// fixed LastModified that differs from the one in the dictionary, so seeing
+	// that value come back proves the handler ran rather than the fallback.
+	const testName = pdf.Name("Quire-TestHandler")
+	marker := time.Date(2001, 2, 3, 4, 5, 6, 0, time.UTC)
+	Register(testName, func(r pdf.Getter, private pdf.Object) (Data, error) {
+		return &unknown{lastModified: marker}, nil
+	})
 
-	testName := pdf.Name("TestHandler")
-	testHandler := func(r pdf.Getter, private pdf.Object) (Data, error) {
-		return &unknown{lastModified: time.Now()}, nil
+	pieceDict := pdf.Dict{
+		testName: pdf.Dict{
+			"LastModified": pdf.Date(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)),
+			"Private":      pdf.String("data"),
+		},
 	}
 
-	Register(testName, testHandler)
-
-	registryMu.RLock()
-	_, exists := registry[testName]
-	registryMu.RUnlock()
-
-	if !exists {
-		t.Errorf("Register did not store handler for %v", testName)
+	x := pdf.NewExtractor(mock.Getter)
+	info, err := pdf.Decode(pdf.CursorAt(x, nil), pieceDict, Extract)
+	if err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	data, ok := info.Entries[testName]
+	if !ok {
+		t.Fatalf("Extract produced no entry for %v", testName)
+	}
+	if !data.LastModified().Equal(marker) {
+		t.Errorf("registered handler not used: LastModified = %v, want %v",
+			data.LastModified(), marker)
 	}
 }
 
@@ -197,13 +208,8 @@ func TestPieceInfoEmbed(t *testing.T) {
 }
 
 func TestErrDiscard(t *testing.T) {
-	// clear registry for test
-	registryMu.Lock()
-	registry = make(map[pdf.Name]func(r pdf.Getter, private pdf.Object) (Data, error))
-	registryMu.Unlock()
-
 	// register a handler that discards entries
-	testName := pdf.Name("DiscardHandler")
+	testName := pdf.Name("Quire-DiscardHandler")
 	Register(testName, func(r pdf.Getter, private pdf.Object) (Data, error) {
 		return nil, ErrDiscard
 	})

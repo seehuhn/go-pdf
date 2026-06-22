@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestType3Roundtrip(t *testing.T) {
+func TestType3RoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for i, d := range type3Dicts {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.Name), func(t *testing.T) {

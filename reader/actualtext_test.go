@@ -17,11 +17,16 @@
 package reader
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
+
+// errAbortActualText is returned by a test ActualText callback to abort a run
+// mid-region, leaving the reader's ActualText state dirty.
+var errAbortActualText = errors.New("abort")
 
 type actualTextEvent struct {
 	event ActualTextEvent
@@ -178,38 +183,68 @@ func TestInActualText(t *testing.T) {
 }
 
 func TestActualTextResetClears(t *testing.T) {
+	// Reset must clear ActualText state left dirty by an aborted run.  A
+	// callback that fails on the Begin event aborts ProcessIter before the
+	// region's auto-close runs, leaving it open; Reset then returns the reader
+	// to a clean state.
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
+	r.ActualText = func(ActualTextEvent, string) error {
+		return errAbortActualText
+	}
 
-	r.actualTextStartDepth = 3
-	r.actualTextValue = "stale"
+	if err := r.ProcessIter(stringStream("/Span <</ActualText (STALE)>> BDC\nEMC\n").NewIter()); err == nil {
+		t.Fatal("expected the callback error to abort ProcessIter")
+	}
+	if !r.InActualText() {
+		t.Fatal("test setup: an aborted run should leave the region open")
+	}
 
 	r.Reset()
 
-	if r.actualTextStartDepth != -1 {
-		t.Errorf("after Reset, actualTextStartDepth = %d, want -1", r.actualTextStartDepth)
-	}
-	if r.actualTextValue != "" {
-		t.Errorf("after Reset, actualTextValue = %q, want \"\"", r.actualTextValue)
+	if r.InActualText() {
+		t.Error("InActualText() true after Reset, want false")
 	}
 }
 
 func TestActualTextProcessIterResets(t *testing.T) {
-	// ProcessIter must reset stale ActualText state from a prior run.
+	// A new ProcessIter must not inherit ActualText state left dirty by an
+	// aborted run.  The first run's callback fails mid-region, leaving it open;
+	// without the reset at the start of ProcessIter the second run's region
+	// would be treated as nested and suppressed instead of firing its own
+	// Begin/End events.
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
 
-	r.actualTextStartDepth = 7
-	r.actualTextValue = "stale"
-
-	if err := r.ProcessIter(stringStream("").NewIter()); err != nil {
-		t.Fatalf("ProcessIter failed: %v", err)
+	var events []actualTextEvent
+	fail := true
+	r.ActualText = func(event ActualTextEvent, text string) error {
+		if fail {
+			return errAbortActualText
+		}
+		events = append(events, actualTextEvent{event: event, text: text})
+		return nil
 	}
 
-	if r.actualTextStartDepth != -1 {
-		t.Errorf("after ProcessIter, actualTextStartDepth = %d, want -1", r.actualTextStartDepth)
+	if err := r.ProcessIter(stringStream("/Span <</ActualText (STALE)>> BDC\nEMC\n").NewIter()); err == nil {
+		t.Fatal("expected the callback error to abort the first run")
 	}
-	if r.actualTextValue != "" {
-		t.Errorf("after ProcessIter, actualTextValue = %q, want \"\"", r.actualTextValue)
+
+	fail = false
+	if err := r.ProcessIter(stringStream("/Span <</ActualText (FRESH)>> BDC\nEMC\n").NewIter()); err != nil {
+		t.Fatalf("second ProcessIter failed: %v", err)
+	}
+
+	want := []actualTextEvent{
+		{ActualTextBegin, "FRESH"},
+		{ActualTextEnd, "FRESH"},
+	}
+	if len(events) != len(want) {
+		t.Fatalf("got %d events, want %d: %+v", len(events), len(want), events)
+	}
+	for i, wnt := range want {
+		if events[i] != wnt {
+			t.Errorf("event %d: got %+v, want %+v", i, events[i], wnt)
+		}
 	}
 }

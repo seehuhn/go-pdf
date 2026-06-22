@@ -74,21 +74,28 @@ func TestGetQuadPointsSimple(t *testing.T) {
 }
 
 func TestTextGetQuadPointsComprehensive(t *testing.T) {
+	// Expected quad points are derived by hand from the squarefont geometry
+	// (see internal/squarefont): glyph "A" has bounding box [0.1, 0.5] × [0.2,
+	// 0.6] em and advance 0.5 em; "space" advances 0.25 em with no ink; the
+	// font ascent is 0.8 em and descent -0.2 em.  For "A A" at size 10 the
+	// text-space box therefore spans x ∈ [1, 12.5] (LLx of the first A to URx
+	// of the second, which starts 0.5+0.25 = 0.75 em past the origin) and
+	// y ∈ [-2, 8] (descent and ascent dominate the glyph box).  Text rise
+	// lifts the top of the glyph box to URy*size + rise.
 	testCases := []struct {
-		name         string
-		fontSize     float64
-		setupFunc    func(*builder.Builder) *font.GlyphSeq
-		expectedFunc func() []vec.Vec2
+		name      string
+		fontSize  float64
+		setupFunc func(*builder.Builder) *font.GlyphSeq
+		expected  []vec.Vec2
 	}{
 		{
 			name:     "identity_transform",
 			fontSize: 10.0,
 			setupFunc: func(b *builder.Builder) *font.GlyphSeq {
-				// Basic identity transform with standard text layout
 				return b.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Identity)
+			expected: []vec.Vec2{
+				{X: 1, Y: -2}, {X: 12.5, Y: -2}, {X: 12.5, Y: 8}, {X: 1, Y: 8},
 			},
 		},
 		{
@@ -98,8 +105,9 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				b.TextSetMatrix(matrix.Translate(20, 30))
 				return b.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Translate(20, 30))
+			// box translated by (20, 30)
+			expected: []vec.Vec2{
+				{X: 21, Y: 28}, {X: 32.5, Y: 28}, {X: 32.5, Y: 38}, {X: 21, Y: 38},
 			},
 		},
 		{
@@ -109,8 +117,9 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				b.TextSetMatrix(matrix.Scale(1.5, 1.2))
 				return b.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 0, 0, matrix.Identity, matrix.Scale(1.5, 1.2))
+			// box scaled by (1.5, 1.2)
+			expected: []vec.Vec2{
+				{X: 1.5, Y: -2.4}, {X: 18.75, Y: -2.4}, {X: 18.75, Y: 9.6}, {X: 1.5, Y: 9.6},
 			},
 		},
 		{
@@ -120,102 +129,37 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				b.TextSetRise(5.0)
 				return b.TextLayout(nil, "A A")
 			},
-			expectedFunc: func() []vec.Vec2 {
-				return calculateExpectedQuadPoints(10.0, 5.0, 0, matrix.Identity, matrix.Identity)
+			// rise 5 lifts the glyph-box top to URy*size + rise = 6 + 5 = 11
+			expected: []vec.Vec2{
+				{X: 1, Y: -2}, {X: 12.5, Y: -2}, {X: 12.5, Y: 11}, {X: 1, Y: 11},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create test font
 			testFont := squarefont.All[0].MakeFont()
 
-			// Create builder
 			b := builder.New(content.Page, nil, pdf.V2_0)
-
-			// Start text object and set font
 			b.TextBegin()
 			b.TextSetFont(testFont, tc.fontSize)
 
-			// Run setup function to configure transforms and get glyph sequence
 			glyphSeq := tc.setupFunc(b)
 
-			// Call the method under test
 			result := b.TextGetQuadPoints(glyphSeq, 0)
 
-			// Calculate expected values
-			expected := tc.expectedFunc()
-
-			// Compare results
-			if len(result) != len(expected) {
-				t.Errorf("expected %d points, got %d", len(expected), len(result))
-				return
+			if len(result) != len(tc.expected) {
+				t.Fatalf("expected %d points, got %d", len(tc.expected), len(result))
 			}
-
-			for i := range expected {
-				if math.Abs(result[i].X-expected[i].X) > 1e-6 || math.Abs(result[i].Y-expected[i].Y) > 1e-6 {
-					t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, expected[i].X, expected[i].Y, result[i].X, result[i].Y)
+			for i := range tc.expected {
+				if math.Abs(result[i].X-tc.expected[i].X) > 1e-6 || math.Abs(result[i].Y-tc.expected[i].Y) > 1e-6 {
+					t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, tc.expected[i].X, tc.expected[i].Y, result[i].X, result[i].Y)
 				}
 			}
 
 			b.TextEnd()
 		})
 	}
-}
-
-// calculateExpectedQuadPoints computes the expected quad points for given parameters
-// This matches the logic from the actual implementation
-func calculateExpectedQuadPoints(fontSize, textRise, skip float64, ctm, textMatrix matrix.Matrix) []vec.Vec2 {
-	// Squarefont constants (from internal/squarefont/font.go)
-	const (
-		SquareLeft   = 100 // LLx for "A"
-		SquareRight  = 500 // URx for "A"
-		SquareBottom = 200 // LLy for "A"
-		SquareTop    = 600 // URy for "A"
-		SpaceWidth   = 250 // advance width for space
-		SquareWidth  = 500 // advance width for "A"
-	)
-
-	scale := fontSize / 1000.0
-
-	// From debug test: "A A" identity gives [1 2 12.5 2 12.5 6 1 6]
-	// This means:
-	// - Left = skip + LLx*scale = 0 + 100*0.01 = 1
-	// - Right = skip + (advance_A + advance_space)*scale + URx*scale = 0 + (500+250)*0.01 + 500*0.01 = 7.5 + 5 = 12.5
-	// - Bottom = -(LLy*scale + rise) = -(200*0.01 + 0) = -2, but we got +2, so it's +LLy*scale = +2
-	// - Top = URy*scale + rise = 600*0.01 + 0 = 6
-
-	leftBearing := skip + SquareLeft*scale                                    // skip + LLx of first A
-	rightBearing := skip + (SquareWidth+SpaceWidth)*scale + SquareRight*scale // skip + total_advance + URx of second A
-
-	// Vertical bounds: use geometry-based calculation like the actual implementation
-	// For squarefont: Ascent=800, Descent=-200 (from squarefont constants)
-	ascent := 800.0
-	descent := -200.0
-	// For text rise, the implementation adds glyph.Rise to each glyph calculation
-	// This results in height being affected but depth staying the same in this case
-	height := ascent*scale + textRise*0.6 // empirically observed factor
-	depth := -descent * scale             // depth unchanged by textRise in this specific case
-
-	// Build rectangle in text space
-	rectText := []float64{
-		leftBearing, -depth, // bottom-left (note: -depth)
-		rightBearing, -depth, // bottom-right
-		rightBearing, height, // top-right
-		leftBearing, height, // top-left
-	}
-
-	// Apply combined transformation: CTM * TextMatrix
-	M := ctm.Mul(textMatrix)
-
-	// Transform all corners to default user space
-	result := make([]vec.Vec2, 4)
-	for i := range 4 {
-		result[i] = M.Apply(vec.Vec2{X: rectText[2*i], Y: rectText[2*i+1]})
-	}
-
-	return result
 }
 
 func TestGetGlyphQuadPointsStateValidation(t *testing.T) {

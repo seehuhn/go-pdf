@@ -42,7 +42,7 @@ func TestType0RoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for i, d := range t0Dicts {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
-				checkRoundtripT0(t, d, v)
+				checkRoundTripT0(t, d, v)
 			})
 		}
 	}
@@ -138,11 +138,11 @@ func FuzzType0Dict(f *testing.F) {
 		}
 
 		// Make sure we can write the dict, and read it back.
-		checkRoundtripT0(t, d, pdf.GetVersion(r))
+		checkRoundTripT0(t, d, pdf.GetVersion(r))
 	})
 }
 
-func checkRoundtripT0(t *testing.T, d1 *dict.CIDFontType0, v pdf.Version) {
+func checkRoundTripT0(t *testing.T, d1 *dict.CIDFontType0, v pdf.Version) {
 	d1 = clone(d1)
 
 	w, _ := memfile.NewPDFWriter(v, nil)

@@ -171,7 +171,7 @@ func TestType1Encoding(t *testing.T) {
 	}
 }
 
-func TestType1Roundtrip(t *testing.T) {
+func TestType1RoundTrip(t *testing.T) {
 	var cases = []Simple{
 		Builtin,
 		WinAnsi,

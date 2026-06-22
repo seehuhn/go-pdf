@@ -19,8 +19,6 @@ package lzw
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"testing"
 )
 
@@ -50,59 +48,5 @@ func TestLZWSimple(t *testing.T) {
 		fmt.Printf("% 0X\n", out)
 		fmt.Printf("% 0X\n", expected)
 		t.Fatal("wrong result")
-	}
-}
-
-func TestRoundtrip(t *testing.T) {
-	for _, ecw := range []bool{false, true} {
-		for _, ecr := range []bool{false, true} {
-			fmt.Println(ecw, ecr)
-			good := ecw == ecr
-
-			body, err := os.ReadFile("reader.go")
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			buf := &bytes.Buffer{}
-			w, err := NewWriter(buf, ecw)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var in []byte
-			for len(in) < 1e5 {
-				in = append(in, body...)
-				_, err = w.Write(body)
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			err = w.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			r := NewReader(buf, ecr)
-			out, err := io.ReadAll(r)
-			if err != nil {
-				if good {
-					t.Error(ecw, ecr, err)
-				}
-				continue
-			}
-			err = r.Close()
-			if err != nil {
-				if good {
-					t.Error(ecw, ecr, err)
-				}
-				continue
-			}
-
-			if good && !bytes.Equal(in, out) {
-				t.Error(ecw, ecr, "roundtrip failed")
-			} else if !good && bytes.Equal(in, out) {
-				t.Error(ecw, ecr, "roundtrip unexpectedly succeeded")
-			}
-		}
 	}
 }

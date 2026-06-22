@@ -142,7 +142,7 @@ func TestRoundTrip(t *testing.T) {
 			}
 
 			if string(result) != input {
-				t.Errorf("Roundtrip failed: %q -> %q", input, result)
+				t.Errorf("round-trip failed: %q -> %q", input, result)
 			}
 		}
 	}

@@ -39,7 +39,7 @@ import (
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
-func TestType1Roundtrip(t *testing.T) {
+func TestType1RoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for i, d := range t1Dicts {
 			if v >= pdf.V2_0 && d.Name != "" {
@@ -47,7 +47,7 @@ func TestType1Roundtrip(t *testing.T) {
 			}
 
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
-				checkRoundtripT1(t, d, v)
+				checkRoundTripT1(t, d, v)
 			})
 		}
 	}
@@ -148,11 +148,11 @@ func FuzzType1Dict(f *testing.F) {
 		}
 
 		// Make sure we can write the dict, and read it back.
-		checkRoundtripT1(t, d, pdf.GetVersion(r))
+		checkRoundTripT1(t, d, pdf.GetVersion(r))
 	})
 }
 
-func checkRoundtripT1(t *testing.T, d1 *dict.Type1, v pdf.Version) {
+func checkRoundTripT1(t *testing.T, d1 *dict.Type1, v pdf.Version) {
 	d1 = clone(d1)
 
 	w, _ := memfile.NewPDFWriter(v, nil)

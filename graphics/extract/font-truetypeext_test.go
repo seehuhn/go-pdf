@@ -38,7 +38,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestTrueTypeRoundtrip(t *testing.T) {
+func TestTrueTypeRoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for i, d := range ttDicts {
 			if v >= pdf.V2_0 && d.Name != "" {
@@ -46,7 +46,7 @@ func TestTrueTypeRoundtrip(t *testing.T) {
 			}
 
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.PostScriptName), func(t *testing.T) {
-				checkRoundtripTT(t, d, v)
+				checkRoundTripTT(t, d, v)
 			})
 		}
 	}
@@ -120,11 +120,11 @@ func FuzzTrueTypeDict(f *testing.F) {
 		}
 
 		// Make sure we can write the dict, and read it back.
-		checkRoundtripTT(t, d, pdf.GetVersion(r))
+		checkRoundTripTT(t, d, pdf.GetVersion(r))
 	})
 }
 
-func checkRoundtripTT(t *testing.T, d1 *dict.TrueType, v pdf.Version) {
+func checkRoundTripTT(t *testing.T, d1 *dict.TrueType, v pdf.Version) {
 	d1 = clone(d1)
 
 	w, _ := memfile.NewPDFWriter(v, nil)

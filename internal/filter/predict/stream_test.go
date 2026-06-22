@@ -499,6 +499,12 @@ func TestStreamStatePreservation(t *testing.T) {
 	}
 }
 
+// sentinel errors injected by the mock reader and writer below
+var (
+	errSimulatedRead  = errors.New("simulated read error")
+	errSimulatedWrite = errors.New("simulated write error")
+)
+
 // Mock reader that can simulate read errors
 type errorReader struct {
 	data       []byte
@@ -508,7 +514,7 @@ type errorReader struct {
 
 func (r *errorReader) Read(p []byte) (n int, err error) {
 	if r.pos >= r.errorAfter {
-		return 0, errors.New("simulated read error")
+		return 0, errSimulatedRead
 	}
 
 	available := len(r.data) - r.pos
@@ -555,11 +561,8 @@ func TestErrorPropagation(t *testing.T) {
 
 	buf := make([]byte, 10)
 	_, err = reader.Read(buf)
-	if err == nil {
-		t.Error("expected error to be propagated from underlying reader")
-	}
-	if err.Error() != "simulated read error" {
-		t.Errorf("wrong error message: %v", err)
+	if !errors.Is(err, errSimulatedRead) {
+		t.Errorf("underlying read error not propagated: got %v", err)
 	}
 }
 
@@ -571,7 +574,7 @@ type errorWriter struct {
 
 func (w *errorWriter) Write(p []byte) (n int, err error) {
 	if len(w.data) >= w.errorAfter {
-		return 0, errors.New("simulated write error")
+		return 0, errSimulatedWrite
 	}
 
 	available := w.errorAfter - len(w.data)
@@ -579,7 +582,7 @@ func (w *errorWriter) Write(p []byte) (n int, err error) {
 	w.data = append(w.data, p[:n]...)
 
 	if len(w.data) >= w.errorAfter {
-		return n, errors.New("simulated write error")
+		return n, errSimulatedWrite
 	}
 	return n, nil
 }
@@ -609,10 +612,7 @@ func TestWriteErrorPropagation(t *testing.T) {
 
 	data := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 	_, err = writer.Write(data)
-	if err == nil {
-		t.Error("expected error to be propagated from underlying writer")
-	}
-	if err.Error() != "simulated write error" {
-		t.Errorf("wrong error message: %v", err)
+	if !errors.Is(err, errSimulatedWrite) {
+		t.Errorf("underlying write error not propagated: got %v", err)
 	}
 }
