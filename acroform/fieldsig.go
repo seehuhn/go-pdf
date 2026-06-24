@@ -20,11 +20,11 @@ import "seehuhn.de/go/pdf"
 
 // PDF 2.0 sections: 12.7.5.5
 
-// FieldSig is a digital signature form field (field type "Sig").
+// SignatureField is a digital signature form field (field type "Sig").
 //
 // The signature value is kept opaque.
-type FieldSig struct {
-	fieldBase
+type SignatureField struct {
+	Common
 
 	// V (optional) is the field's signature dictionary. The library treats this
 	// value as opaque.
@@ -51,12 +51,12 @@ type FieldSig struct {
 	SV *SigSeedValue
 }
 
-var _ Field = (*FieldSig)(nil)
+var _ Field = (*SignatureField)(nil)
 
 // FieldType implements the [Field] interface.
-func (f *FieldSig) FieldType() pdf.Name { return "Sig" }
+func (f *SignatureField) FieldType() pdf.Name { return "Sig" }
 
-func (f *FieldSig) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
+func (f *SignatureField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if err := pdf.CheckVersion(rm.Out, "signature field", pdf.V1_3); err != nil {
 		return err
 	}

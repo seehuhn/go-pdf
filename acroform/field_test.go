@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestFieldBtnVariant(t *testing.T) {
+func TestButtonFieldVariant(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		ff   FieldFlags
@@ -37,8 +37,8 @@ func TestFieldBtnVariant(t *testing.T) {
 		{"push", FieldPushbutton, ButtonPush},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			f := &FieldBtn{}
-			f.Ff = tt.ff
+			f := &ButtonField{}
+			f.Flags = tt.ff
 			if got := f.Variant(); got != tt.want {
 				t.Errorf("Variant() = %d, want %d", got, tt.want)
 			}
@@ -49,11 +49,11 @@ func TestFieldBtnVariant(t *testing.T) {
 func TestAllFields(t *testing.T) {
 	leaf := NewTextField("ZipCode")
 	form := &InteractiveForm{
-		Fields: []TreeNode{
-			&Group{Name: "PersonalData", Kids: []TreeNode{
-				&Group{Name: "Address", Kids: []TreeNode{leaf}},
+		Fields: []Node{
+			&Group{Name: "PersonalData", Kids: []Node{
+				&Group{Name: "Address", Kids: []Node{leaf}},
 				// an anonymous group contributes no name component
-				&Group{Kids: []TreeNode{NewTextField("Phone")}},
+				&Group{Kids: []Node{NewTextField("Phone")}},
 			}},
 		},
 	}
@@ -82,7 +82,7 @@ func TestEncodeFieldNameWithPeriod(t *testing.T) {
 }
 
 func TestEncodeFieldVersionGating(t *testing.T) {
-	tx := func(setup func(*FieldTx)) *FieldTx {
+	tx := func(setup func(*TextField)) *TextField {
 		f := NewTextField("x")
 		setup(f)
 		return f
@@ -93,9 +93,9 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		field   Field
 	}{
 		{"field requires 1.2", pdf.V1_1, NewTextField("x")},
-		{"TU requires 1.3", pdf.V1_2, tx(func(f *FieldTx) { f.TU = "label" })},
-		{"TM requires 1.3", pdf.V1_2, tx(func(f *FieldTx) { f.TM = "map" })},
-		{"AA requires 1.3", pdf.V1_2, tx(func(f *FieldTx) {
+		{"TU requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.TU = "label" })},
+		{"TM requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.TM = "map" })},
+		{"AA requires 1.3", pdf.V1_2, tx(func(f *TextField) {
 			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: pdf.String("0;")}}
 		})},
 		{"signature field requires 1.3", pdf.V1_2, NewSignatureField("x")},
@@ -104,24 +104,24 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 			f.Opt = []string{"A"}
 			return f
 		}()},
-		{"FileSelect flag requires 1.4", pdf.V1_3, tx(func(f *FieldTx) { f.Ff = FieldFileSelect })},
-		{"DoNotSpellCheck flag requires 1.4", pdf.V1_3, tx(func(f *FieldTx) { f.Ff = FieldDoNotSpellCheck })},
-		{"DoNotScroll flag requires 1.4", pdf.V1_3, tx(func(f *FieldTx) { f.Ff = FieldDoNotScroll })},
+		{"FileSelect flag requires 1.4", pdf.V1_3, tx(func(f *TextField) { f.Flags = FieldFileSelect })},
+		{"DoNotSpellCheck flag requires 1.4", pdf.V1_3, tx(func(f *TextField) { f.Flags = FieldDoNotSpellCheck })},
+		{"DoNotScroll flag requires 1.4", pdf.V1_3, tx(func(f *TextField) { f.Flags = FieldDoNotScroll })},
 		{"MultiSelect flag requires 1.4", pdf.V1_3, func() Field {
 			f := NewChoiceField("x")
-			f.Ff = FieldMultiSelect
+			f.Flags = FieldMultiSelect
 			return f
 		}()},
-		{"Comb flag requires 1.5", pdf.V1_4, tx(func(f *FieldTx) { f.Ff = FieldComb; f.MaxLen = 6 })},
-		{"RichText flag requires 1.5", pdf.V1_4, tx(func(f *FieldTx) { f.Ff = FieldRichText })},
+		{"Comb flag requires 1.5", pdf.V1_4, tx(func(f *TextField) { f.Flags = FieldComb; f.MaxLen = 6 })},
+		{"RichText flag requires 1.5", pdf.V1_4, tx(func(f *TextField) { f.Flags = FieldRichText })},
 		{"RadiosInUnison flag requires 1.5", pdf.V1_4, func() Field {
 			f := NewButtonField("x")
-			f.Ff = FieldRadio | FieldRadiosInUnison
+			f.Flags = FieldRadio | FieldRadiosInUnison
 			return f
 		}()},
 		{"CommitOnSelChange flag requires 1.5", pdf.V1_4, func() Field {
 			f := NewChoiceField("x")
-			f.Ff = FieldCommitOnSelChange
+			f.Flags = FieldCommitOnSelChange
 			return f
 		}()},
 	}
@@ -141,11 +141,11 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		version pdf.Version
 		field   Field
 	}{
-		{"FileSelect flag at 1.4", pdf.V1_4, tx(func(f *FieldTx) { f.Ff = FieldFileSelect })},
-		{"Comb flag at 1.5", pdf.V1_5, tx(func(f *FieldTx) { f.Ff = FieldComb; f.MaxLen = 6 })},
+		{"FileSelect flag at 1.4", pdf.V1_4, tx(func(f *TextField) { f.Flags = FieldFileSelect })},
+		{"Comb flag at 1.5", pdf.V1_5, tx(func(f *TextField) { f.Flags = FieldComb; f.MaxLen = 6 })},
 		{"CommitOnSelChange flag at 1.5", pdf.V1_5, func() Field {
 			f := NewChoiceField("x")
-			f.Ff = FieldCommitOnSelChange
+			f.Flags = FieldCommitOnSelChange
 			return f
 		}()},
 	}
@@ -161,9 +161,9 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 }
 
 func TestEncodeCombValidation(t *testing.T) {
-	comb := func(extra FieldFlags, maxLen int) *FieldTx {
+	comb := func(extra FieldFlags, maxLen int) *TextField {
 		f := NewTextField("x")
-		f.Ff = FieldComb | extra
+		f.Flags = FieldComb | extra
 		f.MaxLen = maxLen
 		return f
 	}

@@ -73,8 +73,8 @@ type VariableTextField interface {
 	GetVariableText() *VariableText
 }
 
-// fillDict adds the VariableText entries to the given PDF dictionary.
-func (v *VariableText) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
+// fillVarTextDict adds the VariableText entries to the given PDF dictionary.
+func (v *VariableText) fillVarTextDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	w := rm.Out
 
 	if v.DefaultAppearance != "" {

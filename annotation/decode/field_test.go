@@ -40,30 +40,30 @@ func withAnnotAA(w *annotation.Widget, aa *triggers.Annotation) *annotation.Widg
 // fieldTestCases holds representative field-tree roots to round-trip.
 func fieldTestCases() []struct {
 	name string
-	root acroform.TreeNode
+	root acroform.Node
 } {
-	tx := func(name string, setup ...func(*acroform.FieldTx)) *acroform.FieldTx {
+	tx := func(name string, setup ...func(*acroform.TextField)) *acroform.TextField {
 		f := acroform.NewTextField(name)
 		for _, s := range setup {
 			s(f)
 		}
 		return f
 	}
-	btn := func(name string, setup ...func(*acroform.FieldBtn)) *acroform.FieldBtn {
+	btn := func(name string, setup ...func(*acroform.ButtonField)) *acroform.ButtonField {
 		f := acroform.NewButtonField(name)
 		for _, s := range setup {
 			s(f)
 		}
 		return f
 	}
-	ch := func(name string, setup ...func(*acroform.FieldChoice)) *acroform.FieldChoice {
+	ch := func(name string, setup ...func(*acroform.ChoiceField)) *acroform.ChoiceField {
 		f := acroform.NewChoiceField(name)
 		for _, s := range setup {
 			s(f)
 		}
 		return f
 	}
-	sig := func(name string, setup ...func(*acroform.FieldSig)) *acroform.FieldSig {
+	sig := func(name string, setup ...func(*acroform.SignatureField)) *acroform.SignatureField {
 		f := acroform.NewSignatureField(name)
 		for _, s := range setup {
 			s(f)
@@ -73,45 +73,45 @@ func fieldTestCases() []struct {
 
 	return []struct {
 		name string
-		root acroform.TreeNode
+		root acroform.Node
 	}{
 		{"minimal text", tx("name")},
-		{"flags", tx("locked", func(f *acroform.FieldTx) {
-			f.Ff = acroform.FieldReadOnly | acroform.FieldRequired | acroform.FieldNoExport
+		{"flags", tx("locked", func(f *acroform.TextField) {
+			f.Flags = acroform.FieldReadOnly | acroform.FieldRequired | acroform.FieldNoExport
 		})},
-		{"direct values", tx("v", func(f *acroform.FieldTx) {
+		{"direct values", tx("v", func(f *acroform.TextField) {
 			f.V = pdf.String("hello")
 			f.DV = pdf.String("world")
 		})},
-		{"reference value", tx("vr", func(f *acroform.FieldTx) { f.V = pdf.NewReference(100, 0) })},
-		{"text variable text", tx("vt", func(f *acroform.FieldTx) {
+		{"reference value", tx("vr", func(f *acroform.TextField) { f.V = pdf.NewReference(100, 0) })},
+		{"text variable text", tx("vt", func(f *acroform.TextField) {
 			f.DefaultAppearance = "/Helv 12 Tf 0 g"
 			f.Align = pdf.TextAlignCenter
 			f.MaxLen = 24
 		})},
-		{"comb", tx("comb", func(f *acroform.FieldTx) { f.Ff = acroform.FieldComb; f.MaxLen = 6 })},
-		{"alternate names", ch("choice", func(f *acroform.FieldChoice) { f.TU = "Choose one"; f.TM = "choice_map" })},
-		{"choice options", ch("fonts", func(f *acroform.FieldChoice) {
-			f.Ff = acroform.FieldCombo
+		{"comb", tx("comb", func(f *acroform.TextField) { f.Flags = acroform.FieldComb; f.MaxLen = 6 })},
+		{"alternate names", ch("choice", func(f *acroform.ChoiceField) { f.TU = "Choose one"; f.TM = "choice_map" })},
+		{"choice options", ch("fonts", func(f *acroform.ChoiceField) {
+			f.Flags = acroform.FieldCombo
 			f.Opt = []acroform.ChoiceOption{{Export: "h", Display: "Helvetica"}, {Export: "Times", Display: "Times"}}
 			f.Selected = []int{1}
 			f.V = pdf.String("Times")
 		})},
-		{"checkbox", btn("agree", func(f *acroform.FieldBtn) { f.V = "Yes"; f.DV = "Off" })},
-		{"radio with export values", btn("size", func(f *acroform.FieldBtn) {
-			f.Ff = acroform.FieldRadio
+		{"checkbox", btn("agree", func(f *acroform.ButtonField) { f.V = "Yes"; f.DV = "Off" })},
+		{"radio with export values", btn("size", func(f *acroform.ButtonField) {
+			f.Flags = acroform.FieldRadio
 			f.Opt = []string{"small", "large"}
 			f.V = "small"
 		})},
-		{"push button", btn("submit", func(f *acroform.FieldBtn) { f.Ff = acroform.FieldPushbutton })},
+		{"push button", btn("submit", func(f *acroform.ButtonField) { f.Flags = acroform.FieldPushbutton })},
 		{"signature", sig("sig")},
-		{"signature with lock all", sig("siglockall", func(f *acroform.FieldSig) {
+		{"signature with lock all", sig("siglockall", func(f *acroform.SignatureField) {
 			f.Lock = &acroform.SigFieldLock{Action: acroform.SigFieldLockAll}
 		})},
-		{"signature with lock include", sig("siglock", func(f *acroform.FieldSig) {
+		{"signature with lock include", sig("siglock", func(f *acroform.SignatureField) {
 			f.Lock = &acroform.SigFieldLock{Action: acroform.SigFieldLockInclude, Fields: []string{"name", "address"}}
 		})},
-		{"signature with seed value", sig("sigsv", func(f *acroform.FieldSig) {
+		{"signature with seed value", sig("sigsv", func(f *acroform.SignatureField) {
 			f.SV = &acroform.SigSeedValue{
 				Flags:            acroform.SigSeedFilter | acroform.SigSeedSubFilter | acroform.SigSeedReasons,
 				Filter:           "Adobe.PPKLite",
@@ -123,36 +123,36 @@ func fieldTestCases() []struct {
 				AddRevInfo:       true,
 			}
 		})},
-		{"additional actions", tx("calc", func(f *acroform.FieldTx) {
+		{"additional actions", tx("calc", func(f *acroform.TextField) {
 			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: pdf.String("event.value = 0;")}}
 		})},
-		{"group of sub-fields", &acroform.Group{Name: "address", Kids: []acroform.TreeNode{
+		{"group of sub-fields", &acroform.Group{Name: "address", Kids: []acroform.Node{
 			acroform.NewTextField("street"),
 			acroform.NewTextField("zip"),
 		}}},
-		{"merged widget", func() acroform.TreeNode {
+		{"merged widget", func() acroform.Node {
 			f := btn("submitW")
 			addWidget(f, 0, 0, 72, 24)
 			return f
 		}()},
-		{"merged widget with mixed AA", func() acroform.TreeNode {
-			f := btn("submitAA", func(f *acroform.FieldBtn) {
+		{"merged widget with mixed AA", func() acroform.Node {
+			f := btn("submitAA", func(f *acroform.ButtonField) {
 				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: pdf.String("calc();")}}
 			})
 			withAnnotAA(addWidget(f, 0, 0, 72, 24),
 				&triggers.Annotation{Focus: &action.JavaScript{JS: pdf.String("focus();")}})
 			return f
 		}()},
-		{"merged widget field-only AA", func() acroform.TreeNode {
-			f := btn("calcOnly", func(f *acroform.FieldBtn) {
+		{"merged widget field-only AA", func() acroform.Node {
+			f := btn("calcOnly", func(f *acroform.ButtonField) {
 				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: pdf.String("calc();")}}
 			})
 			addWidget(f, 0, 0, 72, 24)
 			return f
 		}()},
-		{"multiple widgets", func() acroform.TreeNode {
-			f := btn("color", func(f *acroform.FieldBtn) {
-				f.Ff = acroform.FieldRadio
+		{"multiple widgets", func() acroform.Node {
+			f := btn("color", func(f *acroform.ButtonField) {
+				f.Flags = acroform.FieldRadio
 				f.Opt = []string{"red", "green"}
 			})
 			addWidget(f, 0, 0, 20, 20)
@@ -167,7 +167,7 @@ func TestFieldRoundTrip(t *testing.T) {
 		for _, tc := range fieldTestCases() {
 			t.Run(tc.name+"-"+version.String(), func(t *testing.T) {
 				got := roundTripRoots(t, version, tc.root)
-				if diff := cmp.Diff(snapNodes([]acroform.TreeNode{tc.root}), snapNodes(got), fieldCmpOptions()...); diff != "" {
+				if diff := cmp.Diff(snapNodes([]acroform.Node{tc.root}), snapNodes(got), fieldCmpOptions()...); diff != "" {
 					t.Errorf("round trip failed (-want +got):\n%s", diff)
 				}
 			})
@@ -177,7 +177,7 @@ func TestFieldRoundTrip(t *testing.T) {
 
 // decodeRootField decodes a single field-tree root reference, threading an empty
 // inherited context, for tests that build a tree by hand.
-func decodeRootField(x *pdf.Extractor, ref pdf.Reference) (acroform.TreeNode, error) {
+func decodeRootField(x *pdf.Extractor, ref pdf.Reference) (acroform.Node, error) {
 	d := newFieldTreeDecoder()
 	res, err := pdf.DecodeOptional(pdf.CursorAt(x, nil), ref, d.nodeFunc(inherited{}))
 	if err != nil || res == nil {
@@ -220,8 +220,8 @@ func TestDecodeFieldKidsSelfCycle(t *testing.T) {
 	}
 	// the only kid is the self-reference; once it is dropped the node is a
 	// childless terminal text field
-	if _, ok := node.(*acroform.FieldTx); !ok {
-		t.Fatalf("expected a *acroform.FieldTx, got %T", node)
+	if _, ok := node.(*acroform.TextField); !ok {
+		t.Fatalf("expected a *acroform.TextField, got %T", node)
 	}
 }
 
@@ -251,7 +251,7 @@ func TestDecodeFieldKidsMutualCycle(t *testing.T) {
 	if len(g.Kids) != 1 {
 		t.Fatalf("expected one kid, got %d", len(g.Kids))
 	}
-	if _, ok := g.Kids[0].(*acroform.FieldTx); !ok {
+	if _, ok := g.Kids[0].(*acroform.TextField); !ok {
 		t.Fatalf("expected B to be a terminal field, got %T", g.Kids[0])
 	}
 }
@@ -320,9 +320,9 @@ func TestDecodeFieldInheritedType(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a *acroform.Group, got %T", node)
 	}
-	kid, ok := g.Kids[0].(*acroform.FieldTx)
+	kid, ok := g.Kids[0].(*acroform.TextField)
 	if !ok {
-		t.Fatalf("expected a *acroform.FieldTx kid, got %T", g.Kids[0])
+		t.Fatalf("expected a *acroform.TextField kid, got %T", g.Kids[0])
 	}
 	if v, ok := kid.V.(pdf.String); !ok || string(v) != "hello" {
 		t.Errorf("kid V = %v, want \"hello\"", kid.V)
@@ -352,8 +352,8 @@ func TestDecodeCombInheritedMaxLen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
-	kid := node.(*acroform.Group).Kids[0].(*acroform.FieldTx)
-	if kid.Ff&acroform.FieldComb == 0 {
+	kid := node.(*acroform.Group).Kids[0].(*acroform.TextField)
+	if kid.Flags&acroform.FieldComb == 0 {
 		t.Error("Comb flag was cleared despite inherited MaxLen")
 	}
 	if kid.MaxLen != 8 {
@@ -393,8 +393,8 @@ func TestDecodeCombSnap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
-			tx := node.(*acroform.FieldTx)
-			if got := tx.Ff&acroform.FieldComb != 0; got != tc.wantComb {
+			tx := node.(*acroform.TextField)
+			if got := tx.Flags&acroform.FieldComb != 0; got != tc.wantComb {
 				t.Errorf("Comb flag = %t, want %t", got, tc.wantComb)
 			}
 			if tx.MaxLen != tc.wantMaxLen {
@@ -559,9 +559,9 @@ func TestDecodeChoiceOptSkipsNonStrings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	ch, ok := node.(*acroform.FieldChoice)
+	ch, ok := node.(*acroform.ChoiceField)
 	if !ok {
-		t.Fatalf("expected *acroform.FieldChoice, got %T", node)
+		t.Fatalf("expected *acroform.ChoiceField, got %T", node)
 	}
 	want := []acroform.ChoiceOption{
 		{Export: "plain", Display: "plain"},

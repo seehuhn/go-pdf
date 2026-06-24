@@ -24,9 +24,10 @@ import (
 
 // PDF 2.0 sections: 12.7.5.3
 
-// FieldTx is a text input form field (field type "Tx").
-type FieldTx struct {
-	fieldBase
+// TextField is a text input form field (field type "Tx").
+type TextField struct {
+	Common
+
 	VariableText
 
 	// V (optional) is the field's text value, a text string or a text stream.
@@ -48,13 +49,13 @@ type FieldTx struct {
 	MaxLen int
 }
 
-var _ Field = (*FieldTx)(nil)
+var _ Field = (*TextField)(nil)
 
 // FieldType implements the [Field] interface.
-func (f *FieldTx) FieldType() pdf.Name { return "Tx" }
+func (f *TextField) FieldType() pdf.Name { return "Tx" }
 
-func (f *FieldTx) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
-	if err := f.VariableText.fillDict(rm, dict); err != nil {
+func (f *TextField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if err := f.VariableText.fillVarTextDict(rm, dict); err != nil {
 		return err
 	}
 	if f.V != nil {
@@ -65,8 +66,8 @@ func (f *FieldTx) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	}
 	// the Comb flag requires a MaxLen and may not be combined with the
 	// Multiline, Password or FileSelect flags
-	if f.Ff&FieldComb != 0 {
-		if f.Ff&(FieldMultiline|FieldPassword|FieldFileSelect) != 0 {
+	if f.Flags&FieldComb != 0 {
+		if f.Flags&(FieldMultiline|FieldPassword|FieldFileSelect) != 0 {
 			return errors.New("Comb flag conflicts with Multiline, Password or FileSelect")
 		}
 		if f.MaxLen <= 0 {

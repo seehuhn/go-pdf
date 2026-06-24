@@ -4481,7 +4481,7 @@ types:
     introduced: '1.5'
     goType: string
     purpose: Title is the title of the screen annotation.
-  - goName: MK
+  - goName: Style
     pdfKey: MK
     pdfType: dictionary
     required: false
@@ -5185,7 +5185,7 @@ types:
     goType: Highlight
     purpose: highlighting mode used when the annotation's active area is clicked
     notes: '"T" is normalised to "P" on read'
-  - goName: MK
+  - goName: Style
     pdfKey: MK
     pdfType: dictionary
     required: false
@@ -5261,16 +5261,16 @@ types:
 
 
       If this field is set, the Common.Border field is ignored.'
-  - goName: Parent
+  - goName: Field
     pdfKey: Parent
     pdfType: dictionary
     required: false
     introduced: '1.2'
     refTypes:
-    - FieldTx
-    - FieldBtn
-    - FieldChoice
-    - type: FieldSig
+    - TextField
+    - ButtonField
+    - ChoiceField
+    - type: SignatureField
       since: '1.3'
     - Field
     goType: acroform.Field
@@ -5807,13 +5807,13 @@ types:
     pdfType: array
     required: false
     introduced: '1.2'
-    goType: '[]acroform.TreeNode'
+    goType: '[]acroform.Node'
     refTypes:
     - type: Field
       collection: array
 - name: Field
-  purpose: attributes shared by all terminal field types (the unexported base the field types embed)
-  goType: acroform.fieldBase
+  purpose: attributes shared by all terminal field types (the base the field types embed)
+  goType: acroform.Common
   goPackage: acroform
   goRepr: struct
   pdfRepr: dict
@@ -5840,7 +5840,7 @@ types:
     required: false
     introduced: '1.3'
     goType: string
-  - goName: Ff
+  - goName: Flags
     pdfKey: Ff
     pdfType: bitmask
     required: false
@@ -5898,9 +5898,9 @@ types:
     goType: pdf.Object
     refTypes:
     - Stream
-- name: FieldBtn
+- name: ButtonField
   purpose: button form field (check box, radio button, or push button)
-  goType: acroform.FieldBtn
+  goType: acroform.ButtonField
   goPackage: acroform
   goRepr: struct
   pdfRepr: dict
@@ -5942,9 +5942,9 @@ types:
     introduced: '1.2'
     goType: pdf.Name
     inheritable: true
-- name: FieldChoice
+- name: ChoiceField
   purpose: choice (list or combo box) form field
-  goType: acroform.FieldChoice
+  goType: acroform.ChoiceField
   goPackage: acroform
   goRepr: struct
   pdfRepr: dict
@@ -6040,9 +6040,9 @@ types:
     introduced: '1.5'
     possibleValues:
     - '1.2'
-- name: FieldSig
+- name: SignatureField
   purpose: digital signature form field
-  goType: acroform.FieldSig
+  goType: acroform.SignatureField
   goPackage: acroform
   goRepr: struct
   pdfRepr: dict
@@ -6098,9 +6098,9 @@ types:
     introduced: '1.5'
     refTypes:
     - SigSeedValue
-- name: FieldTx
+- name: TextField
   purpose: text input form field
-  goType: acroform.FieldTx
+  goType: acroform.TextField
   goPackage: acroform
   goRepr: struct
   pdfRepr: dict
@@ -6283,7 +6283,7 @@ types:
     pdfType: array
     required: true
     introduced: '1.2'
-    goType: '[]acroform.TreeNode'
+    goType: '[]acroform.Node'
     refTypes:
     - type: Field
       collection: array

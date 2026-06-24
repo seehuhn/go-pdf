@@ -32,7 +32,7 @@ import (
 // justification, and one widget.
 func combWidget(value string, maxLen int, align pdf.TextAlign) *annotation.Widget {
 	f := acroform.NewTextField("c")
-	f.Ff = acroform.FieldComb
+	f.Flags = acroform.FieldComb
 	f.MaxLen = maxLen
 	f.Align = align
 	f.V = pdf.TextString(value)

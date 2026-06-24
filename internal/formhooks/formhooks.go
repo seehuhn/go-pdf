@@ -14,33 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package formhooks gives the annotation package access to form field plumbing
-// of the acroform package, without making it part of the public acroform API.
+// Package formhooks lets the acroform and annotation packages call into each
+// other without an import cycle.
 //
-// The function variables are set by the acroform package when it is
-// initialised. This package must not import acroform (every consumer of a
-// hook imports acroform anyway, for its types), so the hooks pass fields as
-// untyped values.
+// The function variables are set by the annotation package when it is
+// initialised and called by the acroform package. This package must not import
+// either of them, so the hooks pass values as untyped any.
 package formhooks
 
 import "seehuhn.de/go/pdf"
 
-// WidgetInfo tells a widget annotation how to tie itself to its form field when
-// the widget is written.
-type WidgetInfo struct {
-	// ParentRef is the value for the widget's /Parent entry, or 0 to omit it.
-	// For a merged field/widget it is the field's enclosing group; for a widget
-	// of a multi-widget field it is the field's own object.
-	ParentRef pdf.Reference
-
-	// Entries holds the field's own dictionary entries to fold into a merged
-	// field/widget dictionary. It is nil when the widget is not merged with its
-	// field.
-	Entries pdf.Dict
-}
-
-// WidgetFieldInfo reports how a widget annotation should be tied to its form
-// field. The field and widget are passed as untyped values (an acroform.Field
-// and the *annotation.Widget). The acroform package sets this when it is
-// initialised; it returns an error if the form has not been stored yet.
-var WidgetFieldInfo func(rm *pdf.ResourceManager, field, widget any) (WidgetInfo, error)
+// EncodeWidgetEntries returns the widget annotation's own dictionary entries
+// (everything except the form-field linkage: /Parent and the folded-in field
+// entries). The acroform package calls it while encoding a form to assemble the
+// merged or separate field/widget dictionary; the annotation package sets it
+// when it is initialised. The widget is passed as an untyped value (the
+// *annotation.Widget).
+var EncodeWidgetEntries func(rm *pdf.ResourceManager, widget any) (pdf.Dict, error)

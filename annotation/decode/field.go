@@ -100,7 +100,7 @@ func newFieldTreeDecoder() *fieldTreeDecoder {
 // (a dropped field) while keeping the value passed through [pdf.Decode] a
 // non-nil concrete pointer, which its cache requires.
 type treeResult struct {
-	node acroform.TreeNode
+	node acroform.Node
 }
 
 // nodeFunc returns an extractor function that decodes a tree node with the given
@@ -118,12 +118,12 @@ func (d *fieldTreeDecoder) nodeFunc(ctx inherited) func(pdf.Cursor, pdf.Object, 
 
 // decodeRoots decodes the /Fields (or another root array) of a form into tree
 // nodes, deduplicating and skipping entries that are not references.
-func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherited) ([]acroform.TreeNode, error) {
+func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherited) ([]acroform.Node, error) {
 	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil {
 		return nil, err
 	}
-	var roots []acroform.TreeNode
+	var roots []acroform.Node
 	for _, el := range arr {
 		ref, ok := el.(pdf.Reference)
 		if !ok || d.seen[ref] {
@@ -148,7 +148,7 @@ func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherit
 // Always invoke this through [fieldTreeDecoder.nodeFunc] and [pdf.Decode]
 // so that indirect references are resolved, the depth is bounded, and cycle
 // detection covers the field hierarchy.
-func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherited) (acroform.TreeNode, error) {
+func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherited) (acroform.Node, error) {
 	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherite
 // own inheritable entries extend the context for its descendants but are
 // otherwise dropped (its TU/TM/AA and value entries are not represented). A
 // group whose children all drop out is itself dropped.
-func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherited, fieldKids []pdf.Reference) (acroform.TreeNode, error) {
+func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherited, fieldKids []pdf.Reference) (acroform.Node, error) {
 	childCtx := applyOwnContext(ctx, c, dict)
 	g := &acroform.Group{Name: partialName(c, dict)}
 	for _, ref := range fieldKids {
@@ -239,7 +239,7 @@ func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherite
 // decodeTerminal decodes a terminal field and its widget annotations. It returns
 // nil if the field's effective type is unknown (the field is dropped; its widget
 // kids survive through the page's /Annots).
-func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, widgetKids []pdf.Reference) (acroform.TreeNode, error) {
+func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, widgetKids []pdf.Reference) (acroform.Node, error) {
 	f, err := buildTerminal(c, dict, ctx)
 	if err != nil {
 		return nil, err
@@ -257,8 +257,9 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 			return nil, err
 		}
 		if w, ok := a.(*annotation.Widget); ok && w != nil {
-			w.Parent = f
-			f.AddWidget(w)
+			w.Field = f
+			fc := f.GetCommon()
+			fc.Widgets = append(fc.Widgets, w)
 		}
 	}
 	if p := c.Path(); p != nil {
@@ -287,7 +288,7 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 	switch eff.ft {
 	case "Tx":
 		f := acroform.NewTextField(name)
-		f.TU, f.TM, f.Ff, f.AA = string(tu), string(tm), eff.ff, aa
+		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
 		fillVariableText(c, dict, eff, &f.VariableText)
 		f.V = eff.v
 		f.DV = eff.dv
@@ -295,17 +296,17 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 		// the Comb flag is valid only with a MaxLen and with Multiline, Password
 		// and FileSelect all clear; drop an invalid one so the field stays
 		// writable
-		if f.Ff&acroform.FieldComb != 0 {
-			conflict := f.Ff & (acroform.FieldMultiline | acroform.FieldPassword | acroform.FieldFileSelect)
+		if f.Flags&acroform.FieldComb != 0 {
+			conflict := f.Flags & (acroform.FieldMultiline | acroform.FieldPassword | acroform.FieldFileSelect)
 			if f.MaxLen == 0 || conflict != 0 {
-				f.Ff &^= acroform.FieldComb
+				f.Flags &^= acroform.FieldComb
 			}
 		}
 		return f, nil
 
 	case "Btn":
 		f := acroform.NewButtonField(name)
-		f.TU, f.TM, f.Ff, f.AA = string(tu), string(tm), eff.ff, aa
+		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
 		fillVariableText(c, dict, eff, &f.VariableText)
 		if v, err := pdf.Optional(c.Name(eff.v)); err != nil {
 			return nil, err
@@ -324,7 +325,7 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 
 	case "Ch":
 		f := acroform.NewChoiceField(name)
-		f.TU, f.TM, f.Ff, f.AA = string(tu), string(tm), eff.ff, aa
+		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
 		fillVariableText(c, dict, eff, &f.VariableText)
 		f.V = eff.v
 		f.DV = eff.dv
@@ -358,7 +359,7 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 
 	case "Sig":
 		f := acroform.NewSignatureField(name)
-		f.TU, f.TM, f.Ff, f.AA = string(tu), string(tm), eff.ff, aa
+		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
 		f.V = eff.v
 		f.DV = eff.dv
 		if lock, err := pdf.DecodeOptional(c, dict["Lock"], sigFieldLock); err != nil {
@@ -556,8 +557,9 @@ func decodeMergedField(c pdf.Cursor, ref pdf.Reference, dict pdf.Dict, ctx inher
 	// link the pair before publishing: StoreOrLoadPair publishes both halves
 	// atomically, so the winner's already-linked f/w become the shared pair and
 	// a losing concurrent decoder adopts them without mutating shared state.
-	f.AddWidget(w)
-	w.Parent = f
+	fcom := f.GetCommon()
+	fcom.Widgets = append(fcom.Widgets, w)
+	w.Field = f
 	fc, ac := pdf.StoreOrLoadPair[acroform.Field, annotation.Annotation](c.Extractor(), ref, f, w)
 	return fc, ac.(*annotation.Widget), nil
 }

@@ -18,10 +18,13 @@ package acroform
 
 import (
 	"errors"
+	"fmt"
+	"maps"
 	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/internal/formhooks"
 )
 
 // PDF 2.0 sections: 12.7.3
@@ -29,18 +32,16 @@ import (
 // InteractiveForm represents a document's interactive form, referenced from
 // the AcroForm entry in the document catalog.
 //
+// The form must be encoded via [InteractiveForm.Encode] after the pages
+// containing its fields are written; encoding it via
+// [seehuhn.de/go/pdf.ResourceManager.StoreDeferred] arranges this automatically.
+//
 // Use [seehuhn.de/go/pdf/annotation/decode.Form] to decode an interactive form
 // from a PDF file.
 type InteractiveForm struct {
-	// Fields are the roots of the form's field tree: terminal [Field]s and
-	// [Group]s. Encoding the form writes each root and the whole subtree below
-	// it.
-	//
-	// A terminal field with a single widget annotation is merged into that
-	// widget and written when the widget's page is written; such a widget must
-	// therefore appear in some page's annotation list, and that page must be
-	// written after the form is stored.
-	Fields []TreeNode
+	// Fields are the roots of the form's field trees.
+	// Entries are either of type [Group] or [Field].
+	Fields []Node
 
 	// NeedAppearances indicates that the viewer must construct appearance
 	// streams and appearance dictionaries for all widget annotations in the
@@ -101,9 +102,14 @@ type encNode struct {
 }
 
 // Encode returns the interactive form dictionary, suitable for use as the
-// AcroForm entry in the document catalog. It writes the field tree as a side
-// effect, and records on each terminal field how its widget annotations should
-// tie themselves to the tree when they are later written.
+// AcroForm entry in the document catalog. It writes the field tree and all of
+// the form's widget annotations as a side effect.
+//
+// Encode must run after the pages whose widgets the form owns: each form widget
+// reserves its reference when its page is written, and the form fills in those
+// references here. Use [seehuhn.de/go/pdf.ResourceManager.StoreDeferred] to have
+// the form encoded automatically at the end, when the resource manager is
+// closed.
 //
 // This implements the [pdf.Encoder] interface.
 func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
@@ -112,7 +118,7 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// phase 1: build the mirror tree, validate, and emit each node's own entries
-	seenNode := map[TreeNode]bool{}
+	seenNode := map[Node]bool{}
 	seenWidget := map[Widget]bool{}
 	inTree := map[Field]bool{}
 	roots := make([]*encNode, 0, len(f.Fields))
@@ -135,9 +141,10 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{}
 
 	// phase 4: allocate references and write the tree top-down
+	fieldRefs := map[Field]pdf.Reference{}
 	fields := make(pdf.Array, 0, len(roots))
 	for _, n := range roots {
-		ref, err := writeEncNode(rm, n, 0)
+		ref, err := writeEncNode(rm, n, 0, fieldRefs)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +174,7 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			if !inTree[fld] {
 				return nil, errors.New("CalculationOrder field is not in the form")
 			}
-			co = append(co, fld.base().enc.fieldRef)
+			co = append(co, fieldRefs[fld])
 		}
 		dict["CO"] = co
 	}
@@ -209,7 +216,7 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 // emitting its own dictionary entries (phase 1). It recurses into groups and
 // records every terminal field in inTree, rejecting any node or widget that
 // appears in the tree more than once.
-func (f *InteractiveForm) buildEncNode(rm *pdf.ResourceManager, node TreeNode, seenNode map[TreeNode]bool, seenWidget map[Widget]bool, inTree map[Field]bool) (*encNode, error) {
+func (f *InteractiveForm) buildEncNode(rm *pdf.ResourceManager, node Node, seenNode map[Node]bool, seenWidget map[Widget]bool, inTree map[Field]bool) (*encNode, error) {
 	if seenNode[node] {
 		return nil, errors.New("field or group appears more than once in the form")
 	}
@@ -238,7 +245,7 @@ func (f *InteractiveForm) buildEncNode(rm *pdf.ResourceManager, node TreeNode, s
 		return n, nil
 
 	case Field:
-		for _, w := range t.Widgets() {
+		for _, w := range t.GetCommon().Widgets {
 			if seenWidget[w] {
 				return nil, errors.New("widget appears more than once in the form")
 			}
@@ -293,15 +300,16 @@ func factorForm(roots []*encNode) (da, q pdf.Object) {
 
 // writeEncNode allocates references and writes a node and its subtree top-down
 // (phase 4), returning the reference that names the node. parentRef is the
-// enclosing group's reference, or 0 at the root. For a terminal field it records
-// the encode state its widgets need; a single-widget field is merged into its
-// widget and has no object of its own.
-func writeEncNode(rm *pdf.ResourceManager, n *encNode, parentRef pdf.Reference) (pdf.Reference, error) {
+// enclosing group's reference, or 0 at the root. Terminal fields are written
+// together with their widgets: a single-widget field is merged into its widget
+// and has no object of its own. Each terminal field's reference is recorded in
+// fieldRefs for the /CO array.
+func writeEncNode(rm *pdf.ResourceManager, n *encNode, parentRef pdf.Reference, fieldRefs map[Field]pdf.Reference) (pdf.Reference, error) {
 	if n.group != nil {
 		ref := rm.Out.Alloc()
 		kidRefs := make(pdf.Array, 0, len(n.kids))
 		for _, kid := range n.kids {
-			kidRef, err := writeEncNode(rm, kid, ref)
+			kidRef, err := writeEncNode(rm, kid, ref, fieldRefs)
 			if err != nil {
 				return 0, err
 			}
@@ -314,41 +322,99 @@ func writeEncNode(rm *pdf.ResourceManager, n *encNode, parentRef pdf.Reference) 
 		return ref, nil
 	}
 
-	widgets := n.field.Widgets()
+	widgets := n.field.GetCommon().Widgets
 	if len(widgets) == 1 {
-		// a single-widget terminal: no object of its own, folded into its widget
+		// a single-widget terminal: no object of its own; the field's entries
+		// are folded into the widget, forming one merged field/widget dictionary
+		// whose /Parent is the field's enclosing group
 		entries := n.dict
 		if !hasMergedDetectionKey(entries) {
 			// keep the merged dictionary recognisable as a field
 			entries["FT"] = n.field.FieldType()
 		}
-		wref := rm.GetReference(widgets[0])
-		n.field.base().enc = &fieldEncState{
-			rm:        rm,
-			parentRef: parentRef,
-			fieldRef:  wref,
-			entries:   entries,
+		ref, err := writeWidget(rm, widgets[0], entries, parentRef)
+		if err != nil {
+			return 0, err
 		}
-		return wref, nil
+		fieldRefs[n.field] = ref
+		return ref, nil
 	}
 
+	// a field with its own object; each widget gets a /Parent pointing at it
 	ref := rm.Out.Alloc()
-	if len(widgets) > 0 {
-		kidRefs := make(pdf.Array, len(widgets))
-		for i, w := range widgets {
-			kidRefs[i] = rm.GetReference(w)
+	kidRefs := make(pdf.Array, 0, len(widgets))
+	for _, w := range widgets {
+		wref, err := writeWidget(rm, w, nil, ref)
+		if err != nil {
+			return 0, err
 		}
+		kidRefs = append(kidRefs, wref)
+	}
+	if len(kidRefs) > 0 {
 		n.dict["Kids"] = kidRefs
 	}
 	if err := putNode(rm, ref, n.dict, parentRef); err != nil {
 		return 0, err
 	}
-	n.field.base().enc = &fieldEncState{
-		rm:        rm,
-		parentRef: parentRef,
-		fieldRef:  ref,
-	}
+	fieldRefs[n.field] = ref
 	return ref, nil
+}
+
+// writeWidget encodes the widget annotation w and writes it at the reference w
+// reserved while its page was written. fieldEntries are the owning field's own
+// dictionary entries to fold in; they are non-nil only for a single-widget
+// field merged with its widget. Field entries take precedence over the widget's,
+// except for the shared /AA, whose field half (K/F/V/C) and widget half
+// (E/X/Fo/Bl/…) are combined. parentRef becomes the widget's /Parent (the
+// enclosing group for a merged field, or the field's own object for a widget of
+// a multi-widget field); it is omitted when zero.
+func writeWidget(rm *pdf.ResourceManager, w Widget, fieldEntries pdf.Dict, parentRef pdf.Reference) (pdf.Reference, error) {
+	if formhooks.EncodeWidgetEntries == nil {
+		return 0, errors.New("annotation package not linked")
+	}
+	dict, err := formhooks.EncodeWidgetEntries(rm, w)
+	if err != nil {
+		return 0, err
+	}
+
+	for k, v := range fieldEntries {
+		if existing, exists := dict[k]; exists && k == "AA" {
+			merged, err := mergeAADicts(v, existing)
+			if err != nil {
+				return 0, err
+			}
+			dict[k] = merged
+			continue
+		}
+		dict[k] = v
+	}
+	if parentRef != 0 {
+		dict["Parent"] = parentRef
+	}
+
+	return rm.StoreEncoded(w, dict)
+}
+
+// mergeAADicts combines the field-level (K/F/V/C) and annotation-level
+// (E/X/Fo/Bl/…) halves of a merged field's shared /AA dictionary. The two key
+// sets are disjoint by construction, so an overlap signals a bug.
+func mergeAADicts(field, widget pdf.Object) (pdf.Dict, error) {
+	fd, ok := field.(pdf.Dict)
+	if !ok {
+		return nil, errors.New("field AA did not encode to a dictionary")
+	}
+	wd, ok := widget.(pdf.Dict)
+	if !ok {
+		return nil, errors.New("widget AA did not encode to a dictionary")
+	}
+	merged := maps.Clone(fd)
+	for k, v := range wd {
+		if _, exists := merged[k]; exists {
+			return nil, fmt.Errorf("conflicting AA entry %q", k)
+		}
+		merged[k] = v
+	}
+	return merged, nil
 }
 
 // putNode sets the node's /Parent (omitted at the root, where parentRef is 0)

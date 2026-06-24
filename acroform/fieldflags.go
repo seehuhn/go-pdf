@@ -25,6 +25,7 @@ import "seehuhn.de/go/pdf"
 // underlying representation so that they compose with the bitwise OR operator.
 type FieldFlags uint32
 
+// Flags common to all field types.
 const (
 	// FieldReadOnly indicates that the user may not change the value of the
 	// field, and that associated widget annotations should not interact with
@@ -40,7 +41,7 @@ const (
 	FieldNoExport FieldFlags = 1 << 2
 )
 
-// Flags specific to text fields ([FieldTx]).
+// Flags specific to [TextField].
 const (
 	// FieldMultiline indicates that the field may contain multiple lines of
 	// text. If clear, the text is restricted to a single line.
@@ -59,13 +60,13 @@ const (
 	// further text is accepted.
 	FieldDoNotScroll FieldFlags = 1 << 23
 
-	// FieldComb lays the text out into [FieldTx.MaxLen] equally spaced cells.
+	// FieldComb lays the text out into [TextField.MaxLen] equally spaced cells.
 	// It may be set only if MaxLen is set and the Multiline, Password, and
 	// FileSelect flags are all clear.
 	FieldComb FieldFlags = 1 << 24
 )
 
-// Flags specific to button fields ([FieldBtn]).
+// Flags specific to [ButtonField].
 const (
 	// FieldNoToggleToOff (radio buttons only) indicates that exactly one button
 	// is always selected; clicking the selected button does not deselect it.
@@ -85,7 +86,7 @@ const (
 	FieldRadiosInUnison FieldFlags = 1 << 25
 )
 
-// Flags specific to choice fields ([FieldChoice]).
+// Flags specific to [ChoiceField].
 const (
 	// FieldCombo indicates that the field is a combo box. If clear, the field
 	// is a list box.
@@ -110,12 +111,12 @@ const (
 )
 
 // FieldDoNotSpellCheck indicates that text entered in the field is not
-// spell-checked. It applies to text fields ([FieldTx]) and to editable combo
-// boxes ([FieldChoice] with Combo and Edit set).
+// spell-checked. It applies to text fields ([TextField]) and to editable combo
+// boxes ([ChoiceField] with Combo and Edit set).
 const FieldDoNotSpellCheck FieldFlags = 1 << 22
 
 // FieldRichText indicates that the text field's value is a rich text string.
-// It applies to text fields ([FieldTx]).
+// It applies to text fields ([TextField]).
 const FieldRichText FieldFlags = 1 << 25
 
 // flagVersions lists the minimum PDF version of each field flag introduced

@@ -18,22 +18,19 @@ package annotation
 
 import (
 	"errors"
-	"fmt"
-	"maps"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation/appearance"
-	"seehuhn.de/go/pdf/internal/formhooks"
 )
 
 // PDF 2.0 sections: 12.5.2 12.5.6.19
 
-// Widget represents a widget annotation used by interactive forms to represent
-// the appearance of fields and to manage user interactions. When a field has
-// only a single associated widget annotation, the contents of the field
-// dictionary and the annotation dictionary may be merged into a single dictionary.
+// Widget is the visual representation of a document form field on a page.
+// Usually it corresponds to an [acroform.Field], but it can also be used as a
+// purely visual element, to trigger an action when the user clicks on it.
 type Widget struct {
 	Common
 
@@ -47,20 +44,24 @@ type Widget struct {
 	// This corresponds to the /H entry in the PDF annotation dictionary.
 	Highlight Highlight
 
-	// MK (optional) is an appearance characteristics dictionary that is
-	// used in constructing a dynamic appearance stream specifying the
-	// annotation's visual presentation on the page.
-	MK *appearance.Characteristics
+	// Style (optional) specifies the annotation's visual presentation on the
+	// page when the viewer constructs a dynamic appearance stream for the
+	// annotation.
+	//
+	// This corresponds to the /MK entry in the PDF annotation dictionary.
+	Style *appearance.Characteristics
 
-	// Action (optional; PDF 1.1) is an action that is performed when the
-	// annotation is activated.
+	// Action (optional) is an action that is performed when the annotation is
+	// activated.
+	//
+	// This corresponds to the /A entry in the PDF annotation dictionary.
 	Action pdf.Action
 
-	// AA (optional; PDF 1.2) is an additional-actions dictionary defining
-	// the annotation's behaviour in response to various trigger events.
+	// AA (optional) specifies the annotation's behaviour in response to
+	// various trigger events.
 	AA *triggers.Annotation
 
-	// BorderStyle (optional; PDF 1.2) is a border style dictionary specifying
+	// BorderStyle (optional) is a border style dictionary specifying
 	// the width and dash pattern that is used in drawing the annotation's
 	// border.
 	//
@@ -69,9 +70,9 @@ type Widget struct {
 	// This corresponds to the /BS entry in the PDF annotation dictionary.
 	BorderStyle *BorderStyle
 
-	// Parent (optional) is the form field this widget belongs to, or nil if
+	// Field (optional) is the form field this widget belongs to, or nil if
 	// the widget is not part of an interactive form.
-	Parent acroform.Field
+	Field acroform.Field
 }
 
 var (
@@ -85,25 +86,53 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
-// FieldParent implements the acroform.Widget interface; it returns
-// [Widget.Parent], the form field this widget is a child of.
-func (w *Widget) FieldParent() acroform.Field { return w.Parent }
+// ParentField returns [Widget.Field].
+//
+// This implements the acroform.Widget interface.
+func (w *Widget) ParentField() acroform.Field { return w.Field }
 
 // AddWidget adds a widget annotation for the terminal field f at the given
-// rectangle and returns it. A terminal field may have several widgets, one per
-// place it appears. The caller must add the returned widget to the annotation
-// list of the page it appears on.
+// rectangle and returns it. A field may correspond to several widgets, one per
+// place it appears.
+//
+// The caller must add the returned widget to the annotation list of the page
+// it appears on.
 func AddWidget(f acroform.Field, rect pdf.Rectangle) *Widget {
 	w := &Widget{
 		Common:    Common{Rect: rect},
 		Highlight: HighlightInvert,
 	}
-	w.Parent = f
-	f.AddWidget(w)
+	w.Field = f
+	c := f.GetCommon()
+	c.Widgets = append(c.Widgets, w)
 	return w
 }
 
 func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if w.Field != nil {
+		// The widget belongs to a form field. The field's own entries are only
+		// known when the form is encoded, so the form writes this widget then
+		// (merged with the field, or with a /Parent link), pulling the widget's
+		// own entries via [formhooks.EncodeWidgetEntries]. Reserve the reference
+		// and defer the write.
+		if !fieldHasWidget(w.Field, w) {
+			return nil, errors.New("widget's field does not list this widget")
+		}
+		rm.GetReference(w)
+		return nil, nil
+	}
+	dict, err := w.encodeOwnEntries(rm)
+	if err != nil {
+		return nil, err
+	}
+	return dict, nil
+}
+
+// encodeOwnEntries builds the widget's own dictionary entries, excluding the
+// form-field linkage (/Parent and any folded-in field entries). It is used
+// directly for a standalone widget, and by the acroform package — via
+// [formhooks.EncodeWidgetEntries] — when it folds a widget into its field.
+func (w *Widget) encodeOwnEntries(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if err := pdf.CheckVersion(rm.Out, "widget annotation", pdf.V1_2); err != nil {
 		return nil, err
 	}
@@ -127,8 +156,8 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// MK (optional)
-	if w.MK != nil {
-		mk, err := rm.Embed(w.MK)
+	if w.Style != nil {
+		mk, err := rm.Embed(w.Style)
 		if err != nil {
 			return nil, err
 		}
@@ -165,67 +194,12 @@ func (w *Widget) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["BS"] = bs
 	}
 
-	// tie the widget to its form field: for a field whose single widget this is,
-	// fold the field's own entries in here (one merged field/widget dictionary);
-	// otherwise write /Parent pointing at the field's object.
-	if w.Parent != nil {
-		return foldFieldIntoWidget(rm, w, dict)
-	}
-
 	return dict, nil
 }
 
-// foldFieldIntoWidget ties an encoded widget dictionary to its form field
-// (w.Parent), using the encode state the form recorded on the field when it was
-// stored. If the widget is the single widget of a terminal field, the field's
-// own entries are folded into the widget dictionary, producing one merged
-// field/widget object, and /Parent names the field's own parent group (absent
-// for a root field). Otherwise the widget gets a /Parent pointing at the field's
-// own object.
-//
-// Field entries take precedence over the widget's, except for the shared /AA,
-// whose field half (K/F/V/C) and widget half (E/X/Fo/Bl/…) are combined.
-func foldFieldIntoWidget(rm *pdf.ResourceManager, w *Widget, dict pdf.Dict) (pdf.Native, error) {
-	info, err := formhooks.WidgetFieldInfo(rm, w.Parent, w)
-	if err != nil {
-		return nil, err
-	}
-
-	for k, v := range info.Entries {
-		if existing, exists := dict[k]; exists && k == "AA" {
-			merged, err := mergeAADicts(v, existing)
-			if err != nil {
-				return nil, err
-			}
-			dict[k] = merged
-			continue
-		}
-		dict[k] = v
-	}
-	if info.ParentRef != 0 {
-		dict["Parent"] = info.ParentRef
-	}
-	return dict, nil
-}
-
-// mergeAADicts combines the field-level (K/F/V/C) and annotation-level
-// (E/X/Fo/Bl/…) halves of a merged field's shared /AA dictionary. The two key
-// sets are disjoint by construction, so an overlap signals a bug.
-func mergeAADicts(field, widget pdf.Object) (pdf.Dict, error) {
-	fd, ok := field.(pdf.Dict)
-	if !ok {
-		return nil, errors.New("field AA did not encode to a dictionary")
-	}
-	wd, ok := widget.(pdf.Dict)
-	if !ok {
-		return nil, errors.New("widget AA did not encode to a dictionary")
-	}
-	merged := maps.Clone(fd)
-	for k, v := range wd {
-		if _, exists := merged[k]; exists {
-			return nil, fmt.Errorf("conflicting AA entry %q", k)
-		}
-		merged[k] = v
-	}
-	return merged, nil
+// fieldHasWidget reports whether f lists w among its widget annotations. A
+// widget's Field back-reference and the field's Widgets slice must agree; use
+// [AddWidget] to keep them in sync.
+func fieldHasWidget(f acroform.Field, w *Widget) bool {
+	return slices.Contains(f.GetCommon().Widgets, acroform.Widget(w))
 }

@@ -44,7 +44,7 @@ func decodeScreen(c pdf.Cursor, dict pdf.Dict) (*annotation.Screen, error) {
 	if mk, err := pdf.DecodeOptional(c, dict["MK"], appearance.ExtractCharacteristics); err != nil {
 		return nil, err
 	} else {
-		screen.MK = mk
+		screen.Style = mk
 	}
 
 	// A (optional)

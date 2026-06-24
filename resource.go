@@ -204,6 +204,22 @@ func (rm *ResourceManager) GetReference(enc Encoder) Reference {
 	return ref
 }
 
+// StoreDeferred reserves a reference for enc and arranges for enc to be encoded
+// at that reference during [ResourceManager.Close], after all eagerly written
+// objects. It returns the reserved reference immediately.
+//
+// Use it for an object that must be written only after others exist — for
+// example an interactive form, which is written after the pages whose widget
+// annotations it owns. Any error from encoding enc is reported by Close.
+func (rm *ResourceManager) StoreDeferred(enc Encoder) Reference {
+	ref := rm.GetReference(enc)
+	rm.deferred = append(rm.deferred, func(*EmbedHelper) error {
+		_, err := rm.Store(enc)
+		return err
+	})
+	return ref
+}
+
 // Store encodes enc and stores it in the PDF file, returning its reference.
 //
 // If enc was previously stored, the cached reference is returned without
@@ -225,16 +241,30 @@ func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
 		return 0, err
 	}
 	if native == nil {
-		// the encoder chose to write nothing (e.g. an empty outline); report
-		// this as the zero reference, which callers treat as "unset"
+		// The encoder wrote nothing inline. If it reserved a reference for
+		// itself via GetReference, this signals a deferred write: the object
+		// will be filled in later via [ResourceManager.StoreEncoded]. Keep the
+		// reservation pending and return the reserved reference so callers can
+		// already refer to the object. Otherwise the encoder chose to write
+		// nothing, reported as the zero reference, which callers treat as
+		// "unset".
+		if ref, ok := rm.embedded[enc].(Reference); ok {
+			return ref, nil
+		}
 		return 0, nil
 	}
 	if _, isRef := native.(Reference); isRef {
 		return 0, errors.New("encode must not return a reference")
 	}
 
-	// Encode may have reserved its own reference via GetReference.
-	ref, isSet = rm.embedded[enc].(Reference)
+	return rm.putEncoded(enc, native)
+}
+
+// putEncoded writes native as the object for enc, at enc's reserved reference
+// (from [ResourceManager.GetReference]) or a freshly allocated one, fulfilling
+// any reservation.
+func (rm *ResourceManager) putEncoded(enc Encoder, native Native) (Reference, error) {
+	ref, isSet := rm.embedded[enc].(Reference)
 	if !isSet {
 		ref = rm.Out.Alloc()
 		rm.embedded[enc] = ref
@@ -246,7 +276,28 @@ func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
 	return ref, nil
 }
 
-// Close runs all defered calls registered with [EmbedHelper.Defer].
+// StoreEncoded stores an already-encoded value as the object for enc, at the
+// reference reserved for enc via [ResourceManager.GetReference] (or a freshly
+// allocated one), and fulfils the reservation. Unlike [ResourceManager.Store]
+// it does not call enc.Encode; the caller supplies the value.
+//
+// Use it when one object computes the contents of another that reserved its
+// reference earlier — for example an interactive form writing the merged
+// field/widget dictionaries whose references its widgets reserved while the
+// pages were being written.
+func (rm *ResourceManager) StoreEncoded(enc Encoder, obj Native) (Reference, error) {
+	if obj == nil {
+		return 0, errors.New("StoreEncoded requires a non-nil object")
+	}
+	if _, isRef := obj.(Reference); isRef {
+		return 0, errors.New("StoreEncoded must not store a reference")
+	}
+	return rm.putEncoded(enc, obj)
+}
+
+// Close runs all deferred calls registered with [EmbedHelper.Defer] or
+// [ResourceManager.StoreDeferred], then verifies that every reserved reference
+// has been written.
 //
 // After Close has been called, the resource manager can no longer be used.
 func (rm *ResourceManager) Close() error {

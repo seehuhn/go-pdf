@@ -38,7 +38,7 @@ import (
 
 // widgetField is the form-field context that a widget annotation's appearance
 // depends on but that the widget does not itself hold. It is resolved from the
-// widget's form field (w.Parent), with flag and value inheritance from ancestor
+// widget's form field (w.Field), with flag and value inheritance from ancestor
 // fields already applied.
 type widgetField struct {
 	// FieldType is the field type: "Btn", "Tx", "Ch", or "Sig".
@@ -79,15 +79,15 @@ type widgetField struct {
 }
 
 // resolveWidgetField gathers the form-field context for w from its form field
-// (w.Parent), or returns nil if the widget has no associated field.
+// (w.Field), or returns nil if the widget has no associated field.
 func resolveWidgetField(w *annotation.Widget) *widgetField {
-	f := w.Parent
+	f := w.Field
 	if f == nil {
 		return nil
 	}
 	p := &widgetField{
 		FieldType: f.FieldType(),
-		Flags:     f.Flags(),
+		Flags:     f.GetCommon().Flags,
 		OnState:   widgetOnState(f, widgetIndex(w)),
 	}
 	if vt, ok := f.(acroform.VariableTextField); ok {
@@ -96,10 +96,10 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 		p.Align = v.Align
 	}
 	switch x := f.(type) {
-	case *acroform.FieldTx:
+	case *acroform.TextField:
 		p.Value = valueText(x.V)
 		p.MaxLen = x.MaxLen
-	case *acroform.FieldChoice:
+	case *acroform.ChoiceField:
 		p.Options = make([]string, len(x.Opt))
 		for i, o := range x.Opt {
 			p.Options[i] = o.Display
@@ -114,10 +114,10 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 // widgetIndex returns the position of w among the widgets of its field. Radio
 // buttons name each widget's on-state by this index.
 func widgetIndex(w *annotation.Widget) int {
-	if w.Parent == nil {
+	if w.Field == nil {
 		return 0
 	}
-	for i, kw := range w.Parent.Widgets() {
+	for i, kw := range w.Field.GetCommon().Widgets {
 		if kw == acroform.Widget(w) {
 			return i
 		}
@@ -128,11 +128,11 @@ func widgetIndex(w *annotation.Widget) int {
 // widgetOnState returns the on-state name of the index-th widget of a check box
 // or radio button field, or the empty string for other field types.
 func widgetOnState(f acroform.Field, index int) pdf.Name {
-	ff := f.Flags()
+	ff := f.GetCommon().Flags
 	if f.FieldType() != "Btn" || ff&acroform.FieldPushbutton != 0 {
 		return ""
 	}
-	if btn, ok := f.(*acroform.FieldBtn); ok && index < len(btn.Opt) {
+	if btn, ok := f.(*acroform.ButtonField); ok && index < len(btn.Opt) {
 		return pdf.Name(btn.Opt[index])
 	}
 	// a single check box may name its on-state via the field value
@@ -146,14 +146,14 @@ func widgetOnState(f acroform.Field, index int) pdf.Name {
 
 // buttonValue returns a check box or radio button field's value name.
 func buttonValue(f acroform.Field) pdf.Name {
-	if b, ok := f.(*acroform.FieldBtn); ok {
+	if b, ok := f.(*acroform.ButtonField); ok {
 		return b.V
 	}
 	return ""
 }
 
 // choiceValue returns the display text of a choice field's current selection.
-func choiceValue(x *acroform.FieldChoice) string {
+func choiceValue(x *acroform.ChoiceField) string {
 	if len(x.Selected) > 0 {
 		i := x.Selected[0]
 		if i >= 0 && i < len(x.Opt) {
@@ -179,8 +179,8 @@ func valueText(obj pdf.Object) string {
 
 // addWidgetAppearance generates the appearance stream(s) for a form-field widget
 // annotation and stores them in the widget's appearance dictionary. The field
-// context is resolved from the widget's form field (w.Parent); a widget with no
-// field draws only the MK chrome. It is the dispatch target of
+// context is resolved from the widget's form field (w.Field); a widget with no
+// field draws only the Style chrome. It is the dispatch target of
 // [Style.AddAppearance] for [annotation.Widget].
 //
 // Check boxes and radio buttons receive two appearances, keyed by the on-state
@@ -217,7 +217,7 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 		}
 		// select the current appearance from the field value
 		if w.AppearanceState == "" {
-			if buttonValue(w.Parent) == onState {
+			if buttonValue(w.Field) == onState {
 				w.AppearanceState = onState
 			} else {
 				w.AppearanceState = "Off"
@@ -253,8 +253,8 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 // builder.
 func (s *Style) fieldContext(w *annotation.Widget) (b *builder.Builder, width, height float64, m matrix.Matrix) {
 	rot := 0
-	if w.MK != nil {
-		rot = ((w.MK.Rotation % 360) + 360) % 360
+	if w.Style != nil {
+		rot = ((w.Style.Rotation % 360) + 360) % 360
 	}
 	rw := pdf.Round(w.Rect.Dx(), 2)
 	rh := pdf.Round(w.Rect.Dy(), 2)
@@ -318,9 +318,9 @@ func borderStyleName(w *annotation.Widget) pdf.Name {
 }
 
 // drawChrome fills the background and strokes the border of a rectangular field
-// according to the widget's MK and border-style entries.
+// according to the widget's Style and border-style entries.
 func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget) {
-	mk := w.MK
+	mk := w.Style
 	if mk != nil && mk.BackgroundColor != nil {
 		b.SetFillColor(mk.BackgroundColor)
 		b.Rectangle(0, 0, width, height)
@@ -383,8 +383,8 @@ func (s *Style) drawToggle(w *annotation.Widget, fld *widgetField, on bool) (*fo
 
 	if on {
 		glyph := ""
-		if w.MK != nil {
-			glyph = w.MK.Caption
+		if w.Style != nil {
+			glyph = w.Style.Caption
 		}
 		if glyph == "" {
 			if isRadio {
@@ -401,7 +401,7 @@ func (s *Style) drawToggle(w *annotation.Widget, fld *widgetField, on bool) (*fo
 
 // drawCircleChrome fills and strokes a circular field background and border.
 func drawCircleChrome(b *builder.Builder, width, height float64, w *annotation.Widget) {
-	mk := w.MK
+	mk := w.Style
 	cx, cy := width/2, height/2
 	outer := min(width, height) / 2
 	lw := borderWidth(w)
@@ -456,13 +456,13 @@ func (s *Style) drawPushButton(w *annotation.Widget) (*form.Form, error) {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 
-	if w.MK != nil && w.MK.Caption != "" {
+	if w.Style != nil && w.Style.Caption != "" {
 		size := captionSize(height)
 		b.TextBegin()
 		b.TextSetFont(s.ContentFont, size)
 		b.SetFillColor(quireInk)
 		b.TextFirstLine(0, height/2-size*0.33)
-		b.TextShowAligned(w.MK.Caption, width, 0.5)
+		b.TextShowAligned(w.Style.Caption, width, 0.5)
 		b.TextEnd()
 	}
 

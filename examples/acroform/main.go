@@ -91,7 +91,7 @@ func writeForm(filename string) error {
 		},
 		appearances: fallback.NewStyle(pdfVersion),
 		border:      &annotation.BorderStyle{Width: 1},
-		chrome:      &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: borderColor},
+		style:       &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: borderColor},
 		body:        body,
 		bold:        bold,
 	}
@@ -101,11 +101,9 @@ func writeForm(filename string) error {
 		return b.err
 	}
 
-	formRef, err := page.RM.Store(b.form)
-	if err != nil {
-		return err
-	}
-	page.Out.GetMeta().Catalog.AcroForm = formRef
+	// the form is encoded when the resource manager closes, after the page
+	// (and its widget annotations) has been written
+	page.Out.GetMeta().Catalog.AcroForm = page.RM.StoreDeferred(b.form)
 
 	return page.Close()
 }
@@ -115,7 +113,7 @@ type formBuilder struct {
 	form        *acroform.InteractiveForm
 	appearances *fallback.Style
 	border      *annotation.BorderStyle
-	chrome      *appearance.Characteristics
+	style       *appearance.Characteristics
 	body        font.Layouter
 	bold        font.Layouter
 	y           float64
@@ -168,25 +166,25 @@ func (b *formBuilder) build() {
 
 func (b *formBuilder) addText(name, value string, flags acroform.FieldFlags, rect pdf.Rectangle) {
 	f := acroform.NewTextField(name)
-	f.Ff = flags
+	f.Flags = flags
 	f.DefaultAppearance = textAppearance
 	if value != "" {
 		f.V = pdf.TextString(value)
 	}
 	b.form.Fields = append(b.form.Fields, f)
-	b.attach(f, rect, b.chrome)
+	b.attach(f, rect, b.style)
 }
 
 func (b *formBuilder) addCombo(name string, options []string, value string, rect pdf.Rectangle) {
 	f := acroform.NewChoiceField(name)
-	f.Ff = acroform.FieldCombo
+	f.Flags = acroform.FieldCombo
 	f.DefaultAppearance = textAppearance
 	for _, option := range options {
 		f.Opt = append(f.Opt, acroform.ChoiceOption{Display: option, Export: option})
 	}
 	f.V = pdf.TextString(value)
 	b.form.Fields = append(b.form.Fields, f)
-	b.attach(f, rect, b.chrome)
+	b.attach(f, rect, b.style)
 }
 
 func (b *formBuilder) addCheckBox(name, label string, checked bool, x, top float64) {
@@ -196,7 +194,7 @@ func (b *formBuilder) addCheckBox(name, label string, checked bool, x, top float
 	}
 	b.form.Fields = append(b.form.Fields, f)
 
-	mk := fieldChrome()
+	mk := fieldStyle()
 	mk.Caption = "4"
 	b.attach(f, box(x, top, boxSize, boxSize), mk)
 	b.inlineLabel(label, x+boxSize+7, top-boxSize+4)
@@ -204,14 +202,14 @@ func (b *formBuilder) addCheckBox(name, label string, checked bool, x, top float
 
 func (b *formBuilder) addRadio(name string, options []string, selected pdf.Name, top, slot float64) {
 	f := acroform.NewButtonField(name)
-	f.Ff = acroform.FieldRadio
+	f.Flags = acroform.FieldRadio
 	f.Opt = options
 	f.V = selected
 	b.form.Fields = append(b.form.Fields, f)
 
 	for i, option := range options {
 		x := contentLeft + float64(i)*slot
-		mk := fieldChrome()
+		mk := fieldStyle()
 		mk.Caption = "l"
 		b.attach(f, box(x, top, boxSize, boxSize), mk)
 		b.inlineLabel(option, x+boxSize+7, top-boxSize+4)
@@ -227,7 +225,7 @@ func (b *formBuilder) buttons() {
 
 func (b *formBuilder) addButton(name, caption string, border color.Color, act pdf.Action, rect pdf.Rectangle) {
 	f := acroform.NewButtonField(name)
-	f.Ff = acroform.FieldPushbutton
+	f.Flags = acroform.FieldPushbutton
 	b.form.Fields = append(b.form.Fields, f)
 
 	mk := &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: border, Caption: caption}
@@ -242,7 +240,7 @@ func (b *formBuilder) attach(field acroform.Field, rect pdf.Rectangle, mk *appea
 	}
 	w := annotation.AddWidget(field, rect)
 	w.Common.Flags = annotation.FlagPrint
-	w.MK = mk
+	w.Style = mk
 	w.BorderStyle = b.border
 	if err := b.appearances.AddAppearance(w); err != nil {
 		b.err = err
@@ -252,7 +250,7 @@ func (b *formBuilder) attach(field acroform.Field, rect pdf.Rectangle, mk *appea
 	return w
 }
 
-func fieldChrome() *appearance.Characteristics {
+func fieldStyle() *appearance.Characteristics {
 	return &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: borderColor}
 }
 

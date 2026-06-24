@@ -42,7 +42,7 @@ func decodeWidgetBody(c pdf.Cursor, dict pdf.Dict) (*annotation.Widget, error) {
 	if mk, err := pdf.DecodeOptional(c, dict["MK"], appearance.ExtractCharacteristics); err != nil {
 		return nil, err
 	} else {
-		widget.MK = mk
+		widget.Style = mk
 	}
 
 	// A (optional)
@@ -71,7 +71,7 @@ func decodeWidgetBody(c pdf.Cursor, dict pdf.Dict) (*annotation.Widget, error) {
 	}
 
 	// /Parent is intentionally not read here: the field tree owns the linkage
-	// and sets Widget.Parent when the form is decoded.
+	// and sets Widget.Field when the form is decoded.
 
 	// the widget half of a shared /AA keeps only the annotation-level triggers;
 	// drop an empty remnant left by the field/widget split

@@ -20,7 +20,7 @@ import "seehuhn.de/go/pdf"
 
 // PDF 2.0 sections: 12.7.5.2.2 12.7.5.2.3 12.7.5.2.4
 
-// ButtonVariant identifies the kind of a button form field ([FieldBtn]).
+// ButtonVariant identifies the kind of a button form field ([ButtonField]).
 type ButtonVariant int
 
 const (
@@ -37,13 +37,14 @@ const (
 	ButtonPush
 )
 
-// FieldBtn is a button form field (field type "Btn").
+// ButtonField is a button form field (field type "Btn").
 //
 // The three button kinds — check box, radio button, and push button — share one
 // dictionary layout and differ only in their flags, so a single type represents
-// all of them. Use [FieldBtn.Variant] to obtain the kind.
-type FieldBtn struct {
-	fieldBase
+// all of them. Use [ButtonField.Variant] to obtain the kind.
+type ButtonField struct {
+	Common
+
 	VariableText
 
 	// Opt (optional) holds the export value of each of the field's widget
@@ -68,15 +69,15 @@ type FieldBtn struct {
 	DV pdf.Name
 }
 
-var _ Field = (*FieldBtn)(nil)
+var _ Field = (*ButtonField)(nil)
 
 // Variant reports whether the button is a check box, radio button, or push
 // button, derived from the field's flags.
-func (f *FieldBtn) Variant() ButtonVariant {
+func (f *ButtonField) Variant() ButtonVariant {
 	switch {
-	case f.Ff&FieldPushbutton != 0:
+	case f.Flags&FieldPushbutton != 0:
 		return ButtonPush
-	case f.Ff&FieldRadio != 0:
+	case f.Flags&FieldRadio != 0:
 		return ButtonRadio
 	default:
 		return ButtonCheckbox
@@ -84,10 +85,10 @@ func (f *FieldBtn) Variant() ButtonVariant {
 }
 
 // FieldType implements the [Field] interface.
-func (f *FieldBtn) FieldType() pdf.Name { return "Btn" }
+func (f *ButtonField) FieldType() pdf.Name { return "Btn" }
 
-func (f *FieldBtn) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
-	if err := f.VariableText.fillDict(rm, dict); err != nil {
+func (f *ButtonField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if err := f.VariableText.fillVarTextDict(rm, dict); err != nil {
 		return err
 	}
 	if len(f.Opt) > 0 {

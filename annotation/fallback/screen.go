@@ -48,10 +48,10 @@ func (s *Style) addScreenAppearance(a *annotation.Screen) (*form.Form, error) {
 	b.SetExtGState(s.reset)
 	mediaAlpha(b, a.StrokingTransparency, a.NonStrokingTransparency)
 
-	if a.MK != nil && a.MK.Icon != nil {
+	if a.Style != nil && a.Style.Icon != nil {
 		b.PushGraphicsState()
-		b.Transform(fitToRect(a.MK.Icon, rect))
-		b.DrawXObject(a.MK.Icon)
+		b.Transform(fitToRect(a.Style.Icon, rect))
+		b.DrawXObject(a.Style.Icon)
 		b.PopGraphicsState()
 	} else {
 		drawMediaPlaceholder(b, rect)

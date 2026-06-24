@@ -1285,7 +1285,7 @@ var testCases = map[pdf.Name][]testCase{
 					Name: "screen-001",
 				},
 				Title: "Interactive Media",
-				MK: &appearance.Characteristics{
+				Style: &appearance.Characteristics{
 					BorderColor:     color.DeviceRGB{0, 0, 1},
 					BackgroundColor: color.DeviceGray(0.5),
 					Rotation:        90,
@@ -1323,7 +1323,7 @@ var testCases = map[pdf.Name][]testCase{
 					Color:    color.DeviceRGB{0.9, 0.9, 0.9},
 				},
 				Title: "Complete Media Player",
-				MK: &appearance.Characteristics{
+				Style: &appearance.Characteristics{
 					BorderColor:     color.DeviceCMYK{0, 0, 0, 1},
 					Caption:         "Play",
 					RolloverCaption: "Hover",
@@ -1379,7 +1379,7 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Button with custom appearance",
 				},
 				Highlight: annotation.HighlightOutline,
-				MK: &appearance.Characteristics{
+				Style: &appearance.Characteristics{
 					BorderColor:     color.DeviceGray(0),
 					BackgroundColor: color.DeviceRGB{1, 1, 0},
 					Caption:         "OK",
@@ -1434,7 +1434,7 @@ var testCases = map[pdf.Name][]testCase{
 					Color:    color.DeviceRGB{0.8, 0.9, 1.0},
 				},
 				Highlight: annotation.HighlightPush,
-				MK: &appearance.Characteristics{
+				Style: &appearance.Characteristics{
 					Rotation:     180,
 					BorderColor:  color.DeviceRGB{0.25, 0.5, 0.75},
 					TextPosition: appearance.TextPositionIconOnly,

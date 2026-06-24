@@ -35,12 +35,12 @@ type Screen struct {
 	// This corresponds to the /T entry in the PDF annotation dictionary.
 	Title string
 
-	// MK (optional) is an appearance characteristics dictionary. Its Icon
+	// Style (optional) is an appearance characteristics dictionary. Its Icon
 	// provides the icon used in generating the appearance referred to by the
 	// screen annotation's AP entry.
 	//
 	// This corresponds to the /MK entry in the PDF annotation dictionary.
-	MK *appearance.Characteristics
+	Style *appearance.Characteristics
 
 	// Action (optional; PDF 1.1) is an action that is performed when the
 	// annotation is activated.
@@ -84,8 +84,8 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// MK (optional)
-	if s.MK != nil {
-		mk, err := rm.Embed(s.MK)
+	if s.Style != nil {
+		mk, err := rm.Embed(s.Style)
 		if err != nil {
 			return nil, err
 		}

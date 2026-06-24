@@ -33,15 +33,15 @@ import (
 // annotation. It corresponds to the /MK entry of such annotations.
 type Characteristics struct {
 	// Rotation is the number of degrees by which the annotation is rotated
-	// counterclockwise relative to the page. It is a multiple of 90.
+	// counterclockwise relative to the page. This must be a multiple of 90.
 	Rotation int
 
-	// BorderColor (optional) is the colour of the annotation's border. It uses
-	// the DeviceGray, DeviceRGB, or DeviceCMYK colour space.
+	// BorderColor (optional) is the colour of the annotation's border. The
+	// color must use the DeviceGray, DeviceRGB or DeviceCMYK colour space.
 	BorderColor color.Color
 
 	// BackgroundColor (optional) is the colour of the annotation's background.
-	// It uses the DeviceGray, DeviceRGB, or DeviceCMYK colour space.
+	// The color must use the DeviceGray, DeviceRGB or DeviceCMYK colour space.
 	BackgroundColor color.Color
 
 	// Caption is the annotation's normal caption, displayed when it is not
@@ -49,10 +49,10 @@ type Characteristics struct {
 	Caption string
 
 	// RolloverCaption is the caption displayed when the user rolls the cursor
-	// into the annotation's active area without pressing the mouse button.
+	// into the annotation's active area without pressing the pointer button.
 	RolloverCaption string
 
-	// DownCaption is the caption displayed when the mouse button is pressed
+	// DownCaption is the caption displayed when the pointer button is pressed
 	// within the annotation's active area.
 	DownCaption string
 
@@ -74,7 +74,7 @@ type Characteristics struct {
 	IconFit *IconFit
 
 	// TextPosition indicates where to position the caption relative to the
-	// icon. It is one of the TextPosition constants.
+	// icon.
 	TextPosition TextPosition
 
 	// SingleUse determines if Embed returns a dictionary (true) or

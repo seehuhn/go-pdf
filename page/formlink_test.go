@@ -31,7 +31,7 @@ import (
 // TestPageDecodeLinksWidgets builds a document with an interactive form whose
 // widgets are reached only through page /Annots — a merged single-widget field
 // and a multi-widget field with widgets on two pages — and verifies that simply
-// decoding a page links every widget to its field (Widget.Parent), without the
+// decoding a page links every widget to its field (Widget.Field), without the
 // caller decoding the AcroForm itself. It also checks that the merged field and
 // its page widget are one shared object.
 func TestPageDecodeLinksWidgets(t *testing.T) {
@@ -105,11 +105,11 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 	if !ok {
 		t.Fatalf("annot 1 is %T, want *Widget", p1.Annots[1])
 	}
-	if mergedW.Parent == nil {
-		t.Error("merged widget: Parent not linked by page decode")
+	if mergedW.Field == nil {
+		t.Error("merged widget: Field not linked by page decode")
 	}
-	if multiW.Parent == nil {
-		t.Error("multi-widget A: Parent not linked by page decode")
+	if multiW.Field == nil {
+		t.Error("multi-widget A: Field not linked by page decode")
 	}
 
 	// the merged field and its page widget must be one shared object: the field's
@@ -122,10 +122,10 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 	if !ok {
 		t.Fatalf("form field 0 is %T, want a terminal field", form.Fields[0])
 	}
-	if mergedW.Parent != mergedField {
-		t.Error("merged widget.Parent is not the field in /Fields")
+	if mergedW.Field != mergedField {
+		t.Error("merged widget.Field is not the field in /Fields")
 	}
-	widgets := mergedField.Widgets()
+	widgets := mergedField.GetCommon().Widgets
 	if len(widgets) != 1 || widgets[0] != acroform.Widget(mergedW) {
 		t.Errorf("merged field widgets = %v, want the shared page widget", widgets)
 	}
@@ -135,10 +135,10 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 	if !ok {
 		t.Fatalf("form field 1 is %T, want a terminal field", form.Fields[1])
 	}
-	if multiW.Parent != multiField {
-		t.Error("multi-widget A.Parent is not the multi field")
+	if multiW.Field != multiField {
+		t.Error("multi-widget A.Field is not the multi field")
 	}
-	if len(multiField.Widgets()) != 2 {
-		t.Errorf("multi field has %d widgets, want 2", len(multiField.Widgets()))
+	if len(multiField.GetCommon().Widgets) != 2 {
+		t.Errorf("multi field has %d widgets, want 2", len(multiField.GetCommon().Widgets))
 	}
 }

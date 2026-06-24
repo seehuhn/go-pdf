@@ -20,7 +20,7 @@ import "seehuhn.de/go/pdf"
 
 // PDF 2.0 sections: 12.7.5.4
 
-// ChoiceOption is a single selectable item of a [FieldChoice]. Export is the
+// ChoiceOption is a single selectable item of a [ChoiceField]. Export is the
 // value used when the form is submitted; Display is the text shown to the user.
 // When the two are equal, the option is stored as a single string.
 type ChoiceOption struct {
@@ -28,10 +28,10 @@ type ChoiceOption struct {
 	Display string
 }
 
-// FieldChoice is a choice form field: a list box, or a combo box when the
+// ChoiceField is a choice form field: a list box, or a combo box when the
 // [FieldCombo] flag is set (field type "Ch").
-type FieldChoice struct {
-	fieldBase
+type ChoiceField struct {
+	Common
 	VariableText
 
 	// Opt holds the field's selectable options, in display order.
@@ -63,13 +63,13 @@ type FieldChoice struct {
 	DV pdf.Object
 }
 
-var _ Field = (*FieldChoice)(nil)
+var _ Field = (*ChoiceField)(nil)
 
 // FieldType implements the [Field] interface.
-func (f *FieldChoice) FieldType() pdf.Name { return "Ch" }
+func (f *ChoiceField) FieldType() pdf.Name { return "Ch" }
 
-func (f *FieldChoice) fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
-	if err := f.VariableText.fillDict(rm, dict); err != nil {
+func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if err := f.VariableText.fillVarTextDict(rm, dict); err != nil {
 		return err
 	}
 	if len(f.Opt) > 0 {

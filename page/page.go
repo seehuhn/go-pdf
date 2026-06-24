@@ -802,7 +802,7 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 		}
 
 		// A widget annotation belongs to a form field. Decoding the interactive
-		// form links each widget to its field (annotation.Widget.Parent); the
+		// form links each widget to its field (annotation.Widget.Field); the
 		// page's widgets are already cached, so the form's top-down walk links
 		// them via cache hits without a cycle. DecodeExclusive single-flights
 		// so concurrent page decodes share one field tree. Errors are non-fatal: a

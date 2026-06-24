@@ -153,11 +153,7 @@ func createDocument(filename string) error {
 		}
 	}
 
-	formRef, err := page.RM.Store(wr.form)
-	if err != nil {
-		return err
-	}
-	page.Out.GetMeta().Catalog.AcroForm = formRef
+	page.Out.GetMeta().Catalog.AcroForm = page.RM.StoreDeferred(wr.form)
 
 	return page.Close()
 }
@@ -230,12 +226,12 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 		// the merge is in place when the page writes the widget.
 		widget := annotation.AddWidget(f, rect)
 		widget.Common.Flags = annotation.FlagPrint
-		widget.MK = mk
+		widget.Style = mk
 		widget.BorderStyle = bs
 
 		isToggle := d.ft == "Btn" && d.ff&acroform.FieldPushbutton == 0
 		if genAP {
-			// derives the field context from w.Parent and selects the toggle
+			// derives the field context from w.Field and selects the toggle
 			// appearance matching the field value
 			if err := wr.style.AddAppearance(widget); err != nil {
 				return err
@@ -265,7 +261,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		// a push button retains no value; check boxes and radio buttons carry
 		// the on-state name in V, and radio buttons name their widgets in Opt
 		btn := acroform.NewButtonField(name)
-		btn.Ff = d.ff
+		btn.Flags = d.ff
 		if d.ff&acroform.FieldPushbutton == 0 {
 			btn.V = pdf.Name(d.value)
 			if d.ff&acroform.FieldRadio != 0 {
@@ -276,7 +272,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 
 	case "Tx":
 		tx := acroform.NewTextField(name)
-		tx.Ff = d.ff
+		tx.Flags = d.ff
 		tx.DefaultAppearance = defaultDA
 		tx.Align = d.align
 		tx.MaxLen = d.maxLen
@@ -287,7 +283,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 
 	case "Ch":
 		ch := acroform.NewChoiceField(name)
-		ch.Ff = d.ff
+		ch.Flags = d.ff
 		ch.DefaultAppearance = defaultDA
 		ch.Align = d.align
 		ch.Selected = d.sel
@@ -301,7 +297,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 
 	default: // "Sig"
 		sig := acroform.NewSignatureField(name)
-		sig.Ff = d.ff
+		sig.Flags = d.ff
 		f = sig
 	}
 

@@ -78,14 +78,14 @@ func kidDicts(t *testing.T, w *pdf.Writer, group pdf.Dict) []pdf.Dict {
 // a common field type and default appearance shared by a group's children are
 // hoisted into the group; the children no longer carry them
 func TestFactorHoistUnanimous(t *testing.T) {
-	mk := func(name, da string) *FieldTx {
+	mk := func(name, da string) *TextField {
 		f := NewTextField(name)
 		f.DefaultAppearance = da
 		return f
 	}
 	form := &InteractiveForm{
-		Fields: []TreeNode{
-			&Group{Name: "g", Kids: []TreeNode{
+		Fields: []Node{
+			&Group{Name: "g", Kids: []Node{
 				mk("a", "/Helv 12 Tf"),
 				mk("b", "/Helv 12 Tf"),
 			}},
@@ -113,12 +113,12 @@ func TestFactorHoistUnanimous(t *testing.T) {
 
 // the document-wide DA shared by all roots is hoisted into the form dictionary
 func TestFactorHoistFormDA(t *testing.T) {
-	mk := func(name string) *FieldTx {
+	mk := func(name string) *TextField {
 		f := NewTextField(name)
 		f.DefaultAppearance = "/Helv 0 Tf"
 		return f
 	}
-	form := &InteractiveForm{Fields: []TreeNode{mk("a"), mk("b")}}
+	form := &InteractiveForm{Fields: []Node{mk("a"), mk("b")}}
 	w, dict := encodeForm(t, form)
 
 	if s, _ := pdf.NewCursor(w).String(dict["DA"]); string(s) != "/Helv 0 Tf" {
@@ -133,14 +133,14 @@ func TestFactorHoistFormDA(t *testing.T) {
 
 // V and DV are never hoisted, even when every child shares them
 func TestFactorNeverHoistValue(t *testing.T) {
-	mk := func(name string) *FieldTx {
+	mk := func(name string) *TextField {
 		f := NewTextField(name)
 		f.V = pdf.TextString("same")
 		return f
 	}
 	form := &InteractiveForm{
-		Fields: []TreeNode{
-			&Group{Name: "g", Kids: []TreeNode{mk("a"), mk("b")}},
+		Fields: []Node{
+			&Group{Name: "g", Kids: []Node{mk("a"), mk("b")}},
 		},
 	}
 	w, dict := encodeForm(t, form)
@@ -160,13 +160,13 @@ func TestFactorNeverHoistValue(t *testing.T) {
 // hoisted into the group
 func TestFactorFlagsOverride(t *testing.T) {
 	a := NewTextField("a")
-	a.Ff = FieldReadOnly
+	a.Flags = FieldReadOnly
 	b := NewTextField("b")
-	b.Ff = FieldReadOnly
+	b.Flags = FieldReadOnly
 	c := NewTextField("c") // Ff == 0, must keep inheriting 0
 	form := &InteractiveForm{
-		Fields: []TreeNode{
-			&Group{Name: "g", Kids: []TreeNode{a, b, c}},
+		Fields: []Node{
+			&Group{Name: "g", Kids: []Node{a, b, c}},
 		},
 	}
 	w, dict := encodeForm(t, form)
@@ -185,7 +185,7 @@ func TestFactorFlagsOverride(t *testing.T) {
 func TestEncodeEmptyGroup(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
-	form := &InteractiveForm{Fields: []TreeNode{&Group{Name: "g"}}}
+	form := &InteractiveForm{Fields: []Node{&Group{Name: "g"}}}
 	if _, err := form.Encode(rm); err == nil {
 		t.Error("expected error for empty group, got nil")
 	}
@@ -195,7 +195,7 @@ func TestEncodeDuplicateNode(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	f := NewTextField("f")
-	form := &InteractiveForm{Fields: []TreeNode{f, f}}
+	form := &InteractiveForm{Fields: []Node{f, f}}
 	if _, err := form.Encode(rm); err == nil {
 		t.Error("expected error for a field used twice, got nil")
 	}
@@ -205,7 +205,7 @@ func TestEncodeCalculationOrderNotInTree(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	form := &InteractiveForm{
-		Fields:           []TreeNode{NewTextField("a")},
+		Fields:           []Node{NewTextField("a")},
 		CalculationOrder: []Field{NewTextField("orphan")},
 	}
 	if _, err := form.Encode(rm); err == nil {

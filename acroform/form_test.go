@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func textField(name string) *FieldTx { return NewTextField(name) }
+func textField(name string) *TextField { return NewTextField(name) }
 
 func TestEncodeInvalidAlign(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
@@ -31,7 +31,7 @@ func TestEncodeInvalidAlign(t *testing.T) {
 
 	f := NewTextField("f")
 	f.Align = pdf.TextAlign(99)
-	form := &InteractiveForm{Fields: []TreeNode{f}}
+	form := &InteractiveForm{Fields: []Node{f}}
 
 	if _, err := form.Encode(rm); err == nil {
 		t.Error("expected error for out-of-range alignment, got nil")
@@ -44,7 +44,7 @@ func TestEncodeVersionGating(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
-		Fields: []TreeNode{textField("f")},
+		Fields: []Node{textField("f")},
 		XFA:    pdf.Array{pdf.String("x")},
 	}
 
@@ -61,7 +61,7 @@ func TestEncodeXFAStreamForm(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
-		Fields: []TreeNode{textField("f")},
+		Fields: []Node{textField("f")},
 		XFA:    rm.Out.Alloc(), // reference to a stream
 	}
 
@@ -77,24 +77,24 @@ func TestEncodeVersionGatingEntries(t *testing.T) {
 		build   func(rm *pdf.ResourceManager) *InteractiveForm
 	}{
 		{"form requires 1.2", pdf.V1_1, func(rm *pdf.ResourceManager) *InteractiveForm {
-			return &InteractiveForm{Fields: []TreeNode{textField("f")}}
+			return &InteractiveForm{Fields: []Node{textField("f")}}
 		}},
 		{"SigFlags requires 1.3", pdf.V1_2, func(rm *pdf.ResourceManager) *InteractiveForm {
 			return &InteractiveForm{
-				Fields:   []TreeNode{textField("f")},
+				Fields:   []Node{textField("f")},
 				SigFlags: SignaturesExist,
 			}
 		}},
 		{"CO requires 1.3", pdf.V1_2, func(rm *pdf.ResourceManager) *InteractiveForm {
 			f := textField("f")
 			return &InteractiveForm{
-				Fields:           []TreeNode{f},
+				Fields:           []Node{f},
 				CalculationOrder: []Field{f},
 			}
 		}},
 		{"XFA array requires 1.6", pdf.V1_5, func(rm *pdf.ResourceManager) *InteractiveForm {
 			return &InteractiveForm{
-				Fields: []TreeNode{textField("f")},
+				Fields: []Node{textField("f")},
 				XFA:    pdf.Array{pdf.String("template"), pdf.String("<xdp/>")},
 			}
 		}},

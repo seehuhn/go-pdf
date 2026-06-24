@@ -21,123 +21,57 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/action/triggers"
 )
 
 // PDF 2.0 sections: 12.7.4.1 12.7.4.2
 
-// TreeNode is a node of a field tree.
-// This must be either a [*Group] or a [Field].
-type TreeNode interface {
+// Node represents any node, internal or leaf, in the field tree of an
+// interactive form. This is either a [*Group] or one of the four [Field]
+// types.
+type Node interface {
 	// PartialName returns the node's partial field name (the /T entry). An
 	// empty value means the node contributes no component to the fully
 	// qualified names of its descendants.
 	PartialName() string
 }
 
-// Field is a terminal field in a PDF interactive form: a [FieldTx] (text),
-// [FieldBtn] (button), [FieldChoice] (choice), or [FieldSig] (signature).
+// Field is a field in a PDF interactive form. This is implemented by four
+// concrete types:
+//   - [TextField] (text),
+//   - [ButtonField] (button),
+//   - [ChoiceField] (choice) and
+//   - [SignatureField] (signature).
 //
-// In a PDF file, field attributes may be inherited from ancestors in the field
-// tree (12.7.4.1). This package hides that: a decoded field carries fully
-// resolved ("flattened") attribute values, and the encoder restores the
-// inheritance as a storage optimization, invisibly. There are therefore no
-// inheritance helpers; read a field's attributes directly from its fields.
+// A field is rendered on a page by one or more
+// [seehuhn.de/go/pdf/annotation.Widget] annotations. Use
+// [seehuhn.de/go/pdf/annotation.AddWidget] to add a widget to a field.
 //
-// A terminal field is rendered on a page by one or more widget annotations
-// ("seehuhn.de/go/pdf/annotation".Widget); see [Field.Widgets]. A field with
-// exactly one widget is written as a single combined field/widget dictionary;
-// this merging is automatic and transparent.
+// The types implementing Field are the leaf nodes in the field tree of an
+// interactive form.
 //
-// Fields are not written individually; [InteractiveForm.Encode] writes the
-// whole tree when the form is stored.
+// Use [InteractiveForm.Encode] to encode all fields of the form as a PDF field
+// tree.
 type Field interface {
-	TreeNode
+	Node
+
+	// GetCommon returns the entries common to all field types.
+	GetCommon() *Common
 
 	// FieldType returns the PDF field type, one of "Btn", "Tx", "Ch", or "Sig".
 	FieldType() pdf.Name
 
-	// Flags returns the field's flags.
-	Flags() FieldFlags
-
-	// Widgets returns the field's widget annotations, one for each place the
-	// field appears on a page.
-	Widgets() []Widget
-
-	// AddWidget appends a widget annotation to the field. Prefer
-	// "seehuhn.de/go/pdf/annotation".AddWidget, which also sets the widget's
-	// parent link.
-	AddWidget(Widget)
-
-	base() *fieldBase
-	fillTypeDict(rm *pdf.ResourceManager, dict pdf.Dict) error
+	fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error
 }
 
-// Widget is the interface satisfied by a terminal field's widget annotations.
-// Its only implementation is "seehuhn.de/go/pdf/annotation".Widget; the
-// interface exists so that the acroform package can refer to widgets without
-// importing the annotation package.
+// Widget represents the visual representation of a [Field] on a page. The only
+// implementation is "seehuhn.de/go/pdf/annotation".Widget; the interface
+// exists only to avoid dependency cycles.
 type Widget interface {
 	pdf.Encoder
 
-	// FieldParent returns the field this widget belongs to, or nil.
-	FieldParent() Field
+	// ParentField returns the field this widget belongs to, or nil.
+	ParentField() Field
 }
-
-// fieldBase holds the attributes shared by all terminal field types. The four
-// concrete types embed it. Its exported fields can be set directly; the
-// unexported fields carry the widget list and per-encoding state.
-type fieldBase struct {
-	// Name (optional) is the partial field name. An empty value means the
-	// field has no name of its own and does not contribute to fully qualified
-	// field names.
-	//
-	// This corresponds to the /T entry in the PDF field dictionary.
-	Name string
-
-	// TU (optional) is an alternative field name used in the user interface
-	// and for accessibility.
-	TU string
-
-	// TM (optional) is the mapping name used when exporting field data.
-	TM string
-
-	// Ff holds the field flags. The zero value means no flags are set.
-	//
-	// This corresponds to the /Ff entry in the PDF field dictionary.
-	Ff FieldFlags
-
-	// AA (optional) is the field's additional-actions dictionary.
-	AA *triggers.Form
-
-	widgets []Widget
-	enc     *fieldEncState
-}
-
-// fieldEncState records, for one encoding pass, how a field's widget
-// annotations should tie themselves to the field tree. [InteractiveForm.Encode]
-// sets it; the annotation package reads it through the formhooks seam when it
-// later writes the widgets.
-type fieldEncState struct {
-	rm        *pdf.ResourceManager
-	parentRef pdf.Reference // the enclosing group's reference, or 0 for a root
-	fieldRef  pdf.Reference // the field's own reference, or its single widget's
-	entries   pdf.Dict      // the field's own entries; non-nil only when merged
-}
-
-// PartialName implements the [TreeNode] interface.
-func (b *fieldBase) PartialName() string { return b.Name }
-
-// Flags implements the [Field] interface.
-func (b *fieldBase) Flags() FieldFlags { return b.Ff }
-
-// Widgets implements the [Field] interface.
-func (b *fieldBase) Widgets() []Widget { return b.widgets }
-
-// AddWidget implements the [Field] interface.
-func (b *fieldBase) AddWidget(w Widget) { b.widgets = append(b.widgets, w) }
-
-func (b *fieldBase) base() *fieldBase { return b }
 
 // terminalEntries builds the dictionary entries of a terminal field — its
 // flattened own entries (FT, T, TU, TM, Ff, AA, and the type-specific entries),
@@ -148,7 +82,7 @@ func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 		return nil, err
 	}
 
-	b := f.base()
+	b := f.GetCommon()
 	dict := pdf.Dict{
 		"FT": f.FieldType(),
 	}
@@ -171,11 +105,11 @@ func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 		}
 		dict["TM"] = pdf.TextString(b.TM)
 	}
-	if b.Ff != 0 {
-		if err := checkFlagVersions(rm.Out, b.Ff); err != nil {
+	if b.Flags != 0 {
+		if err := checkFlagVersions(rm.Out, b.Flags); err != nil {
 			return nil, err
 		}
-		dict["Ff"] = pdf.Integer(uint32(b.Ff))
+		dict["Ff"] = pdf.Integer(uint32(b.Flags))
 	}
 	if b.AA != nil {
 		if err := pdf.CheckVersion(rm.Out, "field AA entry", pdf.V1_3); err != nil {
@@ -189,7 +123,7 @@ func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 	}
 
 	// type-specific entries (V, DV, DA, Q, MaxLen, Opt, …)
-	if err := f.fillTypeDict(rm, dict); err != nil {
+	if err := f.fillDict(rm, dict); err != nil {
 		return nil, err
 	}
 

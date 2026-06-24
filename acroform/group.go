@@ -33,10 +33,10 @@ type Group struct {
 	Name string
 
 	// Kids holds the group's children: sub-groups and terminal fields.
-	Kids []TreeNode
+	Kids []Node
 }
 
-// PartialName implements the [TreeNode] interface.
+// PartialName implements the [Node] interface.
 func (g *Group) PartialName() string { return g.Name }
 
-var _ TreeNode = (*Group)(nil)
+var _ Node = (*Group)(nil)

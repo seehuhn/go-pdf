@@ -24,8 +24,8 @@ package acroform
 
 // NewTextField returns a new text field (field type "Tx") with the given
 // partial name.
-func NewTextField(name string) *FieldTx {
-	f := &FieldTx{}
+func NewTextField(name string) *TextField {
+	f := &TextField{}
 	f.Name = name
 	return f
 }
@@ -33,24 +33,24 @@ func NewTextField(name string) *FieldTx {
 // NewButtonField returns a new button field (field type "Btn") with the given
 // partial name. Set its flags to select a check box, radio button, or push
 // button.
-func NewButtonField(name string) *FieldBtn {
-	f := &FieldBtn{}
+func NewButtonField(name string) *ButtonField {
+	f := &ButtonField{}
 	f.Name = name
 	return f
 }
 
 // NewChoiceField returns a new choice field (field type "Ch") with the given
 // partial name.
-func NewChoiceField(name string) *FieldChoice {
-	f := &FieldChoice{}
+func NewChoiceField(name string) *ChoiceField {
+	f := &ChoiceField{}
 	f.Name = name
 	return f
 }
 
 // NewSignatureField returns a new signature field (field type "Sig") with the
 // given partial name.
-func NewSignatureField(name string) *FieldSig {
-	f := &FieldSig{}
+func NewSignatureField(name string) *SignatureField {
+	f := &SignatureField{}
 	f.Name = name
 	return f
 }

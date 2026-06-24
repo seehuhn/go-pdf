@@ -18,23 +18,26 @@
 // the PDF specification chapter 12.7.
 //
 // A document's interactive form is an [InteractiveForm], referenced from the
-// AcroForm entry in the document catalog. It holds a tree of nodes ([TreeNode]):
-// terminal fields ([Field]) and interior [Group]s that merely group their
-// descendants under a common name. Each terminal field has a concrete type: a
-// [FieldTx] (text), [FieldBtn] (button), [FieldChoice] (choice), or [FieldSig]
-// (signature).
+// AcroForm entry in the document catalog.  At most one form can be associated
+// with a PDF document.
+//
+// Internally, the interactive form is structured as a tree. Internal nodes are
+// represented by the [*Group] type, while leaf nodes are represented by four
+// concrete field types:
+//   - [TextField] for text input,
+//   - [ButtonField] for push buttons, check boxes, and radio buttons,
+//   - [ChoiceField] for list boxes and combo boxes, and
+//   - [SignatureField] for digital signatures.
+//
+// The [Field] interface is implemented by all four leaf types, while the
+// [Node] interface represents both internal and leaf nodes in the tree.
 //
 // A field tree is plain top-down data. Build it from [Group] literals and the
-// field constructors ([NewTextField] and friends), placing children directly in
-// a [Group.Kids] slice or in [InteractiveForm.Fields]. Attach a field's on-page
-// appearance with "seehuhn.de/go/pdf/annotation".AddWidget. Iterate the terminal
-// fields, with their fully qualified names, using [InteractiveForm.AllFields].
-//
-// In a PDF file many field attributes are inheritable: a field without its own
-// value takes its nearest ancestor's (12.7.4.1). This package hides that. A
-// decoded field carries fully resolved values, and the encoder re-creates the
-// inheritance where it shrinks the file, invisibly. There are therefore no
-// inheritance helpers.
+// field constructors ([NewTextField] and friends), placing children directly
+// in a [Group.Kids] slice or in [InteractiveForm.Fields]. Attach a field's
+// on-page appearance with "seehuhn.de/go/pdf/annotation".AddWidget. Iterate
+// the terminal fields, with their fully qualified names, using
+// [InteractiveForm.AllFields].
 //
 // Forms and fields are read with the "seehuhn.de/go/pdf/annotation/decode"
 // package.

@@ -34,10 +34,10 @@ func TestTreeRoundTrip(t *testing.T) {
 	other := acroform.NewTextField("note")
 	other.DefaultAppearance = "/Helv 12 Tf 0 g"
 
-	root := &acroform.Group{Name: "request", Kids: []acroform.TreeNode{text, other}}
+	root := &acroform.Group{Name: "request", Kids: []acroform.Node{text, other}}
 
 	got := roundTripRoots(t, pdf.V1_7, root)
-	if diff := cmp.Diff(snapNodes([]acroform.TreeNode{root}), snapNodes(got), fieldCmpOptions()...); diff != "" {
+	if diff := cmp.Diff(snapNodes([]acroform.Node{root}), snapNodes(got), fieldCmpOptions()...); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }

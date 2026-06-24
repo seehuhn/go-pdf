@@ -65,7 +65,7 @@ func fieldCmpOptions() []cmp.Option {
 	return []cmp.Option{
 		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
-		cmpopts.IgnoreFields(annotation.Widget{}, "Parent"),
+		cmpopts.IgnoreFields(annotation.Widget{}, "Field"),
 		cmp.Comparer(func(a, b *form.Form) bool {
 			if a == nil || b == nil {
 				return a == b
@@ -82,7 +82,7 @@ type nodeSnap struct {
 	Kind     string
 	Name     string
 	TU, TM   string
-	Ff       acroform.FieldFlags
+	Flags    acroform.FieldFlags
 	AA       *triggers.Form
 	VT       acroform.VariableText
 	V, DV    pdf.Object
@@ -99,7 +99,7 @@ type nodeSnap struct {
 	Kids     []nodeSnap
 }
 
-func snapNodes(nodes []acroform.TreeNode) []nodeSnap {
+func snapNodes(nodes []acroform.Node) []nodeSnap {
 	out := make([]nodeSnap, len(nodes))
 	for i, n := range nodes {
 		out[i] = snapNode(n)
@@ -107,31 +107,31 @@ func snapNodes(nodes []acroform.TreeNode) []nodeSnap {
 	return out
 }
 
-func snapNode(n acroform.TreeNode) nodeSnap {
+func snapNode(n acroform.Node) nodeSnap {
 	s := nodeSnap{Name: n.PartialName()}
 	switch f := n.(type) {
 	case *acroform.Group:
 		s.Kind = "Group"
 		s.Kids = snapNodes(f.Kids)
-	case *acroform.FieldTx:
+	case *acroform.TextField:
 		s.Kind = "Tx"
-		s.TU, s.TM, s.Ff, s.AA = f.TU, f.TM, f.Ff, f.AA
+		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
 		s.VT, s.V, s.DV, s.MaxLen = f.VariableText, f.V, f.DV, f.MaxLen
 		s.Widgets = widgetsOf(f)
-	case *acroform.FieldBtn:
+	case *acroform.ButtonField:
 		s.Kind = "Btn"
-		s.TU, s.TM, s.Ff, s.AA = f.TU, f.TM, f.Ff, f.AA
+		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
 		s.VT, s.BtnV, s.BtnDV, s.BtnOpt = f.VariableText, f.V, f.DV, f.Opt
 		s.Widgets = widgetsOf(f)
-	case *acroform.FieldChoice:
+	case *acroform.ChoiceField:
 		s.Kind = "Ch"
-		s.TU, s.TM, s.Ff, s.AA = f.TU, f.TM, f.Ff, f.AA
+		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
 		s.VT, s.V, s.DV = f.VariableText, f.V, f.DV
 		s.ChOpt, s.TopIndex, s.Selected = f.Opt, f.TopIndex, f.Selected
 		s.Widgets = widgetsOf(f)
-	case *acroform.FieldSig:
+	case *acroform.SignatureField:
 		s.Kind = "Sig"
-		s.TU, s.TM, s.Ff, s.AA = f.TU, f.TM, f.Ff, f.AA
+		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
 		s.V, s.DV, s.Lock, s.SV = f.V, f.DV, f.Lock, f.SV
 		s.Widgets = widgetsOf(f)
 	}
@@ -139,7 +139,7 @@ func snapNode(n acroform.TreeNode) nodeSnap {
 }
 
 func widgetsOf(f acroform.Field) []*annotation.Widget {
-	ws := f.Widgets()
+	ws := f.GetCommon().Widgets
 	if len(ws) == 0 {
 		return nil
 	}
@@ -153,7 +153,7 @@ func widgetsOf(f acroform.Field) []*annotation.Widget {
 // roundTripRoots encodes the given field-tree roots as an interactive form,
 // writes their widgets as their pages would, then decodes the form and returns
 // its fields.
-func roundTripRoots(t *testing.T, version pdf.Version, roots ...acroform.TreeNode) []acroform.TreeNode {
+func roundTripRoots(t *testing.T, version pdf.Version, roots ...acroform.Node) []acroform.Node {
 	t.Helper()
 	form := &acroform.InteractiveForm{Fields: roots}
 	return roundTripForm(t, version, form).Fields
@@ -204,7 +204,7 @@ func roundTripForm(t *testing.T, version pdf.Version, want *acroform.Interactive
 
 // storeWidgets writes every widget annotation in the field tree, standing in for
 // the pages that would normally write them.
-func storeWidgets(rm *pdf.ResourceManager, nodes []acroform.TreeNode) error {
+func storeWidgets(rm *pdf.ResourceManager, nodes []acroform.Node) error {
 	for _, n := range nodes {
 		switch f := n.(type) {
 		case *acroform.Group:
@@ -212,7 +212,7 @@ func storeWidgets(rm *pdf.ResourceManager, nodes []acroform.TreeNode) error {
 				return err
 			}
 		case acroform.Field:
-			for _, wg := range f.Widgets() {
+			for _, wg := range f.GetCommon().Widgets {
 				if _, err := rm.Store(wg); err != nil {
 					return err
 				}
@@ -229,13 +229,13 @@ var formTestCases = []struct {
 	{
 		name: "minimal",
 		form: &acroform.InteractiveForm{
-			Fields: []acroform.TreeNode{acroform.NewTextField("f0")},
+			Fields: []acroform.Node{acroform.NewTextField("f0")},
 		},
 	},
 	{
 		name: "flags and defaults",
 		form: &acroform.InteractiveForm{
-			Fields:          []acroform.TreeNode{acroform.NewTextField("f0"), acroform.NewTextField("f1")},
+			Fields:          []acroform.Node{acroform.NewTextField("f0"), acroform.NewTextField("f1")},
 			NeedAppearances: true,
 			SigFlags:        acroform.SignaturesExist | acroform.AppendOnly,
 		},
@@ -246,7 +246,7 @@ var formTestCases = []struct {
 			f0 := acroform.NewTextField("calc0")
 			f1 := acroform.NewTextField("calc1")
 			return &acroform.InteractiveForm{
-				Fields:           []acroform.TreeNode{f0, f1},
+				Fields:           []acroform.Node{f0, f1},
 				CalculationOrder: []acroform.Field{f1, f0},
 			}
 		}(),
@@ -254,14 +254,14 @@ var formTestCases = []struct {
 	{
 		name: "xfa",
 		form: &acroform.InteractiveForm{
-			Fields: []acroform.TreeNode{acroform.NewTextField("f0")},
+			Fields: []acroform.Node{acroform.NewTextField("f0")},
 			XFA:    pdf.Array{pdf.String("template"), pdf.String("<xdp/>")},
 		},
 	},
 	{
 		name: "default resources",
 		form: &acroform.InteractiveForm{
-			Fields:           []acroform.TreeNode{acroform.NewTextField("f0")},
+			Fields:           []acroform.Node{acroform.NewTextField("f0")},
 			DefaultResources: &content.Resources{SingleUse: true},
 		},
 	},
@@ -351,7 +351,7 @@ func FuzzFormRoundTrip(f *testing.F) {
 			}
 		}
 		for _, tc := range fieldTestCases() {
-			form := &acroform.InteractiveForm{Fields: []acroform.TreeNode{tc.root}}
+			form := &acroform.InteractiveForm{Fields: []acroform.Node{tc.root}}
 			if data, ok := encodeFormBytes(version, opt, form); ok {
 				f.Add(data)
 			}
@@ -386,14 +386,12 @@ func encodeFormBytes(version pdf.Version, opt *pdf.WriterOptions, form *acroform
 		return nil, false
 	}
 	rm := pdf.NewResourceManager(w)
-	ref, err := rm.Store(form)
-	if err != nil {
-		return nil, false
-	}
+	// the widgets reserve their references (as a page would); the form is
+	// encoded at Close and fills them in
 	if err := storeWidgets(rm, form.Fields); err != nil {
 		return nil, false
 	}
-	w.GetMeta().Catalog.AcroForm = ref
+	w.GetMeta().Catalog.AcroForm = rm.StoreDeferred(form)
 	if err := rm.Close(); err != nil {
 		return nil, false
 	}
@@ -414,18 +412,18 @@ func TestFormFixedPoint(t *testing.T) {
 			forms = append(forms, tc.form)
 		}
 		for _, tc := range fieldTestCases() {
-			forms = append(forms, &acroform.InteractiveForm{Fields: []acroform.TreeNode{tc.root}})
+			forms = append(forms, &acroform.InteractiveForm{Fields: []acroform.Node{tc.root}})
 		}
 		// a deeper tree with shared inheritable attributes to hoist
-		mk := func(name, da string) *acroform.FieldTx {
+		mk := func(name, da string) *acroform.TextField {
 			f := acroform.NewTextField(name)
 			f.DefaultAppearance = da
 			f.Align = pdf.TextAlignCenter
 			return f
 		}
 		forms = append(forms, &acroform.InteractiveForm{
-			Fields: []acroform.TreeNode{
-				&acroform.Group{Name: "g", Kids: []acroform.TreeNode{
+			Fields: []acroform.Node{
+				&acroform.Group{Name: "g", Kids: []acroform.Node{
 					mk("a", "/Helv 12 Tf"), mk("b", "/Helv 12 Tf"), mk("c", "/Helv 12 Tf"),
 				}},
 				mk("d", "/Helv 12 Tf"),

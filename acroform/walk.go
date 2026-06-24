@@ -35,7 +35,7 @@ func (f *InteractiveForm) AllFields() iter.Seq2[string, Field] {
 // walkFields visits the terminal fields of the subtree rooted at node,
 // prefixing each fully qualified name with prefix. It returns false as soon as
 // yield returns false, to stop the iteration.
-func walkFields(node TreeNode, prefix string, yield func(string, Field) bool) bool {
+func walkFields(node Node, prefix string, yield func(string, Field) bool) bool {
 	name := joinName(prefix, node.PartialName())
 	switch t := node.(type) {
 	case *Group:
