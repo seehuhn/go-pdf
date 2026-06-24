@@ -29,12 +29,12 @@ import (
 // and value attributes flattened back onto each terminal
 func TestTreeRoundTrip(t *testing.T) {
 	text := acroform.NewTextField("text")
-	text.V = pdf.String("hello")
+	text.V = &pdf.StringOrStream{Value: "hello"}
 	text.DefaultAppearance = "/Helv 12 Tf 0 g"
 	other := acroform.NewTextField("note")
 	other.DefaultAppearance = "/Helv 12 Tf 0 g"
 
-	root := &acroform.Group{Name: "request", Kids: []acroform.Node{text, other}}
+	root := &acroform.Group{Name: "request", Children: []acroform.Node{text, other}}
 
 	got := roundTripRoots(t, pdf.V1_7, root)
 	if diff := cmp.Diff(snapNodes([]acroform.Node{root}), snapNodes(got), fieldCmpOptions()...); diff != "" {

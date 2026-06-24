@@ -34,11 +34,11 @@
 //
 // A field tree is plain top-down data. Build it from [Group] literals and the
 // field constructors ([NewTextField] and friends), placing children directly
-// in a [Group.Kids] slice or in [InteractiveForm.Fields]. Attach a field's
+// in a [Group.Children] slice or in [InteractiveForm.Fields]. Attach a field's
 // on-page appearance with "seehuhn.de/go/pdf/annotation".AddWidget. Iterate
 // the terminal fields, with their fully qualified names, using
 // [InteractiveForm.AllFields].
 //
-// Forms and fields are read with the "seehuhn.de/go/pdf/annotation/decode"
-// package.
+// Interactive forms are read using [seehuhn.de/go/pdf/annotation/decode.Form]
+// and written using [InteractiveForm.Encode].
 package acroform

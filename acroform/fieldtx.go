@@ -24,22 +24,25 @@ import (
 
 // PDF 2.0 sections: 12.7.5.3
 
-// TextField is a text input form field (field type "Tx").
+// TextField is a text input form field.
+//
+// Use [seehuhn.de/go/pdf/annotation.AddWidget] to add a visual representation
+// of the field to a page.
 type TextField struct {
 	Common
 
 	VariableText
 
-	// V (optional) is the field's text value, a text string or a text stream.
+	// V (optional) is the field's text value.
 	//
 	// This corresponds to the /V entry in the PDF field dictionary.
-	V pdf.Object
+	V *pdf.StringOrStream
 
 	// DV (optional) is the field's default text value, used when the form is
 	// reset.
 	//
 	// This corresponds to the /DV entry in the PDF field dictionary.
-	DV pdf.Object
+	DV *pdf.StringOrStream
 
 	// MaxLen is the maximum length of the field's text in characters. A value
 	// of zero indicates that no maximum is set. A field with the [FieldComb]
@@ -59,10 +62,18 @@ func (f *TextField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		return err
 	}
 	if f.V != nil {
-		dict["V"] = f.V
+		obj, err := rm.Embed(*f.V)
+		if err != nil {
+			return err
+		}
+		dict["V"] = obj
 	}
 	if f.DV != nil {
-		dict["DV"] = f.DV
+		obj, err := rm.Embed(*f.DV)
+		if err != nil {
+			return err
+		}
+		dict["DV"] = obj
 	}
 	// the Comb flag requires a MaxLen and may not be combined with the
 	// Multiline, Password or FileSelect flags

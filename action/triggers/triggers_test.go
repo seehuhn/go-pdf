@@ -29,7 +29,7 @@ import (
 // test actions
 var (
 	uriAction = &action.URI{URI: "https://example.com/"}
-	jsAction  = &action.JavaScript{JS: pdf.String("app.alert('Hello');")}
+	jsAction  = &action.JavaScript{JS: &pdf.StringOrStream{Value: "app.alert('Hello');"}}
 )
 
 // --- Annotation tests ---

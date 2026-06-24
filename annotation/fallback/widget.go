@@ -97,7 +97,9 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	}
 	switch x := f.(type) {
 	case *acroform.TextField:
-		p.Value = valueText(x.V)
+		if x.V != nil {
+			p.Value = x.V.Value
+		}
 		p.MaxLen = x.MaxLen
 	case *acroform.ChoiceField:
 		p.Options = make([]string, len(x.Opt))
@@ -160,21 +162,10 @@ func choiceValue(x *acroform.ChoiceField) string {
 			return x.Opt[i].Display
 		}
 	}
-	return valueText(x.V)
-}
-
-// valueText renders a stored field value as display text.
-func valueText(obj pdf.Object) string {
-	switch v := obj.(type) {
-	case pdf.String:
-		return string(v.AsTextString())
-	case pdf.TextString:
-		return string(v)
-	case pdf.Name:
-		return string(v)
-	default:
-		return ""
+	if len(x.V) > 0 {
+		return x.V[0]
 	}
+	return ""
 }
 
 // addWidgetAppearance generates the appearance stream(s) for a form-field widget

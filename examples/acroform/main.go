@@ -169,7 +169,7 @@ func (b *formBuilder) addText(name, value string, flags acroform.FieldFlags, rec
 	f.Flags = flags
 	f.DefaultAppearance = textAppearance
 	if value != "" {
-		f.V = pdf.TextString(value)
+		f.V = &pdf.StringOrStream{Value: value}
 	}
 	b.form.Fields = append(b.form.Fields, f)
 	b.attach(f, rect, b.style)
@@ -182,7 +182,9 @@ func (b *formBuilder) addCombo(name string, options []string, value string, rect
 	for _, option := range options {
 		f.Opt = append(f.Opt, acroform.ChoiceOption{Display: option, Export: option})
 	}
-	f.V = pdf.TextString(value)
+	if value != "" {
+		f.V = []string{value}
+	}
 	b.form.Fields = append(b.form.Fields, f)
 	b.attach(f, rect, b.style)
 }

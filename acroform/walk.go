@@ -39,7 +39,7 @@ func walkFields(node Node, prefix string, yield func(string, Field) bool) bool {
 	name := joinName(prefix, node.PartialName())
 	switch t := node.(type) {
 	case *Group:
-		for _, kid := range t.Kids {
+		for _, kid := range t.Children {
 			if !walkFields(kid, name, yield) {
 				return false
 			}

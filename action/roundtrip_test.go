@@ -239,7 +239,7 @@ var actionTestCases = []pdf.Action{
 	&GoTo3DView{TA: pdf.Reference(1), V: pdf.Name("Default")},
 
 	// JavaScript
-	&JavaScript{JS: pdf.String("app.alert('Hello');")},
+	&JavaScript{JS: &pdf.StringOrStream{Value: "app.alert('Hello');"}},
 
 	// RichMediaExecute (PDF 2.0)
 	&RichMediaExecute{TA: pdf.Reference(1)},
@@ -257,7 +257,7 @@ var actionTestCases = []pdf.Action{
 		},
 	},
 	&JavaScript{
-		JS:   pdf.String("app.alert('test');"),
+		JS:   &pdf.StringOrStream{Value: "app.alert('test');"},
 		Next: ActionList{&Named{N: "LastPage"}},
 	},
 	&Hide{

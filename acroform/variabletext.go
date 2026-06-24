@@ -50,11 +50,11 @@ type VariableText struct {
 	// This corresponds to the /DS entry.
 	DefaultStyle string
 
-	// RichValue (optional) is a rich-text value, a stream or text string. The
-	// library treats this value as opaque.
+	// RichValue (optional) is a rich-text value. The library treats its
+	// content as opaque.
 	//
 	// This corresponds to the /RV entry.
-	RichValue pdf.Object
+	RichValue *pdf.StringOrStream
 }
 
 // GetVariableText returns the variable-text attributes.
@@ -99,7 +99,11 @@ func (v *VariableText) fillVarTextDict(rm *pdf.ResourceManager, dict pdf.Dict) e
 		if err := pdf.CheckVersion(w, "field RV entry", pdf.V1_5); err != nil {
 			return err
 		}
-		dict["RV"] = v.RichValue
+		obj, err := rm.Embed(*v.RichValue)
+		if err != nil {
+			return err
+		}
+		dict["RV"] = obj
 	}
 
 	return nil

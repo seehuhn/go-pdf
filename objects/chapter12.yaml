@@ -63,12 +63,12 @@ types:
     purpose: Next is the sequence of actions to perform after this action.
   - goName: JS
     pdfKey: JS
-    pdfType: stream;text-string
+    pdfType: fn:SinceVersion(1.5,stream);text-string
     required: true
     introduced: '1.3'
     refTypes:
     - Stream
-    goType: pdf.Object
+    goType: '*pdf.StringOrStream'
     purpose: 'JS is the JavaScript code to execute.
 
       Can be a text string or a stream.'
@@ -1234,7 +1234,7 @@ types:
     introduced: '1.5'
     refTypes:
     - Stream
-    goType: pdf.Object
+    goType: '*pdf.StringOrStream'
     purpose: JS is the ECMAScript to execute.
   goPackage: action
   goRepr: struct
@@ -3016,7 +3016,7 @@ types:
     pdfType: stream;text-string
     required: false
     introduced: '1.5'
-    goType: pdf.Object
+    goType: '*pdf.StringOrStream'
     refTypes:
     - Stream
     purpose: Rich text content.
@@ -5828,13 +5828,13 @@ types:
     required: false
     introduced: '1.2'
     goType: string
-  - goName: TU
+  - goName: AltName
     pdfKey: TU
     pdfType: text-string
     required: false
     introduced: '1.3'
     goType: string
-  - goName: TM
+  - goName: ExportName
     pdfKey: TM
     pdfType: text-string
     required: false
@@ -5895,7 +5895,7 @@ types:
     pdfType: stream;text-string
     required: false
     introduced: '1.5'
-    goType: pdf.Object
+    goType: '*pdf.StringOrStream'
     refTypes:
     - Stream
 - name: ButtonField
@@ -5993,14 +5993,14 @@ types:
     pdfType: array;text-string
     required: false
     introduced: '1.2'
-    goType: pdf.Object
+    goType: '[]string'
     inheritable: true
   - goName: DV
     pdfKey: DV
     pdfType: array;text-string
     required: false
     introduced: '1.2'
-    goType: pdf.Object
+    goType: '[]string'
     inheritable: true
 - name: FieldMDPTransformParameters
   purpose: transform parameters for MDP signature fields
@@ -6126,16 +6126,16 @@ types:
     pdfType: fn:SinceVersion(1.5,stream);text-string
     required: false
     introduced: '1.2'
-    goType: pdf.Object
+    goType: '*pdf.StringOrStream'
     inheritable: true
     refTypes:
     - Stream
   - goName: DV
     pdfKey: DV
-    pdfType: stream;text-string
+    pdfType: fn:SinceVersion(1.5,stream);text-string
     required: false
     introduced: '1.2'
-    goType: pdf.Object
+    goType: '*pdf.StringOrStream'
     inheritable: true
     refTypes:
     - Stream

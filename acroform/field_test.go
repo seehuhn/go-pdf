@@ -50,10 +50,10 @@ func TestAllFields(t *testing.T) {
 	leaf := NewTextField("ZipCode")
 	form := &InteractiveForm{
 		Fields: []Node{
-			&Group{Name: "PersonalData", Kids: []Node{
-				&Group{Name: "Address", Kids: []Node{leaf}},
+			&Group{Name: "PersonalData", Children: []Node{
+				&Group{Name: "Address", Children: []Node{leaf}},
 				// an anonymous group contributes no name component
-				&Group{Kids: []Node{NewTextField("Phone")}},
+				&Group{Children: []Node{NewTextField("Phone")}},
 			}},
 		},
 	}
@@ -93,10 +93,10 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		field   Field
 	}{
 		{"field requires 1.2", pdf.V1_1, NewTextField("x")},
-		{"TU requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.TU = "label" })},
-		{"TM requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.TM = "map" })},
+		{"TU requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.AltName = "label" })},
+		{"TM requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.ExportName = "map" })},
 		{"AA requires 1.3", pdf.V1_2, tx(func(f *TextField) {
-			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: pdf.String("0;")}}
+			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: "0;"}}}
 		})},
 		{"signature field requires 1.3", pdf.V1_2, NewSignatureField("x")},
 		{"button Opt requires 1.4", pdf.V1_3, func() Field {

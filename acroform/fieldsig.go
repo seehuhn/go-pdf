@@ -20,9 +20,12 @@ import "seehuhn.de/go/pdf"
 
 // PDF 2.0 sections: 12.7.5.5
 
-// SignatureField is a digital signature form field (field type "Sig").
+// SignatureField is a digital signature form field.
 //
 // The signature value is kept opaque.
+//
+// Use [seehuhn.de/go/pdf/annotation.AddWidget] to add a visual representation
+// of the field to a page.
 type SignatureField struct {
 	Common
 

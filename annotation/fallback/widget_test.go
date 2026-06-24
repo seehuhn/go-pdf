@@ -35,7 +35,7 @@ func combWidget(value string, maxLen int, align pdf.TextAlign) *annotation.Widge
 	f.Flags = acroform.FieldComb
 	f.MaxLen = maxLen
 	f.Align = align
-	f.V = pdf.TextString(value)
+	f.V = &pdf.StringOrStream{Value: value}
 
 	return annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 62, URy: 20})
 }

@@ -85,11 +85,15 @@ type nodeSnap struct {
 	Flags    acroform.FieldFlags
 	AA       *triggers.Form
 	VT       acroform.VariableText
-	V, DV    pdf.Object
+	V, DV    *pdf.StringOrStream
+	SigV     pdf.Object
+	SigDV    pdf.Object
 	MaxLen   int
 	BtnV     pdf.Name
 	BtnDV    pdf.Name
 	BtnOpt   []string
+	ChV      []string
+	ChDV     []string
 	ChOpt    []acroform.ChoiceOption
 	TopIndex int
 	Selected []int
@@ -112,27 +116,27 @@ func snapNode(n acroform.Node) nodeSnap {
 	switch f := n.(type) {
 	case *acroform.Group:
 		s.Kind = "Group"
-		s.Kids = snapNodes(f.Kids)
+		s.Kids = snapNodes(f.Children)
 	case *acroform.TextField:
 		s.Kind = "Tx"
-		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
+		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
 		s.VT, s.V, s.DV, s.MaxLen = f.VariableText, f.V, f.DV, f.MaxLen
 		s.Widgets = widgetsOf(f)
 	case *acroform.ButtonField:
 		s.Kind = "Btn"
-		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
+		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
 		s.VT, s.BtnV, s.BtnDV, s.BtnOpt = f.VariableText, f.V, f.DV, f.Opt
 		s.Widgets = widgetsOf(f)
 	case *acroform.ChoiceField:
 		s.Kind = "Ch"
-		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
-		s.VT, s.V, s.DV = f.VariableText, f.V, f.DV
+		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
+		s.VT, s.ChV, s.ChDV = f.VariableText, f.V, f.DV
 		s.ChOpt, s.TopIndex, s.Selected = f.Opt, f.TopIndex, f.Selected
 		s.Widgets = widgetsOf(f)
 	case *acroform.SignatureField:
 		s.Kind = "Sig"
-		s.TU, s.TM, s.Flags, s.AA = f.TU, f.TM, f.Flags, f.AA
-		s.V, s.DV, s.Lock, s.SV = f.V, f.DV, f.Lock, f.SV
+		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
+		s.SigV, s.SigDV, s.Lock, s.SV = f.V, f.DV, f.Lock, f.SV
 		s.Widgets = widgetsOf(f)
 	}
 	return s
@@ -208,7 +212,7 @@ func storeWidgets(rm *pdf.ResourceManager, nodes []acroform.Node) error {
 	for _, n := range nodes {
 		switch f := n.(type) {
 		case *acroform.Group:
-			if err := storeWidgets(rm, f.Kids); err != nil {
+			if err := storeWidgets(rm, f.Children); err != nil {
 				return err
 			}
 		case acroform.Field:
@@ -423,7 +427,7 @@ func TestFormFixedPoint(t *testing.T) {
 		}
 		forms = append(forms, &acroform.InteractiveForm{
 			Fields: []acroform.Node{
-				&acroform.Group{Name: "g", Kids: []acroform.Node{
+				&acroform.Group{Name: "g", Children: []acroform.Node{
 					mk("a", "/Helv 12 Tf"), mk("b", "/Helv 12 Tf"), mk("c", "/Helv 12 Tf"),
 				}},
 				mk("d", "/Helv 12 Tf"),

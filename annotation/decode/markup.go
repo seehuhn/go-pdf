@@ -38,7 +38,9 @@ func decodeMarkup(c pdf.Cursor, dict pdf.Dict, markup *annotation.Markup) error 
 	}
 
 	// RC (optional)
-	if rc := dict["RC"]; rc != nil {
+	if rc, err := stringOrStreamPtr(c, dict["RC"]); err != nil {
+		return err
+	} else {
 		markup.RC = rc
 	}
 

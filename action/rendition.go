@@ -45,7 +45,7 @@ type Rendition struct {
 	OP optional.UInt
 
 	// JS is the ECMAScript to execute.
-	JS pdf.Object
+	JS *pdf.StringOrStream
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -96,7 +96,11 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if a.JS != nil {
-		dict["JS"] = a.JS
+		js, err := rm.Embed(*a.JS)
+		if err != nil {
+			return nil, err
+		}
+		dict["JS"] = js
 	}
 
 	if next, err := a.Next.Encode(rm); err != nil {
@@ -141,6 +145,15 @@ func decodeRendition(c pdf.Cursor, dict pdf.Dict) (*Rendition, error) {
 		}
 	}
 
+	var js *pdf.StringOrStream
+	if dict["JS"] != nil {
+		sos, err := c.StringOrStream(dict["JS"])
+		if err != nil {
+			return nil, err
+		}
+		js = &sos
+	}
+
 	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
@@ -150,7 +163,7 @@ func decodeRendition(c pdf.Cursor, dict pdf.Dict) (*Rendition, error) {
 		R:    r,
 		AN:   an,
 		OP:   op,
-		JS:   dict["JS"],
+		JS:   js,
 		Next: next,
 	}, nil
 }

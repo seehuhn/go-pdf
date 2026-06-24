@@ -227,7 +227,7 @@ func (f *InteractiveForm) buildEncNode(rm *pdf.ResourceManager, node Node, seenN
 		if strings.Contains(t.Name, ".") {
 			return nil, errors.New("group partial name must not contain a period")
 		}
-		if len(t.Kids) == 0 {
+		if len(t.Children) == 0 {
 			return nil, errors.New("group without children")
 		}
 		dict := pdf.Dict{}
@@ -235,7 +235,7 @@ func (f *InteractiveForm) buildEncNode(rm *pdf.ResourceManager, node Node, seenN
 			dict["T"] = pdf.TextString(t.Name)
 		}
 		n := &encNode{group: t, dict: dict}
-		for _, kid := range t.Kids {
+		for _, kid := range t.Children {
 			kn, err := f.buildEncNode(rm, kid, seenNode, seenWidget, inTree)
 			if err != nil {
 				return nil, err

@@ -38,10 +38,10 @@ type Markup struct {
 	// pop-up window when the annotation is open.
 	Popup pdf.Reference
 
-	// RC (optional) is a rich text string or stream providing a formatted
-	// representation of the annotation's contents. When both Contents and RC
-	// are present, their textual content should be equivalent.
-	RC pdf.Object
+	// RC (optional) is a rich-text value providing a formatted representation
+	// of the annotation's contents. When both Contents and RC are present,
+	// their textual content should be equivalent.
+	RC *pdf.StringOrStream
 
 	// CreationDate (optional) is the date and time when the
 	// annotation was created.
@@ -117,7 +117,11 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 		if err := pdf.CheckVersion(w, "markup annotation RC entry", pdf.V1_5); err != nil {
 			return err
 		}
-		d["RC"] = m.RC
+		obj, err := rm.Embed(*m.RC)
+		if err != nil {
+			return err
+		}
+		d["RC"] = obj
 	}
 
 	if !m.CreationDate.IsZero() {

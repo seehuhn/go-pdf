@@ -29,7 +29,10 @@ type ChoiceOption struct {
 }
 
 // ChoiceField is a choice form field: a list box, or a combo box when the
-// [FieldCombo] flag is set (field type "Ch").
+// [FieldCombo] flag is set.
+//
+// Use [seehuhn.de/go/pdf/annotation.AddWidget] to add a visual representation
+// of the field to a page.
 type ChoiceField struct {
 	Common
 	VariableText
@@ -51,16 +54,18 @@ type ChoiceField struct {
 	// This corresponds to the /I entry in the PDF field dictionary.
 	Selected []int
 
-	// V (optional) is the field's value: the display string of the selected
-	// option, or an array of strings for a multi-select field.
+	// V (optional) holds the display strings of the currently selected options.
+	// A single-selection field has at most one entry.
 	//
-	// This corresponds to the /V entry in the PDF field dictionary.
-	V pdf.Object
+	// This corresponds to the /V entry in the PDF field dictionary, which stores
+	// a bare text string for a single selection and an array of text strings for
+	// multiple selections.
+	V []string
 
-	// DV (optional) is the field's default value, used when the form is reset.
+	// DV (optional) holds the default selection, used when the form is reset.
 	//
 	// This corresponds to the /DV entry in the PDF field dictionary.
-	DV pdf.Object
+	DV []string
 }
 
 var _ Field = (*ChoiceField)(nil)
@@ -96,11 +101,29 @@ func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		}
 		dict["I"] = arr
 	}
-	if f.V != nil {
-		dict["V"] = f.V
+	if v := choiceValueObject(f.V); v != nil {
+		dict["V"] = v
 	}
-	if f.DV != nil {
-		dict["DV"] = f.DV
+	if dv := choiceValueObject(f.DV); dv != nil {
+		dict["DV"] = dv
 	}
 	return nil
+}
+
+// choiceValueObject converts a choice field's selection to its PDF
+// representation: nil when nothing is selected, a bare text string for a single
+// selection, and an array of text strings for multiple selections.
+func choiceValueObject(vals []string) pdf.Object {
+	switch len(vals) {
+	case 0:
+		return nil
+	case 1:
+		return pdf.TextString(vals[0])
+	default:
+		arr := make(pdf.Array, len(vals))
+		for i, s := range vals {
+			arr[i] = pdf.TextString(s)
+		}
+		return arr
+	}
 }

@@ -277,7 +277,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		tx.Align = d.align
 		tx.MaxLen = d.maxLen
 		if d.value != "" {
-			tx.V = pdf.TextString(d.value)
+			tx.V = &pdf.StringOrStream{Value: d.value}
 		}
 		f = tx
 
@@ -291,7 +291,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 			ch.Opt = append(ch.Opt, acroform.ChoiceOption{Display: o, Export: o})
 		}
 		if d.value != "" {
-			ch.V = pdf.TextString(d.value)
+			ch.V = []string{d.value}
 		}
 		f = ch
 

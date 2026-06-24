@@ -37,11 +37,14 @@ const (
 	ButtonPush
 )
 
-// ButtonField is a button form field (field type "Btn").
+// ButtonField is a button form field.
 //
 // The three button kinds — check box, radio button, and push button — share one
 // dictionary layout and differ only in their flags, so a single type represents
 // all of them. Use [ButtonField.Variant] to obtain the kind.
+//
+// Use [seehuhn.de/go/pdf/annotation.AddWidget] to add a visual representation
+// of the field to a page.
 type ButtonField struct {
 	Common
 

@@ -227,10 +227,10 @@ func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherite
 			return nil, err
 		}
 		if res != nil && res.node != nil {
-			g.Kids = append(g.Kids, res.node)
+			g.Children = append(g.Children, res.node)
 		}
 	}
-	if len(g.Kids) == 0 {
+	if len(g.Children) == 0 {
 		return nil, nil
 	}
 	return g, nil
@@ -288,10 +288,16 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 	switch eff.ft {
 	case "Tx":
 		f := acroform.NewTextField(name)
-		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
-		fillVariableText(c, dict, eff, &f.VariableText)
-		f.V = eff.v
-		f.DV = eff.dv
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
+			return nil, err
+		}
+		if f.V, err = stringOrStreamPtr(c, eff.v); err != nil {
+			return nil, err
+		}
+		if f.DV, err = stringOrStreamPtr(c, eff.dv); err != nil {
+			return nil, err
+		}
 		f.MaxLen = eff.maxLen
 		// the Comb flag is valid only with a MaxLen and with Multiline, Password
 		// and FileSelect all clear; drop an invalid one so the field stays
@@ -306,8 +312,10 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 
 	case "Btn":
 		f := acroform.NewButtonField(name)
-		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
-		fillVariableText(c, dict, eff, &f.VariableText)
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
+			return nil, err
+		}
 		if v, err := pdf.Optional(c.Name(eff.v)); err != nil {
 			return nil, err
 		} else {
@@ -325,10 +333,16 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 
 	case "Ch":
 		f := acroform.NewChoiceField(name)
-		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
-		fillVariableText(c, dict, eff, &f.VariableText)
-		f.V = eff.v
-		f.DV = eff.dv
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
+			return nil, err
+		}
+		if f.V, err = choiceFieldValue(c, eff.v); err != nil {
+			return nil, err
+		}
+		if f.DV, err = choiceFieldValue(c, eff.dv); err != nil {
+			return nil, err
+		}
 		// the choice /Opt is not inheritable; read it from the field itself
 		if arr, err := pdf.Optional(c.Array(dict["Opt"])); err != nil {
 			return nil, err
@@ -359,7 +373,7 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, 
 
 	case "Sig":
 		f := acroform.NewSignatureField(name)
-		f.TU, f.TM, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
 		f.V = eff.v
 		f.DV = eff.dv
 		if lock, err := pdf.DecodeOptional(c, dict["Lock"], sigFieldLock); err != nil {
@@ -393,16 +407,34 @@ func decodeFieldAA(c pdf.Cursor, dict pdf.Dict) (*triggers.Form, error) {
 	return aa, nil
 }
 
+// stringOrStreamPtr decodes an optional "text string or stream" value, returning
+// nil when the entry is absent.
+func stringOrStreamPtr(c pdf.Cursor, obj pdf.Object) (*pdf.StringOrStream, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	sos, err := pdf.Optional(c.StringOrStream(obj))
+	if err != nil {
+		return nil, err
+	}
+	return &sos, nil
+}
+
 // fillVariableText fills the variable-text attributes of a field. The default
 // appearance and quadding come from the effective context; the rich-text
 // entries (DS, RV) are not inheritable and are read from the field's own dict.
-func fillVariableText(c pdf.Cursor, dict pdf.Dict, eff inherited, v *acroform.VariableText) {
+func fillVariableText(c pdf.Cursor, dict pdf.Dict, eff inherited, v *acroform.VariableText) error {
 	v.DefaultAppearance = eff.da
 	v.Align = eff.q
 	if ds, err := pdf.Optional(c.TextString(dict["DS"])); err == nil {
 		v.DefaultStyle = string(ds)
 	}
-	v.RichValue = dict["RV"]
+	rv, err := stringOrStreamPtr(c, dict["RV"])
+	if err != nil {
+		return err
+	}
+	v.RichValue = rv
+	return nil
 }
 
 // partialName reads a field's partial name (/T), stripping any period so the
@@ -461,6 +493,37 @@ func decodeChoiceOption(c pdf.Cursor, el pdf.Object) (acroform.ChoiceOption, boo
 		return acroform.ChoiceOption{Export: s, Display: s}, true
 	}
 	return acroform.ChoiceOption{}, false
+}
+
+// choiceFieldValue reads a choice field's /V or /DV entry, which is a bare text
+// string for a single selection or an array of text strings for multiple
+// selections. A malformed length-one array is accepted as a single selection;
+// non-string entries are skipped. The result is nil when nothing is selected.
+func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]string, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	resolved, err := c.Resolve(obj)
+	if err != nil {
+		return nil, err
+	}
+	if arr, ok := resolved.(pdf.Array); ok {
+		var vals []string
+		for _, el := range arr {
+			s, err := c.Resolve(el)
+			if err != nil {
+				return nil, err
+			}
+			if str, ok := s.(pdf.String); ok {
+				vals = append(vals, string(str.AsTextString()))
+			}
+		}
+		return vals, nil
+	}
+	if str, ok := resolved.(pdf.String); ok {
+		return []string{string(str.AsTextString())}, nil
+	}
+	return nil, nil
 }
 
 // choiceOptionString reads obj as a text string. It returns false if obj is

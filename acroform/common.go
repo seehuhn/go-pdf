@@ -28,12 +28,16 @@ type Common struct {
 	// This corresponds to the /T entry in the PDF field dictionary.
 	Name string
 
-	// TU (optional) is an alternative field name used in the user interface
-	// and for accessibility.
-	TU string
+	// AltName (optional) is an alternative field name used in the user
+	// interface and for accessibility.
+	//
+	// This corresponds to the /TU entry in the PDF field dictionary.
+	AltName string
 
-	// TM (optional) is the mapping name used when exporting field data.
-	TM string
+	// ExportName (optional) is the mapping name used when exporting field data.
+	//
+	// This corresponds to the /TM entry in the PDF field dictionary.
+	ExportName string
 
 	// Flags holds the field flags.
 	//

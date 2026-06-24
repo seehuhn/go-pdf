@@ -18,22 +18,27 @@ package acroform
 
 // PDF 2.0 sections: 12.7.4.1 12.7.4.2
 
-// Group is an interior node of a field tree. It is not a field of its own; it
-// exists only to give its descendants a common partial-name prefix. In a PDF
-// file a group corresponds to a non-terminal field dictionary, which a spec
-// calls "merely a container for inheritable attributes" (12.7.4.1); the
-// inheritable attributes themselves are managed by the encoder and are not part
-// of this type.
+// Group is an interior node of a field tree which can be used to group fields
+// together.
+//
+// There are two reasons to use a group:
+//  1. To give a common partial field name to a set of fields, which is then
+//     prepended to the fully qualified names of all descendants.
+//  2. If some attributes have the same value for all descendants,
+//     PDF file size will be reduced by storing the attribute once in the group
+//     instead of repeating it for each descendant.
 type Group struct {
 	// Name (optional) is the partial field name shared by the group's
 	// descendants. An empty value contributes no component to their fully
 	// qualified names.
 	//
-	// This corresponds to the /T entry in the PDF field dictionary.
+	// This corresponds to the /T entry in the PDF dictionary.
 	Name string
 
-	// Kids holds the group's children: sub-groups and terminal fields.
-	Kids []Node
+	// Children holds the group's children: sub-groups and terminal fields.
+	//
+	// This corresponds to the /Kids entry in the PDF dictionary.
+	Children []Node
 }
 
 // PartialName implements the [Node] interface.

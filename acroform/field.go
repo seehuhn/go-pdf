@@ -54,18 +54,18 @@ type Node interface {
 type Field interface {
 	Node
 
-	// GetCommon returns the entries common to all field types.
-	GetCommon() *Common
-
 	// FieldType returns the PDF field type, one of "Btn", "Tx", "Ch", or "Sig".
 	FieldType() pdf.Name
+
+	// GetCommon returns the entries common to all field types.
+	GetCommon() *Common
 
 	fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error
 }
 
 // Widget represents the visual representation of a [Field] on a page. The only
-// implementation is "seehuhn.de/go/pdf/annotation".Widget; the interface
-// exists only to avoid dependency cycles.
+// implementation is "seehuhn.de/go/pdf/annotation".Widget; the interface type
+// is used to avoid dependency cycles.
 type Widget interface {
 	pdf.Encoder
 
@@ -93,17 +93,17 @@ func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 		}
 		dict["T"] = pdf.TextString(b.Name)
 	}
-	if b.TU != "" {
+	if b.AltName != "" {
 		if err := pdf.CheckVersion(rm.Out, "field TU entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["TU"] = pdf.TextString(b.TU)
+		dict["TU"] = pdf.TextString(b.AltName)
 	}
-	if b.TM != "" {
+	if b.ExportName != "" {
 		if err := pdf.CheckVersion(rm.Out, "field TM entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["TM"] = pdf.TextString(b.TM)
+		dict["TM"] = pdf.TextString(b.ExportName)
 	}
 	if b.Flags != 0 {
 		if err := checkFlagVersions(rm.Out, b.Flags); err != nil {

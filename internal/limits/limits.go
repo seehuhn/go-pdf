@@ -270,6 +270,13 @@ const (
 	// for CJK fonts while bounding decompression amplification.
 	MaxFontProgramBytes = 16 << 20
 
+	// MaxStringOrStreamBytes caps the decoded byte count of a value held
+	// in the "text string or stream" dual form (form field values, rich
+	// text contents, embedded scripts).  Such values carry text, never
+	// bulk data, so 16 MiB leaves ample headroom while bounding
+	// decompression amplification from the stream form.
+	MaxStringOrStreamBytes = 16 << 20
+
 	// MaxIndexedLookupBytes caps the decoded byte count of an Indexed
 	// color space lookup table.  PDF 32000-2 §8.6.6.3 bounds the
 	// table at (hival+1) * n bytes with hival <= 255 and n <= 32 in

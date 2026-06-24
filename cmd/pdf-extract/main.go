@@ -32,6 +32,7 @@ import (
 
 	"seehuhn.de/go/pdf/cmd/internal/buildinfo"
 	"seehuhn.de/go/pdf/cmd/internal/profile"
+	"seehuhn.de/go/pdf/cmd/pdf-extract/forms"
 	"seehuhn.de/go/pdf/cmd/pdf-extract/sections"
 	"seehuhn.de/go/pdf/cmd/pdf-extract/text"
 )
@@ -395,6 +396,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nQueries (no output file needed):\n")
 		fmt.Fprintf(os.Stderr, "  sections     list all sections in document\n")
 		fmt.Fprintf(os.Stderr, "  pages        show total page count\n")
+		fmt.Fprintf(os.Stderr, "  form         list interactive form fields and values\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf page 1 to page1.pdf\n")
 		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf section \"Intro\" to intro.txt\n")
@@ -500,6 +502,11 @@ func run(cfg config, cpuprofile, memprofile string) error {
 			return nil
 		case "page", "pages":
 			fmt.Printf("Total pages: %d\n", totalPages)
+			return nil
+		case "form":
+			if err := forms.List(doc, os.Stdout); err != nil {
+				return fmt.Errorf("failed to list form fields: %w", err)
+			}
 			return nil
 		}
 	}

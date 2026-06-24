@@ -25,8 +25,7 @@ import (
 // JavaScript represents a JavaScript action that executes ECMAScript.
 type JavaScript struct {
 	// JS is the JavaScript code to execute.
-	// Can be a text string or a stream.
-	JS pdf.Object
+	JS *pdf.StringOrStream
 
 	// Next is the sequence of actions to perform after this action.
 	Next ActionList
@@ -44,10 +43,14 @@ func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if a.JS == nil {
 		return nil, pdf.Error("JavaScript action must have JS entry")
 	}
+	js, err := rm.Embed(*a.JS)
+	if err != nil {
+		return nil, err
+	}
 
 	dict := pdf.Dict{
 		"S":  pdf.Name(TypeJavaScript),
-		"JS": a.JS,
+		"JS": js,
 	}
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Action")
@@ -63,9 +66,12 @@ func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeJavaScript(c pdf.Cursor, dict pdf.Dict) (*JavaScript, error) {
-	js := dict["JS"]
-	if js == nil {
+	if dict["JS"] == nil {
 		return nil, pdf.Error("JavaScript action missing JS entry")
+	}
+	js, err := c.StringOrStream(dict["JS"])
+	if err != nil {
+		return nil, err
 	}
 
 	next, err := pdf.DecodeOptional(c, dict["Next"], DecodeActionList)
@@ -74,7 +80,7 @@ func decodeJavaScript(c pdf.Cursor, dict pdf.Dict) (*JavaScript, error) {
 	}
 
 	return &JavaScript{
-		JS:   js,
+		JS:   &js,
 		Next: next,
 	}, nil
 }

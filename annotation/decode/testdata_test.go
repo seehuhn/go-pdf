@@ -1894,7 +1894,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				Markup: annotation.Markup{
 					User:      "Redaction Tool",
-					RC:        pdf.String("This content contains sensitive information"),
+					RC:        &pdf.StringOrStream{Value: "This content contains sensitive information"},
 					InReplyTo: pdf.NewReference(200, 0), // In reply to reference
 				},
 				QuadPoints: []float64{
@@ -1991,7 +1991,7 @@ var testCases = map[pdf.Name][]testCase{
 				Markup: annotation.Markup{
 					User:         "3D Measurement System",
 					Subject:      "Complex geospatial measurement",
-					RC:           pdf.String("Associated with 3D measurement data"),
+					RC:           &pdf.StringOrStream{Value: "Associated with 3D measurement data"},
 					CreationDate: time.Date(2023, 8, 20, 14, 30, 0, 0, time.UTC),
 					InReplyTo:    pdf.NewReference(300, 0), // In reply to reference
 					Intent:       "Group",

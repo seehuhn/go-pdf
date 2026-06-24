@@ -85,7 +85,7 @@ func TestFactorHoistUnanimous(t *testing.T) {
 	}
 	form := &InteractiveForm{
 		Fields: []Node{
-			&Group{Name: "g", Kids: []Node{
+			&Group{Name: "g", Children: []Node{
 				mk("a", "/Helv 12 Tf"),
 				mk("b", "/Helv 12 Tf"),
 			}},
@@ -135,12 +135,12 @@ func TestFactorHoistFormDA(t *testing.T) {
 func TestFactorNeverHoistValue(t *testing.T) {
 	mk := func(name string) *TextField {
 		f := NewTextField(name)
-		f.V = pdf.TextString("same")
+		f.V = &pdf.StringOrStream{Value: "same"}
 		return f
 	}
 	form := &InteractiveForm{
 		Fields: []Node{
-			&Group{Name: "g", Kids: []Node{mk("a"), mk("b")}},
+			&Group{Name: "g", Children: []Node{mk("a"), mk("b")}},
 		},
 	}
 	w, dict := encodeForm(t, form)
@@ -166,7 +166,7 @@ func TestFactorFlagsOverride(t *testing.T) {
 	c := NewTextField("c") // Ff == 0, must keep inheriting 0
 	form := &InteractiveForm{
 		Fields: []Node{
-			&Group{Name: "g", Kids: []Node{a, b, c}},
+			&Group{Name: "g", Children: []Node{a, b, c}},
 		},
 	}
 	w, dict := encodeForm(t, form)
