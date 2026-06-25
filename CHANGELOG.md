@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.7.4] (2026-06-25)
+
+### Added
+- `media` package for PDF multimedia objects, with typed movie and
+  movie-activation dictionaries.  Screen and Widget annotations accept
+  inline `/A` and `/AA` action dictionaries.
+- New `acroform` package providing a typed interactive-form field
+  tree, a shared `pdf.TextAlign` type, and `pdf.StringOrStream` for
+  field values.
+- Reference XObject and OPI dictionary support.
+- Read support for the deprecated Adobe AES-256 extension (revision 5).
+
+### Changed
+- The reader API is reworked: the `GetX`/`ExtractorGet` family is
+  replaced by `Cursor` and `Decode`.
+- Content streams are unified around a streaming `Stream` interface;
+  `Segment` moved from `graphics/content` into the `page` package, and
+  page content is split into shareable segments.
+- Interactive forms split across the `acroform` and `annotation/decode`
+  packages; field inheritance is centralised, flattened on read and
+  hoisted on write.
+- `font/dict`: `Dict.Characters` is replaced by `GlyphWidth`, and
+  descriptor flags are exposed in `FontInfo` for font substitution.
+- Font descriptors and layout output are scaled via `UnitsPerEm`.
+
+### Fixed
+- Hardened decoders against resource exhaustion: shading mesh
+  expansion, inline-image and thumbnail buffers, JBIG2 pixel decode,
+  CIDFont `W`/`W2` readers, page-label `/St` amplification, and xref
+  entry counts are now bounded; recursion depth is capped for outlines,
+  name/number trees, and indirect references; a cyclic indirect stream
+  `/Length` no longer overflows the stack.
+- Reject inconsistent `Encrypt` `V`/`R` combinations and validate
+  inline-image `BitsPerComponent`.
+- The `Extractor` decode cache is safe for concurrent use.
+- Streams with an unusable indirect `/Length` are recovered during the
+  sequential scan, and a malformed source object is copied as null.
+
 ## [0.7.3] - 2026-05-19
 
 This release hardens the reader against memory-exhaustion attacks via
