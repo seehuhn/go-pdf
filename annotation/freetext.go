@@ -28,6 +28,9 @@ import (
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.6
 
 // FreeText represents a free text annotation that displays text directly on the page.
+//
+// The background color of the text can be specified using the [Common.Color]
+// field (default: transparent).
 type FreeText struct {
 	Common
 	Markup

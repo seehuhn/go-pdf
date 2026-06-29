@@ -74,7 +74,7 @@ func main() {
 func writeForm(filename string) error {
 	pdfVersion := pdf.V1_7
 
-	page, err := document.CreateSinglePage(filename, document.A4, pdfVersion, &pdf.WriterOptions{HumanReadable: true})
+	page, err := document.CreateSinglePage(filename, document.A4, pdfVersion, nil)
 	if err != nil {
 		return err
 	}
