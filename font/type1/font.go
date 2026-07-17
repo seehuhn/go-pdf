@@ -88,6 +88,9 @@ func (f *Instance) ResourceName() pdf.Name {
 // New creates a new Type 1 PDF font from a Type 1 PostScript font.
 // The argument psFont must be present, metrics is optional.
 func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
+	if psFont.MM != nil {
+		return nil, errors.New("instantiate multiple master font before embedding")
+	}
 	if !isConsistent(psFont, metrics) {
 		return nil, errors.New("inconsistent Type 1 font metrics")
 	}
