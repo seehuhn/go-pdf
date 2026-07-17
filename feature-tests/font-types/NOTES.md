@@ -45,9 +45,17 @@ can be embedded directly without the OpenType wrapper.
 
 These are Type1 fonts which can be modified using one or more parameters
 (weight, width, *etc.*).  Multiple Master fonts use `MMType1` as the
-`Subtype` in the font dictionary.
+`Subtype` in the font dictionary, and their `BaseFont` names an instance
+of the font, with spaces replaced by underscores (*e.g.*
+`MinionMM_366_465_11_`).
 
-Multiple Master Fonts are not supported by this library.
+Reading `MMType1` font dictionaries is supported: they are treated as
+ordinary Type 1 dictionaries, with a flag recording that the subtype was
+`MMType1`.  Embedded Multiple Master font programs will decode to their
+default instance once Multiple Master support lands in `go-postscript`
+(in progress).  This library's own write side never creates `MMType1`
+dictionaries; it embeds Multiple Master instances as ordinary Type 1
+fonts.
 
 ## Simple TrueType Fonts (PDF 1.1)
 

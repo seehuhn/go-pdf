@@ -74,7 +74,7 @@ func Dict(c pdf.Cursor, obj pdf.Object, _ bool) (dict.Dict, error) {
 	}
 
 	switch fontType {
-	case "Type1":
+	case "Type1", "MMType1":
 		return extractFontType1(c, fontDict)
 	case "TrueType":
 		return extractFontTrueType(c, fontDict)

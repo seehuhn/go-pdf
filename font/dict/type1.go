@@ -67,6 +67,11 @@ type Type1 struct {
 	// FontFile contains the embedded font file stream.
 	// If the font is not embedded, this is nil.
 	FontFile *glyphdata.Stream
+
+	// MultipleMaster indicates the dictionary was read with subtype MMType1.
+	// When set, Embed writes the subtype as MMType1 so that a multiple master
+	// instance read from a file round-trips unchanged.
+	MultipleMaster bool
 }
 
 var _ Dict = (*Type1)(nil)
@@ -134,10 +139,14 @@ func (d *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
+	subtype := pdf.Name("Type1")
+	if d.MultipleMaster {
+		subtype = "MMType1"
+	}
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 	fontDict := pdf.Dict{
 		"Type":     pdf.Name("Font"),
-		"Subtype":  pdf.Name("Type1"),
+		"Subtype":  subtype,
 		"BaseFont": pdf.Name(baseFont),
 	}
 	if d.Name != "" {

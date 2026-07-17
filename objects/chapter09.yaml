@@ -2067,7 +2067,7 @@ types:
     notes: Adobe PDF 1.x references
 - name: FontMultipleMaster
   purpose: multiple master font descriptor
-  goType:
+  goType: font/dict.Type1
   pdfType: Font
   pdfRepr: dict
   specTable: Table 109
@@ -2087,12 +2087,19 @@ types:
     introduced: '1.0'
     possibleValues:
     - MMType1
-  - goName:
+    notes: sets Type1.MultipleMaster; BaseFont instance names keep underscores as read (not translated back to spaces)
+  - goName: Name
     pdfKey: Name
     pdfType: name
     required: fn:IsRequired(fn:IsPDFVersion(1.0))
     introduced: '1.0'
     deprecated: '2.0'
+    goType: pdf.Name
+    purpose: 'Name is deprecated and should be left empty.
+
+      Only used in PDF 1.0 where it was the name used to reference the font
+
+      from within content streams.'
   - goName:
     pdfKey: BaseFont
     pdfType: name
@@ -2108,19 +2115,21 @@ types:
     pdfType: integer
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
     introduced: '1.0'
-  - goName:
+  - goName: Width
+    goType: '[256]float64'
     pdfKey: Widths
     pdfType: array
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
     introduced: '1.0'
-  - goName:
+  - goName: Descriptor
+    goType: '*font.Descriptor'
     pdfKey: FontDescriptor
     pdfType: dictionary
     required: fn:IsRequired(fn:SinceVersion(2.0) || fn:NotStandard14Font())
     introduced: '1.0'
     refTypes:
     - FontDescriptorType1
-  - goName:
+  - goName: Encoding
     pdfKey: Encoding
     pdfType: dictionary;name
     required: false
@@ -2131,13 +2140,24 @@ types:
     - WinAnsiEncoding
     refTypes:
     - Encoding
-  - goName:
+    goType: encoding.Simple
+    purpose: Encoding maps character codes to glyph names.
+  - goName: ToUnicode
     pdfKey: ToUnicode
     pdfType: stream
     required: false
     introduced: '1.2'
     refTypes:
     - ToUnicodeCMapStream
+    goType: '*cmap.ToUnicodeFile'
+    purpose: 'ToUnicode (optional) specifies how character codes are mapped to Unicode
+
+      strings.  This overrides the mapping implied by the glyph names.'
+  fileDependent: false
+  writeMethod: (*Type1).Embed
+  goPackage: dict
+  goRepr: struct
+  specSection: 9.6.2.3
 - name: FontTrueType
   purpose: simple font using TrueType outlines
   goType: font/dict.TrueType

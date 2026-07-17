@@ -53,6 +53,41 @@ func TestType1RoundTrip(t *testing.T) {
 	}
 }
 
+// TestMMType1Extract checks that a hand-built font dictionary with Subtype
+// /MMType1 is extracted as a *dict.Type1 with MultipleMaster set.
+func TestMMType1Extract(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	ref := w.Alloc()
+	fontDict := pdf.Dict{
+		"Type":      pdf.Name("Font"),
+		"Subtype":   pdf.Name("MMType1"),
+		"BaseFont":  pdf.Name("MinionMM_366_465_11_"),
+		"FirstChar": pdf.Integer(65),
+		"LastChar":  pdf.Integer(65),
+		"Widths":    pdf.Array{pdf.Integer(600)},
+	}
+	if err := w.Put(ref, fontDict); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	dictAny, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := dictAny.(*dict.Type1)
+	if !ok {
+		t.Fatalf("expected *dict.Type1, got %T", dictAny)
+	}
+	if !d.MultipleMaster {
+		t.Error("expected MultipleMaster to be true")
+	}
+	if d.PostScriptName != "MinionMM_366_465_11_" {
+		t.Errorf("unexpected PostScriptName: %q", d.PostScriptName)
+	}
+}
+
 func FuzzType1Dict(f *testing.F) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for _, d := range t1Dicts {
@@ -150,6 +185,67 @@ func FuzzType1Dict(f *testing.F) {
 		// Make sure we can write the dict, and read it back.
 		checkRoundTripT1(t, d, pdf.GetVersion(r))
 	})
+}
+
+// TestMMType1RoundTripSubtype checks that a Type1 dict with MultipleMaster
+// set writes Subtype /MMType1, and that extracting it again yields
+// MultipleMaster == true.
+func TestMMType1RoundTripSubtype(t *testing.T) {
+	d1 := &dict.Type1{
+		PostScriptName: "MinionMM_366_465_11_",
+		MultipleMaster: true,
+		Descriptor: &font.Descriptor{
+			FontName:  "MinionMM_366_465_11_",
+			FontBBox:  rect.Rect{LLx: 0, LLy: -100, URx: 200, URy: 300},
+			Ascent:    250,
+			Descent:   -50,
+			CapHeight: 150,
+		},
+		Encoding: func(code byte) string {
+			if code == 65 {
+				return "A"
+			}
+			return ""
+		},
+		Width: makeTestWidth(65, 600.0),
+	}
+
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
+	fontDictRef, err := rm.Embed(d1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := pdf.NewCursor(w)
+	fontDict, err := c.DictTyped(fontDictRef, "Font")
+	if err != nil {
+		t.Fatal(err)
+	}
+	subtype, err := c.Name(fontDict["Subtype"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if subtype != "MMType1" {
+		t.Errorf("expected Subtype MMType1, got %q", subtype)
+	}
+
+	x := pdf.NewExtractor(w)
+	dictAny, err := extract.Dict(pdf.CursorAt(x, nil), fontDictRef, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d2, ok := dictAny.(*dict.Type1)
+	if !ok {
+		t.Fatalf("expected *dict.Type1, got %T", dictAny)
+	}
+	if !d2.MultipleMaster {
+		t.Error("expected MultipleMaster to be true after round trip")
+	}
 }
 
 func checkRoundTripT1(t *testing.T, d1 *dict.Type1, v pdf.Version) {
@@ -286,6 +382,34 @@ var t1Dicts = []*dict.Type1{
 			}
 		},
 		Width: makeTestWidth(65, 100.0),
+	},
+	{
+		PostScriptName: "MinionMM_366_465_11_",
+		MultipleMaster: true,
+		Descriptor: &font.Descriptor{
+			FontName:     "MinionMM_366_465_11_",
+			IsFixedPitch: false,
+			IsSerif:      true,
+			IsSymbolic:   false,
+			FontBBox: rect.Rect{
+				LLx: 0,
+				LLy: -100,
+				URx: 200,
+				URy: 300,
+			},
+			Ascent:    250,
+			Descent:   -50,
+			CapHeight: 150,
+		},
+		Encoding: func(code byte) string {
+			switch code {
+			case 65:
+				return "A"
+			default:
+				return ""
+			}
+		},
+		Width: makeTestWidth(65, 600.0),
 	},
 	makeTestDictStandard("Courier"),
 	makeTestDictStandard("Times-Roman"),

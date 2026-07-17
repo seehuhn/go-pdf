@@ -45,11 +45,12 @@ func extractFontType1(c pdf.Cursor, obj pdf.Object) (*dict.Type1, error) {
 	if err != nil {
 		return nil, err
 	}
-	if subtype != "" && subtype != "Type1" {
-		return nil, pdf.Errorf("expected font subtype Type1, got %q", subtype)
+	if subtype != "" && subtype != "Type1" && subtype != "MMType1" {
+		return nil, pdf.Errorf("expected font subtype Type1 or MMType1, got %q", subtype)
 	}
 
 	d := &dict.Type1{}
+	d.MultipleMaster = subtype == "MMType1"
 
 	baseFont, err := c.Name(fontDict["BaseFont"])
 	if err != nil {
@@ -61,6 +62,9 @@ func extractFontType1(c pdf.Cursor, obj pdf.Object) (*dict.Type1, error) {
 	} else {
 		d.PostScriptName = string(baseFont)
 	}
+	// A multiple master instance name has spaces replaced by underscores
+	// (e.g. "MinionMM_366_465_11_"). We don't translate underscores back to
+	// spaces, since this convention is not mandated by the specification.
 
 	d.Name, _ = c.Name(fontDict["Name"])
 
