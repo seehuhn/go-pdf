@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/sfnt/gvar"
 	"seehuhn.de/go/sfnt/hvar"
 	"seehuhn.de/go/sfnt/maxp"
+	"seehuhn.de/go/sfnt/mvar"
 	"seehuhn.de/go/sfnt/os2"
 	"seehuhn.de/go/sfnt/variation"
 )
@@ -144,6 +145,27 @@ func Glyf() *sfnt.Font {
 		AdvanceMap: &variation.DeltaSetIndexMap{
 			// rect -> inner 1 (varies); all others -> inner 0 (no variation)
 			Map: []uint32{0, 1, 0, 0, 0, 0},
+		},
+	}
+
+	// MVAR: CapHeight drops by 100 units at wght=+1 (mirrors the shape used by
+	// go-sfnt's internal/debug/varfont.go, scaled down to this font's single axis).
+	f.Mvar = &mvar.Table{
+		Store: &variation.ItemVariationStore{
+			Regions: []variation.Region{
+				{{Start: 0, Peak: f2(1), End: f2(1)}},
+			},
+			Data: []*variation.ItemVariationData{
+				{
+					RegionIndexes: []uint16{0},
+					Deltas: [][]int32{
+						{-100}, // inner 0: cpht
+					},
+				},
+			},
+		},
+		Records: []mvar.Record{
+			{Tag: "cpht", OuterIndex: 0, InnerIndex: 0},
 		},
 	}
 

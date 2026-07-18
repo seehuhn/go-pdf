@@ -186,17 +186,15 @@ func TestVarFontUnknownAxis(t *testing.T) {
 	}
 }
 
-// the composite path embeds a variable font without error.
-func TestVarFontComposite(t *testing.T) {
-	coords := map[string]float64{"wght": 700}
-	F, err := truetype.NewComposite(varfont.Glyf(), &truetype.OptionsComposite{Variations: coords})
-	if err != nil {
-		t.Fatal(err)
-	}
-
+// embedComposite embeds F, lays out and encodes "A", and reads back the
+// resulting CIDFontType2 dictionary.
+func embedComposite(t *testing.T, F font.Layouter) *dict.CIDFontType2 {
+	t.Helper()
 	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
-	if _, err := rm.Embed(F); err != nil {
+
+	ref, err := rm.Embed(F)
+	if err != nil {
 		t.Fatal(err)
 	}
 	gg := F.Layout(nil, 12, "A")
@@ -206,8 +204,120 @@ func TestVarFontComposite(t *testing.T) {
 	if err := rm.Close(); err != nil {
 		t.Fatal(err)
 	}
+
+	x := pdf.NewExtractor(w)
+	dictObj, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := dictObj.(*dict.CIDFontType2)
+	if !ok {
+		t.Fatalf("wrong font dictionary type: %T", dictObj)
+	}
+	return d
+}
+
+// the composite path embeds a variable font without error, and produces a
+// dictionary whose naming and widths reflect the instanced font (mirroring
+// the simple-font checks in checkInstanced).
+func TestVarFontComposite(t *testing.T) {
+	coords := map[string]float64{"wght": 700}
+	F, err := truetype.NewComposite(varfont.Glyf(), &truetype.OptionsComposite{Variations: coords})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := embedComposite(t, F)
+
 	// the font was pinned to a static instance
 	if F.PostScriptName() == "" {
 		t.Error("empty PostScript name after instancing")
+	}
+
+	inst, err := varfont.Glyf().Instantiate(coords)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// descriptor carries the subset tag and the instance PostScript name
+	wantPS := inst.PostScriptName()
+	if d.PostScriptName != wantPS {
+		t.Errorf("PostScriptName: got %q, want %q", d.PostScriptName, wantPS)
+	}
+	if len(d.SubsetTag) != 6 {
+		t.Errorf("SubsetTag: got %q, want 6 letters", d.SubsetTag)
+	}
+	if want := d.SubsetTag + "+" + wantPS; d.Descriptor.FontName != want {
+		t.Errorf("FontName: got %q, want %q", d.Descriptor.FontName, want)
+	}
+
+	// widths reflect the instanced advance
+	wantW := math.Round(inst.GlyphWidthPDF(varfont.GIDRect))
+	gotW, ok := d.GlyphWidth("A")
+	if !ok {
+		t.Fatal(`no width for "A"`)
+	}
+	if math.Abs(gotW*1000-wantW) > 0.5 {
+		t.Errorf("width: got %v, want %v", gotW*1000, wantW)
+	}
+
+	// the instanced width differs from the default
+	def, _ := varfont.Glyf().Instantiate(nil)
+	if math.Round(def.GlyphWidthPDF(varfont.GIDRect)) == wantW {
+		t.Error("instanced width equals the default width; variations had no effect")
+	}
+}
+
+// the FontDescriptor's font-wide metrics (here CapHeight, via an MVAR
+// table) come from the instanced font, not the variable original.
+func TestVarFontMVARCapHeight(t *testing.T) {
+	coords := map[string]float64{"wght": 700}
+	F, err := truetype.NewSimple(varfont.Glyf(), &truetype.OptionsSimple{Variations: coords})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := embedSimple(t, F)
+
+	inst, err := varfont.Glyf().Instantiate(coords)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantCapHeight := float64(inst.CapHeight)
+	if d.Descriptor.CapHeight != wantCapHeight {
+		t.Errorf("CapHeight: got %v, want %v", d.Descriptor.CapHeight, wantCapHeight)
+	}
+
+	def, _ := varfont.Glyf().Instantiate(nil)
+	if float64(def.CapHeight) == wantCapHeight {
+		t.Error("instanced CapHeight equals the default; the MVAR delta had no effect")
+	}
+}
+
+// the constructor builds Geometry after instancing: the glyph widths exposed
+// through font.Layouter already reflect the pinned instance, not the
+// variable original.  This pins the invariant that nothing caches
+// pre-instance geometry.
+func TestVarFontGeometryInstanced(t *testing.T) {
+	coords := map[string]float64{"wght": 700}
+	F, err := truetype.NewSimple(varfont.Glyf(), &truetype.OptionsSimple{Variations: coords})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	inst, err := varfont.Glyf().Instantiate(coords)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantWidth := inst.GlyphWidthPDF(varfont.GIDRect) / 1000
+	gotWidth := F.Geometry.Widths[varfont.GIDRect]
+	if math.Abs(gotWidth-wantWidth) > 1e-9 {
+		t.Errorf("geometry width: got %v, want %v", gotWidth, wantWidth)
+	}
+
+	def, _ := varfont.Glyf().Instantiate(nil)
+	defWidth := def.GlyphWidthPDF(varfont.GIDRect) / 1000
+	if gotWidth == defWidth {
+		t.Error("geometry width equals the default width; variations had no effect")
 	}
 }

@@ -70,5 +70,11 @@ func TestEmbedSimple(t *testing.T) {
 		t.Errorf("wrong subset tag: %q", dict.SubsetTag)
 	}
 
+	// a static (non-variable) CFF font's naming is unaffected by variable
+	// font instancing: FontName is still subsetTag+"+"+PostScriptName.
+	if want := dict.SubsetTag + "+" + dict.PostScriptName; dict.Descriptor.FontName != want {
+		t.Errorf("FontName: got %q, want %q", dict.Descriptor.FontName, want)
+	}
+
 	// TODO(voss): more tests
 }

@@ -17,10 +17,15 @@
 package textextract
 
 import (
+	"bytes"
+	"io"
 	"testing"
+
+	"seehuhn.de/go/geom/matrix"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -129,6 +134,91 @@ func TestGlyphNameMappingSimpleTrueTypeBuiltin(t *testing.T) {
 		if g := got[cid.CID(code)+1]; g != want {
 			t.Errorf("code 0x%02X: got %q, want %q", code, g, want)
 		}
+	}
+}
+
+// TestGlyphNameMappingGlyfEmbeddedCFF2NoPanic checks that a FontFile3/OpenType
+// stream labeled as glyf-flavored (TrueType/OpenTypeGlyf) but actually
+// carrying CFF2 outlines (a malformed or mislabeled font, which sfnt.Read no
+// longer rejects since go-sfnt C6) falls back to nil instead of panicking.
+func TestGlyphNameMappingGlyfEmbeddedCFF2NoPanic(t *testing.T) {
+	stream := makeCFF2Stream(t, glyphdata.TrueType)
+
+	f := &mockFontInfoGlyfEmbedded{
+		fontInfo: &dict.FontInfoGlyfEmbedded{
+			PostScriptName: "Test",
+			FontFile:       stream,
+			CIDToGID:       []glyph.ID{0, 0},
+		},
+	}
+	got := GlyphNameMapping(f)
+	if got != nil {
+		t.Errorf("expected nil for a CFF2-backed glyf stream, got %v", got)
+	}
+}
+
+// TestGlyphNameMappingSimpleCFF2NoPanic mirrors the above for the simple-font
+// path, which resolves [encoding.UseBuiltin] codes through
+// [sfntglyphs.NewTrueTypeSelector].
+func TestGlyphNameMappingSimpleCFF2NoPanic(t *testing.T) {
+	stream := makeCFF2Stream(t, glyphdata.OpenTypeGlyf)
+
+	enc := encoding.Simple(func(byte) string { return encoding.UseBuiltin })
+	f := &mockFontInfoSimple{
+		fontInfo: &dict.FontInfoSimple{
+			PostScriptName: "Test",
+			FontFile:       stream,
+			Encoding:       enc,
+			IsSymbolic:     true,
+		},
+	}
+	got := GlyphNameMapping(f)
+	if got != nil {
+		t.Errorf("expected nil for a CFF2-backed glyf stream, got %v", got)
+	}
+}
+
+// makeCFF2Stream builds a minimal, non-variable CFF2 sfnt font and wraps its
+// raw encoding (a real OpenType/CFF2 font) in a glyphdata.Stream labeled tp,
+// simulating a malformed or mislabeled embedded font file.
+func makeCFF2Stream(t *testing.T, tp glyphdata.Type) *glyphdata.Stream {
+	t.Helper()
+
+	b := func(v float64) cff.Blend { return cff.Blend{Default: v} }
+	box := &cff.GlyphCFF2{Cmds: []cff.GlyphOpCFF2{
+		{Op: cff.OpMoveTo, Args: []cff.Blend{b(0), b(0)}},
+		{Op: cff.OpLineTo, Args: []cff.Blend{b(500), b(0)}},
+		{Op: cff.OpLineTo, Args: []cff.Blend{b(500), b(700)}},
+		{Op: cff.OpLineTo, Args: []cff.Blend{b(0), b(700)}},
+	}}
+	o := &cff.OutlinesCFF2{
+		Glyphs:   []*cff.GlyphCFF2{box, box},
+		Widths:   []float64{600, 600},
+		Private:  []*cff.PrivateCFF2{{}},
+		FDSelect: func(glyph.ID) int { return 0 },
+	}
+	font := &sfnt.Font{
+		FamilyName: "GlyphnamesCFF2Test",
+		UnitsPerEm: 1000,
+		Ascent:     700,
+		Descent:    -300,
+		CapHeight:  700,
+		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+		Outlines:   o,
+	}
+
+	var buf bytes.Buffer
+	if _, err := font.Write(&buf); err != nil {
+		t.Fatalf("write CFF2 font: %v", err)
+	}
+	data := buf.Bytes()
+
+	return &glyphdata.Stream{
+		Type: tp,
+		WriteTo: func(w io.Writer, _ *glyphdata.Lengths) error {
+			_, err := w.Write(data)
+			return err
+		},
 	}
 }
 

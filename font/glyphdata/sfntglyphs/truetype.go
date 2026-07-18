@@ -172,8 +172,8 @@ func methodD(ll []ttLookup, font *sfnt.Font) []ttLookup {
 }
 
 func methodE(ll []ttLookup, font *sfnt.Font) []ttLookup {
-	outlines := font.Outlines.(*glyf.Outlines)
-	if len(outlines.Names) == 0 {
+	outlines, ok := font.Outlines.(*glyf.Outlines)
+	if !ok || len(outlines.Names) == 0 {
 		return ll
 	}
 

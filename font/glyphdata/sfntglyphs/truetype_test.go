@@ -189,6 +189,23 @@ func TestNewTrueTypeSelector(t *testing.T) {
 	}
 }
 
+// NewTrueTypeSelector is documented for TrueType/OpenType-glyf fonts, but
+// must not panic when handed a font with a different outline kind (e.g. a
+// CFF2 font read from a malformed or mislabeled stream): method E used to
+// perform an unchecked type assertion on font.Outlines.
+func TestNewTrueTypeSelectorCFF2NoPanic(t *testing.T) {
+	font := makeCFF2Font()
+	enc := encoding.Simple(func(c byte) string {
+		return pdfenc.WinAnsi.Encoding[c]
+	})
+
+	sel := NewTrueTypeSelector(font, true, enc)
+	gid, ok := sel(cid.CID(1))
+	if gid != 0 || ok {
+		t.Errorf("got (%d, %v), want (0, false)", gid, ok)
+	}
+}
+
 // ttFont creates a minimal TrueType font for testing.
 func ttFont(numGlyphs int, cmaps sfntcmap.Table, names []string) *sfnt.Font {
 	return &sfnt.Font{
