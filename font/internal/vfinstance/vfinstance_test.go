@@ -84,6 +84,29 @@ func TestApplyVariableNilInstanced(t *testing.T) {
 	}
 }
 
+// a static CFF2 font with nil variations is converted to static CFF, even
+// though it has no axes to pin.
+func TestApplyStaticCFF2(t *testing.T) {
+	info := varfont.StaticCFF2()
+	if info.IsVariable() {
+		t.Fatal("fixture is unexpectedly variable")
+	}
+	if !info.IsCFF2() {
+		t.Fatal("fixture does not use CFF2 outlines")
+	}
+
+	got, err := Apply(info, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.IsCFF2() {
+		t.Error("converted font still reports CFF2")
+	}
+	if !got.IsCFF() {
+		t.Error("converted font is not CFF")
+	}
+}
+
 // applying to an already-instanced font with nil variations is a no-op.
 func TestApplyIdempotent(t *testing.T) {
 	info := varfont.Glyf()
