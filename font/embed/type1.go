@@ -39,6 +39,7 @@ type Type1Options struct {
 // The file `psname` can be either an .pfb or .pfa file.
 // The file `afmname` is the corresponding .afm file.
 // Both `psname` and `afmname` are optional, but at least one of them must be given.
+// See Type1Options and Type1Font for multiple-master font instancing behavior.
 func Type1File(psname, afmname string, opt *Type1Options) (font.Layouter, error) {
 	var psFont *pst1.Font
 	var metrics *afm.Metrics
