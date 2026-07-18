@@ -18,7 +18,6 @@ package opentype
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"slices"
 
@@ -228,7 +227,7 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 
 	// convert to a simple font, if needed:
 	if len(subsetOutlines.Private) != 1 {
-		return nil, fmt.Errorf("need exactly one private dict for a simple font")
+		return nil, errors.New("font must be embedded as a composite font")
 	}
 	subsetOutlines.ROS = nil
 	subsetOutlines.GIDToCID = nil
