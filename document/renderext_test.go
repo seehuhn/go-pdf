@@ -28,7 +28,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/graphics/testcases"
+	"seehuhn.de/go/pdf/internal/debug/varfont"
 	"seehuhn.de/go/pdf/internal/fonttypes"
 )
 
@@ -134,6 +136,67 @@ func TestTextShowRaw2(t *testing.T) {
 					}
 				}
 			})
+		}
+	}
+}
+
+// TestVarFontShowRaw checks that the glyph x positions computed while
+// laying out text with a non-default instance of a variable font match the
+// reference positions in gsVarFontWidths.  Those positions were validated
+// with ghostscript by gen_gsref.go: rendering the glyphs sequentially and
+// rendering them individually at these positions produce identical images,
+// which confirms that the advance width baked into the embedded, instanced
+// font's PDF Widths array (used by ghostscript to advance the text
+// position) agrees with the width our own layout used to track position.
+func TestVarFontShowRaw(t *testing.T) {
+	F, err := truetype.NewSimple(varfont.Glyf(), &truetype.OptionsSimple{Variations: gsVarFontVariations})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	page, err := document.WriteSinglePage(io.Discard, &pdf.Rectangle{URx: 400, URy: 120}, pdf.V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page.TextSetFont(F, gsVarFontFontSize)
+	page.TextBegin()
+	page.TextFirstLine(10, 10)
+
+	var got []float64
+	for _, g := range page.TextLayout(nil, gsVarFontString).Seq {
+		got = append(got, page.State.GState.TextMatrix[4])
+		code, ok := F.Encode(g.GID, g.Text)
+		if !ok {
+			t.Fatalf("cannot encode glyph ID %d (%q)", g.GID, g.Text)
+		}
+		s := F.Codec().AppendCode(nil, code)
+		page.TextShowRaw(s)
+	}
+	page.TextEnd()
+	if err := page.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(got) != len(gsVarFontWidths) {
+		t.Fatalf("got %d positions, want %d", len(got), len(gsVarFontWidths))
+	}
+	for i := range got {
+		if got[i] != gsVarFontWidths[i] {
+			t.Errorf("position %d: got %v, want %v", i, got[i], gsVarFontWidths[i])
+		}
+	}
+
+	// the instanced width differs from the default, so this test actually
+	// exercises the non-default advance width
+	def, err := truetype.NewSimple(varfont.Glyf(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) >= 2 {
+		gotAdvance := got[1] - got[0]
+		defAdvance := def.GetGeometry().Widths[varfont.GIDRect] * gsVarFontFontSize
+		if math.Abs(gotAdvance-defAdvance) < 1e-9 {
+			t.Error("instanced advance equals the default advance; variations had no effect")
 		}
 	}
 }

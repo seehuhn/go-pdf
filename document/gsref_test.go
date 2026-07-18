@@ -55,3 +55,15 @@ var gsTextShowRaw2 = map[string][]float64{
 	"2.0/Type1b":                {10, 41.6, 124.9, 149.6, 216.3, 271.90000000000003},
 	"2.0/Type3":                 {10, 41.640625, 124.94140625, 149.599609375, 216.298828125, 271.9140625},
 }
+
+var gsVarFontString = "AAA"
+var gsVarFontFontSize float64 = 100
+var gsVarFontVariations = map[string]float64{
+	"wght": 700,
+}
+
+// gsVarFontWidths holds the glyph x positions recorded during text layout
+// of gsVarFontString with the synthetic glyf variable font instanced at
+// gsVarFontVariations.  The positions were validated with ghostscript at
+// generation time; see gen_gsref.go.
+var gsVarFontWidths = []float64{10, 66, 122}
