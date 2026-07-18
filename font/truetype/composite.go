@@ -38,6 +38,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
+	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
@@ -50,6 +51,11 @@ type OptionsComposite struct {
 	WritingMode  font.WritingMode
 	MakeGIDToCID func() cmap.GIDToCID
 	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
+
+	// Variations pins the axes of a variable font before embedding.  Keys are
+	// variation axis tags; omitted axes keep their default value.  A variable
+	// font is always instanced, even when this is nil.
+	Variations map[string]float64
 }
 
 // Composite represents a TrueType font together with the font options.
@@ -78,12 +84,17 @@ func (f *Composite) ResourceName() pdf.Name {
 // The font info must be an OpenType/TrueType font with glyf outlines.
 // The font can be embedded as a simple font or as a composite font.
 func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
-	if !info.IsGlyf() {
-		return nil, errors.New("no glyf outlines in font")
-	}
-
 	if opt == nil {
 		opt = &OptionsComposite{}
+	}
+
+	info, err := vfinstance.Apply(info, opt.Variations)
+	if err != nil {
+		return nil, err
+	}
+
+	if !info.IsGlyf() {
+		return nil, errors.New("no glyf outlines in font")
 	}
 
 	geometry := &font.Geometry{
@@ -225,7 +236,11 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
-		subsetFont = origFont.Subset(glyphs)
+		sf, err := origFont.Subset(glyphs)
+		if err != nil {
+			return nil, err
+		}
+		subsetFont = sf
 	} else {
 		subsetFont = origFont
 	}

@@ -38,6 +38,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
+	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
@@ -46,6 +47,11 @@ type OptionsSimple struct {
 	Language     language.Tag
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
+
+	// Variations pins the axes of a variable font before embedding.  Keys are
+	// variation axis tags; omitted axes keep their default value.  A variable
+	// font is always instanced, even when this is nil.
+	Variations map[string]float64
 }
 
 // Simple represents a TrueType font which can be embedded in a PDF file.
@@ -77,12 +83,17 @@ func (f *Simple) ResourceName() pdf.Name {
 // NewSimple makes a PDF TrueType font from a sfnt.Font.
 // The font info must be an OpenType/TrueType font with glyf outlines.
 func NewSimple(info *sfnt.Font, opt *OptionsSimple) (*Simple, error) {
-	if !info.IsGlyf() {
-		return nil, errors.New("no glyf outlines in font")
-	}
-
 	if opt == nil {
 		opt = &OptionsSimple{}
+	}
+
+	info, err := vfinstance.Apply(info, opt.Variations)
+	if err != nil {
+		return nil, err
+	}
+
+	if !info.IsGlyf() {
+		return nil, errors.New("no glyf outlines in font")
 	}
 
 	geometry := &font.Geometry{
@@ -253,7 +264,11 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
-		subsetFont = origFont.Subset(glyphs)
+		sf, err := origFont.Subset(glyphs)
+		if err != nil {
+			return nil, err
+		}
+		subsetFont = sf
 	} else {
 		subsetFont = origFont
 	}

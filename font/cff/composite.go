@@ -43,6 +43,7 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
+	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 )
@@ -55,6 +56,11 @@ type OptionsComposite struct {
 	WritingMode  font.WritingMode
 	MakeGIDToCID func() cmap.GIDToCID
 	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
+
+	// Variations pins the axes of a variable font before embedding.  Keys are
+	// variation axis tags; omitted axes keep their default value.  A CFF2 or
+	// otherwise variable font is always instanced, even when this is nil.
+	Variations map[string]float64
 }
 
 // Composite represents a CFF font which can be embedded in a PDF file
@@ -103,6 +109,11 @@ func (f *Composite) ResourceName() pdf.Name {
 func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 	if opt == nil {
 		opt = &OptionsComposite{}
+	}
+
+	info, err := vfinstance.Apply(info, opt.Variations)
+	if err != nil {
+		return nil, err
 	}
 
 	cffFont := info.AsCFF()

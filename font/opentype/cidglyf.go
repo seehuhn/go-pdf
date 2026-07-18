@@ -206,7 +206,11 @@ func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
 
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
-		subsetFont = origFont.Subset(glyphs)
+		sf, err := origFont.Subset(glyphs)
+		if err != nil {
+			return nil, err
+		}
+		subsetFont = sf
 	} else {
 		subsetFont = origFont
 	}

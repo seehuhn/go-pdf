@@ -20,6 +20,7 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/sfnt"
 )
@@ -29,6 +30,11 @@ type Options struct {
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
 	Composite    bool
+
+	// Variations pins the axes of a variable font before embedding.  Keys are
+	// variation axis tags; omitted axes keep their default value.  A variable
+	// font is always instanced, even when this is nil.
+	Variations map[string]float64
 }
 
 // OpenTypeFile loads and embeds an OpenType/TrueType font.
@@ -47,8 +53,12 @@ func OpenTypeFont(info *sfnt.Font, opt *Options) (font.Layouter, error) {
 		opt = &Options{}
 	}
 
+	info, err := vfinstance.Apply(info, opt.Variations)
+	if err != nil {
+		return nil, err
+	}
+
 	var F font.Layouter
-	var err error
 	if info.IsCFF() {
 		if opt.Composite {
 			o := &cff.OptionsComposite{

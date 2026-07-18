@@ -254,7 +254,10 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 
 	// build the subset font
 
-	newTTF := fb.base.Subset(glyphs)
+	newTTF, err := fb.base.Subset(glyphs)
+	if err != nil {
+		return nil, err
+	}
 	newTTF.CMapTable = make(sfntcmap.Table)
 
 	// make .notdef (GID 0) look like X, so unmapped lookups render as "X"

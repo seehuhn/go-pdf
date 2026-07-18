@@ -135,7 +135,10 @@ func makeTestFont() (font.Instance, error) {
 	origFont.Gdef = nil
 	origFont.Gsub = nil
 	origFont.Gpos = nil
-	subsetFont := origFont.Subset(subsetGlyphs)
+	subsetFont, err := origFont.Subset(subsetGlyphs)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create a PDF font dictionary for the font.
 	qv := 1000 / float64(subsetFont.UnitsPerEm)

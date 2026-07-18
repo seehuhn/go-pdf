@@ -221,7 +221,11 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
-		subsetFont = origFont.Subset(glyphs)
+		sf, err := origFont.Subset(glyphs)
+		if err != nil {
+			return nil, err
+		}
+		subsetFont = sf
 	} else {
 		subsetFont = origFont
 	}

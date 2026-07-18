@@ -22,6 +22,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
+	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/sfnt"
 )
 
@@ -30,6 +31,11 @@ type OptionsSimple struct {
 	Language     language.Tag
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
+
+	// Variations pins the axes of a variable font before embedding.  Keys are
+	// variation axis tags; omitted axes keep their default value.  A variable
+	// font is always instanced, even when this is nil.
+	Variations map[string]float64
 }
 
 // OptionsComposite contains options for creating a composite OpenType font.
@@ -41,6 +47,11 @@ type OptionsComposite struct {
 	WritingMode  font.WritingMode
 	MakeGIDToCID func() cmap.GIDToCID
 	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
+
+	// Variations pins the axes of a variable font before embedding.  Keys are
+	// variation axis tags; omitted axes keep their default value.  A variable
+	// font is always instanced, even when this is nil.
+	Variations map[string]float64
 }
 
 // NewSimple creates a simple OpenType font from an sfnt.Font.
@@ -49,6 +60,11 @@ type OptionsComposite struct {
 func NewSimple(info *sfnt.Font, opt *OptionsSimple) (font.Layouter, error) {
 	if opt == nil {
 		opt = &OptionsSimple{}
+	}
+
+	info, err := vfinstance.Apply(info, opt.Variations)
+	if err != nil {
+		return nil, err
 	}
 
 	if info.IsCFF() {
@@ -63,6 +79,11 @@ func NewSimple(info *sfnt.Font, opt *OptionsSimple) (font.Layouter, error) {
 func NewComposite(info *sfnt.Font, opt *OptionsComposite) (font.Layouter, error) {
 	if opt == nil {
 		opt = &OptionsComposite{}
+	}
+
+	info, err := vfinstance.Apply(info, opt.Variations)
+	if err != nil {
+		return nil, err
 	}
 
 	if info.IsCFF() {
