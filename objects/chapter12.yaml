@@ -5148,7 +5148,7 @@ types:
       special consideration for the dimensions of the target media.'
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2 12.5.6.22
   fileDependent: true
   writeMethod: (*Watermark).Encode
   embeds:
@@ -6158,11 +6158,17 @@ types:
     notes: Table 232 and https://github.com/pdf-association/pdf-issues/issues/191
 - name: FixedPrint
   purpose: fixed-position printing parameters for a watermark
-  goType:
+  goType: annotation.FixedPrint
   pdfType: FixedPrint
   pdfRepr: dict
   introduced: '1.6'
   specTable: Table 194
+  goPackage: annotation
+  goRepr: struct
+  specSection: 12.5.6.22
+  readFunc: annotation.ExtractFixedPrint
+  fileDependent: false
+  writeMethod: (*FixedPrint).Embed
   fields:
   - goName:
     pdfKey: Type
@@ -6172,24 +6178,28 @@ types:
     possibleValues:
     - FixedPrint
     notes: Table 194
-  - goName:
+    discriminator: true
+  - goName: Matrix
     pdfKey: Matrix
     pdfType: matrix
     required: false
     default: '[1 0 0 1 0 0]'
     introduced: '1.6'
-  - goName:
+    goType: matrix.Matrix
+  - goName: H
     pdfKey: H
     pdfType: number
     required: false
     default: '0'
     introduced: '1.6'
-  - goName:
+    goType: float64
+  - goName: V
     pdfKey: V
     pdfType: number
     required: false
     default: '0'
     introduced: '1.6'
+    goType: float64
 - name: GeographicCoordinateSystem
   purpose: "geographic coordinate system"
   goType: measure.CoordinateSystem

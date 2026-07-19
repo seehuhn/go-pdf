@@ -21,6 +21,7 @@ import (
 	"io"
 	"time"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 
 	"golang.org/x/text/language"
@@ -1625,9 +1626,9 @@ var testCases = map[pdf.Name][]testCase{
 					Name: "watermark-001",
 				},
 				FixedPrint: &annotation.FixedPrint{
-					Matrix: []float64{1, 0, 0, 1, 72, -72}, // Translate 1 inch right and down
-					H:      0.0,                            // Left edge
-					V:      1.0,                            // Top edge
+					Matrix: matrix.Matrix{1, 0, 0, 1, 72, -72}, // Translate 1 inch right and down
+					H:      0.0,                                // Left edge
+					V:      1.0,                                // Top edge
 				},
 			},
 		},
@@ -1639,9 +1640,9 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Draft - Do Not Distribute",
 				},
 				FixedPrint: &annotation.FixedPrint{
-					Matrix: []float64{1, 0, 0, 1, 0, 0}, // Identity matrix
-					H:      0.5,                         // Center horizontally (50%)
-					V:      0.1,                         // Near top (10% from top)
+					Matrix: matrix.Identity,
+					H:      0.5, // Center horizontally (50%)
+					V:      0.1, // Near top (10% from top)
 				},
 			},
 		},
@@ -1653,9 +1654,9 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "SAMPLE",
 				},
 				FixedPrint: &annotation.FixedPrint{
-					Matrix: []float64{0.707, 0.707, -0.707, 0.707, 0, 0}, // 45-degree rotation
-					H:      0.25,                                         // 25% from left
-					V:      0.75,                                         // 75% from bottom
+					Matrix: matrix.Matrix{0.707, 0.707, -0.707, 0.707, 0, 0}, // 45-degree rotation
+					H:      0.25,                                             // 25% from left
+					V:      0.75,                                             // 75% from bottom
 				},
 			},
 		},
@@ -1666,9 +1667,9 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 50, LLy: 50, URx: 250, URy: 100},
 				},
 				FixedPrint: &annotation.FixedPrint{
-					Matrix: []float64{1, 0, 0, 1, 0, 0}, // Identity matrix (default)
-					H:      0.0,                         // Default horizontal position
-					V:      0.0,                         // Default vertical position
+					Matrix: matrix.Identity,
+					H:      0.0, // Default horizontal position
+					V:      0.0, // Default vertical position
 				},
 			},
 		},
@@ -1680,9 +1681,9 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "© 2023 Company Name",
 				},
 				FixedPrint: &annotation.FixedPrint{
-					Matrix: []float64{1, 0, 0, 1, -20, 20}, // Offset from edge for margins
-					H:      0.95,                           // 95% from left (near right edge)
-					V:      0.05,                           // 5% from bottom (near bottom edge)
+					Matrix: matrix.Matrix{1, 0, 0, 1, -20, 20}, // Offset from edge for margins
+					H:      0.95,                               // 95% from left (near right edge)
+					V:      0.05,                               // 5% from bottom (near bottom edge)
 				},
 			},
 		},
@@ -1693,6 +1694,30 @@ var testCases = map[pdf.Name][]testCase{
 					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
 				},
 				// No FixedPrint dictionary - should be drawn without special media consideration
+			},
+		},
+		{
+			name: "watermark with inline fixed print",
+			annotation: &annotation.Watermark{
+				Common: annotation.Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+				},
+				FixedPrint: &annotation.FixedPrint{
+					Matrix:    matrix.Matrix{1, 0, 0, 1, 10, 10},
+					H:         0.2,
+					SingleUse: true, // written as a direct dictionary
+				},
+			},
+		},
+		{
+			name: "watermark with default fixed print",
+			annotation: &annotation.Watermark{
+				Common: annotation.Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+				},
+				FixedPrint: &annotation.FixedPrint{
+					Matrix: matrix.Identity, // absent Matrix decodes to identity
+				},
 			},
 		},
 	},
