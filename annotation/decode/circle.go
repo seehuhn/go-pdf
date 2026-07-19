@@ -25,7 +25,6 @@ import (
 func decodeCircle(c pdf.Cursor, dict pdf.Dict) (*annotation.Circle, error) {
 	circle := &annotation.Circle{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &circle.Common, dict); err != nil {
 		return nil, err
 	}

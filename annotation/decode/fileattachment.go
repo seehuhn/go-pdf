@@ -25,7 +25,6 @@ import (
 func decodeFileAttachment(c pdf.Cursor, dict pdf.Dict) (*annotation.FileAttachment, error) {
 	fileAttachment := &annotation.FileAttachment{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &fileAttachment.Common, dict); err != nil {
 		return nil, err
 	}

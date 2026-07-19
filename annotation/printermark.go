@@ -22,22 +22,25 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// PDF 2.0 sections: 12.5.2 12.5.6.20
+// PDF 2.0 sections: 12.5.2 12.5.6.20 14.11.3
 
 // PrinterMark represents a printer's mark annotation that contains a graphic
 // symbol, such as a registration target, color bar, or cut mark, that may be
-// added to a page to assist production personnel in identifying components
-// of a multiple-plate job and maintaining consistent output during production.
+// added to a page to assist production personnel in identifying components of
+// a multiple-plate job and maintaining consistent output during production.
 //
-// The visual presentation is defined by a form XObject specified as an
-// appearance stream in the AP entry. The Print and ReadOnly flags in the F
-// entry is set and all others clear.
+// The visual presentation is defined by Common.Appearance, which is required
+// for this annotation type.
+//
+// Common.Flags must be set to FlagPrint|FlagReadOnly .
 type PrinterMark struct {
 	Common
 
-	// MN (optional) is an arbitrary name identifying the type of printer's mark,
-	// such as "ColorBar" or "RegistrationTarget".
-	MN pdf.Name
+	// MarkName (optional) is an arbitrary name identifying the type of
+	// printer's mark, such as "ColorBar" or "RegistrationTarget".
+	//
+	// This corresponds to the /MN entry in the PDF annotation dictionary.
+	MarkName pdf.Name
 }
 
 var _ Annotation = (*PrinterMark)(nil)
@@ -67,9 +70,10 @@ func (p *PrinterMark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add printer's mark-specific fields
+
 	// MN (optional)
-	if p.MN != "" {
-		dict["MN"] = p.MN
+	if p.MarkName != "" {
+		dict["MN"] = p.MarkName
 	}
 
 	return dict, nil

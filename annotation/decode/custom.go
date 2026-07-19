@@ -34,7 +34,6 @@ func decodeCustom(c pdf.Cursor, dict pdf.Dict) (*annotation.Custom, error) {
 		Data: dict,
 	}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &cust.Common, dict); err != nil {
 		return nil, err
 	}

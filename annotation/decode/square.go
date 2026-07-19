@@ -25,7 +25,6 @@ import (
 func decodeSquare(c pdf.Cursor, dict pdf.Dict) (*annotation.Square, error) {
 	square := &annotation.Square{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &square.Common, dict); err != nil {
 		return nil, err
 	}

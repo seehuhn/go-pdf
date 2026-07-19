@@ -27,7 +27,6 @@ import (
 func decodeLink(c pdf.Cursor, dict pdf.Dict) (*annotation.Link, error) {
 	link := &annotation.Link{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &link.Common, dict); err != nil {
 		return nil, err
 	}

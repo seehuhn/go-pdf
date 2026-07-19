@@ -63,25 +63,25 @@ type Form struct {
 	// alternative to the identity matrix for convenience.
 	Matrix matrix.Matrix
 
-	// Group specifies transparency group attributes (PDF 1.4).
+	// Group (optional) specifies transparency group attributes.
 	// If non-nil, this form XObject is a transparency group XObject.
 	Group *group.TransparencyAttributes
 
-	// Ref (optional; PDF 1.4) makes this form a reference XObject: a proxy for
+	// Ref (optional) makes this form a reference XObject: a proxy for
 	// a single page imported from another PDF file.
 	Ref *reference.Dict
 
-	// PrinterMark (optional; PDF 1.4) holds the entries specific to a printer's
+	// PrinterMark (optional) holds the entries specific to a printer's
 	// mark.  They take effect where the form is used as the normal appearance
 	// of a printer's mark annotation, and are ignored elsewhere.
 	PrinterMark *printermark.Attributes
 
-	// TrapNet (optional; PDF 1.3) holds the entries specific to a trap network.
+	// TrapNet (optional) holds the entries specific to a trap network.
 	// They take effect where the form is used as the normal appearance of a
 	// trap network annotation, and are ignored elsewhere.
 	TrapNet *trapnet.Attributes
 
-	// OPI (optional; PDF 1.2) is an Open Prepress Interface dictionary
+	// OPI (optional) is an Open Prepress Interface dictionary
 	// describing a low-resolution proxy for a high-resolution image.
 	// OPI is deprecated in PDF 2.0.
 	OPI opi.Dict

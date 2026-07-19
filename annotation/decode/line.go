@@ -26,7 +26,6 @@ import (
 func decodeLine(c pdf.Cursor, dict pdf.Dict) (*annotation.Line, error) {
 	line := &annotation.Line{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &line.Common, dict); err != nil {
 		return nil, err
 	}

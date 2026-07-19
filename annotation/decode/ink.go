@@ -25,7 +25,6 @@ import (
 func decodeInk(c pdf.Cursor, dict pdf.Dict) (*annotation.Ink, error) {
 	ink := &annotation.Ink{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &ink.Common, dict); err != nil {
 		return nil, err
 	}

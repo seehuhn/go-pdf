@@ -24,7 +24,6 @@ import (
 func decodePopup(c pdf.Cursor, dict pdf.Dict) (*annotation.Popup, error) {
 	popup := &annotation.Popup{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &popup.Common, dict); err != nil {
 		return nil, err
 	}

@@ -24,42 +24,62 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// PDF 2.0 sections: 12.5.2 12.5.6.21
+// PDF 2.0 sections: 12.5.2 12.5.6.21 14.11.6
 
-// TrapNet represents a trap network annotation that defines the trapping
-// characteristics for a page of a PDF document. Trapping is the process of
-// adding marks to a page along color boundaries to avoid unwanted visual
-// artifacts resulting from misregistration of colorants when the page is printed.
+// TrapNet (deprecated in PDF 2.0) represents a trap network annotation that
+// defines the trapping characteristics for a page of a PDF document. Trapping
+// is the process of adding marks to a page along color boundaries to avoid
+// unwanted visual artifacts resulting from misregistration of colorants when
+// the page is printed.
 //
-// NOTE: TrapNet annotations are deprecated in PDF 2.0.
+// A page can have at most one trap network annotation, and if it is present,
+// it must be the last element in the page object's Annots array.
 //
-// A page has no more than one trap network annotation, which is
-// always be the last element in the page object's Annots array. The AP
-// (appearances), AS (appearance state), and F (flags) entries are present,
-// with the Print and ReadOnly flags set and all others clear.
+// The visual presentation is defined by Common.Appearance, which is required
+// for this annotation type (either Appearance.Normal or Appearance.NormalMap).
+//
+// Common.Flags must be set to FlagPrint|FlagReadOnly .
 type TrapNet struct {
 	Common
 
-	// LastModified (required if Version and AnnotStates are absent; is
-	// absent if Version and AnnotStates are present; PDF 1.4) is the date and
-	// time when the trap network was most recently modified.
+	// LastModified is the date and time when the trap network was most
+	// recently modified.
 	//
-	// This is the LastModified entry of the trap network annotation.  It
-	// shadows the promoted [Common.LastModified] field, which holds the
-	// modification date of the annotation itself (the M entry).
+	// Either LastModified or the pair of Version and AnnotStates must be
+	// present. The LastModified entry is mutually exclusive with the Version
+	// and AnnotStates pair.
+	//
+	// This is the LastModified entry of the trap network.  It shadows the
+	// promoted [Common.LastModified] field, which holds the modification date
+	// of the annotation itself.
 	LastModified time.Time
 
-	// Version (required if AnnotStates is present; is absent if
-	// LastModified is present) is an unordered array of all objects present
-	// in the page description at the time the trap networks were generated
-	// and that, if changed, could affect the appearance of the page.
+	// Version contains the set of all "objects" present in the page
+	// description at the time the trap networks were generated, in arbitrary
+	// order.  Set comparison of the current object set can be used to
+	// determine whether the trap networks need to be updated.
+	//
+	// The "Objects" are the content streams from the page's Contents, resource
+	// objects (except procedure sets) in the page's resource dictionary, the
+	// resource objects in the resource dictionaries of any form XObjects on
+	// the page, and any OPI dictionaries associated with XObjects on the page.
+	//
+	// Either LastModified or the pair of Version and AnnotStates must be
+	// present. The LastModified entry is mutually exclusive with the Version
+	// and AnnotStates pair.
 	Version []pdf.Reference
 
-	// AnnotStates (required if Version is present; is absent if
-	// LastModified is present) is an array of name objects representing the
-	// appearance states (value of the AS entry) for annotations associated
-	// with the page. The appearance states are listed in the same order
-	// as the annotations in the page's Annots array.
+	// AnnotStates contains the Common.AppearanceState values for all
+	// annotations on the page (excluding the trap network annotation itself)
+	// in the order of the page's Annots array, at the time the trap networks
+	// were generated.  Empty names indicate that the corresponding annotation
+	// had no appearance state. If the current appearance states of the
+	// annotations on the page differ from the values in this array, the trap
+	// network needs to be updated.
+	//
+	// Either LastModified or the pair of Version and AnnotStates must be
+	// present. The LastModified entry is mutually exclusive with the Version
+	// and AnnotStates pair.
 	AnnotStates []pdf.Name
 
 	// FontFauxing (optional) is an array of font dictionaries representing
@@ -86,14 +106,14 @@ func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// The AS entry is required only where the normal appearance holds several
-	// trap networks to choose between, which is the general rule for appearance
-	// states and is checked in fillDict.  Taken literally the specification
-	// demands AS on every trap network annotation, but the same subclause
-	// describes AS as designating one of several alternate networks, and the
-	// parallel wording for printer's marks makes the requirement conditional.
-	// A state name is meaningless where there is nothing to select, so
-	// requiring one would mean inventing a name and wrapping the sole
-	// appearance in a subdictionary that the file never had.
+	// trap networks to choose between, which is the general rule for
+	// appearance states and is checked in fillDict.  Taken literally the
+	// specification demands AS on every trap network annotation, but the same
+	// subclause describes AS as designating one of several alternate networks,
+	// and the parallel wording for printer's marks makes the requirement
+	// conditional.  A state name is meaningless where there is nothing to
+	// select, so requiring one would mean inventing a name and wrapping the
+	// sole appearance in a subdictionary that the file never had.
 
 	// The normal appearance of a trap network annotation is the trap network
 	// itself, so it must carry the trap network entries.  An annotation

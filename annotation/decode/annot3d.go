@@ -24,7 +24,6 @@ import (
 func decodeAnnot3D(c pdf.Cursor, dict pdf.Dict) (*annotation.Annot3D, error) {
 	annot3D := &annotation.Annot3D{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &annot3D.Common, dict); err != nil {
 		return nil, err
 	}

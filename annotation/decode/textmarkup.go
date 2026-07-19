@@ -27,7 +27,6 @@ func decodeTextMarkup(c pdf.Cursor, dict pdf.Dict, subtype pdf.Name) (*annotatio
 
 	textMarkup.Type = annotation.TextMarkupType(subtype)
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &textMarkup.Common, dict); err != nil {
 		return nil, err
 	}

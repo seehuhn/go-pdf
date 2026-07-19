@@ -24,7 +24,6 @@ import (
 func decodeCaret(c pdf.Cursor, dict pdf.Dict) (*annotation.Caret, error) {
 	caret := &annotation.Caret{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &caret.Common, dict); err != nil {
 		return nil, err
 	}

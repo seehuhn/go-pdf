@@ -26,7 +26,6 @@ import (
 func decodePolyline(c pdf.Cursor, dict pdf.Dict) (*annotation.PolyLine, error) {
 	polyline := &annotation.PolyLine{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &polyline.Common, dict); err != nil {
 		return nil, err
 	}

@@ -24,7 +24,6 @@ import (
 func decodeProjection(c pdf.Cursor, dict pdf.Dict) (*annotation.Projection, error) {
 	projection := &annotation.Projection{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &projection.Common, dict); err != nil {
 		return nil, err
 	}

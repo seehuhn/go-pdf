@@ -30,16 +30,15 @@ import (
 func decodeTrapNet(c pdf.Cursor, dict pdf.Dict) (*annotation.TrapNet, error) {
 	trapNet := &annotation.TrapNet{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &trapNet.Common, dict); err != nil {
 		return nil, err
 	}
 
-	// The Print and ReadOnly flags are required, and all others must be
-	// clear.  Snap the flags so that malformed input stays writable.
+	// flag values for trap network annotations are prescribed by the spec:
 	trapNet.Flags = annotation.FlagPrint | annotation.FlagReadOnly
 
 	// Extract trap network-specific fields
+
 	if lastModified, err := pdf.Optional(c.Date(dict["LastModified"])); err != nil {
 		return nil, err
 	} else {

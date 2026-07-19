@@ -27,7 +27,6 @@ import (
 func decodeScreen(c pdf.Cursor, dict pdf.Dict) (*annotation.Screen, error) {
 	screen := &annotation.Screen{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &screen.Common, dict); err != nil {
 		return nil, err
 	}

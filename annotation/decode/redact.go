@@ -25,7 +25,6 @@ import (
 func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 	redact := &annotation.Redact{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &redact.Common, dict); err != nil {
 		return nil, err
 	}

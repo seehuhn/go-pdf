@@ -25,7 +25,6 @@ import (
 func decodeSound(c pdf.Cursor, dict pdf.Dict) (*annotation.Sound, error) {
 	a := &annotation.Sound{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &a.Common, dict); err != nil {
 		return nil, err
 	}

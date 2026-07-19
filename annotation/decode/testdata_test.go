@@ -1471,7 +1471,7 @@ var testCases = map[pdf.Name][]testCase{
 					Contents: "Registration target",
 					Flags:    annotation.FlagPrint | annotation.FlagReadOnly,
 				},
-				MN: "RegistrationTarget",
+				MarkName: "RegistrationTarget",
 			},
 		},
 		{
@@ -1482,7 +1482,7 @@ var testCases = map[pdf.Name][]testCase{
 					Name:  "colorbar-001",
 					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
-				MN: "ColorBar",
+				MarkName: "ColorBar",
 			},
 		},
 		{
@@ -1494,7 +1494,7 @@ var testCases = map[pdf.Name][]testCase{
 					Color:    color.DeviceRGB{0, 0, 0},
 					Flags:    annotation.FlagPrint | annotation.FlagReadOnly,
 				},
-				MN: "CutMark",
+				MarkName: "CutMark",
 			},
 		},
 		{
@@ -1510,7 +1510,7 @@ var testCases = map[pdf.Name][]testCase{
 					},
 					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
-				MN: "RegistrationTarget",
+				MarkName: "RegistrationTarget",
 			},
 		},
 		{
@@ -1520,7 +1520,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:  pdf.Rectangle{LLx: 150, LLy: 150, URx: 200, URy: 200},
 					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
-				MN: "GrayRamp",
+				MarkName: "GrayRamp",
 			},
 		},
 		{

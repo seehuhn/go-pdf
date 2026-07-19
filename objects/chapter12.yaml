@@ -4232,7 +4232,7 @@ types:
   pdfType: Annot
   pdfRepr: dict
   introduced: '1.4'
-  specTable: Table 166
+  specTable: Table 166 and Table 398
   fields:
   - goName:
     pdfKey: Type
@@ -4251,7 +4251,7 @@ types:
     possibleValues:
     - PrinterMark
     discriminator: true
-  - goName: MN
+  - goName: MarkName
     pdfKey: MN
     pdfType: name
     required: false
@@ -4261,12 +4261,12 @@ types:
     - RegistrationTarget
     - '*'
     goType: pdf.Name
-    purpose: 'MN (optional) is an arbitrary name identifying the type of printer''s mark,
+    purpose: 'MarkName (optional) is an arbitrary name identifying the type of printer''s mark,
 
       such as "ColorBar" or "RegistrationTarget".'
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2
+  specSection: 12.5.2, 12.5.6.20, 14.11.3
   fileDependent: true
   writeMethod: (*PrinterMark).Encode
   embeds:
@@ -5049,7 +5049,7 @@ types:
       generation of trap networks for the page.'
   goPackage: annotation
   goRepr: struct
-  specSection: 12.5.2 12.5.6.21
+  specSection: 12.5.2 12.5.6.21 14.11.6
   fileDependent: true
   writeMethod: (*TrapNet).Encode
   embeds:

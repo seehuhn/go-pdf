@@ -24,7 +24,6 @@ import (
 func decodeStamp(c pdf.Cursor, dict pdf.Dict) (*annotation.Stamp, error) {
 	stamp := &annotation.Stamp{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &stamp.Common, dict); err != nil {
 		return nil, err
 	}

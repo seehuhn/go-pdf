@@ -90,8 +90,8 @@ type Common struct {
 	BlendMode pdf.Name
 
 	// AppearanceState is the annotation's appearance state, which selects the
-	// applicable appearance stream from an appearance subdictionary.
-	// The field is required if [Common.Appearance] uses one of the map entries.
+	// applicable appearance stream from an appearance subdictionary. The field
+	// is required if [Common.Appearance] uses one of the map entries.
 	//
 	// This corresponds to the /AS entry in the PDF annotation dictionary.
 	AppearanceState pdf.Name

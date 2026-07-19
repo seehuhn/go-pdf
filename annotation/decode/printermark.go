@@ -24,21 +24,20 @@ import (
 func decodePrinterMark(c pdf.Cursor, dict pdf.Dict) (*annotation.PrinterMark, error) {
 	printerMark := &annotation.PrinterMark{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &printerMark.Common, dict); err != nil {
 		return nil, err
 	}
 
-	// The Print and ReadOnly flags are required, and all others must be
-	// clear.  Snap the flags so that malformed input stays writable.
+	// flag values for printer's mark annotations are prescribed by the spec:
 	printerMark.Flags = annotation.FlagPrint | annotation.FlagReadOnly
 
 	// Extract printer's mark-specific fields
+
 	// MN (optional)
 	if mn, err := pdf.Optional(c.Name(dict["MN"])); err != nil {
 		return nil, err
-	} else if mn != "" {
-		printerMark.MN = mn
+	} else {
+		printerMark.MarkName = mn
 	}
 
 	return printerMark, nil

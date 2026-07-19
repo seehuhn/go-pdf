@@ -26,7 +26,6 @@ import (
 func decodePolygon(c pdf.Cursor, dict pdf.Dict) (*annotation.Polygon, error) {
 	polygon := &annotation.Polygon{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &polygon.Common, dict); err != nil {
 		return nil, err
 	}

@@ -25,7 +25,6 @@ import (
 func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*annotation.Movie, error) {
 	annot := &annotation.Movie{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &annot.Common, dict); err != nil {
 		return nil, err
 	}

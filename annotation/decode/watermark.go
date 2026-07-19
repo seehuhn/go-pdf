@@ -24,7 +24,6 @@ import (
 func decodeWatermark(c pdf.Cursor, dict pdf.Dict) (*annotation.Watermark, error) {
 	watermark := &annotation.Watermark{}
 
-	// Extract common annotation fields
 	if err := decodeCommon(c, &watermark.Common, dict); err != nil {
 		return nil, err
 	}
