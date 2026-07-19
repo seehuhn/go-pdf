@@ -152,6 +152,36 @@ func (c *Common) GetCommon() *Common {
 	return c
 }
 
+// AppearanceRequired reports whether an annotation of the given subtype must
+// carry an appearance dictionary.
+//
+// Starting with PDF 2.0 every annotation needs one, except annotations whose
+// rectangle degenerates to a single point and annotations of subtype Popup,
+// Projection or Link.  Printer's mark and trap network annotations need one at
+// every version, since their whole visual content lives in the normal
+// appearance.
+//
+// The degenerate rectangle is exempt for those two subtypes as well.  An
+// appearance covering an empty rectangle has no valid bounding box, so
+// requiring one here would produce annotations which cannot be written.
+//
+// Writers reject an annotation which needs an appearance dictionary but has
+// none; readers repair one by supplying an empty appearance.
+func AppearanceRequired(subtype pdf.Name, rect pdf.Rectangle, v pdf.Version) bool {
+	switch subtype {
+	case "Popup", "Projection", "Link":
+		return false
+	}
+	if rect.LLx == rect.URx && rect.LLy == rect.URy {
+		return false
+	}
+	switch subtype {
+	case "PrinterMark", "TrapNet":
+		return true
+	}
+	return v >= pdf.V2_0
+}
+
 // fillDict adds the fields corresponding to the Common struct
 // to the given PDF dictionary.  If fields are not valid for the PDF version
 // corresponding to the ResourceManager, an error is returned.
@@ -207,14 +237,8 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 			return err
 		}
 		dict["AP"] = ref
-	} else {
-		// check for missing appearance dictionary per PDF spec requirements
-		subtype := dict["Subtype"].(pdf.Name)
-		isSinglePoint := c.Rect.LLx == c.Rect.URx && c.Rect.LLy == c.Rect.URy
-		isExemptSubtype := subtype == "Popup" || subtype == "Projection" || subtype == "Link"
-		if pdf.GetVersion(w) >= pdf.V2_0 && !isSinglePoint && !isExemptSubtype {
-			return errors.New("missing appearance dictionary")
-		}
+	} else if AppearanceRequired(dict["Subtype"].(pdf.Name), c.Rect, pdf.GetVersion(w)) {
+		return errors.New("missing appearance dictionary")
 	}
 
 	if c.AppearanceState != "" {

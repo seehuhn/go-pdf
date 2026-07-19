@@ -2884,418 +2884,49 @@ types:
     refTypes:
     - FilterLZWDecode
     - FilterFlateDecode
-- name: XObjectFormPrinterMark
-  purpose: "printer mark form XObject"
-  goType:
-  pdfType: XObject
-  pdfRepr: stream
+- name: PrinterMarkAttributes
+  purpose: "printer's mark form XObject entries"
+  goType: graphics/printermark.Attributes
+  pdfRepr: inline
   introduced: '1.4'
-  specTable: Table 5
+  specTable: Table 399
   fields:
-  - goName:
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - XObject
-    notes: Table 5, Table 93 and Table 399
-  - goName:
-    pdfKey: Subtype
-    pdfType: name
-    required: true
-    introduced: '1.4'
-    possibleValues:
-    - Form
-  - goName:
-    pdfKey: FormType
-    pdfType: integer
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - '1'
-  - goName:
-    pdfKey: BBox
-    pdfType: rectangle
-    required: true
-    introduced: '1.4'
-  - goName:
-    pdfKey: Matrix
-    pdfType: matrix
-    required: false
-    default: '[1 0 0 1 0 0]'
-    introduced: '1.4'
-  - goName:
-    pdfKey: Resources
-    pdfType: dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - Resource
-  - goName:
-    pdfKey: Group
-    pdfType: dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - GroupAttributes
-  - goName:
-    pdfKey: Ref
-    pdfType: dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - Reference
-  - goName:
-    pdfKey: Metadata
-    pdfType: stream
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - Metadata
-  - goName:
-    pdfKey: PieceInfo
-    pdfType: dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - PagePiece
-  - goName:
-    pdfKey: LastModified
-    pdfType: date
-    required: fn:IsRequired(fn:IsPresent(PieceInfo))
-    introduced: '1.4'
-  - goName:
-    pdfKey: StructParent
-    pdfType: integer
-    required: false
-    introduced: '1.4'
-    notes: Table 359
-  - goName:
-    pdfKey: StructParents
-    pdfType: integer
-    required: false
-    introduced: '1.4'
-    notes: Table 359
-  - goName:
-    pdfKey: OPI
-    pdfType: dictionary
-    required: false
-    introduced: '1.4'
-    deprecated: '2.0'
-    refTypes:
-    - OPIVersion13
-    - OPIVersion20
-  - goName:
-    pdfKey: OC
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    refTypes:
-    - OptContentGroup
-    - OptContentMembership
-  - goName:
-    pdfKey: Name
-    pdfType: name
-    required: false
-    introduced: '1.4'
-    deprecated: '2.0'
-  - goName:
-    pdfKey: AF
-    pdfType: array
-    required: false
-    introduced: '2.0'
-    refTypes:
-    - type: AFFileSpecification
-      collection: array
-  - goName:
-    pdfKey: Measure
-    pdfType: dictionary
-    required: false
-    introduced: '1.7'
-    refTypes:
-    - MeasureRL
-    - MeasureGEO
-  - goName:
-    pdfKey: PtData
-    pdfType: dictionary
-    required: false
-    introduced: '1.7'
-    refTypes:
-    - PointData
-  - goName:
-    pdfKey: Length
-    pdfType: integer
-    required: true
-    introduced: '1.4'
-  - goName:
-    pdfKey: Filter
-    pdfType: array;name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: DecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: F
-    pdfType: dictionary;string
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - FileSpecification
-  - goName:
-    pdfKey: FFilter
-    pdfType: array;name
-    required: false
-    introduced: '1.4'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: FDecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.4'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: DL
-    pdfType: integer
-    required: false
-    introduced: '1.5'
-  - goName:
+  - goName: MarkStyle
+    goType: string
     pdfKey: MarkStyle
     pdfType: text-string
     required: false
     introduced: '1.4'
-    notes: from Table 399 printer mark form dictionary
-  - goName:
+    purpose: MarkStyle (optional) describes the printer's mark to the user.
+  - goName: Colorants
+    goType: 'map[pdf.Name]*color.SpaceSeparation'
     pdfKey: Colorants
     pdfType: dictionary
     required: false
     introduced: '1.4'
     refTypes:
-    - ColorantsDict
-- name: XObjectFormTrapNet
-  purpose: "trap network form XObject"
-  goType:
-  pdfType: XObject
-  pdfRepr: stream
+    - SeparationColorSpace
+    purpose: 'Colorants (optional) identifies the individual colourants associated
+
+      with the printer''s mark, such as a colour bar.  Each key must equal the
+
+      colorant name of the Separation colour space it maps to.'
+  readFunc: printermark.ExtractAttributes
+  fileDependent: false
+  writeMethod: (*Attributes).FillDict
+  goPackage: printermark
+  goRepr: struct
+  specSection: '14.11.3'
+- name: TrapNetAttributes
+  purpose: "trap network appearance stream entries"
+  deprecated: '2.0'
+  goType: graphics/trapnet.Attributes
+  pdfRepr: inline
   introduced: '1.3'
-  specTable: Table 93
+  specTable: Table 404
   fields:
-  - goName:
-    pdfKey: Type
-    pdfType: name
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    possibleValues:
-    - XObject
-    notes: Table 93 and Table 404
-  - goName:
-    pdfKey: Subtype
-    pdfType: name
-    required: true
-    introduced: '1.3'
-    deprecated: '2.0'
-    possibleValues:
-    - Form
-  - goName:
-    pdfKey: FormType
-    pdfType: integer
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    possibleValues:
-    - '1'
-  - goName:
-    pdfKey: BBox
-    pdfType: rectangle
-    required: true
-    introduced: '1.3'
-    deprecated: '2.0'
-  - goName:
-    pdfKey: Matrix
-    pdfType: matrix
-    required: false
-    default: '[1 0 0 1 0 0]'
-    introduced: '1.3'
-    deprecated: '2.0'
-  - goName:
-    pdfKey: Resources
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    refTypes:
-    - Resource
-  - goName:
-    pdfKey: Group
-    pdfType: dictionary
-    required: false
-    introduced: '1.4'
-    deprecated: '2.0'
-    refTypes:
-    - GroupAttributes
-  - goName:
-    pdfKey: Ref
-    pdfType: dictionary
-    required: false
-    introduced: '1.4'
-    deprecated: '2.0'
-    refTypes:
-    - Reference
-  - goName:
-    pdfKey: Metadata
-    pdfType: stream
-    required: false
-    introduced: '1.4'
-    deprecated: '2.0'
-    refTypes:
-    - Metadata
-  - goName:
-    pdfKey: PieceInfo
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    refTypes:
-    - PagePiece
-  - goName:
-    pdfKey: LastModified
-    pdfType: date
-    required: fn:IsRequired(fn:IsPresent(PieceInfo))
-    introduced: '1.3'
-    deprecated: '2.0'
-  - goName:
-    pdfKey: StructParent
-    pdfType: integer
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    notes: Table 359
-  - goName:
-    pdfKey: StructParents
-    pdfType: integer
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    notes: Table 359
-  - goName:
-    pdfKey: OPI
-    pdfType: dictionary
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    refTypes:
-    - OPIVersion13
-    - OPIVersion20
-  - goName:
-    pdfKey: OC
-    pdfType: dictionary
-    required: false
-    introduced: '1.5'
-    deprecated: '2.0'
-    refTypes:
-    - OptContentGroup
-    - OptContentMembership
-  - goName:
-    pdfKey: Name
-    pdfType: name
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-  - goName:
-    pdfKey: Length
-    pdfType: integer
-    required: true
-    introduced: '1.3'
-    deprecated: '2.0'
-  - goName:
-    pdfKey: Filter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: DecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: F
-    pdfType: dictionary;string
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    refTypes:
-    - FileSpecification
-  - goName:
-    pdfKey: FFilter
-    pdfType: array;name
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    possibleValues:
-    - ASCIIHexDecode
-    - ASCII85Decode
-    - LZWDecode
-    - FlateDecode
-    - RunLengthDecode
-    - fn:SinceVersion(1.5,Crypt)
-  - goName:
-    pdfKey: FDecodeParms
-    pdfType: array;dictionary
-    required: false
-    introduced: '1.3'
-    deprecated: '2.0'
-    refTypes:
-    - FilterLZWDecode
-    - FilterFlateDecode
-    - type: FilterCrypt
-      since: '1.5'
-  - goName:
-    pdfKey: DL
-    pdfType: integer
-    required: false
-    introduced: '1.5'
-    deprecated: '2.0'
-  - goName:
+  - goName: PCM
+    goType: pdf.Name
     pdfKey: PCM
     pdfType: name
     required: true
@@ -3308,28 +2939,45 @@ types:
     - DeviceCMY
     - DeviceRGBK
     - DeviceN
-    notes: Table 404
-  - goName:
+    purpose: 'PCM is the process colour model assumed when the trap network was
+
+      created.'
+  - goName: SeparationColorNames
+    goType: '[]pdf.Name'
     pdfKey: SeparationColorNames
     pdfType: array
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-    notes: Table 404
-  - goName:
+    purpose: 'SeparationColorNames (optional) names the colourants assumed when the
+
+      trap network was created.'
+  - goName: TrapRegions
+    goType: '[]*opaque.Object'
     pdfKey: TrapRegions
     pdfType: array
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-    notes: Table 404
-  - goName:
+    purpose: 'TrapRegions (optional; deprecated in PDF 2.0) refers to the TrapRegion
+
+      objects which define the page''s trapping zones and the associated
+
+      trapping parameters.  The library does not interpret these objects.'
+  - goName: TrapStyles
+    goType: string
     pdfKey: TrapStyles
     pdfType: text-string
     required: false
     introduced: '1.3'
     deprecated: '2.0'
-    notes: Table 404
+    purpose: TrapStyles (optional) describes the trap network to the user.
+  readFunc: trapnet.ExtractAttributes
+  fileDependent: false
+  writeMethod: (*Attributes).FillDict
+  goPackage: trapnet
+  goRepr: struct
+  specSection: '14.11.6'
 - name: XObjectFormType1
   purpose: "type 1 form XObject"
   goType: graphics/form.Form
@@ -3451,6 +3099,34 @@ types:
     required: false
     introduced: '1.3'
     notes: Table 359
+  - goName: PrinterMark
+    pdfKey:
+    pdfType:
+    required: false
+    introduced: '1.4'
+    refTypes:
+    - PrinterMarkAttributes
+    goType: '*printermark.Attributes'
+    purpose: 'PrinterMark (optional; PDF 1.4) holds the entries specific to a printer''s
+
+      mark.  They take effect where the form is used as the normal appearance
+
+      of a printer''s mark annotation, and are ignored elsewhere.'
+    notes: the entries are stored directly in the form dictionary, see Table 399
+  - goName: TrapNet
+    pdfKey:
+    pdfType:
+    required: false
+    introduced: '1.3'
+    refTypes:
+    - TrapNetAttributes
+    goType: '*trapnet.Attributes'
+    purpose: 'TrapNet (optional; PDF 1.3) holds the entries specific to a trap network.
+
+      They take effect where the form is used as the normal appearance of a
+
+      trap network annotation, and are ignored elsewhere.'
+    notes: the entries are stored directly in the form dictionary, see Table 404
   - goName: OPI
     pdfKey: OPI
     pdfType: dictionary

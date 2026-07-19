@@ -4959,6 +4959,7 @@ types:
   - AnnotMarkup
 - name: AnnotTrapNetwork
   purpose: defines trapping for a page region
+  deprecated: '2.0'
   goType: annotation.TrapNet
   pdfType: Annot
   pdfRepr: dict
@@ -4991,12 +4992,19 @@ types:
     required: fn:IsRequired(fn:Not(fn:IsPresent(Version)) && fn:Not(fn:IsPresent(AnnotStates)))
     introduced: '1.4'
     deprecated: '2.0'
-    goType: string
+    goType: time.Time
     purpose: 'LastModified (required if Version and AnnotStates are absent; is
 
       absent if Version and AnnotStates are present; PDF 1.4) is the date and
 
-      time when the trap network was most recently modified.'
+      time when the trap network was most recently modified.
+
+
+      This is the LastModified entry of the trap network annotation.  It
+
+      shadows the promoted [Common.LastModified] field, which holds the
+
+      modification date of the annotation itself (the M entry).'
   - goName: Version
     pdfKey: Version
     pdfType: array
@@ -5483,7 +5491,7 @@ types:
     introduced: '1.4'
     refTypes:
     - AppearancePrinterMarkSubDict
-    - XObjectFormPrinterMark
+    - XObjectFormType1
     notes: Table 170
   - goName:
     pdfKey: R
@@ -5493,7 +5501,7 @@ types:
     introduced: '1.4'
     refTypes:
     - AppearancePrinterMarkSubDict
-    - XObjectFormPrinterMark
+    - XObjectFormType1
   - goName:
     pdfKey: D
     pdfType: dictionary;stream
@@ -5502,7 +5510,7 @@ types:
     introduced: '1.4'
     refTypes:
     - AppearancePrinterMarkSubDict
-    - XObjectFormPrinterMark
+    - XObjectFormType1
 - name: AppearancePrinterMarkSubDict
   purpose: sub-dictionary of printer mark appearances
   goType:
@@ -5515,7 +5523,7 @@ types:
     required: false
     introduced: '1.4'
     refTypes:
-    - XObjectFormPrinterMark
+    - XObjectFormType1
     notes: Table 170 and Clause 12.5.5
 - name: AppearanceSubDict
   purpose: sub-dictionary of annotation appearances
@@ -5533,6 +5541,7 @@ types:
     notes: Table 170 and Clause 12.5.5
 - name: AppearanceTrapNet
   purpose: appearance of a trap network annotation
+  deprecated: '2.0'
   goType:
   pdfRepr: dict
   introduced: '1.3'
@@ -5545,7 +5554,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - AppearanceTrapNetSubDict
-    - XObjectFormTrapNet
+    - XObjectFormType1
     notes: Table 170
   - goName:
     pdfKey: R
@@ -5556,7 +5565,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - AppearanceTrapNetSubDict
-    - XObjectFormTrapNet
+    - XObjectFormType1
   - goName:
     pdfKey: D
     pdfType: dictionary;stream
@@ -5566,7 +5575,7 @@ types:
     deprecated: '2.0'
     refTypes:
     - AppearanceTrapNetSubDict
-    - XObjectFormTrapNet
+    - XObjectFormType1
 - name: AppearanceTrapNetSubDict
   purpose: sub-dictionary of trap network appearances
   goType:
@@ -5580,7 +5589,7 @@ types:
     introduced: '1.3'
     deprecated: '2.0'
     refTypes:
-    - XObjectFormTrapNet
+    - XObjectFormType1
     notes: Table 170 and Clause 12.5.5
 - name: BorderEffect
   purpose: visual effect applied to annotation borders

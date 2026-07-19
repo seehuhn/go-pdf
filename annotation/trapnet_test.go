@@ -18,10 +18,32 @@ package annotation
 
 import (
 	"testing"
+	"time"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/trapnet"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
+
+// trapNetRect is the annotation rectangle shared by the test cases below.
+var trapNetRect = pdf.Rectangle{URx: 612, URy: 792}
+
+// trapNetAppearance returns an appearance a trap network annotation can carry.
+// A trap network needs one at every PDF version, and its normal appearance is
+// the trap network itself, so the form has to hold the trap network entries.
+func trapNetAppearance(rect pdf.Rectangle) *appearance.Dict {
+	return &appearance.Dict{
+		Normal: &form.Form{
+			BBox:    rect,
+			Res:     &content.Resources{},
+			TrapNet: &trapnet.Attributes{PCM: trapnet.DefaultPCM},
+		},
+		SingleUse: true,
+	}
+}
 
 // TestTrapNetEncodeValidCombinations verifies that Encode accepts valid
 // field combinations for LastModified/Version/AnnotStates.
@@ -33,14 +55,14 @@ func TestTrapNetEncodeValidCombinations(t *testing.T) {
 		{
 			name: "LastModified only",
 			data: TrapNet{
-				Common:       Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
-				LastModified: "D:20231215103000Z",
+				Common:       Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
+				LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 			},
 		},
 		{
 			name: "Version and AnnotStates",
 			data: TrapNet{
-				Common:      Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
+				Common:      Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
 				Version:     []pdf.Reference{pdf.NewReference(1, 0)},
 				AnnotStates: []pdf.Name{"N"},
 			},
@@ -67,14 +89,14 @@ func TestTrapNetEncodeInvalidCombinations(t *testing.T) {
 		{
 			name: "none present",
 			data: TrapNet{
-				Common: Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
+				Common: Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
 			},
 		},
 		{
 			name: "all three present",
 			data: TrapNet{
-				Common:       Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
-				LastModified: "D:20231215103000Z",
+				Common:       Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
+				LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 				Version:      []pdf.Reference{pdf.NewReference(1, 0)},
 				AnnotStates:  []pdf.Name{"N"},
 			},
@@ -82,30 +104,30 @@ func TestTrapNetEncodeInvalidCombinations(t *testing.T) {
 		{
 			name: "LastModified and Version",
 			data: TrapNet{
-				Common:       Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
-				LastModified: "D:20231215103000Z",
+				Common:       Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
+				LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 				Version:      []pdf.Reference{pdf.NewReference(1, 0)},
 			},
 		},
 		{
 			name: "LastModified and AnnotStates",
 			data: TrapNet{
-				Common:       Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
-				LastModified: "D:20231215103000Z",
+				Common:       Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
+				LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 				AnnotStates:  []pdf.Name{"N"},
 			},
 		},
 		{
 			name: "Version only",
 			data: TrapNet{
-				Common:  Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
+				Common:  Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
 				Version: []pdf.Reference{pdf.NewReference(1, 0)},
 			},
 		},
 		{
 			name: "AnnotStates only",
 			data: TrapNet{
-				Common:      Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
+				Common:      Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
 				AnnotStates: []pdf.Name{"N"},
 			},
 		},
@@ -125,8 +147,8 @@ func TestTrapNetEncodeInvalidCombinations(t *testing.T) {
 // PDF 1.3 because LastModified requires PDF 1.4.
 func TestTrapNetEncodeLastModifiedV13(t *testing.T) {
 	tn := TrapNet{
-		Common:       Common{Rect: pdf.Rectangle{URx: 612, URy: 792}},
-		LastModified: "D:20231215103000Z",
+		Common:       Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
+		LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 	}
 	w, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(w)

@@ -26,7 +26,7 @@ objects/
 | Field | Default | Specify when |
 |-------|---------|--------------|
 | `goRepr` | `struct` | interface, array, etc. |
-| `pdfRepr` | `dict` | stream, array |
+| `pdfRepr` | `dict` | stream, map, name, byte-string, inline |
 | `required` | `false` | field is required |
 | `introduced` | `"1.0"` | later version |
 | `typeRequired` | `false` | Type field is required |
@@ -115,6 +115,11 @@ types:
 ```
 
 ## Field Definition
+
+A type with `pdfRepr: inline` has no dictionary of its own: its fields are
+stored directly in the parent dictionary.  A field holding such a type names it
+in `refTypes` and leaves `pdfKey` and `pdfType` empty, since the individual keys
+belong to the inline type rather than to the parent.
 
 ```yaml
 fields:

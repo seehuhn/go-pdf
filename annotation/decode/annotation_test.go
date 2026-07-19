@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/trapnet"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/pdf/sound"
@@ -51,6 +52,15 @@ func makeDefaultAppearance() *form.Form {
 	}
 }
 
+// makeTrapNetAppearance returns an appearance which is valid for a trap
+// network annotation: the normal appearance of such an annotation is the trap
+// network itself and has to carry the trap network entries.
+func makeTrapNetAppearance() *form.Form {
+	f := makeDefaultAppearance()
+	f.TrapNet = &trapnet.Attributes{PCM: trapnet.DefaultPCM}
+	return f
+}
+
 var (
 	defaultAppearance     = makeDefaultAppearance()
 	defaultAppearanceDict = &appearance.Dict{
@@ -58,14 +68,28 @@ var (
 		RollOver: defaultAppearance,
 		Down:     defaultAppearance,
 	}
+	trapNetAppearance     = makeTrapNetAppearance()
+	trapNetAppearanceDict = &appearance.Dict{
+		Normal:   trapNetAppearance,
+		RollOver: trapNetAppearance,
+		Down:     trapNetAppearance,
+	}
 )
+
+// appearanceFor returns an appearance dictionary which a can legally use.
+func appearanceFor(a annotation.Annotation) *appearance.Dict {
+	if _, isTrapNet := a.(*annotation.TrapNet); isTrapNet {
+		return trapNetAppearanceDict
+	}
+	return defaultAppearanceDict
+}
 
 func TestRoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for annotationType, cases := range testCases {
 			for _, tc := range cases {
 				t.Run(fmt.Sprintf("%s-%s-%s", annotationType, tc.name, v), func(t *testing.T) {
-					roundTripTest(t, v, tc.annotation)
+					roundTripValue(t, v, tc.annotation)
 				})
 			}
 		}
@@ -85,24 +109,34 @@ func TestRoundTripDict(t *testing.T) {
 				}
 
 				// if we managed to decode an annotation, do a round-trip test
-				roundTripTest(t, v, a)
+				roundTripFile(t, v, a)
 			})
 		}
 	}
 }
 
-// roundTripTest performs a round-trip test for any annotation type.
-// For PDF 2.0, it adds an appearance dictionary if needed.
-func roundTripTest(t *testing.T, v pdf.Version, a1 annotation.Annotation) {
-	// add appearance dictionary for PDF 2.0 if needed
-	if v >= pdf.V2_0 {
+// roundTripValue performs a round-trip test for an annotation constructed in
+// Go.  Test cases are written without an appearance dictionary where it is not
+// the point of the case, so one is supplied here wherever the annotation needs
+// it.  Asking [annotation.AppearanceRequired] rather than checking the version
+// keeps this in step with the rule the writer enforces.
+//
+// Only use this for hand-written values.  Anything read from a file must go
+// through [roundTripFile], which does not touch the value it is given: the
+// whole point of a round trip is that whatever we can read, we can write back
+// unchanged, and completing the value here would hide exactly that failure.
+func roundTripValue(t *testing.T, v pdf.Version, a1 annotation.Annotation) {
+	c := a1.GetCommon()
+	if c.Appearance == nil && annotation.AppearanceRequired(a1.AnnotationType(), c.Rect, v) {
 		a1 = shallowCopy(a1)
-		c := a1.GetCommon()
-		if c.Appearance == nil {
-			c.Appearance = defaultAppearanceDict
-		}
+		a1.GetCommon().Appearance = appearanceFor(a1)
 	}
+	roundTripFile(t, v, a1)
+}
 
+// roundTripFile performs a round-trip test for any annotation type, writing
+// a1 exactly as given and comparing the result of reading it back.
+func roundTripFile(t *testing.T, v pdf.Version, a1 annotation.Annotation) {
 	buf, _ := memfile.NewPDFWriter(v, nil)
 	rm := pdf.NewResourceManager(buf)
 
@@ -111,7 +145,7 @@ func roundTripTest(t *testing.T, v pdf.Version, a1 annotation.Annotation) {
 	if pdf.IsWrongVersion(err) {
 		t.Skip()
 	} else if err != nil {
-		t.Fatal(err)
+		t.Fatalf("cannot write the annotation back: %v", err)
 	}
 	err = rm.Close()
 	if err != nil {
@@ -286,7 +320,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 			a := shallowCopy(tc.annotation)
 			common := a.GetCommon()
-			common.Appearance = defaultAppearanceDict
+			common.Appearance = appearanceFor(a)
 			common.AppearanceState = pdf.Name("Normal")
 
 			embedded, err := a.Encode(rm)
@@ -342,6 +376,6 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		// Make sure we can write the annotation, and read it back.
-		roundTripTest(t, pdf.GetVersion(r), annot)
+		roundTripFile(t, pdf.GetVersion(r), annot)
 	})
 }

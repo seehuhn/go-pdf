@@ -30,7 +30,9 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/graphics/opi"
+	"seehuhn.de/go/pdf/graphics/printermark"
 	"seehuhn.de/go/pdf/graphics/reference"
+	"seehuhn.de/go/pdf/graphics/trapnet"
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
@@ -87,6 +89,20 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 		return nil, err
 	} else {
 		f.Ref = r
+	}
+
+	// PrinterMark entries (optional)
+	if pm, err := printermark.ExtractAttributes(c, dict); err != nil {
+		return nil, err
+	} else {
+		f.PrinterMark = pm
+	}
+
+	// TrapNet entries (optional)
+	if tn, err := trapnet.ExtractAttributes(c, dict); err != nil {
+		return nil, err
+	} else {
+		f.TrapNet = tn
 	}
 
 	// OPI (optional)
@@ -192,11 +208,38 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 
 // repairForm fixes invalid data in a form XObject after extraction.
 func repairForm(f *form.Form, r pdf.Getter) {
-	if v := pdf.GetVersion(r); v == pdf.V1_0 {
+	v := pdf.GetVersion(r)
+
+	if v == pdf.V1_0 {
 		if f.Name == "" {
 			f.Name = "Form"
 		}
 	} else if v >= pdf.V2_0 {
 		f.Name = ""
+	}
+
+	// Drop entries which cannot be written at this PDF version, so that
+	// everything we read can be written back.  Each case mirrors a version
+	// check on the write side, either in [form.Form.Embed] or in the Embed
+	// method of the entry's own type.
+	if v < pdf.V1_2 {
+		f.OPI = nil
+	}
+	if v < pdf.V1_3 {
+		f.StructParent.Clear()
+		f.TrapNet = nil
+	}
+	if v < pdf.V1_4 {
+		f.Group = nil
+		f.Ref = nil
+		f.PrinterMark = nil
+	}
+	if v < pdf.V1_5 {
+		f.OptionalContent = nil
+	}
+	if v < pdf.V2_0 {
+		f.Measure = nil
+		f.PtData = nil
+		f.AssociatedFiles = nil
 	}
 }

@@ -1469,6 +1469,7 @@ var testCases = map[pdf.Name][]testCase{
 				Common: annotation.Common{
 					Rect:     pdf.Rectangle{LLx: 50, LLy: 50, URx: 100, URy: 100},
 					Contents: "Registration target",
+					Flags:    annotation.FlagPrint | annotation.FlagReadOnly,
 				},
 				MN: "RegistrationTarget",
 			},
@@ -1477,8 +1478,9 @@ var testCases = map[pdf.Name][]testCase{
 			name: "color bar printer's mark",
 			annotation: &annotation.PrinterMark{
 				Common: annotation.Common{
-					Rect: pdf.Rectangle{LLx: 200, LLy: 780, URx: 400, URy: 800},
-					Name: "colorbar-001",
+					Rect:  pdf.Rectangle{LLx: 200, LLy: 780, URx: 400, URy: 800},
+					Name:  "colorbar-001",
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
 				MN: "ColorBar",
 			},
@@ -1490,6 +1492,7 @@ var testCases = map[pdf.Name][]testCase{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
 					Contents: "Corner cut mark",
 					Color:    color.DeviceRGB{0, 0, 0},
+					Flags:    annotation.FlagPrint | annotation.FlagReadOnly,
 				},
 				MN: "CutMark",
 			},
@@ -1505,6 +1508,7 @@ var testCases = map[pdf.Name][]testCase{
 						VCornerRadius: 2.0,
 						Width:         2.0,
 					},
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
 				MN: "RegistrationTarget",
 			},
@@ -1514,7 +1518,7 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &annotation.PrinterMark{
 				Common: annotation.Common{
 					Rect:  pdf.Rectangle{LLx: 150, LLy: 150, URx: 200, URy: 200},
-					Flags: 6, // Print (2) + ReadOnly (4) flags as per spec
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
 				MN: "GrayRamp",
 			},
@@ -1523,7 +1527,8 @@ var testCases = map[pdf.Name][]testCase{
 			name: "minimal printer's mark annotation",
 			annotation: &annotation.PrinterMark{
 				Common: annotation.Common{
-					Rect: pdf.Rectangle{LLx: 300, LLy: 300, URx: 320, URy: 320},
+					Rect:  pdf.Rectangle{LLx: 300, LLy: 300, URx: 320, URy: 320},
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
 				// MN field is optional, not specified here
 			},
@@ -1535,9 +1540,9 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &annotation.TrapNet{
 				Common: annotation.Common{
 					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					Flags: 6,                                                 // Print (2) + ReadOnly (4) flags as per spec
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
-				LastModified: "D:20231215103000Z",
+				LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 			},
 		},
 		{
@@ -1545,7 +1550,7 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &annotation.TrapNet{
 				Common: annotation.Common{
 					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					Flags: 6,                                                 // Print (2) + ReadOnly (4) flags as per spec
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 					Name:  "trapnet-001",
 				},
 				Version: []pdf.Reference{
@@ -1561,10 +1566,10 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &annotation.TrapNet{
 				Common: annotation.Common{
 					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					Flags:    6,                                                 // Print (2) + ReadOnly (4) flags
+					Flags:    annotation.FlagPrint | annotation.FlagReadOnly,
 					Contents: "Trap network with font substitutions",
 				},
-				LastModified: "D:20231201120000Z",
+				LastModified: time.Date(2023, 12, 1, 12, 0, 0, 0, time.UTC),
 				FontFauxing: []pdf.Reference{
 					pdf.NewReference(200, 0), // Substitute font 1
 					pdf.NewReference(201, 0), // Substitute font 2
@@ -1576,7 +1581,7 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &annotation.TrapNet{
 				Common: annotation.Common{
 					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					Flags: 6,                                                 // Print (2) + ReadOnly (4) flags
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 					Name:  "complex-trapnet",
 				},
 				Version: []pdf.Reference{
@@ -1596,9 +1601,9 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &annotation.TrapNet{
 				Common: annotation.Common{
 					Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}, // Full page
-					Flags: 6,                                                 // Required Print + ReadOnly flags
+					Flags: annotation.FlagPrint | annotation.FlagReadOnly,
 				},
-				LastModified: "D:20231201000000Z", // Minimal required field
+				LastModified: time.Date(2023, 12, 1, 0, 0, 0, 0, time.UTC), // Minimal required field
 			},
 		},
 	},

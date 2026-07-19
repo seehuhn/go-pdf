@@ -17,6 +17,7 @@
 package fallback
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -50,5 +51,29 @@ func TestAddAppearanceLowVersion(t *testing.T) {
 				t.Errorf("unexpected error for PDF 1.2: %v", err)
 			}
 		})
+	}
+}
+
+// TestErrNoFallback checks that a type without a fallback implementation is
+// reported as such, and that a type which has one is not.  Callers use this
+// distinction to tell an annotation they are content to skip from one whose
+// fallback could not be built.
+func TestErrNoFallback(t *testing.T) {
+	s := NewStyle(pdf.V2_0)
+	rect := pdf.Rectangle{URx: 100, URy: 100}
+
+	for _, a := range []annotation.Annotation{
+		&annotation.PrinterMark{Common: annotation.Common{Rect: rect}},
+		&annotation.TrapNet{Common: annotation.Common{Rect: rect}},
+		&annotation.Projection{Common: annotation.Common{Rect: rect}},
+	} {
+		if err := s.AddAppearance(a); !errors.Is(err, ErrNoFallback) {
+			t.Errorf("%T: expected ErrNoFallback, got %v", a, err)
+		}
+	}
+
+	square := &annotation.Square{Common: annotation.Common{Rect: rect}}
+	if err := s.AddAppearance(square); errors.Is(err, ErrNoFallback) {
+		t.Error("Square: expected a fallback to be available")
 	}
 }

@@ -17,8 +17,12 @@
 package decode
 
 import (
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/form"
 )
 
 // Annotation reads an annotation from a PDF file.
@@ -26,6 +30,56 @@ import (
 // Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func Annotation(c pdf.Cursor, obj pdf.Object, _ bool) (annotation.Annotation, error) {
+	a, err := decodeAnnotation(c, obj)
+	if err != nil {
+		return nil, err
+	}
+	repairMissingAppearance(a, pdf.GetVersion(c.Getter()))
+	return a, nil
+}
+
+// repairMissingAppearance supplies an empty appearance for an annotation which
+// needs one but has none, so that everything we can read can be written back.
+//
+// The appearance is empty rather than a generated fallback: the file gives no
+// appearance, and inventing one here would fix the annotation's rendering in
+// place, taking the choice away from the viewer.
+//
+// Subtypes whose appearance needs more than a bare form supply it themselves,
+// while decoding, and are left alone here.
+func repairMissingAppearance(a annotation.Annotation, v pdf.Version) {
+	c := a.GetCommon()
+	if c.Appearance == nil && annotation.AppearanceRequired(a.AnnotationType(), c.Rect, v) {
+		c.Appearance = emptyAppearance(c.Rect)
+	}
+}
+
+// emptyAppearance builds an appearance dictionary which draws nothing over the
+// given rectangle.
+//
+// The shape mirrors what reading such an appearance back yields: an absent
+// Matrix reads as the identity, and absent R and D entries default to N.
+// Without this the result would not be a fixed point.
+func emptyAppearance(rect pdf.Rectangle) *appearance.Dict {
+	empty := &form.Form{
+		BBox:   rect,
+		Res:    &content.Resources{},
+		Matrix: matrix.Identity,
+	}
+	// The three entries share one form.  Repairs which follow, in particular
+	// [repairTrapNetAppearance], copy the form they fix rather than modifying
+	// it, so the sharing cannot leak a change from one entry into the others.
+	// Anything added here which does modify a form in place has to copy it
+	// first, or build a form per entry.
+	return &appearance.Dict{
+		Normal:    empty,
+		RollOver:  empty,
+		Down:      empty,
+		SingleUse: true,
+	}
+}
+
+func decodeAnnotation(c pdf.Cursor, obj pdf.Object) (annotation.Annotation, error) {
 	dict, err := c.DictTyped(obj, "Annot")
 	if err != nil {
 		return nil, err

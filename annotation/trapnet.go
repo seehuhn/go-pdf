@@ -18,6 +18,8 @@ package annotation
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"seehuhn.de/go/pdf"
 )
@@ -41,7 +43,11 @@ type TrapNet struct {
 	// LastModified (required if Version and AnnotStates are absent; is
 	// absent if Version and AnnotStates are present; PDF 1.4) is the date and
 	// time when the trap network was most recently modified.
-	LastModified string
+	//
+	// This is the LastModified entry of the trap network annotation.  It
+	// shadows the promoted [Common.LastModified] field, which holds the
+	// modification date of the annotation itself (the M entry).
+	LastModified time.Time
 
 	// Version (required if AnnotStates is present; is absent if
 	// LastModified is present) is an unordered array of all objects present
@@ -75,8 +81,36 @@ func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 
+	if t.Flags != FlagPrint|FlagReadOnly {
+		return nil, errors.New("trap network needs Print and ReadOnly flags only")
+	}
+
+	// The AS entry is required only where the normal appearance holds several
+	// trap networks to choose between, which is the general rule for appearance
+	// states and is checked in fillDict.  Taken literally the specification
+	// demands AS on every trap network annotation, but the same subclause
+	// describes AS as designating one of several alternate networks, and the
+	// parallel wording for printer's marks makes the requirement conditional.
+	// A state name is meaningless where there is nothing to select, so
+	// requiring one would mean inventing a name and wrapping the sole
+	// appearance in a subdictionary that the file never had.
+
+	// The normal appearance of a trap network annotation is the trap network
+	// itself, so it must carry the trap network entries.  An annotation
+	// without an appearance has nothing to check.
+	if ap := t.Appearance; ap != nil {
+		if ap.Normal != nil && ap.Normal.TrapNet == nil {
+			return nil, errors.New("normal appearance is not a trap network")
+		}
+		for name, f := range ap.NormalMap {
+			if f != nil && f.TrapNet == nil {
+				return nil, fmt.Errorf("normal appearance %q is not a trap network", name)
+			}
+		}
+	}
+
 	// validate field combinations
-	hasLM := t.LastModified != ""
+	hasLM := !t.LastModified.IsZero()
 	hasVer := len(t.Version) > 0
 	hasAS := len(t.AnnotStates) > 0
 	switch {
@@ -100,8 +134,8 @@ func (t *TrapNet) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// Add trap network-specific fields
-	if t.LastModified != "" {
-		dict["LastModified"] = pdf.TextString(t.LastModified)
+	if !t.LastModified.IsZero() {
+		dict["LastModified"] = pdf.Date(t.LastModified)
 	}
 
 	// Version (conditional)

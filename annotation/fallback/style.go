@@ -17,7 +17,7 @@
 package fallback
 
 import (
-	"fmt"
+	"errors"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -109,10 +109,21 @@ func NewStyle(version pdf.Version) *Style {
 	}
 }
 
+// ErrNoFallback is returned by [Style.AddAppearance] for an annotation type it
+// cannot draw.  Callers which walk a document's annotations use it to tell a
+// type they are content to skip from a fallback which was attempted and
+// failed.
+var ErrNoFallback = errors.New("no fallback appearance for this annotation type")
+
 // AddAppearance generates a normal appearance stream for the annotation
 // and sets it in the annotation's appearance dictionary. Any existing
 // rollover and down appearances are cleared. The annotation's Rect and
 // other fields may be adjusted to match the generated appearance.
+//
+// It returns [ErrNoFallback] if the annotation type has no fallback
+// appearance.  Some types are not drawn as a matter of policy and some are
+// simply not implemented yet; the renderer decides which types it offers here,
+// see page.ShouldSynthesizeFallback in the go-render module.
 func (s *Style) AddAppearance(a annotation.Annotation) error {
 	// TODO(voss): cache appearances where possible
 
@@ -156,7 +167,7 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 		// buttons need an on/off map, not a single normal stream)
 		return s.addWidgetAppearance(a)
 	default:
-		return fmt.Errorf("unsupported annotation type: %T", a)
+		return ErrNoFallback
 	}
 	if err != nil {
 		return err

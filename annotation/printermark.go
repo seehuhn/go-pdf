@@ -16,7 +16,11 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 12.5.2 12.5.6.20
 
@@ -47,6 +51,10 @@ func (p *PrinterMark) AnnotationType() pdf.Name {
 func (p *PrinterMark) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "printer's mark annotation", pdf.V1_4); err != nil {
 		return nil, err
+	}
+
+	if p.Flags != FlagPrint|FlagReadOnly {
+		return nil, errors.New("printer's mark needs Print and ReadOnly flags only")
 	}
 
 	dict := pdf.Dict{

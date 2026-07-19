@@ -17,9 +17,13 @@
 package decode
 
 import (
+	"maps"
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/graphics/trapnet"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
@@ -37,7 +41,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tn.LastModified == "" {
+		if tn.LastModified.IsZero() {
 			t.Error("expected LastModified to be set")
 		}
 		if len(tn.Version) != 0 {
@@ -60,8 +64,8 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tn.LastModified != "" {
-			t.Errorf("expected LastModified to be cleared, got %q", tn.LastModified)
+		if !tn.LastModified.IsZero() {
+			t.Errorf("expected LastModified to be cleared, got %v", tn.LastModified)
 		}
 		if len(tn.Version) == 0 {
 			t.Error("expected Version to be kept")
@@ -82,7 +86,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tn.LastModified == "" {
+		if tn.LastModified.IsZero() {
 			t.Error("expected LastModified to be kept")
 		}
 		if len(tn.Version) != 0 {
@@ -101,7 +105,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tn.LastModified == "" {
+		if tn.LastModified.IsZero() {
 			t.Error("expected LastModified to be kept")
 		}
 		if len(tn.AnnotStates) != 0 {
@@ -119,7 +123,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tn.LastModified == "" {
+		if tn.LastModified.IsZero() {
 			t.Error("expected LastModified to be set")
 		}
 		if len(tn.Version) != 0 {
@@ -137,11 +141,205 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tn.LastModified == "" {
+		if tn.LastModified.IsZero() {
 			t.Error("expected LastModified to be set")
 		}
 		if len(tn.AnnotStates) != 0 {
 			t.Error("expected AnnotStates to be dropped")
 		}
 	})
+}
+
+// writeFormStream writes a bare form XObject and returns its reference.
+func writeFormStream(t *testing.T, w *pdf.Writer, extra pdf.Dict) pdf.Reference {
+	t.Helper()
+	ref := w.Alloc()
+	dict := pdf.Dict{
+		"Subtype":   pdf.Name("Form"),
+		"BBox":      &pdf.Rectangle{URx: 24, URy: 24},
+		"Resources": pdf.Dict{},
+	}
+	maps.Copy(dict, extra)
+	stm, err := w.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return ref
+}
+
+// TestTrapNetFlagRepair checks that the Print and ReadOnly flags are forced on
+// read, so that a trap network annotation stays writable.
+func TestTrapNetFlagRepair(t *testing.T) {
+	x := pdf.NewExtractor(mock.Getter)
+	want := annotation.FlagPrint | annotation.FlagReadOnly
+
+	for _, flags := range []pdf.Integer{0, 6, 1, 0xFFFF} {
+		dict := pdf.Dict{
+			"Subtype":      pdf.Name("TrapNet"),
+			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
+			"LastModified": pdf.TextString("D:20231215103000Z"),
+			"F":            flags,
+		}
+		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tn.Flags != want {
+			t.Errorf("F=%d: expected flags %d, got %d", flags, want, tn.Flags)
+		}
+	}
+}
+
+// TestPrinterMarkFlagRepair checks the same for printer's mark annotations.
+func TestPrinterMarkFlagRepair(t *testing.T) {
+	x := pdf.NewExtractor(mock.Getter)
+	want := annotation.FlagPrint | annotation.FlagReadOnly
+
+	for _, flags := range []pdf.Integer{0, 6, 1, 0xFFFF} {
+		dict := pdf.Dict{
+			"Subtype": pdf.Name("PrinterMark"),
+			"Rect":    &pdf.Rectangle{URx: 612, URy: 792},
+			"F":       flags,
+		}
+		pm, err := decodePrinterMark(pdf.CursorAt(x, nil), dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pm.Flags != want {
+			t.Errorf("F=%d: expected flags %d, got %d", flags, want, pm.Flags)
+		}
+	}
+}
+
+// TestTrapNetAppearanceRepair checks that a normal appearance without the trap
+// network entries is repaired, so that the annotation can be written back.
+func TestTrapNetAppearanceRepair(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	formRef := writeFormStream(t, w, nil)
+
+	dict := pdf.Dict{
+		"Subtype":      pdf.Name("TrapNet"),
+		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
+		"LastModified": pdf.TextString("D:20231215103000Z"),
+		"AP":           pdf.Dict{"N": formRef},
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tn.Appearance == nil || tn.Appearance.Normal == nil {
+		t.Fatal("expected a normal appearance")
+	}
+	if tn.Appearance.Normal.TrapNet == nil {
+		t.Fatal("expected the normal appearance to carry trap network entries")
+	}
+	if got := tn.Appearance.Normal.TrapNet.PCM; got != trapnet.DefaultPCM {
+		t.Errorf("expected PCM %q, got %q", trapnet.DefaultPCM, got)
+	}
+
+	// the repaired annotation must be writable
+	out, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(out)
+	if _, err := tn.Encode(rm); err != nil {
+		t.Fatalf("cannot write the annotation back: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestTrapNetAppearanceRepairIsLocal checks that repairing the normal
+// appearance does not modify forms which are shared with other appearances.
+// Forms reached through an appearance sub-dictionary are cached by the
+// extractor, so an in-place fix would leak into every other holder.
+func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	formRef := writeFormStream(t, w, nil)
+
+	// /N and /D name the very same form object
+	dict := pdf.Dict{
+		"Subtype":      pdf.Name("TrapNet"),
+		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
+		"LastModified": pdf.TextString("D:20231215103000Z"),
+		"AP": pdf.Dict{
+			"N": pdf.Dict{"On": formRef},
+			"D": pdf.Dict{"On": formRef},
+		},
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	normal := tn.Appearance.NormalMap["On"]
+	down := tn.Appearance.DownMap["On"]
+	if normal == nil || down == nil {
+		t.Fatal("expected both appearance states")
+	}
+	if normal.TrapNet == nil {
+		t.Error("expected the normal appearance to be repaired")
+	}
+	if down.TrapNet != nil {
+		t.Error("the down appearance was modified by the repair")
+	}
+}
+
+// TestTrapNetAppearanceKeepsPrinterMark checks that supplying the missing trap
+// network entries leaves the printer's mark entries alone.  The form may be
+// shared with a printer's mark annotation, and dropping them here would
+// discard data the file legitimately carries.
+func TestTrapNetAppearanceKeepsPrinterMark(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	formRef := writeFormStream(t, w, pdf.Dict{"MarkStyle": pdf.TextString("Colour bar")})
+
+	dict := pdf.Dict{
+		"Subtype":      pdf.Name("TrapNet"),
+		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
+		"LastModified": pdf.TextString("D:20231215103000Z"),
+		"AP":           pdf.Dict{"N": formRef},
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	normal := tn.Appearance.Normal
+	if normal == nil {
+		t.Fatal("expected a normal appearance")
+	}
+	if normal.PrinterMark == nil {
+		t.Error("expected the printer's mark entries to be kept")
+	}
+	if normal.TrapNet == nil {
+		t.Error("expected the normal appearance to carry trap network entries")
+	}
+
+	// the repaired annotation must be writable
+	out, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(out)
+	if _, err := tn.Encode(rm); err != nil {
+		t.Fatalf("cannot write the annotation back: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -29,9 +29,15 @@ func decodePrinterMark(c pdf.Cursor, dict pdf.Dict) (*annotation.PrinterMark, er
 		return nil, err
 	}
 
+	// The Print and ReadOnly flags are required, and all others must be
+	// clear.  Snap the flags so that malformed input stays writable.
+	printerMark.Flags = annotation.FlagPrint | annotation.FlagReadOnly
+
 	// Extract printer's mark-specific fields
 	// MN (optional)
-	if mn, err := c.Name(dict["MN"]); err == nil && mn != "" {
+	if mn, err := pdf.Optional(c.Name(dict["MN"])); err != nil {
+		return nil, err
+	} else if mn != "" {
 		printerMark.MN = mn
 	}
 

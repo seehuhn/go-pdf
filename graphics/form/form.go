@@ -29,7 +29,9 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/graphics/opi"
+	"seehuhn.de/go/pdf/graphics/printermark"
 	"seehuhn.de/go/pdf/graphics/reference"
+	"seehuhn.de/go/pdf/graphics/trapnet"
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
@@ -68,6 +70,16 @@ type Form struct {
 	// Ref (optional; PDF 1.4) makes this form a reference XObject: a proxy for
 	// a single page imported from another PDF file.
 	Ref *reference.Dict
+
+	// PrinterMark (optional; PDF 1.4) holds the entries specific to a printer's
+	// mark.  They take effect where the form is used as the normal appearance
+	// of a printer's mark annotation, and are ignored elsewhere.
+	PrinterMark *printermark.Attributes
+
+	// TrapNet (optional; PDF 1.3) holds the entries specific to a trap network.
+	// They take effect where the form is used as the normal appearance of a
+	// trap network annotation, and are ignored elsewhere.
+	TrapNet *trapnet.Attributes
 
 	// OPI (optional; PDF 1.2) is an Open Prepress Interface dictionary
 	// describing a low-resolution proxy for a high-resolution image.
@@ -186,6 +198,16 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["Ref"] = refObj
+	}
+	if f.PrinterMark != nil {
+		if err := f.PrinterMark.FillDict(e, dict); err != nil {
+			return nil, err
+		}
+	}
+	if f.TrapNet != nil {
+		if err := f.TrapNet.FillDict(e, dict); err != nil {
+			return nil, err
+		}
 	}
 	if f.OPI != nil {
 		opiObj, err := e.Embed(f.OPI)
@@ -346,6 +368,12 @@ func (f *Form) Equal(other *Form) bool {
 		return false
 	}
 	if !f.Ref.Equal(other.Ref) {
+		return false
+	}
+	if !f.PrinterMark.Equal(other.PrinterMark) {
+		return false
+	}
+	if !f.TrapNet.Equal(other.TrapNet) {
 		return false
 	}
 	if (f.OPI == nil) != (other.OPI == nil) {

@@ -18,6 +18,7 @@ package form_test
 
 import (
 	"io"
+	"maps"
 	"testing"
 	"time"
 
@@ -655,5 +656,250 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 	if form2.AssociatedFiles[0].FileNameUnicode != form1.AssociatedFiles[0].FileNameUnicode {
 		t.Errorf("AssociatedFiles FileNameUnicode round trip failed: got %s, want %s",
 			form2.AssociatedFiles[0].FileNameUnicode, form1.AssociatedFiles[0].FileNameUnicode)
+	}
+}
+
+// writeFormDict writes a form XObject dict with the given extra entries,
+// bypassing form.Embed so that tests can construct dicts which Embed would
+// refuse to produce.
+func writeFormDict(t *testing.T, version pdf.Version, extra pdf.Dict) (*pdf.Writer, pdf.Reference) {
+	t.Helper()
+	writer, _ := memfile.NewPDFWriter(version, nil)
+	ref := writer.Alloc()
+	dict := pdf.Dict{
+		"Subtype":   pdf.Name("Form"),
+		"BBox":      &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		"Resources": pdf.Dict{},
+	}
+	maps.Copy(dict, extra)
+	stm, err := writer.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return writer, ref
+}
+
+// TestExtractKeepsBothVariants checks that a form which carries both printer's
+// mark and trap network entries keeps both.  Neither set of entries makes the
+// dictionary invalid; which of them applies depends on where the form is
+// referenced from, which is not known here.
+func TestExtractKeepsBothVariants(t *testing.T) {
+	writer, ref := writeFormDict(t, pdf.V1_7, pdf.Dict{
+		"MarkStyle": pdf.TextString("Colour bar"),
+		"PCM":       pdf.Name("DeviceCMYK"),
+	})
+
+	x := pdf.NewExtractor(writer)
+	f, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if f.PrinterMark == nil {
+		t.Error("expected the printer's mark entries to be kept")
+	}
+	if f.TrapNet == nil {
+		t.Error("expected the trap network entries to be kept")
+	}
+
+	mustEmbed(t, pdf.V1_7, f)
+}
+
+// TestExtractKeepsTrapNetAt13 checks that a form carrying both sets of entries
+// keeps the trap network at PDF 1.3, where printer's marks do not yet exist.
+// Resolving a conflict between the two used to run before the version
+// stripping, so that both sets were lost here.
+func TestExtractKeepsTrapNetAt13(t *testing.T) {
+	writer, ref := writeFormDict(t, pdf.V1_3, pdf.Dict{
+		"MarkStyle": pdf.TextString("Colour bar"),
+		"PCM":       pdf.Name("DeviceCMYK"),
+	})
+
+	x := pdf.NewExtractor(writer)
+	f, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if f.PrinterMark != nil {
+		t.Error("expected the printer's mark entries to be dropped at PDF 1.3")
+	}
+	if f.TrapNet == nil {
+		t.Error("expected the trap network entries to be kept")
+	}
+
+	mustEmbed(t, pdf.V1_3, f)
+}
+
+// TestExtractStripsFutureEntries checks that entries which the file's PDF
+// version cannot carry are dropped on read, so that everything which can be
+// read can also be written back.
+func TestExtractStripsFutureEntries(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// tooOld is a version which cannot carry the entry, ok is one which can
+		tooOld  pdf.Version
+		ok      pdf.Version
+		extra   pdf.Dict
+		present func(*form.Form) bool
+	}{
+		{
+			name:    "TrapNet before 1.3",
+			tooOld:  pdf.V1_2,
+			ok:      pdf.V1_3,
+			extra:   pdf.Dict{"PCM": pdf.Name("DeviceCMYK")},
+			present: func(f *form.Form) bool { return f.TrapNet != nil },
+		},
+		{
+			name:    "PrinterMark before 1.4",
+			tooOld:  pdf.V1_3,
+			ok:      pdf.V1_4,
+			extra:   pdf.Dict{"MarkStyle": pdf.TextString("Colour bar")},
+			present: func(f *form.Form) bool { return f.PrinterMark != nil },
+		},
+		{
+			name:   "StructParent before 1.3",
+			tooOld: pdf.V1_2,
+			ok:     pdf.V1_3,
+			extra:  pdf.Dict{"StructParent": pdf.Integer(3)},
+			present: func(f *form.Form) bool {
+				_, ok := f.StructParent.Get()
+				return ok
+			},
+		},
+		{
+			name:   "Group before 1.4",
+			tooOld: pdf.V1_3,
+			ok:     pdf.V1_4,
+			extra: pdf.Dict{
+				"Group": pdf.Dict{
+					"Type": pdf.Name("Group"),
+					"S":    pdf.Name("Transparency"),
+				},
+			},
+			present: func(f *form.Form) bool { return f.Group != nil },
+		},
+		{
+			name:   "Measure before 2.0",
+			tooOld: pdf.V1_7,
+			ok:     pdf.V2_0,
+			extra: pdf.Dict{
+				"Measure": pdf.Dict{
+					"Type":    pdf.Name("Measure"),
+					"Subtype": pdf.Name("RL"),
+					"R":       pdf.TextString("1in = 1in"),
+				},
+			},
+			present: func(f *form.Form) bool { return f.Measure != nil },
+		},
+		{
+			name:   "OPI before 1.2",
+			tooOld: pdf.V1_1,
+			ok:     pdf.V1_2,
+			extra: pdf.Dict{
+				"OPI": pdf.Dict{
+					"1.3": pdf.Dict{
+						"Type":    pdf.Name("OPI"),
+						"Version": pdf.Real(1.3),
+						"F": pdf.Dict{
+							"Type": pdf.Name("Filespec"),
+							"F":    pdf.String("pic.tif"),
+						},
+						"Size": pdf.Array{pdf.Integer(100), pdf.Integer(100)},
+						"CropRect": pdf.Array{pdf.Integer(0), pdf.Integer(100),
+							pdf.Integer(100), pdf.Integer(0)},
+						"Position": pdf.Array{
+							pdf.Integer(0), pdf.Integer(0),
+							pdf.Integer(0), pdf.Integer(100),
+							pdf.Integer(100), pdf.Integer(100),
+							pdf.Integer(100), pdf.Integer(0),
+						},
+					},
+				},
+			},
+			present: func(f *form.Form) bool { return f.OPI != nil },
+		},
+		{
+			name:   "Ref before 1.4",
+			tooOld: pdf.V1_3,
+			ok:     pdf.V1_4,
+			extra: pdf.Dict{
+				"Ref": pdf.Dict{
+					"F": pdf.Dict{
+						"Type": pdf.Name("Filespec"),
+						"F":    pdf.String("target.pdf"),
+					},
+					"Page": pdf.Integer(0),
+				},
+			},
+			present: func(f *form.Form) bool { return f.Ref != nil },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// The entry must survive at a version which allows it, otherwise
+			// the check below would pass for the wrong reason.
+			writer, ref := writeFormDict(t, tc.ok, tc.extra)
+			x := pdf.NewExtractor(writer)
+			f, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !tc.present(f) {
+				t.Fatalf("entry does not survive extraction at %s", tc.ok)
+			}
+
+			writer, ref = writeFormDict(t, tc.tooOld, tc.extra)
+			x = pdf.NewExtractor(writer)
+			f, err = extract.Form(pdf.CursorAt(x, nil), ref, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.present(f) {
+				t.Errorf("entry was not dropped at %s", tc.tooOld)
+			}
+
+			// the crucial part: what we read must be writable again
+			mustEmbed(t, tc.tooOld, f)
+		})
+	}
+}
+
+// mustEmbed writes f to a new file of the given version and reads it back,
+// checking that the value survives unchanged.  Writing alone only shows that
+// the form is acceptable; the round trip shows that nothing was lost.
+//
+// Callers pass the version f was read at, and reading drops entries that
+// version cannot carry, so a version error means the read side let something
+// through.  Unlike the usual round-trip helper this one therefore fails on
+// [pdf.IsWrongVersion] rather than skipping.
+func mustEmbed(t *testing.T, version pdf.Version, f *form.Form) {
+	t.Helper()
+
+	out, _ := memfile.NewPDFWriter(version, nil)
+	rm := pdf.NewResourceManager(out)
+	obj, err := rm.Embed(f)
+	if err != nil {
+		t.Fatalf("cannot write the form back: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(out)
+	f2, err := extract.Form(pdf.CursorAt(x, nil), obj, false)
+	if err != nil {
+		t.Fatalf("cannot read the form back: %v", err)
+	}
+	if diff := cmp.Diff(f, f2); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
