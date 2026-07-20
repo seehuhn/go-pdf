@@ -78,6 +78,8 @@ type Style struct {
 	reset *extgstate.ExtGState
 }
 
+var _ annotation.AppearanceGenerator = (*Style)(nil)
+
 // NewStyle returns a new Style with default fonts and graphics state.
 // Appearance streams are built for the given PDF version, so that
 // version-restricted operators are rejected at build time.
@@ -122,8 +124,8 @@ var ErrNoFallback = errors.New("no fallback appearance for this annotation type"
 //
 // It returns [ErrNoFallback] if the annotation type has no fallback
 // appearance.  Some types are not drawn as a matter of policy and some are
-// simply not implemented yet; the renderer decides which types it offers here,
-// see page.ShouldSynthesizeFallback in the go-render module.
+// simply not implemented yet; a caller decides which types it offers here,
+// see [seehuhn.de/go/pdf/annotation.ShouldSynthesizeFallback].
 func (s *Style) AddAppearance(a annotation.Annotation) error {
 	// TODO(voss): cache appearances where possible
 
