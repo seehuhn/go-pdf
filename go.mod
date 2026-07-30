@@ -18,5 +18,5 @@ require (
 
 require (
 	golang.org/x/sys v0.46.0 // indirect
-	seehuhn.de/go/dag v0.0.0-20250630092703-dd0e13308cb3 // indirect
+	seehuhn.de/go/dag v1.0.0 // indirect
 )
