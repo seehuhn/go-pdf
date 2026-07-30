@@ -158,11 +158,10 @@ type converter struct {
 }
 
 // buildOCState constructs the optional-content visibility state from the set of
-// hidden group references.  Each of the document's optional-content groups is
-// registered under both extraction identities it can acquire during the walk
-// (as a [oc.Conditional] for a direct /OC entry, and as a [*oc.Group] for an
-// OCMD member), so that visibility checks made through the shared extractor's
-// cache resolve consistently.
+// hidden group references.  Every path that reaches a group during the walk
+// decodes it under its reference through the shared extractor, so a single
+// [*oc.Group] per reference carries the state for all of them.  A group
+// written inline has no reference to share and stays visible.
 func (c *converter) buildOCState(hidden []pdf.Reference) error {
 	if len(hidden) == 0 {
 		return nil
@@ -181,21 +180,15 @@ func (c *converter) buildOCState(hidden []pdf.Reference) error {
 		return err
 	}
 
+	cur := pdf.CursorAt(c.x, nil)
 	state := (&oc.Configuration{}).DefaultState(nil, oc.EventView, nil)
 	for _, item := range ocgs {
 		ref, ok := item.(pdf.Reference)
 		if !ok {
 			continue
 		}
-		on := !hiddenSet[ref]
-		cur := pdf.CursorAt(c.x, nil)
-		if cond, err := pdf.Decode(cur, ref, oc.ExtractConditional); err == nil {
-			if g, ok := cond.(*oc.Group); ok {
-				state.SetState(g, on)
-			}
-		}
 		if g, err := pdf.DecodeOptional(cur, ref, oc.ExtractGroup); err == nil && g != nil {
-			state.SetState(g, on)
+			state.SetState(g, !hiddenSet[ref])
 		}
 	}
 	c.ocState = state

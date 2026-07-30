@@ -490,3 +490,84 @@ func asFloat(o pdf.Object) float64 {
 	}
 	return 0
 }
+
+// TestFlattenMergedFieldValue checks that a form field merged with its single
+// widget keeps its field context while being flattened.  Such a dictionary is
+// both the annotation and the field, so the annotation decoder has to recover
+// the reference it was called for to link the two; a widget that reaches the
+// fallback generator with no field attached draws only empty chrome, silently
+// dropping the field value from the printed page.
+func TestFlattenMergedFieldValue(t *testing.T) {
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// one object that is both a text field and its widget, with a value but no
+	// appearance stream
+	mergedRef := w.Alloc()
+	w.Put(mergedRef, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"),
+		"Rect": pdf.Array{pdf.Integer(20), pdf.Integer(20), pdf.Integer(160), pdf.Integer(60)},
+		"F":    pdf.Integer(4), // Print
+		"FT":   pdf.Name("Tx"),
+		"T":    pdf.TextString("merged"),
+		"V":    pdf.TextString("hello"),
+		"DA":   pdf.String("0 0 0 rg /Helv 12 Tf"),
+	})
+
+	formRef := w.Alloc()
+	w.Put(formRef, pdf.Dict{"Fields": pdf.Array{mergedRef}})
+
+	contentRef := w.Alloc()
+	cstm, _ := w.OpenStream(contentRef, pdf.Dict{})
+	io.WriteString(cstm, "q 0 0 1 rg 5 5 10 10 re f Q\n")
+	cstm.Close()
+
+	pageRef := w.Alloc()
+	pagesRef := w.Alloc()
+	w.Put(pageRef, pdf.Dict{
+		"Type": pdf.Name("Page"), "Parent": pagesRef,
+		"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(200), pdf.Integer(200)},
+		"Contents": contentRef,
+		"Annots":   pdf.Array{mergedRef},
+	})
+	w.Put(pagesRef, pdf.Dict{"Type": pdf.Name("Pages"), "Kids": pdf.Array{pageRef}, "Count": pdf.Integer(1)})
+	w.GetMeta().Catalog.Pages = pagesRef
+	w.GetMeta().Catalog.AcroForm = formRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := Write(&out, r, nil); err != nil {
+		t.Fatal(err)
+	}
+	res := out.Bytes()
+
+	rr, err := pdf.NewReader(bytes.NewReader(res), int64(len(res)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, page, err := pagetree.GetPage(rr, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur := pdf.NewCursor(rr)
+	resDict, _ := cur.Dict(page["Resources"])
+	xobjs, err := cur.Dict(resDict["XObject"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := cur.ReadAll(xobjs["PPAnnot0"], 1<<20)
+	if err != nil {
+		t.Fatalf("flattened form does not resolve in output: %v", err)
+	}
+
+	// the field value is drawn, so the flattened form shows text
+	if !strings.Contains(string(body), "Tj") && !strings.Contains(string(body), "TJ") {
+		t.Errorf("flattened merged field draws no text, so the value was lost:\n%s", body)
+	}
+}

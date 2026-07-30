@@ -62,7 +62,7 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 	}
 
 	for _, item := range annots {
-		ai, err := decode.Annotation(pdf.CursorAt(c.x, nil), item, false)
+		ai, err := pdf.Decode(pdf.CursorAt(c.x, nil), item, decode.Annotation)
 		if err != nil || ai == nil {
 			continue
 		}
@@ -201,5 +201,5 @@ func (c *converter) annotDropped(ai annotation.Annotation) bool {
 		*annotation.RichMedia, *annotation.Annot3D:
 		return true
 	}
-	return annotation.AnnotSuppressed(ai, true, false, c.hideMkp, c.ocState)
+	return annotation.Suppressed(ai, true, false, c.hideMkp, c.ocState)
 }

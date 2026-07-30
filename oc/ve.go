@@ -87,19 +87,14 @@ func ExtractVisibilityExpression(c pdf.Cursor, obj pdf.Object, isDirect bool) (V
 		}
 	}
 
-	// single-OCG case: when invoked via [pdf.Decode], any Reference
-	// has already been unwrapped, so recover the original Reference from
-	// the path so the extractor cache returns the same *Group as other
-	// extraction paths.
-	groupObj, groupPath := obj, c.Path()
-	if !isDirect && groupPath != nil {
-		groupObj = groupPath.Ref
-		groupPath = groupPath.Parent
-	}
+	// single-OCG case: recover the reference the group was reached through, so
+	// that the extractor cache returns the same *Group as other extraction
+	// paths
+	groupCursor, groupObj := c.AtRef(obj, isDirect)
 	if groupObj == nil {
 		return nil, pdf.Error("invalid visibility expression: missing object")
 	}
-	g, err := pdf.Decode(pdf.CursorAt(c.Extractor(), groupPath), groupObj, ExtractGroup)
+	g, err := pdf.Decode(groupCursor, groupObj, ExtractGroup)
 	if err != nil {
 		return nil, err
 	}

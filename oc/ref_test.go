@@ -162,3 +162,70 @@ func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
 		t.Error("membership group pointer differs from directly extracted group")
 	}
 }
+
+// TestConditionalPointerIdentity verifies that an OCG reached through
+// [ExtractConditional] — the path taken by an annotation's /OC entry — is the
+// same *Group as one extracted directly.  [ExtractConditional] receives the
+// resolved dictionary, so it has to recover the reference itself; without
+// that, the annotation's group would be a second value which no
+// [GroupStates] can reach, leaving the annotation visible whatever the state.
+func TestConditionalPointerIdentity(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	ocgRef := w.Alloc()
+	err := w.Put(ocgRef, pdf.Dict{
+		"Type": pdf.Name("OCG"),
+		"Name": pdf.TextString("Layer"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// an OCMD, to check the same for the membership branch
+	ocmdRef := w.Alloc()
+	err = w.Put(ocmdRef, pdf.Dict{
+		"Type": pdf.Name("OCMD"),
+		"OCGs": ocgRef,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+
+	group, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	md, err := pdf.Decode(pdf.CursorAt(x, nil), ocmdRef, ExtractMembership)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cond, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractConditional)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cond != Conditional(group) {
+		t.Error("conditional group pointer differs from directly extracted group")
+	}
+
+	condMD, err := pdf.Decode(pdf.CursorAt(x, nil), ocmdRef, ExtractConditional)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if condMD != Conditional(md) {
+		t.Error("conditional membership pointer differs from directly extracted membership")
+	}
+
+	// the state built from the document's group list must control the
+	// annotation-style conditional too
+	state := (&Configuration{}).DefaultState([]*Group{group}, EventView, nil)
+	state.SetState(group, false)
+	if cond.IsVisible(state) {
+		t.Error("conditional is visible although its group is off")
+	}
+	if condMD.IsVisible(state) {
+		t.Error("membership conditional is visible although its group is off")
+	}
+}

@@ -82,9 +82,9 @@ func ShouldSynthesizeFallback(a Annotation) bool {
 	return true
 }
 
-// EffectiveAnnotFlags returns the annotation's flags including the implicit
+// EffectiveFlags returns the annotation's flags including the implicit
 // NoZoom and NoRotate that text annotations always carry (§12.5.6.4).
-func EffectiveAnnotFlags(a Annotation) Flags {
+func EffectiveFlags(a Annotation) Flags {
 	flags := a.GetCommon().Flags
 	if _, ok := a.(*Text); ok {
 		flags |= FlagNoZoom | FlagNoRotate
@@ -92,30 +92,46 @@ func EffectiveAnnotFlags(a Annotation) Flags {
 	return flags
 }
 
-// AnnotInteractionHidden reports whether flags hide the annotation from
+// InteractionHidden reports whether the flags hide the annotation from
 // interactive display.  NoView annotations with ToggleNoView stay eligible:
 // NoView inverts on hover (§12.5.3).
-func AnnotInteractionHidden(flags Flags) bool {
-	if flags&FlagHidden != 0 {
+func (f Flags) InteractionHidden() bool {
+	if f&FlagHidden != 0 {
 		return true
 	}
-	return flags&FlagNoView != 0 && flags&FlagToggleNoView == 0
+	return f&FlagNoView != 0 && f&FlagToggleNoView == 0
 }
 
-// AnnotSuppressed reports whether an annotation should not be shown, given the
+// DisplayHidden reports whether the flags hide the annotation from ordinary
+// screen display.  Unlike [Flags.InteractionHidden], NoView hides the
+// annotation even together with ToggleNoView: the inversion applies only
+// while the pointer hovers over the annotation or it is selected (§12.5.3).
+func (f Flags) DisplayHidden() bool {
+	return f&(FlagHidden|FlagNoView) != 0
+}
+
+// Suppressed reports whether an annotation should not be shown, given the
 // visibility context.  forPrint selects the print flag rule (Print set,
 // Hidden clear); hover selects the interactive flag rule used for rollover
-// renders; otherwise the default rule (neither Hidden nor NoView) applies.  An
-// annotation is also suppressed when its optional-content entry is off, or
-// when hideMarkup is set and it is a markup annotation (§12.5.6.2).  ocState
-// may be nil, in which case the optional-content check is skipped.
-func AnnotSuppressed(a Annotation, forPrint, hover, hideMarkup bool, ocState *oc.GroupStates) bool {
+// renders; otherwise the default rule (neither Hidden nor NoView) applies.
+//
+// An annotation of a subtype the library does not know is suppressed in every
+// one of the three contexts if it carries the Invisible flag, which applies to
+// such subtypes alone (§12.5.3).  An annotation is also suppressed when its
+// optional-content entry is off, or when hideMarkup is set and it is a markup
+// annotation (§12.5.6.2).  ocState may be nil, in which case the
+// optional-content check is skipped.
+func Suppressed(a Annotation, forPrint, hover, hideMarkup bool, ocState *oc.GroupStates) bool {
 	c := a.GetCommon()
+
+	if invisibleUnknown(a) {
+		return true
+	}
 
 	// annotation visibility flags
 	switch {
 	case hover:
-		if AnnotInteractionHidden(c.Flags) {
+		if c.Flags.InteractionHidden() {
 			return true
 		}
 	case forPrint:
@@ -126,7 +142,7 @@ func AnnotSuppressed(a Annotation, forPrint, hover, hideMarkup bool, ocState *oc
 			return true
 		}
 	default:
-		if c.Flags&(FlagHidden|FlagNoView) != 0 {
+		if c.Flags.DisplayHidden() {
 			return true
 		}
 	}
@@ -146,4 +162,36 @@ func AnnotSuppressed(a Annotation, forPrint, hover, hideMarkup bool, ocState *oc
 	}
 
 	return false
+}
+
+// NeverShown reports whether an annotation's flags keep it out of every
+// visibility context, so that no screen render, hover render or print render
+// draws it.  Optional content and hide-markup only ever suppress an
+// annotation further, so [Suppressed] holds for such an annotation
+// whatever the rest of the context.
+//
+// Unlike the rest of the visibility context, the flags are fixed once the file
+// is read, so a caller can act on this once instead of per render — to skip
+// building an appearance nothing can draw, say.  A false result is not a
+// promise that the annotation is ever shown.
+func NeverShown(a Annotation) bool {
+	if invisibleUnknown(a) {
+		return true
+	}
+	f := a.GetCommon().Flags
+	if f&FlagHidden != 0 {
+		return true
+	}
+	// NoView keeps the annotation off the screen, ToggleNoView would bring it
+	// back on hover, and Print would still put it on paper
+	return f&FlagNoView != 0 && f&(FlagToggleNoView|FlagPrint) == 0
+}
+
+// invisibleUnknown reports whether the annotation is of a subtype the reader
+// does not know, which this library represents as [*Custom], and carries the
+// Invisible flag.  For those the flag hides the annotation in every context,
+// printing included (§12.5.3).
+func invisibleUnknown(a Annotation) bool {
+	_, unknown := a.(*Custom)
+	return unknown && a.GetCommon().Flags&FlagInvisible != 0
 }

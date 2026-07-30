@@ -134,9 +134,11 @@ func (c Cursor) DictTyped(obj Object, tp Name) (Dict, error) {
 }
 
 // CheckDictType checks that the "Type" entry of dict, if present, equals
-// wantType. A missing "Type" entry is accepted.
+// wantType. A missing "Type" entry is accepted, as is one which is not a name:
+// such an entry says nothing about the type, and the context the dictionary
+// was reached through already does.
 func (c Cursor) CheckDictType(dict Dict, wantType Name) error {
-	haveType, err := c.Name(dict["Type"])
+	haveType, err := Optional(c.Name(dict["Type"]))
 	if err != nil {
 		return err
 	}

@@ -191,3 +191,40 @@ func (r mockGetterType) GetMeta() *MetaInfo {
 func (r mockGetterType) Get(ref Reference, canObjStm bool) (Native, error) {
 	return nil, nil
 }
+
+// TestCheckDictType covers the three ways a "Type" entry can stand towards the
+// expected type: a matching name, a name naming something else, and an entry
+// carrying no type information at all.  The last case includes a "Type" which
+// is not a name; a reader that rejected those would drop dictionaries over a
+// producer's syntax slip, when the context they were reached through already
+// says what they are.
+func TestCheckDictType(t *testing.T) {
+	cases := []struct {
+		name    string
+		typeObj Object
+		wantErr bool
+	}{
+		{name: "matching name", typeObj: Name("Wanted")},
+		{name: "different name", typeObj: Name("Other"), wantErr: true},
+		{name: "missing", typeObj: nil},
+		{name: "empty name", typeObj: Name("")},
+		{name: "string instead of a name", typeObj: String("Wanted")},
+		{name: "number instead of a name", typeObj: Integer(3)},
+	}
+
+	c := NewCursor(mockGetter)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dict := Dict{}
+			if tc.typeObj != nil {
+				dict["Type"] = tc.typeObj
+			}
+			err := c.CheckDictType(dict, "Wanted")
+			if tc.wantErr && err == nil {
+				t.Error("no error for a dictionary of the wrong type")
+			} else if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}

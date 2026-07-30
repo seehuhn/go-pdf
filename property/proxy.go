@@ -36,12 +36,8 @@ func ExtractList(c pdf.Cursor, obj pdf.Object, isDirect bool) (List, error) {
 	// for an indirect property list, store the reference (so re-embedding
 	// translates it) and re-anchor the cursor at the parent path, so that
 	// resolving the reference below does not trip its own cycle check
+	c, obj = c.AtRef(obj, isDirect)
 	path := c.Path()
-	if !isDirect && path != nil {
-		obj = path.Ref
-		path = path.Parent
-		c = pdf.CursorAt(c.Extractor(), path)
-	}
 
 	// validate that the object resolves to a dictionary
 	dict, err := c.Dict(obj)
