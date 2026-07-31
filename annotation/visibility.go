@@ -41,11 +41,20 @@ func HasAppearance(a Annotation) bool {
 	return ap != nil && ap.Content != nil
 }
 
-// HasRolloverAppearance reports whether an annotation has a rollover (/R)
-// appearance stream with content.
+// HasRolloverAppearance reports whether an annotation looks different under
+// the pointer, i.e. whether its rollover appearance is an appearance stream of
+// its own rather than the normal appearance repeated.  A viewer uses this to
+// decide which annotations are worth a hover render at all.
+//
+// The two appearances are compared by identity, which is what tells a rollover
+// the file asks for from the one substituted for a missing /R entry.
 func HasRolloverAppearance(a Annotation) bool {
-	ap := Resolve(a.GetCommon(), appearance.RollOver)
-	return ap != nil && ap.Content != nil
+	c := a.GetCommon()
+	ap := Resolve(c, appearance.RollOver)
+	if ap == nil || ap.Content == nil {
+		return false
+	}
+	return ap != Resolve(c, appearance.Normal)
 }
 
 // ShouldSynthesizeFallback reports whether a fallback appearance may be

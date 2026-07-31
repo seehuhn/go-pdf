@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/trapnet"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
@@ -257,10 +258,57 @@ func TestTrapNetAppearanceRepair(t *testing.T) {
 	}
 }
 
+// TestTrapNetRepairKeepsAppearanceShared checks that the appearance supplied
+// for a trap network which has none is written back as a bare /N entry.  The
+// three appearances start out as one form, and shaping the normal appearance
+// into a trap network must not leave the other two behind as appearances of
+// their own.
+func TestTrapNetRepairKeepsAppearanceShared(t *testing.T) {
+	dict := pdf.Dict{
+		"Subtype":      pdf.Name("TrapNet"),
+		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
+		"LastModified": pdf.TextString("D:20231215103000Z"),
+	}
+
+	x := pdf.NewExtractor(mock.Getter)
+	tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(out)
+	obj, err := tn.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	annotDict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatalf("expected a dictionary, got %T", obj)
+	}
+	ap, err := pdf.NewCursor(out).Dict(annotDict["AP"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ap["N"] == nil {
+		t.Error("missing N entry")
+	}
+	if ap["R"] != nil || ap["D"] != nil {
+		t.Errorf("appearance dictionary gained R/D entries: %v", ap)
+	}
+}
+
 // TestTrapNetAppearanceRepairIsLocal checks that repairing the normal
-// appearance does not modify forms which are shared with other appearances.
-// Forms reached through an appearance sub-dictionary are cached by the
-// extractor, so an in-place fix would leak into every other holder.
+// appearance does not modify the form itself.  Forms reached through an
+// appearance sub-dictionary are cached by the extractor, so an in-place fix
+// would leak into every other holder.
+//
+// A down appearance which repeated the normal appearance keeps repeating it,
+// pointing at the repaired form rather than the one the file holds.
 func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	formRef := writeFormStream(t, w, nil)
@@ -293,8 +341,18 @@ func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
 	if normal.TrapNet == nil {
 		t.Error("expected the normal appearance to be repaired")
 	}
-	if down.TrapNet != nil {
-		t.Error("the down appearance was modified by the repair")
+	if down != normal {
+		t.Error("the down appearance no longer repeats the normal one")
+	}
+
+	// the form the file holds is what every other holder of the reference
+	// sees, and the repair must have left it alone
+	shared, err := pdf.Decode(pdf.CursorAt(x, nil), formRef, extract.Form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shared.TrapNet != nil {
+		t.Error("the shared form was modified by the repair")
 	}
 }
 

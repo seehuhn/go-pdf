@@ -83,7 +83,7 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 		if ap == nil || ap.Content == nil {
 			continue
 		}
-		m, ok := appearance.AppearanceToRect(ap, common.Rect)
+		m, ok := appearance.ToRect(ap, common.Rect)
 		if !ok {
 			continue
 		}

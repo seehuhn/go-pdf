@@ -22,6 +22,10 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 // AddAppearance must report an error, not panic, when the target PDF version
@@ -75,5 +79,241 @@ func TestErrNoFallback(t *testing.T) {
 	square := &annotation.Square{Common: annotation.Common{Rect: rect}}
 	if err := s.AddAppearance(square); errors.Is(err, ErrNoFallback) {
 		t.Error("Square: expected a fallback to be available")
+	}
+}
+
+// TestAddAppearanceKeepsRollover checks that generating a normal appearance
+// leaves the rollover and down appearances alone.  Those are content the
+// caller supplied, and a reader which discarded them would hide a hover
+// effect the file asks for.
+func TestAddAppearanceKeepsRollover(t *testing.T) {
+	rect := pdf.Rectangle{URx: 100, URy: 100}
+	rollover := &form.Form{
+		Content: &content.Operators{},
+		BBox:    pdf.Rectangle{URx: 1, URy: 1},
+	}
+	down := &form.Form{
+		Content: &content.Operators{},
+		BBox:    pdf.Rectangle{URx: 2, URy: 2},
+	}
+
+	build := map[string]func() annotation.Annotation{
+		"text": func() annotation.Annotation {
+			return &annotation.Text{Common: annotation.Common{
+				Rect:       rect,
+				Appearance: &appearance.Dict{RollOver: rollover, Down: down},
+			}}
+		},
+		"widget": func() annotation.Annotation {
+			w := combWidget("AB", 6, pdf.TextAlignLeft)
+			w.Appearance = &appearance.Dict{RollOver: rollover, Down: down}
+			return w
+		},
+	}
+
+	for name, mk := range build {
+		t.Run(name, func(t *testing.T) {
+			a := mk()
+			if err := NewStyle(pdf.V2_0).AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+			ap := a.GetCommon().Appearance
+			if ap.RollOver != rollover {
+				t.Errorf("rollover appearance = %v, want it kept", ap.RollOver)
+			}
+			if ap.Down != down {
+				t.Errorf("down appearance = %v, want it kept", ap.Down)
+			}
+			if !annotation.HasAppearance(a) {
+				t.Error("no normal appearance was generated")
+			}
+		})
+	}
+}
+
+// TestAddAppearanceKeepsRepeats checks the other side of
+// [TestAddAppearanceKeepsRollover]: a rollover or down appearance which only
+// repeats the normal one keeps repeating the generated appearance.  Reading an
+// annotation whose appearance the file leaves out yields three entries sharing
+// one form, and leaving them behind would turn the discarded appearance into a
+// hover effect the file never asked for.
+func TestAddAppearanceKeepsRepeats(t *testing.T) {
+	rect := pdf.Rectangle{URx: 100, URy: 100}
+	empty := &form.Form{BBox: rect}
+
+	build := map[string]func() annotation.Annotation{
+		"text": func() annotation.Annotation {
+			return &annotation.Text{Common: annotation.Common{
+				Rect: rect,
+				Appearance: &appearance.Dict{
+					Normal: empty, RollOver: empty, Down: empty,
+				},
+			}}
+		},
+		"widget": func() annotation.Annotation {
+			w := combWidget("AB", 6, pdf.TextAlignLeft)
+			w.Appearance = &appearance.Dict{
+				Normal: empty, RollOver: empty, Down: empty,
+			}
+			return w
+		},
+	}
+
+	for name, mk := range build {
+		t.Run(name, func(t *testing.T) {
+			a := mk()
+			if err := NewStyle(pdf.V2_0).AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+
+			c := a.GetCommon()
+			ap := c.Appearance
+			normal := ap.Resolve(c.AppearanceState, appearance.Normal)
+			if normal == nil || normal == empty {
+				t.Fatal("no normal appearance was generated")
+			}
+			if got := ap.Resolve(c.AppearanceState, appearance.RollOver); got != normal {
+				t.Errorf("rollover appearance = %v, want the generated one", got)
+			}
+			if got := ap.Resolve(c.AppearanceState, appearance.Down); got != normal {
+				t.Errorf("down appearance = %v, want the generated one", got)
+			}
+			if annotation.HasRolloverAppearance(a) {
+				t.Error("the annotation gained a rollover appearance")
+			}
+		})
+	}
+}
+
+// TestAddAppearanceKeepsStateForRollover checks that an annotation whose
+// rollover or down appearance selects by state keeps an appearance state to
+// select with, even though the generated normal appearance is a single stream.
+// Without one the appearance dictionary could not be written back.
+func TestAddAppearanceKeepsStateForRollover(t *testing.T) {
+	rollover := &form.Form{
+		Content: &content.Operators{},
+		BBox:    pdf.Rectangle{URx: 1, URy: 1},
+	}
+
+	cases := []struct {
+		name  string
+		state pdf.Name // the state the file names, if any
+		want  pdf.Name
+	}{
+		{name: "keptState", state: "Off", want: "Off"},
+		// the file names no state, so one has to be supplied
+		{name: "suppliedState", state: "", want: "Off"},
+	}
+
+	build := map[string]func() *appearance.Dict{
+		"rollover": func() *appearance.Dict {
+			return &appearance.Dict{
+				RollOverMap: map[pdf.Name]*form.Form{"Off": rollover},
+			}
+		},
+		"down": func() *appearance.Dict {
+			return &appearance.Dict{
+				DownMap: map[pdf.Name]*form.Form{"Off": rollover},
+			}
+		},
+	}
+
+	for entry, mkDict := range build {
+		for _, tc := range cases {
+			t.Run(entry+"/"+tc.name, func(t *testing.T) {
+				w := combWidget("AB", 6, pdf.TextAlignLeft)
+				w.Appearance = mkDict()
+				w.AppearanceState = tc.state
+
+				if err := NewStyle(pdf.V2_0).AddAppearance(w); err != nil {
+					t.Fatal(err)
+				}
+
+				if got := w.AppearanceState; got != tc.want {
+					t.Errorf("appearance state = %q, want %q", got, tc.want)
+				}
+				if !annotation.HasAppearance(w) {
+					t.Error("no normal appearance was generated")
+				}
+
+				buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+				rm := pdf.NewResourceManager(buf)
+				if _, err := w.Encode(rm); err != nil {
+					t.Errorf("encoding the annotation: %v", err)
+				}
+			})
+		}
+	}
+}
+
+// TestAddAppearanceDropsUnusedState checks the other direction: an appearance
+// dictionary which no longer selects by state has no use for an appearance
+// state, and keeping one would name a state nothing defines.
+func TestAddAppearanceDropsUnusedState(t *testing.T) {
+	w := combWidget("AB", 6, pdf.TextAlignLeft)
+	w.AppearanceState = "Off"
+
+	if err := NewStyle(pdf.V2_0).AddAppearance(w); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := w.AppearanceState; got != "" {
+		t.Errorf("appearance state = %q, want it dropped", got)
+	}
+}
+
+// TestAddAppearanceLeavesSharedDictAlone checks that generating an appearance
+// does not write through to other annotations.  Reading a file shares one
+// appearance dictionary between every annotation whose AP entry points at it,
+// so a repair applied in place would change annotations nobody asked about.
+func TestAddAppearanceLeavesSharedDictAlone(t *testing.T) {
+	rect := pdf.Rectangle{URx: 100, URy: 100}
+	original := &form.Form{
+		Content: &content.Operators{},
+		BBox:    pdf.Rectangle{URx: 1, URy: 1},
+	}
+
+	build := map[string]func(*appearance.Dict) annotation.Annotation{
+		"text": func(ap *appearance.Dict) annotation.Annotation {
+			return &annotation.Text{Common: annotation.Common{Rect: rect, Appearance: ap}}
+		},
+		"widget": func(ap *appearance.Dict) annotation.Annotation {
+			w := combWidget("AB", 6, pdf.TextAlignLeft)
+			w.Appearance = ap
+			return w
+		},
+	}
+
+	for name, mk := range build {
+		t.Run(name, func(t *testing.T) {
+			// the shape reading an indirect AP entry produces: the rollover
+			// and down entries hold the normal appearance, and one dictionary
+			// serves both annotations
+			shared := &appearance.Dict{
+				NormalMap:   map[pdf.Name]*form.Form{"On": original},
+				RollOverMap: map[pdf.Name]*form.Form{"On": original},
+				DownMap:     map[pdf.Name]*form.Form{"On": original},
+			}
+			a, other := mk(shared), mk(shared)
+			a.GetCommon().AppearanceState = "On"
+			other.GetCommon().AppearanceState = "On"
+
+			if err := NewStyle(pdf.V2_0).AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+
+			if other.GetCommon().Appearance != shared {
+				t.Fatal("the other annotation lost its appearance dictionary")
+			}
+			if shared.NormalMap["On"] != original {
+				t.Error("the shared normal appearance was replaced")
+			}
+			if shared.RollOverMap["On"] != original || shared.DownMap["On"] != original {
+				t.Error("the shared rollover or down appearance was replaced")
+			}
+			if a.GetCommon().Appearance.NormalMap["On"] == original {
+				t.Error("no normal appearance was generated")
+			}
+		})
 	}
 }

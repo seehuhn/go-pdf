@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -183,8 +182,8 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 		if err != nil {
 			return err
 		}
-		w.Appearance = &appearance.Dict{SingleUse: true, Normal: chrome}
-		w.AppearanceState = ""
+		setNormalAppearance(w, chrome, nil)
+		syncAppearanceState(w.GetCommon())
 		return nil
 	}
 
@@ -202,10 +201,8 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 		if onState == "" {
 			onState = "On"
 		}
-		w.Appearance = &appearance.Dict{
-			SingleUse: true,
-			NormalMap: map[pdf.Name]*form.Form{onState: on, "Off": off},
-		}
+		setNormalAppearance(w, nil,
+			map[pdf.Name]*form.Form{onState: on, "Off": off})
 		// select the current appearance from the field value
 		if w.AppearanceState == "" {
 			if buttonValue(w.Field) == onState {
@@ -233,9 +230,22 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 		return err
 	}
 
-	w.Appearance = &appearance.Dict{SingleUse: true, Normal: normal}
-	w.AppearanceState = ""
+	setNormalAppearance(w, normal, nil)
+	syncAppearanceState(w.GetCommon())
 	return nil
+}
+
+// setNormalAppearance stores a widget's generated normal appearance, either as
+// a single stream or as a per-state map.  A rollover or down appearance of its
+// own is content the caller supplied and stays untouched, while one which
+// repeated the normal appearance repeats the generated one.
+//
+// The caller settles the appearance state afterwards: the check box and radio
+// button case takes it from the field value, and the rest use
+// [syncAppearanceState].
+func setNormalAppearance(w *annotation.Widget, normal *form.Form, byState map[pdf.Name]*form.Form) {
+	w.Appearance = ownAppearance(w.Appearance)
+	w.Appearance.SetNormal(normal, byState)
 }
 
 // fieldContext sets up a content builder for a widget's appearance and returns

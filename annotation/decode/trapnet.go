@@ -128,6 +128,10 @@ func decodeTrapNet(c pdf.Cursor, dict pdf.Dict) (*annotation.TrapNet, error) {
 // Appearance dictionaries and the forms inside them are cached by the
 // extractor and can be shared with other annotations, so copies are made
 // whenever something needs fixing.  ap is returned unchanged otherwise.
+//
+// A rollover or down appearance which repeated the normal appearance follows
+// the repair, so that the annotation still looks the same under the pointer
+// and the entries stay out of the file.
 func repairTrapNetAppearance(ap *appearance.Dict) *appearance.Dict {
 	if ap == nil {
 		return nil
@@ -153,10 +157,9 @@ func repairTrapNetAppearance(ap *appearance.Dict) *appearance.Dict {
 		return ap
 	}
 
-	fixed := *ap
-	fixed.Normal = normal
-	fixed.NormalMap = normalMap
-	return &fixed
+	fixed := ap.Clone()
+	fixed.SetNormal(normal, normalMap)
+	return fixed
 }
 
 // asTrapNet returns f with the trap network entries supplied if they are

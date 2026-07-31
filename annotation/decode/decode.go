@@ -19,6 +19,7 @@ package decode
 import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -30,11 +31,17 @@ import (
 // Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func Annotation(c pdf.Cursor, obj pdf.Object, _ bool) (annotation.Annotation, error) {
-	a, err := decodeAnnotation(c, obj)
+	dict, err := c.DictTyped(obj, "Annot")
+	if err != nil {
+		return nil, err
+	}
+
+	a, err := decodeAnnotation(c, dict)
 	if err != nil {
 		return nil, err
 	}
 	repairMissingAppearance(a, pdf.GetVersion(c.Getter()))
+	repairMissingAppearanceState(c, a, dict)
 	return a, nil
 }
 
@@ -52,6 +59,76 @@ func repairMissingAppearance(a annotation.Annotation, v pdf.Version) {
 	if c.Appearance == nil && annotation.AppearanceRequired(a.AnnotationType(), c.Rect, v) {
 		c.Appearance = emptyAppearance(c.Rect)
 	}
+}
+
+// repairMissingAppearanceState names an appearance state for an annotation
+// whose appearance dictionary holds a stream per state but which names none,
+// so that everything we can read can be written back.
+//
+// A file storing appearance streams means them to be seen, so a state is
+// picked rather than the annotation left undrawn.  A check box or radio button
+// takes its state from the field value; see [buttonAppearanceState].  Anything
+// else falls back to [appearance.Dict.AnyState].
+func repairMissingAppearanceState(c pdf.Cursor, a annotation.Annotation, dict pdf.Dict) {
+	common := a.GetCommon()
+	if common.AppearanceState != "" {
+		return
+	}
+	if w, ok := a.(*annotation.Widget); ok {
+		if state, ok := buttonAppearanceState(c, w, dict); ok {
+			common.AppearanceState = state
+			return
+		}
+	}
+	common.AppearanceState = common.Appearance.AnyState()
+}
+
+// buttonAppearanceState returns the appearance state a check box or radio
+// button widget shows, taken from the value of its field.  The second return
+// value is false if the annotation is not such a widget, or if neither the
+// value nor "Off" names one of the widget's normal appearances.
+//
+// A button field's value and the appearance states of its widgets say the same
+// thing, so a widget whose file names no state takes one from the value rather
+// than from the appearance dictionary alone: a check box which is on must not
+// come out unchecked.  A widget the value does not name is off, which is also
+// where a radio button other than the selected one ends up.
+//
+// The field of a widget read on its own is not known yet, so the value is
+// reconstructed from the /Parent chain the way the field tree does it.  The
+// answer therefore does not depend on whether the form was read as well.
+func buttonAppearanceState(c pdf.Cursor, w *annotation.Widget, dict pdf.Dict) (pdf.Name, bool) {
+	ap := w.Appearance
+	if ap == nil || len(ap.NormalMap) == 0 {
+		return "", false
+	}
+
+	var value pdf.Name
+	switch f := w.Field.(type) {
+	case *acroform.ButtonField:
+		if f.Variant() == acroform.ButtonPush {
+			return "", false
+		}
+		value = f.V
+	case nil:
+		ctx := applyOwnContext(inheritedFromChain(c, dict), c, dict)
+		if ctx.ft != "Btn" || ctx.ff&acroform.FieldPushbutton != 0 {
+			return "", false
+		}
+		value, _ = pdf.Optional(c.Name(ctx.v))
+	default:
+		return "", false
+	}
+
+	if value != "" && value != "Off" {
+		if _, ok := ap.NormalMap[value]; ok {
+			return value, true
+		}
+	}
+	if _, ok := ap.NormalMap["Off"]; ok {
+		return "Off", true
+	}
+	return "", false
 }
 
 // emptyAppearance builds an appearance dictionary which draws nothing over the
@@ -79,12 +156,7 @@ func emptyAppearance(rect pdf.Rectangle) *appearance.Dict {
 	}
 }
 
-func decodeAnnotation(c pdf.Cursor, obj pdf.Object) (annotation.Annotation, error) {
-	dict, err := c.DictTyped(obj, "Annot")
-	if err != nil {
-		return nil, err
-	}
-
+func decodeAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error) {
 	// a field merged with its single widget is one object that is both a Widget
 	// annotation and a form field; decode it as a linked field+widget pair and
 	// return the widget half, so the page's /Annots and the field tree's /Kids

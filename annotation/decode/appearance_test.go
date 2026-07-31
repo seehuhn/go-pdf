@@ -118,6 +118,41 @@ func TestMissingAppearanceRepairIsExact(t *testing.T) {
 	}
 }
 
+// TestEmptyStateNameIsWritable checks that an appearance sub-dictionary keyed
+// by the empty name does not make an annotation impossible to write back.  An
+// empty /AS entry reads as no /AS at all, so such a state can never be shown;
+// keeping it would leave behind a map demanding an /AS entry which cannot name
+// it.
+func TestEmptyStateNameIsWritable(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+	apRef, err := rm.Embed(defaultAppearance)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	dict := pdf.Dict{
+		"Type":    pdf.Name("Annot"),
+		"Subtype": pdf.Name("Square"),
+		"Rect":    &pdf.Rectangle{URx: 100, URy: 100},
+		"AP":      pdf.Dict{"N": pdf.Dict{"": apRef}},
+	}
+
+	x := pdf.NewExtractor(w)
+	a, err := Annotation(pdf.CursorAt(x, nil), dict, false)
+	if err != nil {
+		t.Fatalf("cannot read: %v", err)
+	}
+
+	out, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	if _, err := a.Encode(pdf.NewResourceManager(out)); err != nil {
+		t.Errorf("cannot write back: %v", err)
+	}
+}
+
 // TestSuppliedAppearanceIsEmpty checks that the supplied appearance draws
 // nothing.  A renderer treats it as absent and generates its own fallback, so
 // reading a file must not fix the annotation's appearance in place.

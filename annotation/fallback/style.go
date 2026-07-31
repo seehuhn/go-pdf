@@ -18,6 +18,7 @@ package fallback
 
 import (
 	"errors"
+	"maps"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -117,10 +118,17 @@ func NewStyle(version pdf.Version) *Style {
 // failed.
 var ErrNoFallback = errors.New("no fallback appearance for this annotation type")
 
-// AddAppearance generates a normal appearance stream for the annotation
-// and sets it in the annotation's appearance dictionary. Any existing
-// rollover and down appearances are cleared. The annotation's Rect and
-// other fields may be adjusted to match the generated appearance.
+// AddAppearance generates a normal appearance stream for the annotation and
+// gives the annotation an appearance dictionary holding it.  A rollover or down
+// appearance of its own is content the caller supplied and is carried over,
+// while one which repeated the normal appearance repeats the generated one.
+// The annotation's Rect and other fields may be adjusted to match the
+// generated appearance.
+//
+// The annotation's previous appearance dictionary is left unchanged: reading a
+// file shares one dictionary between every annotation whose AP entry points at
+// it, so the annotation receives a copy rather than its neighbours receiving
+// the generated appearance.
 //
 // It returns [ErrNoFallback] if the annotation type has no fallback
 // appearance.  Some types are not drawn as a matter of policy and some are
@@ -176,33 +184,52 @@ func (s *Style) AddAppearance(a annotation.Annotation) error {
 	}
 
 	c := a.GetCommon()
-	if c.Appearance == nil {
-		c.Appearance = &appearance.Dict{
-			SingleUse: true,
-		}
-	}
+	c.Appearance = ownAppearance(c.Appearance)
+	// only the normal appearance is replaced; a single stream and a per-state
+	// map are alternatives for the same entry, so setting one clears the other
 	if c.AppearanceState == "" {
-		c.Appearance.Normal = normal
-		c.Appearance.NormalMap = nil
-		c.Appearance.RollOver = nil
-		c.Appearance.RollOverMap = nil
-		c.Appearance.Down = nil
-		c.Appearance.DownMap = nil
+		c.Appearance.SetNormal(normal, nil)
 	} else {
-		c.Appearance.Normal = nil
-		if c.Appearance.NormalMap == nil {
-			c.Appearance.NormalMap = make(map[pdf.Name]*form.Form)
+		// SetNormal needs the current map intact to work out which entries
+		// repeat it, so the new state goes into a copy
+		byState := maps.Clone(c.Appearance.NormalMap)
+		if byState == nil {
+			byState = make(map[pdf.Name]*form.Form)
 		}
-		c.Appearance.NormalMap[c.AppearanceState] = normal
-		if c.Appearance.RollOverMap != nil {
-			delete(c.Appearance.RollOverMap, c.AppearanceState)
-		}
-		if c.Appearance.DownMap != nil {
-			delete(c.Appearance.DownMap, c.AppearanceState)
-		}
+		byState[c.AppearanceState] = normal
+		c.Appearance.SetNormal(nil, byState)
 	}
+	syncAppearanceState(c)
 
 	return nil
+}
+
+// ownAppearance returns an appearance dictionary the caller may change, given
+// the one an annotation currently holds.  A dictionary read from a file is
+// shared with every other annotation whose AP entry points at it, so this
+// package works on a copy rather than writing through to its neighbours: it
+// never modifies a dictionary it did not create itself.
+func ownAppearance(d *appearance.Dict) *appearance.Dict {
+	if d == nil {
+		return &appearance.Dict{SingleUse: true}
+	}
+	return d.Clone()
+}
+
+// syncAppearanceState brings the annotation's appearance state in line with
+// its appearance dictionary, after a generated normal appearance replaced the
+// previous one.
+//
+// The rollover and down appearances survive the replacement, so a dictionary
+// can still select by state after a stateless normal appearance went in, and
+// then needs a state to select with.  One which no longer selects by state has
+// no use for the entry.
+func syncAppearanceState(c *annotation.Common) {
+	if state := c.Appearance.AnyState(); state == "" {
+		c.AppearanceState = ""
+	} else if c.AppearanceState == "" {
+		c.AppearanceState = state
+	}
 }
 
 // harvest finalizes the builder into a form with the given bounding box.  It

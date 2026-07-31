@@ -28,13 +28,15 @@ import (
 type Kind int
 
 const (
-	Normal Kind = iota
-	RollOver
-	Down
+	Normal   Kind = iota // shown while the annotation is not interacting with the user
+	RollOver             // shown while the pointer rests inside the active area
+	Down                 // shown while the pointer button is held down
 )
 
 // Resolve returns the appearance form of the given kind, honouring the
-// appearance state.  It is nil-safe: a nil dictionary yields nil.
+// appearance state.  Where the appearance is given per state, the result is nil
+// unless state names one of them, so that an annotation with no matching state
+// shows nothing.  Resolve is nil-safe: a nil dictionary yields nil.
 func (d *Dict) Resolve(state pdf.Name, kind Kind) *form.Form {
 	if d == nil {
 		return nil
@@ -49,19 +51,21 @@ func (d *Dict) Resolve(state pdf.Name, kind Kind) *form.Form {
 	case Down:
 		single, byState = d.Down, d.DownMap
 	}
-	if state != "" && byState != nil {
+	if single == nil && len(byState) == 0 {
+		single, byState = d.Normal, d.NormalMap
+	}
+	if state != "" && len(byState) > 0 {
 		return byState[state]
 	}
 	return single
 }
 
-// AppearanceToRect returns the matrix mapping an appearance form's coordinates
-// into the annotation rectangle, following the algorithm of §12.5.5: the
-// form matrix is applied to the form's bounding box, and the result is scaled
-// and translated to align with rect.  The second return value is false when
-// the appearance has no content or its transformed bounding box is degenerate,
-// in which case there is nothing to draw.
-func AppearanceToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
+// ToRect returns the matrix mapping an appearance form's coordinates into the
+// annotation rectangle: the form matrix is applied to the form's bounding box,
+// and the result is scaled and translated to align with rect.  The second
+// return value is false when the appearance has no content or its transformed
+// bounding box is degenerate, in which case there is nothing to draw.
+func ToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
 	if ap == nil || ap.Content == nil {
 		return matrix.Matrix{}, false
 	}
