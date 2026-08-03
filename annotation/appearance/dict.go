@@ -243,14 +243,14 @@ func (d *Dict) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Clone returns a shallow copy of the appearance dictionary.
 //
-// The method is nil-safe: a nil dictionary yields nil.
-//
 // The appearance streams themselves are shared with the original rather than
 // copied.  A form is one appearance stream in the file, and which entries hold
 // the same one is what tells a rollover the file asks for from the normal
 // appearance repeated; copying the forms would turn every repeat into an entry
 // of its own.  Use [Dict.SetNormal] to replace one, which keeps the entries
 // which repeat the normal appearance in step.
+//
+// The method is nil-safe: a nil dictionary yields nil.
 func (d *Dict) Clone() *Dict {
 	if d == nil {
 		return nil
