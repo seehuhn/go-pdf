@@ -86,6 +86,11 @@ func (w *Widget) AnnotationType() pdf.Name {
 	return "Widget"
 }
 
+// getBorderStyle implements [borderStyled].
+func (w *Widget) getBorderStyle() *BorderStyle {
+	return w.BorderStyle
+}
+
 // ParentField returns [Widget.Field].
 //
 // This implements the acroform.Widget interface.

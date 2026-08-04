@@ -96,6 +96,11 @@ func (p *Polygon) AnnotationType() pdf.Name {
 	return "Polygon"
 }
 
+// getBorderStyle implements [borderStyled].
+func (p *Polygon) getBorderStyle() *BorderStyle {
+	return p.BorderStyle
+}
+
 func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "polygon annotations", pdf.V1_5); err != nil {
 		return nil, err
@@ -121,7 +126,7 @@ func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	if len(p.Vertices) > 0 {
 		if len(p.Vertices)%2 != 0 {
-			return nil, errors.New("Vertices must have an even number of elements")
+			return nil, errors.New("odd number of entries in Vertices")
 		}
 		verticesArray := make(pdf.Array, len(p.Vertices))
 		for i, vertex := range p.Vertices {

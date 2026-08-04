@@ -247,28 +247,6 @@ func harvest(b *builder.Builder, bbox pdf.Rectangle) (*form.Form, error) {
 	}, nil
 }
 
-// getBorderLineWidth returns the line width from BorderStyle, Border, or default
-func getBorderLineWidth(border *annotation.Border, borderStyle *annotation.BorderStyle) float64 {
-	if borderStyle != nil {
-		return borderStyle.Width
-	}
-	if border != nil {
-		return border.Width
-	}
-	return 1.0 // default line width
-}
-
-// getBorderDashPattern returns the dash pattern from BorderStyle or Border
-func getBorderDashPattern(border *annotation.Border, borderStyle *annotation.BorderStyle) []float64 {
-	if borderStyle != nil && len(borderStyle.DashArray) > 0 {
-		return borderStyle.DashArray
-	}
-	if border != nil && len(border.DashArray) > 0 {
-		return border.DashArray
-	}
-	return nil
-}
-
 // applyMargins adjusts a rectangle by applying margins (RD array)
 func applyMargins(rect pdf.Rectangle, margin []float64) pdf.Rectangle {
 	// apply margins (RD array) if specified

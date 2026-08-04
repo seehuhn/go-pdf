@@ -301,23 +301,6 @@ func (s *Style) drawChromeField(w *annotation.Widget) (*form.Form, error) {
 	return s.finishForm(b, width, height, m)
 }
 
-func borderWidth(w *annotation.Widget) float64 {
-	if w.BorderStyle != nil {
-		return w.BorderStyle.Width
-	}
-	if w.Border != nil {
-		return w.Border.Width
-	}
-	return 1
-}
-
-func borderStyleName(w *annotation.Widget) pdf.Name {
-	if w.BorderStyle != nil && w.BorderStyle.Style != "" {
-		return w.BorderStyle.Style
-	}
-	return "S"
-}
-
 // drawChrome fills the background and strokes the border of a rectangular field
 // according to the widget's Style and border-style entries.
 func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget) {
@@ -328,12 +311,12 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 		b.Fill()
 	}
 
-	lw := borderWidth(w)
+	lw := annotation.EffectiveBorderWidth(w)
 	if mk == nil || mk.BorderColor == nil || lw <= 0 {
 		return
 	}
 
-	style := borderStyleName(w)
+	style := annotation.EffectiveBorderStyle(w)
 	switch style {
 	case "U": // underline: a single rule along the bottom edge
 		b.SetLineWidth(lw)
@@ -405,7 +388,7 @@ func drawCircleChrome(b *builder.Builder, width, height float64, w *annotation.W
 	mk := w.Style
 	cx, cy := width/2, height/2
 	outer := min(width, height) / 2
-	lw := borderWidth(w)
+	lw := annotation.EffectiveBorderWidth(w)
 
 	if mk != nil && mk.BackgroundColor != nil {
 		b.SetFillColor(mk.BackgroundColor)
@@ -475,7 +458,7 @@ func (s *Style) drawTextField(w *annotation.Widget, fld *widgetField) (*form.For
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
 
-	lw := borderWidth(w)
+	lw := annotation.EffectiveBorderWidth(w)
 	const pad = 2.0
 
 	switch {
@@ -624,7 +607,7 @@ func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *wid
 func (s *Style) drawChoiceField(w *annotation.Widget, fld *widgetField) (*form.Form, error) {
 	b, width, height, m := s.fieldContext(w)
 	drawChrome(b, width, height, w)
-	lw := borderWidth(w)
+	lw := annotation.EffectiveBorderWidth(w)
 	const pad = 2.0
 
 	if fld.Flags&acroform.FieldCombo != 0 {

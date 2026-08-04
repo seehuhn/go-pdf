@@ -27,26 +27,9 @@ import (
 )
 
 func (s *Style) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
-	borderWidth := 0.0
-	var dashPattern []float64
-	style := pdf.Name("S")
-	if a.Common.Border != nil {
-		borderWidth = a.Common.Border.Width
-		dashPattern = a.Common.Border.DashArray
-		if len(dashPattern) > 0 {
-			style = "D"
-		}
-	}
-	if a.BorderStyle != nil {
-		borderWidth = a.BorderStyle.Width
-		style = a.BorderStyle.Style
-		if style == "D" {
-			dashPattern = a.BorderStyle.DashArray
-			if len(dashPattern) == 0 {
-				dashPattern = []float64{3}
-			}
-		}
-	}
+	borderWidth := annotation.EffectiveBorderWidth(a)
+	dashPattern := annotation.EffectiveBorderDash(a)
+	style := annotation.EffectiveBorderStyle(a)
 
 	col := a.Color
 	if col == nil {

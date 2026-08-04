@@ -92,6 +92,11 @@ func (c *Circle) AnnotationType() pdf.Name {
 	return "Circle"
 }
 
+// getBorderStyle implements [borderStyled].
+func (c *Circle) getBorderStyle() *BorderStyle {
+	return c.BorderStyle
+}
+
 func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Circle"),

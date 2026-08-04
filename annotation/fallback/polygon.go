@@ -28,8 +28,8 @@ import (
 )
 
 func (s *Style) addPolygonAppearance(a *annotation.Polygon) (*form.Form, error) {
-	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
-	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
+	lw := annotation.EffectiveBorderWidth(a)
+	dashPattern := annotation.EffectiveBorderDash(a)
 	col := a.Color
 
 	bbox := a.Rect

@@ -37,7 +37,7 @@ const (
 
 func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error) {
 	// extract information from the pre-set fields
-	lw := a.BorderWidth()
+	lw := annotation.EffectiveBorderWidth(a)
 	bgCol := a.Color
 
 	calloutLine := a.CalloutLine
@@ -58,8 +58,13 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error
 
 	// Set some relevant ignored fields: even if they are not used
 	// for rendering, these may be useful in case the appearance stream
-	// needs to be re-generated after edits.
-	a.Border = &annotation.Border{Width: lw}
+	// needs to be re-generated after edits.  A nil Border is the "no border"
+	// value; a zero width cannot be expressed as a border array.
+	if lw > 0 {
+		a.Border = &annotation.Border{Width: lw}
+	} else {
+		a.Border = nil
+	}
 	a.BorderStyle = nil
 	if !isCloudy {
 		a.BorderEffect = nil
@@ -89,10 +94,14 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error
 		co = newCloudOutline(verts, be.Intensity, lw)
 	}
 
-	// draw border
+	// draw border and background
 	if a.Intent != annotation.FreeTextIntentTypeWriter {
-		b.SetLineWidth(lw)
-		b.SetStrokeColor(quireInk)
+		// a border width of 0 asks for no border
+		hasBorder := lw > 0
+		if hasBorder {
+			b.SetLineWidth(lw)
+			b.SetStrokeColor(quireInk)
+		}
 		if co != nil {
 			if bgCol != nil {
 				b.SetFillColor(bgCol)
@@ -100,24 +109,30 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error
 				b.Fill()
 				outer.Extend(&fillBBox)
 			}
-			b.SetLineCap(graphics.LineCapRound)
-			strokeBBox := co.strokePath(b)
-			b.Stroke()
-			outer.Extend(&strokeBBox)
-			// expand for stroke width
-			outer = pdf.Rectangle{
-				LLx: outer.LLx - lw/2,
-				LLy: outer.LLy - lw/2,
-				URx: outer.URx + lw/2,
-				URy: outer.URy + lw/2,
+			if hasBorder {
+				b.SetLineCap(graphics.LineCapRound)
+				strokeBBox := co.strokePath(b)
+				b.Stroke()
+				outer.Extend(&strokeBBox)
+				// expand for stroke width
+				outer = pdf.Rectangle{
+					LLx: outer.LLx - lw/2,
+					LLy: outer.LLy - lw/2,
+					URx: outer.URx + lw/2,
+					URy: outer.URy + lw/2,
+				}
 			}
-		} else {
+		} else if bgCol != nil || hasBorder {
 			if bgCol != nil {
 				b.SetFillColor(bgCol)
-				b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+			}
+			b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+			switch {
+			case bgCol != nil && hasBorder:
 				b.FillAndStroke()
-			} else {
-				b.Rectangle(inner.LLx+lw/2, inner.LLy+lw/2, inner.Dx()-lw, inner.Dy()-lw)
+			case bgCol != nil:
+				b.Fill()
+			default:
 				b.Stroke()
 			}
 		}

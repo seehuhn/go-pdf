@@ -28,8 +28,8 @@ import (
 )
 
 func (s *Style) addInkAppearance(a *annotation.Ink) (*form.Form, error) {
-	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
-	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
+	lw := annotation.EffectiveBorderWidth(a)
+	dashPattern := annotation.EffectiveBorderDash(a)
 	col := a.Color
 
 	if col == nil || lw <= 0 || !hasInkPoints(a.InkList) {

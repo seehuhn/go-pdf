@@ -28,8 +28,8 @@ import (
 )
 
 func (s *Style) addSquareAppearance(a *annotation.Square) (*form.Form, error) {
-	lw := getBorderLineWidth(a.Common.Border, a.BorderStyle)
-	dashPattern := getBorderDashPattern(a.Common.Border, a.BorderStyle)
+	lw := annotation.EffectiveBorderWidth(a)
+	dashPattern := annotation.EffectiveBorderDash(a)
 	col := a.Color
 
 	rect := applyMargins(a.Rect, a.Margin)

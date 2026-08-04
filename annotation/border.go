@@ -51,6 +51,92 @@ var _ pdf.Embedder = (*Border)(nil)
 // Using this for [Common.Border] slightly reduces file size.
 var PDFDefaultBorder = &Border{Width: 1}
 
+// borderStyled is implemented by the annotation types which can carry a border
+// style dictionary, so that a rule reading the style can be written once for
+// all of them.  Each type's style is reachable through its exported
+// BorderStyle field; this interface exists to reach it from an [Annotation],
+// and adding a case to it means implementing the method on the new type.
+type borderStyled interface {
+	Annotation
+	getBorderStyle() *BorderStyle
+}
+
+var (
+	_ borderStyled = (*Circle)(nil)
+	_ borderStyled = (*FreeText)(nil)
+	_ borderStyled = (*Ink)(nil)
+	_ borderStyled = (*Line)(nil)
+	_ borderStyled = (*Link)(nil)
+	_ borderStyled = (*Polygon)(nil)
+	_ borderStyled = (*PolyLine)(nil)
+	_ borderStyled = (*Square)(nil)
+	_ borderStyled = (*Widget)(nil)
+)
+
+// EffectiveBorderWidth returns the width of the border drawn around the
+// annotation, in default user space units.  A width of 0 means no border is
+// drawn.
+//
+// A border style takes precedence over the [Common.Border] array, which is
+// ignored whenever one is present.  An annotation with neither has no border:
+// reading an annotation whose border is left out supplies the width the
+// absent entry stands for, so a border missing at this point is one the file
+// asked to be left undrawn.
+func EffectiveBorderWidth(a Annotation) float64 {
+	if bs, ok := a.(borderStyled); ok {
+		if style := bs.getBorderStyle(); style != nil {
+			return style.Width
+		}
+	}
+	if border := a.GetCommon().Border; border != nil {
+		return border.Width
+	}
+	return 0
+}
+
+// EffectiveBorderStyle returns the style the annotation's border is drawn
+// with: "S" (solid), "D" (dashed), "B" (beveled), "I" (inset) or "U"
+// (underline).  An annotation which asks for none is drawn solid.
+//
+// A border style takes precedence over the [Common.Border] array, as it does
+// for [EffectiveBorderWidth].  A border array has no style entry of its own,
+// so it can only ask for a solid or a dashed border, and it asks for a dashed
+// one by carrying a dash pattern.
+func EffectiveBorderStyle(a Annotation) pdf.Name {
+	if bs, ok := a.(borderStyled); ok {
+		if style := bs.getBorderStyle(); style != nil {
+			if style.Style == "" {
+				return "S"
+			}
+			return style.Style
+		}
+	}
+	if border := a.GetCommon().Border; border != nil && len(border.DashArray) > 0 {
+		return "D"
+	}
+	return "S"
+}
+
+// EffectiveBorderDash returns the pattern of dashes and gaps the annotation's
+// border is drawn with, in default user space units, or nil for an unbroken
+// border.  The dash phase is always 0.
+//
+// A border style takes precedence over the [Common.Border] array, as it does
+// for [EffectiveBorderWidth].  A style holds a dash pattern only when it asks
+// for a dashed border, so no check against [EffectiveBorderStyle] is needed
+// here.
+func EffectiveBorderDash(a Annotation) []float64 {
+	if bs, ok := a.(borderStyled); ok {
+		if style := bs.getBorderStyle(); style != nil {
+			return style.DashArray
+		}
+	}
+	if border := a.GetCommon().Border; border != nil {
+		return border.DashArray
+	}
+	return nil
+}
+
 // ExtractBorder extracts a Border from a PDF array.
 // If no border entry exists, returns the PDF default (solid border with width 1).
 // If no border is to be drawn, returns nil.

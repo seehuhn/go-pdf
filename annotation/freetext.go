@@ -106,6 +106,11 @@ func (f *FreeText) AnnotationType() pdf.Name {
 	return "FreeText"
 }
 
+// getBorderStyle implements [borderStyled].
+func (f *FreeText) getBorderStyle() *BorderStyle {
+	return f.BorderStyle
+}
+
 func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "free text annotation", pdf.V1_3); err != nil {
 		return nil, err
@@ -234,16 +239,6 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	return dict, nil
-}
-
-func (f *FreeText) BorderWidth() float64 {
-	if f.BorderStyle != nil {
-		return f.BorderStyle.Width
-	}
-	if f.Common.Border != nil {
-		return f.Common.Border.Width
-	}
-	return 0 // Go default = no border
 }
 
 // These constants represent the allowed values for the Markup.Intent

@@ -93,6 +93,11 @@ func (s *Square) AnnotationType() pdf.Name {
 	return "Square"
 }
 
+// getBorderStyle implements [borderStyled].
+func (s *Square) getBorderStyle() *BorderStyle {
+	return s.BorderStyle
+}
+
 func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "square annotations", pdf.V1_3); err != nil {
 		return nil, err

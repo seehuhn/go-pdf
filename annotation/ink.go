@@ -63,6 +63,11 @@ func (i *Ink) AnnotationType() pdf.Name {
 	return "Ink"
 }
 
+// getBorderStyle implements [borderStyled].
+func (i *Ink) getBorderStyle() *BorderStyle {
+	return i.BorderStyle
+}
+
 func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
 		return nil, err

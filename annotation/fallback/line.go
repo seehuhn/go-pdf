@@ -29,13 +29,20 @@ import (
 )
 
 func (s *Style) addLineAppearance(a *annotation.Line) (*form.Form, error) {
-	lw := getLineWidth(a)
-	dashPattern := getDashPattern(a)
+	lw := annotation.EffectiveBorderWidth(a)
+	dashPattern := annotation.EffectiveBorderDash(a)
 
 	bbox := calculateLineBBox(a, lw)
 	a.Rect = bbox
 
 	b := builder.New(content.Form, nil, s.version)
+
+	// the border width is the thickness of the line itself, so a width of 0
+	// leaves the annotation with nothing to draw
+	if lw <= 0 {
+		b.SetExtGState(s.reset)
+		return harvest(b, bbox)
+	}
 
 	b.SetExtGState(s.reset)
 	b.SetLineWidth(lw)
@@ -49,30 +56,6 @@ func (s *Style) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 	}
 
 	return harvest(b, bbox)
-}
-
-// getLineWidth returns the line width from BorderStyle, Border, or default
-func getLineWidth(a *annotation.Line) float64 {
-	if a.BorderStyle != nil {
-		return a.BorderStyle.Width
-	}
-	if a.Common.Border != nil {
-		return a.Common.Border.Width
-	}
-	return 0
-}
-
-// getDashPattern returns the dash pattern if any
-func getDashPattern(a *annotation.Line) []float64 {
-	if a.BorderStyle != nil {
-		if a.BorderStyle.Style != "D" {
-			return nil
-		}
-		return a.BorderStyle.DashArray
-	} else if a.Common.Border != nil {
-		return a.Common.Border.DashArray
-	}
-	return nil // solid line
 }
 
 // calculateLineBBox calculates the bounding box for the line annotation

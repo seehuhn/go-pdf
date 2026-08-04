@@ -128,6 +128,11 @@ func (l *Line) AnnotationType() pdf.Name {
 	return "Line"
 }
 
+// getBorderStyle implements [borderStyled].
+func (l *Line) getBorderStyle() *BorderStyle {
+	return l.BorderStyle
+}
+
 func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if l.BorderStyle != nil && l.Common.Border != nil {
 		return nil, errors.New("Border and BorderStyle are mutually exclusive")

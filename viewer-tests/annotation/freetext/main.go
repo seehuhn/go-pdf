@@ -50,7 +50,17 @@ const (
 	yOuterStep = 50.0
 
 	lw = 1.0
+
+	// second block, below the first: callout lines of differing width
+	yWidthTop  = 210.0
+	yWidthStep = 50.0
 )
+
+// calloutWidths are the border widths used in the second block.  A width of 0
+// is the interesting case: §12.5.4 says no border shall be drawn, but
+// §12.5.6.6 ties BS to the annotation's border and says nothing about the
+// width of the callout line.
+var calloutWidths = []float64{0, 1, 2, 3}
 
 func main() {
 	err := createDocument("test.pdf")
@@ -146,7 +156,69 @@ func createDocument(filename string) error {
 		}
 	}
 
+	err = addCalloutWidths(w, da)
+	if err != nil {
+		return err
+	}
+
 	return page.Close()
+}
+
+// addCalloutWidths adds a row of callout annotations for each of
+// [calloutWidths], so that viewers can be compared on what a border width of 0
+// does to the callout line.  The callout lines run horizontally into the
+// annotation, all with a closed-arrow tip, so that only the width differs.
+func addCalloutWidths(w *writer, da string) error {
+	page := w.page
+
+	yBottom := yWidthTop - float64(len(calloutWidths)-1)*yWidthStep
+
+	page.SetLineWidth(0.5)
+	page.SetStrokeColor(color.Blue)
+	page.MoveTo(pdf.Round(mid1, 2), pdf.Round(yWidthTop+20, 2))
+	page.LineTo(pdf.Round(mid1, 2), pdf.Round(yBottom-20, 2))
+	page.MoveTo(pdf.Round(mid2, 2), pdf.Round(yWidthTop+20, 2))
+	page.LineTo(pdf.Round(mid2, 2), pdf.Round(yBottom-20, 2))
+	for i := range calloutWidths {
+		y := yWidthTop - float64(i)*yWidthStep
+		page.MoveTo(pdf.Round(mid1-20, 2), pdf.Round(y, 2))
+		page.LineTo(pdf.Round(mid2+20, 2), pdf.Round(y, 2))
+	}
+	page.Stroke()
+
+	for i, width := range calloutWidths {
+		y := yWidthTop - float64(i)*yWidthStep
+
+		// the width is given via BS, since a Border array cannot express 0
+		template := &annotation.FreeText{
+			DefaultAppearance: da,
+			Common: annotation.Common{
+				Rect: pdf.Rectangle{
+					LLx: pdf.Round(leftX0, 2),
+					LLy: pdf.Round(y-annotHeight/2, 2),
+					URx: pdf.Round(leftX1, 2),
+					URy: pdf.Round(y+annotHeight/2, 2),
+				},
+				Contents: fmt.Sprintf("callout\nBS.W = %g", width),
+				Flags:    annotation.FlagPrint,
+				Color:    color.DeviceRGB{0.965, 0.898, 0.749},
+			},
+			Markup: annotation.Markup{
+				Intent: annotation.FreeTextIntentCallout,
+			},
+			BorderStyle: &annotation.BorderStyle{Width: width, SingleUse: true},
+			CalloutLine: []vec.Vec2{
+				{X: pdf.Round(mid1, 2), Y: pdf.Round(y, 2)},
+				{X: pdf.Round(leftX1, 2), Y: pdf.Round(y, 2)},
+			},
+			LineEndingStyle: annotation.LineEndingStyleClosedArrow,
+		}
+		err := w.addAnnotationPair(template)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type writer struct {
@@ -170,10 +242,12 @@ func (w *writer) addAnnotationPair(left *annotation.FreeText) error {
 	right.Rect.LLx += deltaX
 	right.Rect.URx += deltaX
 	right.Margin = slices.Clone(right.Margin)
-	right.CalloutLine = []vec.Vec2{
-		{X: pdf.Round(mid2, 2), Y: left.CalloutLine[0].Y},    // mid2 instead of mid1, keep same Y
-		{X: pdf.Round(mid2+50, 2), Y: left.CalloutLine[1].Y}, // mid2+50 instead of mid1-50, keep same Y
-		{X: pdf.Round(rightX0, 2), Y: left.CalloutLine[2].Y}, // rightX0 instead of leftX1, keep same Y
+
+	// mirror the callout about the centre line between the two guides, which
+	// maps mid1 to mid2 and leftX1 to rightX0
+	right.CalloutLine = make([]vec.Vec2, len(left.CalloutLine))
+	for i, p := range left.CalloutLine {
+		right.CalloutLine[i] = vec.Vec2{X: pdf.Round(mid1+mid2-p.X, 2), Y: p.Y}
 	}
 
 	err := w.style.AddAppearance(right)

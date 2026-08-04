@@ -29,8 +29,17 @@ import (
 )
 
 // combWidget builds a comb text field with the given value, MaxLen and
-// justification, and one widget.
+// justification, and one widget of border width 1.
 func combWidget(value string, maxLen int, align pdf.TextAlign) *annotation.Widget {
+	w := borderlessCombWidget(value, maxLen, align)
+	w.BorderStyle = &annotation.BorderStyle{Width: 1}
+	return w
+}
+
+// borderlessCombWidget is like combWidget but leaves the widget without a
+// border, which is what a widget carrying neither a border style nor a border
+// array asks for.
+func borderlessCombWidget(value string, maxLen int, align pdf.TextAlign) *annotation.Widget {
 	f := acroform.NewTextField("c")
 	f.Flags = acroform.FieldComb
 	f.MaxLen = maxLen
@@ -141,6 +150,22 @@ func TestCombAppearance(t *testing.T) {
 				t.Errorf("first cell starts at x=%g, want %g", x, tc.wantCellX)
 			}
 		})
+	}
+}
+
+// TestCombAppearanceNoBorder checks that the comb cells span the whole
+// rectangle when the widget asks for no border, rather than being inset by a
+// border width the annotation never requested.
+func TestCombAppearanceNoBorder(t *testing.T) {
+	w := borderlessCombWidget("AB", 6, pdf.TextAlignLeft)
+	s := NewStyle(pdf.V2_0)
+	if err := s.AddAppearance(w); err != nil {
+		t.Fatal(err)
+	}
+	tokens := contentTokens(t, w)
+
+	if x, _ := firstTd(t, tokens); math.Abs(x) > 0.01 {
+		t.Errorf("first cell starts at x=%g, want 0", x)
 	}
 }
 

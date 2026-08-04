@@ -46,7 +46,7 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, e
 		return harvest(b, a.Rect)
 	}
 
-	bw := getBorderLineWidth(a.Common.Border, nil)
+	bw := annotation.EffectiveBorderWidth(a)
 
 	// line width for stroke-based types
 	var lw float64
@@ -57,6 +57,14 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, e
 		lw = 0.7 * bw
 	default: // Underline, StrikeOut
 		lw = bw
+	}
+
+	// a highlight is a fill and has no border, but the other types draw the
+	// border itself, so a width of 0 leaves them with nothing to draw
+	if lw <= 0 && a.Type != annotation.TextMarkupTypeHighlight {
+		b := builder.New(content.Form, nil, s.version)
+		b.SetExtGState(s.reset)
+		return harvest(b, a.Rect)
 	}
 
 	// bounding box from all quad points

@@ -93,6 +93,11 @@ func (l *Link) AnnotationType() pdf.Name {
 	return "Link"
 }
 
+// getBorderStyle implements [borderStyled].
+func (l *Link) getBorderStyle() *BorderStyle {
+	return l.BorderStyle
+}
+
 func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if l.Action != nil && l.Destination != nil {
 		return nil, errors.New("conflicting Action and Destination fields in Link annotation")
