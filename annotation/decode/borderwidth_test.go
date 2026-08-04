@@ -74,11 +74,15 @@ func squareWithBorder(border, style pdf.Object) pdf.Dict {
 }
 
 // borderAppearance returns the content stream of the appearance synthesized
-// for the annotation, as a string.  A fresh style is used for each call, so
+// for the annotation, as a string.  A fresh generator is used for each call, so
 // that the result depends on the annotation alone.
 func borderAppearance(t *testing.T, a annotation.Annotation) string {
 	t.Helper()
-	if err := fallback.NewStyle(pdf.V2_0).AddAppearance(a); err != nil {
+	gen, err := fallback.NewStyle().New(pdf.V2_0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gen.AddAppearance(a); err != nil {
 		t.Fatal(err)
 	}
 	ap := annotation.Resolve(a.GetCommon(), appearance.Normal)

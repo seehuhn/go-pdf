@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, error) {
+func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := a.Color
@@ -54,9 +54,9 @@ func (s *Style) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, error
 	bbox := openPolylineBBox(points, lw, startLE, endLE)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
-	b.SetExtGState(s.reset)
+	g.reset(b)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 		gs := &extgstate.ExtGState{
 			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,

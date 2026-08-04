@@ -31,7 +31,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
+func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
 	col := a.Color
 	if col == nil {
 		col = quireSignalError
@@ -50,9 +50,9 @@ func (s *Style) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
 		}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
-	b.SetExtGState(s.reset)
+	g.reset(b)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 		gs := &extgstate.ExtGState{
 			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
@@ -109,13 +109,13 @@ func (s *Style) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
 
 	// measure and draw text
 	textPadX := innerPadX + lw*2
-	seq := s.ContentFont.Layout(nil, 1.0, label)
+	seq := g.ContentFont.Layout(nil, 1.0, label)
 	textW := seq.TotalWidth()
 	if textW > 0 {
 		availW := w - 2*textPadX
 		availH := h - 2*innerPadY - 2*lw
 		fontSize := availW / textW
-		geom := s.ContentFont.GetGeometry()
+		geom := g.ContentFont.GetGeometry()
 		textH := (geom.Ascent - geom.Descent) * fontSize
 		if textH > availH*0.8 {
 			fontSize = availH * 0.8 / (geom.Ascent - geom.Descent)
@@ -127,7 +127,7 @@ func (s *Style) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
 		// center text, shifted slightly below geometric center
 		drop := fontSize * 0.08
 		b.TextBegin()
-		b.TextSetFont(s.ContentFont, fontSize)
+		b.TextSetFont(g.ContentFont, fontSize)
 		b.TextSetHorizontalScaling(1)
 		ty := cy - (geom.Ascent+geom.Descent)*fontSize/2 - drop
 		b.TextFirstLine(rect.LLx+textPadX, ty)

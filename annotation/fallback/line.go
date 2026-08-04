@@ -28,23 +28,23 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addLineAppearance(a *annotation.Line) (*form.Form, error) {
+func (g *Generator) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
 
 	bbox := calculateLineBBox(a, lw)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
 	// the border width is the thickness of the line itself, so a width of 0
 	// leaves the annotation with nothing to draw
 	if lw <= 0 {
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		return harvest(b, bbox)
 	}
 
-	b.SetExtGState(s.reset)
+	g.reset(b)
 	b.SetLineWidth(lw)
 	b.SetStrokeColor(quireInk)
 	b.SetLineDash(dashPattern, 0)

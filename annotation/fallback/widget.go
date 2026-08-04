@@ -170,15 +170,15 @@ func choiceValue(x *acroform.ChoiceField) string {
 // addWidgetAppearance generates the appearance stream(s) for a form-field widget
 // annotation and stores them in the widget's appearance dictionary. The field
 // context is resolved from the widget's form field (w.Field); a widget with no
-// field draws only the Style chrome. It is the dispatch target of
-// [Style.AddAppearance] for [annotation.Widget].
+// field draws only the chrome. It is the dispatch target of
+// [Generator.AddAppearance] for [annotation.Widget].
 //
 // Check boxes and radio buttons receive two appearances, keyed by the on-state
 // name and "Off"; all other field types receive a single normal appearance.
-func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
+func (g *Generator) addWidgetAppearance(w *annotation.Widget) error {
 	fld := resolveWidgetField(w)
 	if fld == nil {
-		chrome, err := s.drawChromeField(w)
+		chrome, err := g.drawChromeField(w)
 		if err != nil {
 			return err
 		}
@@ -189,11 +189,11 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 
 	if fld.FieldType == "Btn" && fld.Flags&acroform.FieldPushbutton == 0 {
 		// check box or radio button: an on and an off appearance
-		on, err := s.drawToggle(w, fld, true)
+		on, err := g.drawToggle(w, fld, true)
 		if err != nil {
 			return err
 		}
-		off, err := s.drawToggle(w, fld, false)
+		off, err := g.drawToggle(w, fld, false)
 		if err != nil {
 			return err
 		}
@@ -218,13 +218,13 @@ func (s *Style) addWidgetAppearance(w *annotation.Widget) error {
 	var err error
 	switch fld.FieldType {
 	case "Btn":
-		normal, err = s.drawPushButton(w)
+		normal, err = g.drawPushButton(w)
 	case "Tx":
-		normal, err = s.drawTextField(w, fld)
+		normal, err = g.drawTextField(w, fld)
 	case "Ch":
-		normal, err = s.drawChoiceField(w, fld)
+		normal, err = g.drawChoiceField(w, fld)
 	default: // Sig and anything else: chrome only
-		normal, err = s.drawChromeField(w)
+		normal, err = g.drawChromeField(w)
 	}
 	if err != nil {
 		return err
@@ -252,7 +252,7 @@ func setNormalAppearance(w *annotation.Widget, normal *form.Form, byState map[pd
 // the local drawing box (always rooted at the origin), the placement matrix
 // that maps it onto the widget rectangle with the MK rotation applied, and the
 // builder.
-func (s *Style) fieldContext(w *annotation.Widget) (b *builder.Builder, width, height float64, m matrix.Matrix) {
+func (g *Generator) fieldContext(w *annotation.Widget) (b *builder.Builder, width, height float64, m matrix.Matrix) {
 	rot := 0
 	if w.Style != nil {
 		rot = ((w.Style.Rotation % 360) + 360) % 360
@@ -276,12 +276,12 @@ func (s *Style) fieldContext(w *annotation.Widget) (b *builder.Builder, width, h
 		m = matrix.Matrix{1, 0, 0, 1, llx, lly}
 	}
 
-	b = builder.New(content.Form, nil, s.version)
-	b.SetExtGState(s.reset)
+	b = builder.New(content.Form, nil, g.version)
+	g.reset(b)
 	return b, width, height, m
 }
 
-func (s *Style) finishForm(b *builder.Builder, width, height float64, m matrix.Matrix) (*form.Form, error) {
+func (g *Generator) finishForm(b *builder.Builder, width, height float64, m matrix.Matrix) (*form.Form, error) {
 	ops, err := b.Harvest()
 	if err != nil {
 		return nil, err
@@ -295,10 +295,10 @@ func (s *Style) finishForm(b *builder.Builder, width, height float64, m matrix.M
 }
 
 // drawChromeField draws background and border only.
-func (s *Style) drawChromeField(w *annotation.Widget) (*form.Form, error) {
-	b, width, height, m := s.fieldContext(w)
+func (g *Generator) drawChromeField(w *annotation.Widget) (*form.Form, error) {
+	b, width, height, m := g.fieldContext(w)
 	drawChrome(b, width, height, w)
-	return s.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m)
 }
 
 // drawChrome fills the background and strokes the border of a rectangular field
@@ -355,8 +355,8 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 
 // drawToggle draws one appearance of a check box or radio button: the on-glyph
 // when on is true, chrome only otherwise. Radio buttons use a circular border.
-func (s *Style) drawToggle(w *annotation.Widget, fld *widgetField, on bool) (*form.Form, error) {
-	b, width, height, m := s.fieldContext(w)
+func (g *Generator) drawToggle(w *annotation.Widget, fld *widgetField, on bool) (*form.Form, error) {
+	b, width, height, m := g.fieldContext(w)
 	isRadio := fld.Flags&acroform.FieldRadio != 0
 
 	if isRadio {
@@ -377,10 +377,10 @@ func (s *Style) drawToggle(w *annotation.Widget, fld *widgetField, on bool) (*fo
 				glyph = "4" // ZapfDingbats check mark
 			}
 		}
-		s.drawDingbat(b, width, height, glyph)
+		g.drawDingbat(b, width, height, glyph)
 	}
 
-	return s.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m)
 }
 
 // drawCircleChrome fills and strokes a circular field background and border.
@@ -407,14 +407,14 @@ func drawCircleChrome(b *builder.Builder, width, height float64, w *annotation.W
 // by its code in the ZapfDingbats encoding (the MK.CA convention, e.g. "4" for a
 // check mark); it is translated to the glyph's Unicode value so that the font's
 // character map selects the intended glyph.
-func (s *Style) drawDingbat(b *builder.Builder, width, height float64, marker string) {
+func (g *Generator) drawDingbat(b *builder.Builder, width, height float64, marker string) {
 	glyph := dingbatText(marker)
 	if glyph == "" {
 		return
 	}
 	size := min(width, height) * 0.62
 	b.TextBegin()
-	b.TextSetFont(s.dingbatsFont, size)
+	b.TextSetFont(g.dingbats(), size)
 	b.SetFillColor(quireInk)
 	b.TextFirstLine(0, height/2-size*0.33)
 	b.TextShowAligned(glyph, width, 0.5)
@@ -436,26 +436,26 @@ func dingbatText(marker string) string {
 }
 
 // drawPushButton draws a push button's chrome and centred caption.
-func (s *Style) drawPushButton(w *annotation.Widget) (*form.Form, error) {
-	b, width, height, m := s.fieldContext(w)
+func (g *Generator) drawPushButton(w *annotation.Widget) (*form.Form, error) {
+	b, width, height, m := g.fieldContext(w)
 	drawChrome(b, width, height, w)
 
 	if w.Style != nil && w.Style.Caption != "" {
 		size := captionSize(height)
 		b.TextBegin()
-		b.TextSetFont(s.ContentFont, size)
+		b.TextSetFont(g.ContentFont, size)
 		b.SetFillColor(quireInk)
 		b.TextFirstLine(0, height/2-size*0.33)
 		b.TextShowAligned(w.Style.Caption, width, 0.5)
 		b.TextEnd()
 	}
 
-	return s.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m)
 }
 
 // drawTextField draws a text field's chrome and value.
-func (s *Style) drawTextField(w *annotation.Widget, fld *widgetField) (*form.Form, error) {
-	b, width, height, m := s.fieldContext(w)
+func (g *Generator) drawTextField(w *annotation.Widget, fld *widgetField) (*form.Form, error) {
+	b, width, height, m := g.fieldContext(w)
 	drawChrome(b, width, height, w)
 
 	lw := annotation.EffectiveBorderWidth(w)
@@ -464,20 +464,20 @@ func (s *Style) drawTextField(w *annotation.Widget, fld *widgetField) (*form.For
 	switch {
 	case fld.Flags&acroform.FieldPassword != 0:
 		// the value is masked: one bullet per character
-		s.drawSingleLine(b, width, height, lw, pad, fld, strings.Repeat("*", utf8.RuneCountInString(fld.Value)))
+		g.drawSingleLine(b, width, height, lw, pad, fld, strings.Repeat("*", utf8.RuneCountInString(fld.Value)))
 	case fld.Flags&acroform.FieldComb != 0 && fld.MaxLen > 0:
-		s.drawComb(b, width, height, lw, fld)
+		g.drawComb(b, width, height, lw, fld)
 	case fld.Flags&acroform.FieldMultiline != 0:
-		s.drawMultiline(b, width, height, lw, pad, fld)
+		g.drawMultiline(b, width, height, lw, pad, fld)
 	case fld.Value != "":
-		s.drawSingleLine(b, width, height, lw, pad, fld, fld.Value)
+		g.drawSingleLine(b, width, height, lw, pad, fld, fld.Value)
 	}
 
-	return s.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m)
 }
 
 // drawSingleLine draws text as a single, vertically centred line.
-func (s *Style) drawSingleLine(b *builder.Builder, width, height, lw, pad float64, fld *widgetField, text string) {
+func (g *Generator) drawSingleLine(b *builder.Builder, width, height, lw, pad float64, fld *widgetField, text string) {
 	if text == "" {
 		return
 	}
@@ -494,7 +494,7 @@ func (s *Style) drawSingleLine(b *builder.Builder, width, height, lw, pad float6
 	b.EndPath()
 
 	b.TextBegin()
-	b.TextSetFont(s.ContentFont, size)
+	b.TextSetFont(g.ContentFont, size)
 	b.SetFillColor(col)
 	b.TextFirstLine(left, height/2-size*0.33)
 	b.TextShowAligned(text, contentWidth, quadFraction(fld.Align))
@@ -504,11 +504,11 @@ func (s *Style) drawSingleLine(b *builder.Builder, width, height, lw, pad float6
 }
 
 // drawMultiline draws word-wrapped, top-aligned field text.
-func (s *Style) drawMultiline(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
+func (g *Generator) drawMultiline(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
 	if fld.Value == "" {
 		return
 	}
-	F := s.ContentFont
+	F := g.ContentFont
 	size, col := parseDA(fld.DefaultAppearance)
 	if size == 0 {
 		size = 11
@@ -553,7 +553,7 @@ func (s *Style) drawMultiline(b *builder.Builder, width, height, lw, pad float64
 // drawComb lays the value out into MaxLen equal cells separated by hairline
 // rules, one character per cell. A value shorter than MaxLen occupies the
 // left, middle or right cells, following the field's justification.
-func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *widgetField) {
+func (g *Generator) drawComb(b *builder.Builder, width, height, lw float64, fld *widgetField) {
 	n := fld.MaxLen
 	cellW := (width - 2*lw) / float64(n)
 
@@ -585,7 +585,7 @@ func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *wid
 	}
 	baseline := pdf.Round(height/2-size*0.33, 2)
 	b.TextBegin()
-	b.TextSetFont(s.ContentFont, size)
+	b.TextSetFont(g.ContentFont, size)
 	b.SetFillColor(col)
 	prev := 0.0
 	for i := range k {
@@ -604,24 +604,24 @@ func (s *Style) drawComb(b *builder.Builder, width, height, lw float64, fld *wid
 }
 
 // drawChoiceField draws a list box or, when the combo flag is set, a combo box.
-func (s *Style) drawChoiceField(w *annotation.Widget, fld *widgetField) (*form.Form, error) {
-	b, width, height, m := s.fieldContext(w)
+func (g *Generator) drawChoiceField(w *annotation.Widget, fld *widgetField) (*form.Form, error) {
+	b, width, height, m := g.fieldContext(w)
 	drawChrome(b, width, height, w)
 	lw := annotation.EffectiveBorderWidth(w)
 	const pad = 2.0
 
 	if fld.Flags&acroform.FieldCombo != 0 {
-		s.drawCombo(b, width, height, lw, pad, fld)
+		g.drawCombo(b, width, height, lw, pad, fld)
 	} else {
-		s.drawListBox(b, width, height, lw, pad, fld)
+		g.drawListBox(b, width, height, lw, pad, fld)
 	}
 
-	return s.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m)
 }
 
 // drawCombo draws the selected value as a single line plus a divider and a
 // disclosure chevron at the right edge.
-func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
+func (g *Generator) drawCombo(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
 	chevronW := height
 	divX := width - chevronW
 
@@ -652,7 +652,7 @@ func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fl
 		}
 		left := lw + pad
 		b.TextBegin()
-		b.TextSetFont(s.ContentFont, size)
+		b.TextSetFont(g.ContentFont, size)
 		b.SetFillColor(col)
 		b.TextFirstLine(left, height/2-size*0.33)
 		b.TextShowAligned(fld.Value, divX-left-pad, quadFraction(fld.Align))
@@ -662,12 +662,12 @@ func (s *Style) drawCombo(b *builder.Builder, width, height, lw, pad float64, fl
 
 // drawListBox draws the option items, scrolled to TopIndex, with the selected
 // rows highlighted in the Quire selection treatment (amber wash and indicator).
-func (s *Style) drawListBox(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
+func (g *Generator) drawListBox(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
 	size, col := parseDA(fld.DefaultAppearance)
 	if size == 0 {
 		size = 11
 	}
-	rowH := pdf.Round(s.ContentFont.GetGeometry().Leading*size, 2)
+	rowH := pdf.Round(g.ContentFont.GetGeometry().Leading*size, 2)
 	if rowH <= 0 {
 		rowH = size * 1.3
 	}
@@ -699,7 +699,7 @@ func (s *Style) drawListBox(b *builder.Builder, width, height, lw, pad float64, 
 			b.Fill()
 		}
 		b.TextBegin()
-		b.TextSetFont(s.ContentFont, size)
+		b.TextSetFont(g.ContentFont, size)
 		b.SetFillColor(col)
 		b.TextFirstLine(left, rowBottom+(rowH-size)/2+size*0.2)
 		b.TextShow(fld.Options[i])
@@ -738,6 +738,12 @@ func clampFloat(v, lo, hi float64) float64 {
 
 // parseDA extracts the text size and colour from a default-appearance string.
 // Unrecognised input yields a zero size (auto) and the default ink colour.
+//
+// The font name is deliberately ignored: it names an entry in the form's
+// default resources, which is a font dictionary in the file rather than
+// something this package can lay text out with, so the appearance is drawn with
+// [Generator.ContentFont] whatever the string asks for.  A caller which wants
+// the two to agree can name the generator's font in its default resources.
 func parseDA(da string) (size float64, col color.Color) {
 	col = quireInk
 	fields := strings.Fields(da)

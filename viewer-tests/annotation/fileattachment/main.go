@@ -73,9 +73,14 @@ func createDocument(filename string) error {
 	B := font.Must(standard.TimesBold.New())
 	H := font.Must(standard.Helvetica.New())
 
+	style, err := fallback.NewStyle().New(pdf.V1_7)
+	if err != nil {
+		return err
+	}
+
 	w := &writer{
 		page:  page,
-		style: fallback.NewStyle(pdf.V1_7),
+		style: style,
 		yPos:  startY,
 		font:  H,
 	}
@@ -213,7 +218,7 @@ func sampleFile(name string) *file.Specification {
 
 type writer struct {
 	page  *document.Page
-	style *fallback.Style
+	style *fallback.Generator
 	yPos  float64
 	font  font.Layouter
 }

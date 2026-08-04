@@ -68,9 +68,14 @@ func createDocument(filename string) error {
 
 	page.DrawShading(pageBackground(paper))
 
+	style, err := fallback.NewStyle().New(pdf.V1_7)
+	if err != nil {
+		return err
+	}
+
 	w := &writer{
 		page:  page,
-		style: fallback.NewStyle(pdf.V1_7),
+		style: style,
 		yPos:  startY,
 	}
 
@@ -423,7 +428,7 @@ func createDocument(filename string) error {
 
 type writer struct {
 	page  *document.Page
-	style *fallback.Style
+	style *fallback.Generator
 	yPos  float64
 }
 

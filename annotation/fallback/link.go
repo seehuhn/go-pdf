@@ -26,7 +26,7 @@ import (
 	"seehuhn.de/go/pdf/internal/colconv"
 )
 
-func (s *Style) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
+func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 	borderWidth := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
 	style := annotation.EffectiveBorderStyle(a)
@@ -46,18 +46,18 @@ func (s *Style) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 		}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
 	switch style {
 	case "U": // underline
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		b.SetStrokeColor(col)
 		b.SetLineWidth(borderWidth)
 		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 		b.Stroke()
 	case "D": // dashed
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		b.SetStrokeColor(col)
 		b.SetLineWidth(borderWidth)
 		b.SetLineDash(dashPattern, 0)
@@ -68,13 +68,13 @@ func (s *Style) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 			pdf.Round(bbox.URy-bbox.LLy-borderWidth, 2))
 		b.Stroke()
 	case "B":
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		drawBeveledBorder(b, bbox, borderWidth, col, true)
 	case "I":
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		drawBeveledBorder(b, bbox, borderWidth, col, false)
 	default: // solid or unknown
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		b.SetStrokeColor(col)
 		b.SetLineWidth(borderWidth)
 		b.Rectangle(

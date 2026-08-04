@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, error) {
+func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, error) {
 	col := a.Color
 
 	if len(a.QuadPoints) < 4 {
@@ -41,8 +41,8 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, e
 	}
 
 	if col == nil {
-		b := builder.New(content.Form, nil, s.version)
-		b.SetExtGState(s.reset)
+		b := builder.New(content.Form, nil, g.version)
+		g.reset(b)
 		return harvest(b, a.Rect)
 	}
 
@@ -62,8 +62,8 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, e
 	// a highlight is a fill and has no border, but the other types draw the
 	// border itself, so a width of 0 leaves them with nothing to draw
 	if lw <= 0 && a.Type != annotation.TextMarkupTypeHighlight {
-		b := builder.New(content.Form, nil, s.version)
-		b.SetExtGState(s.reset)
+		b := builder.New(content.Form, nil, g.version)
+		g.reset(b)
 		return harvest(b, a.Rect)
 	}
 
@@ -88,8 +88,8 @@ func (s *Style) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, e
 	bbox.IRound(2)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, s.version)
-	b.SetExtGState(s.reset)
+	b := builder.New(content.Form, nil, g.version)
+	g.reset(b)
 
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 		gs := &extgstate.ExtGState{

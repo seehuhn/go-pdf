@@ -36,7 +36,7 @@ import (
 // requires.  Readers must not call it for a screen annotation lacking an
 // appearance stream: §12.5.6.18 says such an annotation has no default visual
 // appearance.
-func (s *Style) addScreenAppearance(a *annotation.Screen) (*form.Form, error) {
+func (g *Generator) addScreenAppearance(a *annotation.Screen) (*form.Form, error) {
 	rect := a.Rect
 	w := rect.Dx()
 	h := rect.Dy()
@@ -44,8 +44,8 @@ func (s *Style) addScreenAppearance(a *annotation.Screen) (*form.Form, error) {
 		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.version)
-	b.SetExtGState(s.reset)
+	b := builder.New(content.Form, nil, g.version)
+	g.reset(b)
 	mediaAlpha(b, a.StrokingTransparency, a.NonStrokingTransparency)
 
 	if a.Style != nil && a.Style.Icon != nil {

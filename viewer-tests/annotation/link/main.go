@@ -63,6 +63,11 @@ func createDocument(filename string) error {
 		return err
 	}
 
+	style, err := fallback.NewStyle().New(pdf.V1_7)
+	if err != nil {
+		return err
+	}
+
 	w := &writer{
 		Page:    page.Builder,
 		Roman:   font.Must(standard.TimesRoman.New()),
@@ -70,7 +75,7 @@ func createDocument(filename string) error {
 		TextCol: color.DeviceGray(0.1),
 		LinkCol: color.DeviceRGB{0, 0, 0.9},
 
-		style: fallback.NewStyle(pdf.V1_7),
+		style: style,
 		page:  page,
 		yPos:  startY,
 	}
@@ -261,7 +266,7 @@ type writer struct {
 	TextCol color.Color
 	LinkCol color.Color
 
-	style *fallback.Style
+	style *fallback.Generator
 	page  *document.Page
 	yPos  float64
 }

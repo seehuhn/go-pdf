@@ -23,16 +23,16 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-// AddAppearance must report an error, not panic, when the target PDF version
-// is too old for the operators the appearance needs (e.g. `gs`, PDF 1.2+).
-// Readers synthesize appearances at the document's version, where the input
-// is untrusted, so a malformed low-version file must not crash the caller.
-func TestAddAppearanceLowVersion(t *testing.T) {
+// Appearances are built for every PDF version the library supports.  The reset
+// state uses the line cap, join, miter limit and dash operators, which are
+// available throughout, so no version is left without a fallback appearance.
+func TestAddAppearanceAnyVersion(t *testing.T) {
 	rect := pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20}
 
 	build := map[string]func() annotation.Annotation{
@@ -46,13 +46,47 @@ func TestAddAppearanceLowVersion(t *testing.T) {
 
 	for name, mk := range build {
 		t.Run(name, func(t *testing.T) {
-			// pre-1.2: gs is unavailable, so building must fail with an error
-			if err := NewStyle(pdf.V1_1).AddAppearance(mk()); err == nil {
-				t.Error("expected an error for PDF 1.1, got nil")
+			for _, v := range []pdf.Version{pdf.V1_0, pdf.V1_1, pdf.V1_2, pdf.V1_3, pdf.V1_4, pdf.V1_7, pdf.V2_0} {
+				if err := newGen(t, v).AddAppearance(mk()); err != nil {
+					t.Errorf("unexpected error for PDF %s: %v", v, err)
+				}
 			}
-			// 1.2 and later: building succeeds
-			if err := NewStyle(pdf.V1_2).AddAppearance(mk()); err != nil {
-				t.Errorf("unexpected error for PDF 1.2: %v", err)
+		})
+	}
+}
+
+// The reset state carries text knockout and stroke adjustment in a graphics
+// state dictionary, which cannot hold either before PDF 1.4.  Writing one into
+// an older file would make the file invalid, so the appearance streams must
+// leave the dictionary out below that version and include it from 1.4 on.
+func TestResetGraphicsStateVersion(t *testing.T) {
+	for _, tc := range []struct {
+		version pdf.Version
+		wantGS  bool
+	}{
+		{pdf.V1_0, false},
+		{pdf.V1_2, false},
+		{pdf.V1_3, false},
+		{pdf.V1_4, true},
+		{pdf.V2_0, true},
+	} {
+		t.Run(tc.version.String(), func(t *testing.T) {
+			a := &annotation.Text{
+				Common: annotation.Common{
+					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
+				},
+			}
+			if err := newGen(t, tc.version).AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+
+			normal := a.Appearance.Normal
+			if normal == nil {
+				t.Fatal("no normal appearance")
+			}
+			gotGS := len(normal.Res.ExtGState) > 0
+			if gotGS != tc.wantGS {
+				t.Errorf("graphics state dictionary present = %t, want %t", gotGS, tc.wantGS)
 			}
 		})
 	}
@@ -63,7 +97,7 @@ func TestAddAppearanceLowVersion(t *testing.T) {
 // distinction to tell an annotation they are content to skip from one whose
 // fallback could not be built.
 func TestErrNoFallback(t *testing.T) {
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	rect := pdf.Rectangle{URx: 100, URy: 100}
 
 	for _, a := range []annotation.Annotation{
@@ -114,7 +148,7 @@ func TestAddAppearanceKeepsRollover(t *testing.T) {
 	for name, mk := range build {
 		t.Run(name, func(t *testing.T) {
 			a := mk()
-			if err := NewStyle(pdf.V2_0).AddAppearance(a); err != nil {
+			if err := newGen(t, pdf.V2_0).AddAppearance(a); err != nil {
 				t.Fatal(err)
 			}
 			ap := a.GetCommon().Appearance
@@ -162,7 +196,7 @@ func TestAddAppearanceKeepsRepeats(t *testing.T) {
 	for name, mk := range build {
 		t.Run(name, func(t *testing.T) {
 			a := mk()
-			if err := NewStyle(pdf.V2_0).AddAppearance(a); err != nil {
+			if err := newGen(t, pdf.V2_0).AddAppearance(a); err != nil {
 				t.Fatal(err)
 			}
 
@@ -225,7 +259,7 @@ func TestAddAppearanceKeepsStateForRollover(t *testing.T) {
 				w.Appearance = mkDict()
 				w.AppearanceState = tc.state
 
-				if err := NewStyle(pdf.V2_0).AddAppearance(w); err != nil {
+				if err := newGen(t, pdf.V2_0).AddAppearance(w); err != nil {
 					t.Fatal(err)
 				}
 
@@ -253,7 +287,7 @@ func TestAddAppearanceDropsUnusedState(t *testing.T) {
 	w := combWidget("AB", 6, pdf.TextAlignLeft)
 	w.AppearanceState = "Off"
 
-	if err := NewStyle(pdf.V2_0).AddAppearance(w); err != nil {
+	if err := newGen(t, pdf.V2_0).AddAppearance(w); err != nil {
 		t.Fatal(err)
 	}
 
@@ -298,7 +332,7 @@ func TestAddAppearanceLeavesSharedDictAlone(t *testing.T) {
 			a.GetCommon().AppearanceState = "On"
 			other.GetCommon().AppearanceState = "On"
 
-			if err := NewStyle(pdf.V2_0).AddAppearance(a); err != nil {
+			if err := newGen(t, pdf.V2_0).AddAppearance(a); err != nil {
 				t.Fatal(err)
 			}
 
@@ -316,4 +350,44 @@ func TestAddAppearanceLeavesSharedDictAlone(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The fonts a Generator draws with are made once and then reused, so that a
+// file holds a single copy of each however many appearances are built.  The
+// icon font is made on first use rather than with the Generator, which is where
+// a second copy could otherwise creep in.
+func TestGeneratorReusesFonts(t *testing.T) {
+	g := newGen(t, pdf.V2_0)
+
+	iconFontOf := func() font.Instance {
+		t.Helper()
+		a := &annotation.Text{
+			Common: annotation.Common{
+				Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
+			},
+			Icon: annotation.TextIconHelp,
+		}
+		if err := g.AddAppearance(a); err != nil {
+			t.Fatal(err)
+		}
+		for _, F := range a.Appearance.Normal.Res.Font {
+			return F
+		}
+		t.Fatal("appearance references no font")
+		return nil
+	}
+
+	if first, second := iconFontOf(), iconFontOf(); first != second {
+		t.Error("the icon font was made twice")
+	}
+}
+
+// newGen returns a Generator for the default style, for use in tests.
+func newGen(t *testing.T, version pdf.Version) *Generator {
+	t.Helper()
+	gen, err := NewStyle().New(version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return gen
 }

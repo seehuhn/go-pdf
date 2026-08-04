@@ -35,7 +35,7 @@ const (
 	freeTextPadding  = 2
 )
 
-func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error) {
+func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error) {
 	// extract information from the pre-set fields
 	lw := annotation.EffectiveBorderWidth(a)
 	bgCol := a.Color
@@ -74,9 +74,9 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error
 	a.DefaultStyle = ""
 
 	// generate the appearance stream
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
-	b.SetExtGState(s.reset)
+	g.reset(b)
 
 	// precompute cloud outline if applicable
 	var co *cloudOutline
@@ -148,7 +148,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error
 
 	// render text content if present
 	if a.Contents != "" {
-		F := s.ContentFont
+		F := g.ContentFont
 
 		clipLeft := inner.LLx + lw + freeTextPadding
 		clipBottom := inner.LLy + lw + freeTextPadding
@@ -217,7 +217,7 @@ func (s *Style) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error
 	}
 
 	// set DA to match the font/size/color used in the appearance stream
-	fontName := b.FontName(s.ContentFont)
+	fontName := b.FontName(g.ContentFont)
 	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf %g %g %g rg",
 		fontName, freeTextFontSize,
 		quireInk[0], quireInk[1], quireInk[2])

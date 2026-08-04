@@ -66,7 +66,7 @@ func main() {
 
 type writer struct {
 	page   *document.Page
-	style  *fallback.Style
+	style  *fallback.Generator
 	form   *acroform.InteractiveForm
 	label  font.Layouter
 	yPos   float64
@@ -100,9 +100,15 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	H := font.Must(standard.Helvetica.New())
+	style, err := fallback.NewStyle().New(pdf.V1_7)
+	if err != nil {
+		return err
+	}
+
+	// the generator's font doubles as the form's "Helv", so the file holds one
+	// Helvetica and the DA strings name the font which draws the field values
+	H := style.ContentFont
 	B := font.Must(standard.HelveticaBold.New())
-	style := fallback.NewStyle(pdf.V1_7)
 
 	wr := &writer{
 		page:  page,

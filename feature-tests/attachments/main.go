@@ -86,7 +86,10 @@ func run() error {
 	}
 
 	page := doc.AddPage()
-	fbStyle := fallback.NewStyle(pdf.V1_7)
+	fbStyle, err := fallback.NewStyle().New(pdf.V1_7)
+	if err != nil {
+		return err
+	}
 
 	iconRects := drawDescription(page)
 
@@ -185,7 +188,7 @@ func finaliseCatalogue(doc *document.MultiPage, tree map[pdf.Name]pdf.Object) er
 // page's Annots array.  If spec is already embedded in the document (via
 // registerInCatalogue), the resource manager re-uses the same reference
 // so that a conforming reader's Attachments panel lists the file once.
-func addFileAttachment(page *document.Page, style *fallback.Style,
+func addFileAttachment(page *document.Page, style *fallback.Generator,
 	spec *file.Specification, rect pdf.Rectangle, contents string) error {
 	fa := &annotation.FileAttachment{
 		Common: annotation.Common{

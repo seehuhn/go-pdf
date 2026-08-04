@@ -82,9 +82,14 @@ func createDocument(filename string) error {
 
 	page.DrawShading(pageBackground(paper))
 
+	style, err := fallback.NewStyle().New(pdf.V1_7)
+	if err != nil {
+		return err
+	}
+
 	w := &writer{
 		page:  page,
-		style: fallback.NewStyle(pdf.V1_7),
+		style: style,
 	}
 
 	// register the content font in the page resources for DA-based rendering
@@ -223,7 +228,7 @@ func addCalloutWidths(w *writer, da string) error {
 
 type writer struct {
 	page  *document.Page
-	style *fallback.Style
+	style *fallback.Generator
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {

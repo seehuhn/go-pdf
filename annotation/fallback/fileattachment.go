@@ -35,7 +35,7 @@ import (
 // text annotations implicitly, but which FileAttachment does not get for
 // free.  See §12.5.3: "the annotation's position is defined by the
 // coordinates of the upper-left corner of its annotation rectangle".
-func (s *Style) addFileAttachmentAppearance(a *annotation.FileAttachment) (*form.Form, error) {
+func (g *Generator) addFileAttachmentAppearance(a *annotation.FileAttachment) (*form.Form, error) {
 	a.Rect = pdf.Rectangle{
 		LLx: a.Rect.LLx,
 		LLy: a.Rect.URy - 24,
@@ -49,8 +49,8 @@ func (s *Style) addFileAttachmentAppearance(a *annotation.FileAttachment) (*form
 		col = quireInk2
 	}
 
-	b := builder.New(content.Form, nil, s.version)
-	b.SetExtGState(s.reset)
+	b := builder.New(content.Form, nil, g.version)
+	g.reset(b)
 
 	// card background: hairline slate-3 border + slate-1 fill.  Cool
 	// chrome on the warm page makes the icon read as viewer-added

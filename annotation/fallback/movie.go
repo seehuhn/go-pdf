@@ -32,7 +32,7 @@ import (
 // When the movie dictionary supplies an embedded poster image, that image is
 // drawn stretched to fill the Rect; otherwise a generic media placeholder is
 // drawn (see [drawMediaPlaceholder]).
-func (s *Style) addMovieAppearance(a *annotation.Movie) (*form.Form, error) {
+func (g *Generator) addMovieAppearance(a *annotation.Movie) (*form.Form, error) {
 	rect := a.Rect
 	w := rect.Dx()
 	h := rect.Dy()
@@ -40,8 +40,8 @@ func (s *Style) addMovieAppearance(a *annotation.Movie) (*form.Form, error) {
 		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.version)
-	b.SetExtGState(s.reset)
+	b := builder.New(content.Form, nil, g.version)
+	g.reset(b)
 	mediaAlpha(b, a.StrokingTransparency, a.NonStrokingTransparency)
 
 	// PosterFromMovieFile lives inside an undecoded movie container, so we can

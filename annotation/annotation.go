@@ -37,7 +37,7 @@ type Annotation interface {
 
 // AppearanceGenerator generates a normal appearance stream for an annotation
 // that lacks one, storing it in the annotation.  It is implemented by
-// [seehuhn.de/go/pdf/annotation/fallback.Style]; callers that flatten or
+// [seehuhn.de/go/pdf/annotation/fallback.Generator]; callers that flatten or
 // render annotations can accept this interface to inject a custom generator.
 type AppearanceGenerator interface {
 	AddAppearance(Annotation) error

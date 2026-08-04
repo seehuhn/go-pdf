@@ -29,7 +29,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addCircleAppearance(a *annotation.Circle) (*form.Form, error) {
+func (g *Generator) addCircleAppearance(a *annotation.Circle) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := a.Color
@@ -54,9 +54,9 @@ func (s *Style) addCircleAppearance(a *annotation.Circle) (*form.Form, error) {
 		}, nil
 	}
 
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
-	b.SetExtGState(s.reset)
+	g.reset(b)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 		gs := &extgstate.ExtGState{
 			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,

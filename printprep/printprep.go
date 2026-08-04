@@ -46,8 +46,8 @@ type Options struct {
 	HideMarkup bool
 
 	// Generator supplies appearance streams for printable annotations that lack
-	// one.  A nil value uses the library default,
-	// [fallback.NewStyle] for the output version.
+	// one.  A nil value uses the fallback package's default style for the
+	// output version, see [fallback.NewStyle].
 	Generator annotation.AppearanceGenerator
 }
 
@@ -95,7 +95,10 @@ func Write(w io.Writer, r *pdf.Reader, opts *Options) error {
 		patternCache: map[pdf.Reference]pdf.Reference{},
 	}
 	if c.gen == nil {
-		c.gen = fallback.NewStyle(version)
+		c.gen, err = fallback.NewStyle().New(version)
+		if err != nil {
+			return err
+		}
 	}
 	if err := c.buildOCState(opts.HiddenLayers); err != nil {
 		return err

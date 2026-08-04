@@ -25,7 +25,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addCaretAppearance(a *annotation.Caret) (*form.Form, error) {
+func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) {
 	col := a.Color
 	if col == nil {
 		return &form.Form{
@@ -52,9 +52,9 @@ func (s *Style) addCaretAppearance(a *annotation.Caret) (*form.Form, error) {
 		}
 	}
 
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
-	b.SetExtGState(s.reset)
+	g.reset(b)
 	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
 		gs := &extgstate.ExtGState{
 			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
@@ -97,7 +97,7 @@ func (s *Style) addCaretAppearance(a *annotation.Caret) (*form.Form, error) {
 		}
 		cx := (inner.LLx + inner.URx) / 2
 		b.TextBegin()
-		b.TextSetFont(s.iconFont, fontSize)
+		b.TextSetFont(g.icons(), fontSize)
 		b.TextSetHorizontalScaling(1)
 		b.TextFirstLine(cx-fontSize*0.25, y0-fontSize*0.85)
 		b.TextShow("\u00B6")

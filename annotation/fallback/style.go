@@ -50,71 +50,152 @@ import (
 //    Icon is used as the appearance-generation input by addScreenAppearance
 //  - Sy: "symbol" for Caret
 
-// Style controls the visual appearance of fallback annotation streams.
-// The ContentFont field may be replaced after construction to use a
-// different font for text content.
+// Style describes the look of the fallback appearance streams.  It carries no
+// state tied to a particular document and can be used for any number of them;
+// use [Style.New] to obtain a [Generator] for one document.
 type Style struct {
+	// NewContentFont chooses the font used to render the text content of
+	// annotations, for example for FreeText annotations.  A nil value selects
+	// the default, Helvetica.
+	//
+	// It is called once for each [Generator] and must return a new instance
+	// every time, since an instance belongs to the one document its generator
+	// serves, as described for [Generator].  A caller which instead wants to
+	// name the generator's font elsewhere in its document, for example in a
+	// default appearance string, can read [Generator.ContentFont] rather than
+	// supplying an instance here.
+	NewContentFont func() (font.Layouter, error)
+}
+
+// NewStyle returns a Style which uses the default fonts.  This is the zero
+// Style; a caller which changes some of the fields can equally well start from
+// a Style literal.
+func NewStyle() *Style {
+	return &Style{}
+}
+
+// Generator builds the fallback appearance streams for a single document.
+//
+// A Generator holds the font instances used in the streams it builds, so that
+// the document needs only one copy of each.  These instances allocate character
+// codes as text is laid out, which ties a Generator to one document and makes
+// it unsafe for concurrent use.  A caller writing the document out must build
+// every appearance stream before the fonts are written, since the codes are not
+// settled until then.
+//
+// A caller which only draws the appearances, rather than writing them to a
+// file, is under the same one-document restriction: the streams share the
+// generator's fonts, so they cannot be mixed with those of another generator.
+type Generator struct {
 	// ContentFont is the font used to render the text content of annotations,
-	// for example for FreeText annotations.
+	// for example for FreeText annotations.  It comes from the Style's
+	// NewContentFont.  A caller which needs to name the same font elsewhere in
+	// its document, for example in a default appearance string, can read it
+	// here rather than making a second instance.
 	ContentFont font.Layouter
 
-	// version is the PDF version targeted by appearance streams built via
-	// this Style.  It is passed through to [builder.New] so that
-	// version-restricted operators (e.g. `gs` on pre-1.2) are rejected at
-	// build time.
+	// version is the PDF version targeted by the appearance streams.  It is
+	// passed through to [builder.New] so that operators the file cannot use
+	// are rejected at build time, and decides whether the reset state can be
+	// carried in a graphics state dictionary.
 	version pdf.Version
 
 	// iconFont is the font used to render symbols inside some of the icons for
 	// text annotations.  If this is changed to be different from
 	// extended.NimbusRomanBold, the layout of some text icons may need to be
-	// adjusted.
+	// adjusted.  Use [Generator.icons] to read it.
 	iconFont font.Layouter
 
 	// dingbatsFont is ZapfDingbats, used to draw the on-glyphs of check box and
 	// radio button widgets (the marker named by the MK.CA characteristic).
+	// Use [Generator.dingbats] to read it.
 	dingbatsFont font.Layouter
 
-	// reset is used to set a default graphics state at the beginning of each
-	// appearance stream.
-	reset *extgstate.ExtGState
+	// resetGS holds the reset parameters which have no operator of their own,
+	// or nil for a file which cannot express them.  One dictionary is shared by
+	// every appearance stream, so the file holds a single copy.
+	resetGS *extgstate.ExtGState
 }
 
-var _ annotation.AppearanceGenerator = (*Style)(nil)
-
-// NewStyle returns a new Style with default fonts and graphics state.
-// Appearance streams are built for the given PDF version, so that
-// version-restricted operators are rejected at build time.
-func NewStyle(version pdf.Version) *Style {
-	reset := &extgstate.ExtGState{
-		Set: graphics.StateTextKnockout |
-			graphics.StateLineCap |
-			graphics.StateLineJoin |
-			graphics.StateMiterLimit |
-			graphics.StateLineDash |
-			graphics.StateStrokeAdjustment,
-		TextKnockout:     false,
-		LineCap:          graphics.LineCapButt,
-		LineJoin:         graphics.LineJoinMiter,
-		MiterLimit:       10,
-		DashPattern:      nil,
-		DashPhase:        0,
-		StrokeAdjustment: false,
+// icons returns the font used for the symbols inside text annotation icons.
+//
+// Most documents have no annotation which needs it, so it is made on first use
+// rather than with the Generator: parsing a font program is far more expensive
+// than building the appearance streams that use it.
+func (g *Generator) icons() font.Layouter {
+	if g.iconFont == nil {
+		g.iconFont = font.Must(extended.NimbusRomanBold.New())
 	}
+	return g.iconFont
+}
 
-	// Allocate fonts once here, to make sure that at most one instance of each
-	// font is embedded in an output file.
-	return &Style{
-		version:      version,
-		iconFont:     font.Must(extended.NimbusRomanBold.New()),
-		dingbatsFont: font.Must(standard.ZapfDingbats.New()),
-		ContentFont:  font.Must(standard.Helvetica.New()),
-		reset:        reset,
+// dingbats returns the font used for check box and radio button on-glyphs.
+// Like [Generator.icons], it is made on first use.
+func (g *Generator) dingbats() font.Layouter {
+	if g.dingbatsFont == nil {
+		g.dingbatsFont = font.Must(standard.ZapfDingbats.New())
+	}
+	return g.dingbatsFont
+}
+
+// reset establishes a known graphics state at the start of an appearance
+// stream.  The drawing code below is written on the assumption that these
+// values are in force, whatever state a viewer had set up when it invoked the
+// stream.
+//
+// Line cap, join, miter limit and dash pattern have had operators of their own
+// since PDF 1.0 and are set that way.  Text knockout has no operator and can
+// be set only through a graphics state dictionary, which puts it out of reach
+// before PDF 1.4; stroke adjustment travels with it, since its initial value
+// is the one wanted here and it need only be restated where a dictionary is
+// written anyway.
+func (g *Generator) reset(b *builder.Builder) {
+	b.SetLineCap(graphics.LineCapButt)
+	b.SetLineJoin(graphics.LineJoinMiter)
+	b.SetMiterLimit(10)
+	b.SetLineDash(nil, 0)
+
+	if g.resetGS != nil {
+		b.SetExtGState(g.resetGS)
 	}
 }
 
-// ErrNoFallback is returned by [Style.AddAppearance] for an annotation type it
-// cannot draw.  Callers which walk a document's annotations use it to tell a
-// type they are content to skip from a fallback which was attempted and
+var _ annotation.AppearanceGenerator = (*Generator)(nil)
+
+// New returns a Generator for a PDF file of the given version.  Appearance
+// streams are built for that version, so that operators the file cannot use
+// are rejected at build time.
+//
+// An error is returned if the Style's content font cannot be made.
+func (s *Style) New(version pdf.Version) (*Generator, error) {
+	var contentFont font.Layouter
+	var err error
+	if s.NewContentFont == nil {
+		contentFont, err = standard.Helvetica.New()
+	} else {
+		contentFont, err = s.NewContentFont()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	g := &Generator{
+		ContentFont: contentFont,
+		version:     version,
+	}
+	if version >= pdf.V1_4 {
+		g.resetGS = &extgstate.ExtGState{
+			Set:              graphics.StateTextKnockout | graphics.StateStrokeAdjustment,
+			TextKnockout:     false,
+			StrokeAdjustment: false,
+		}
+	}
+	return g, nil
+}
+
+// ErrNoFallback is returned by [Generator.AddAppearance] for an annotation
+// type it cannot draw.  Callers which walk a document's annotations use it to
+// tell a type they are content to skip from a fallback which was attempted and
 // failed.
 var ErrNoFallback = errors.New("no fallback appearance for this annotation type")
 
@@ -134,48 +215,48 @@ var ErrNoFallback = errors.New("no fallback appearance for this annotation type"
 // appearance.  Some types are not drawn as a matter of policy and some are
 // simply not implemented yet; a caller decides which types it offers here,
 // see [seehuhn.de/go/pdf/annotation.ShouldSynthesizeFallback].
-func (s *Style) AddAppearance(a annotation.Annotation) error {
+func (g *Generator) AddAppearance(a annotation.Annotation) error {
 	// TODO(voss): cache appearances where possible
 
 	var normal *form.Form
 	var err error
 	switch a := a.(type) {
 	case *annotation.Text:
-		normal, err = s.addTextAppearance(a)
+		normal, err = g.addTextAppearance(a)
 	case *annotation.Link:
-		normal, err = s.addLinkAppearance(a)
+		normal, err = g.addLinkAppearance(a)
 	case *annotation.FreeText:
-		normal, err = s.addFreeTextAppearance(a)
+		normal, err = g.addFreeTextAppearance(a)
 	case *annotation.Line:
-		normal, err = s.addLineAppearance(a)
+		normal, err = g.addLineAppearance(a)
 	case *annotation.Square:
-		normal, err = s.addSquareAppearance(a)
+		normal, err = g.addSquareAppearance(a)
 	case *annotation.Circle:
-		normal, err = s.addCircleAppearance(a)
+		normal, err = g.addCircleAppearance(a)
 	case *annotation.Polygon:
-		normal, err = s.addPolygonAppearance(a)
+		normal, err = g.addPolygonAppearance(a)
 	case *annotation.PolyLine:
-		normal, err = s.addPolyLineAppearance(a)
+		normal, err = g.addPolyLineAppearance(a)
 	case *annotation.Ink:
-		normal, err = s.addInkAppearance(a)
+		normal, err = g.addInkAppearance(a)
 	case *annotation.TextMarkup:
-		normal, err = s.addTextMarkupAppearance(a)
+		normal, err = g.addTextMarkupAppearance(a)
 	case *annotation.Caret:
-		normal, err = s.addCaretAppearance(a)
+		normal, err = g.addCaretAppearance(a)
 	case *annotation.Stamp:
-		normal, err = s.addStampAppearance(a)
+		normal, err = g.addStampAppearance(a)
 	case *annotation.FileAttachment:
-		normal, err = s.addFileAttachmentAppearance(a)
+		normal, err = g.addFileAttachmentAppearance(a)
 	case *annotation.Sound:
-		normal, err = s.addSoundAppearance(a)
+		normal, err = g.addSoundAppearance(a)
 	case *annotation.Movie:
-		normal, err = s.addMovieAppearance(a)
+		normal, err = g.addMovieAppearance(a)
 	case *annotation.Screen:
-		normal, err = s.addScreenAppearance(a)
+		normal, err = g.addScreenAppearance(a)
 	case *annotation.Widget:
 		// widgets build their own appearance dictionary (check boxes and radio
 		// buttons need an on/off map, not a single normal stream)
-		return s.addWidgetAppearance(a)
+		return g.addWidgetAppearance(a)
 	default:
 		return ErrNoFallback
 	}

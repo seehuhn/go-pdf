@@ -37,7 +37,7 @@ func (stubImage) Embed(*pdf.EmbedHelper) (pdf.Native, error) { return pdf.Intege
 var mediaRect = pdf.Rectangle{LLx: 10, LLy: 20, URx: 210, URy: 120}
 
 func TestMoviePoster(t *testing.T) {
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	poster := stubImage{}
 	a := &annotation.Movie{
 		Common: annotation.Common{Rect: mediaRect},
@@ -63,7 +63,7 @@ func TestMoviePoster(t *testing.T) {
 }
 
 func TestMoviePlaceholder(t *testing.T) {
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	cases := map[string]*movie.Movie{
 		"nil movie":        nil,
 		"nil poster":       {},
@@ -94,7 +94,7 @@ func TestMoviePlaceholder(t *testing.T) {
 }
 
 func TestMovieZeroRect(t *testing.T) {
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	zero := pdf.Rectangle{LLx: 5, LLy: 5, URx: 5, URy: 5}
 	a := &annotation.Movie{Common: annotation.Common{Rect: zero}}
 

@@ -33,7 +33,7 @@ import (
 // a fixed 24×24 icon anchored at the upper-left of the supplied Rect,
 // with NoZoom and NoRotate forced so the icon stays icon-sized at any
 // zoom level.
-func (s *Style) addSoundAppearance(a *annotation.Sound) (*form.Form, error) {
+func (g *Generator) addSoundAppearance(a *annotation.Sound) (*form.Form, error) {
 	a.Rect = pdf.Rectangle{
 		LLx: a.Rect.LLx,
 		LLy: a.Rect.URy - 24,
@@ -47,8 +47,8 @@ func (s *Style) addSoundAppearance(a *annotation.Sound) (*form.Form, error) {
 		col = quireInk2
 	}
 
-	b := builder.New(content.Form, nil, s.version)
-	b.SetExtGState(s.reset)
+	b := builder.New(content.Form, nil, g.version)
+	g.reset(b)
 
 	// slate card backdrop, identical to file attachments
 	b.SetLineWidth(0.5)

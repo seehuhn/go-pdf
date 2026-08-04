@@ -139,11 +139,11 @@ func TestNoBorderDrawsNoStroke(t *testing.T) {
 				t.Fatalf("border width %v, want 1: the case is set up wrongly", w)
 			}
 
-			s := NewStyle(pdf.V2_0)
+			s := newGen(t, pdf.V2_0)
 			if err := s.AddAppearance(noBorder); err != nil {
 				t.Fatal(err)
 			}
-			s2 := NewStyle(pdf.V2_0)
+			s2 := newGen(t, pdf.V2_0)
 			if err := s2.AddAppearance(withBorder); err != nil {
 				t.Fatal(err)
 			}
@@ -196,7 +196,7 @@ func TestBorderDashReachesAppearance(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := NewStyle(pdf.V2_0)
+			s := newGen(t, pdf.V2_0)
 			if err := s.AddAppearance(tc.a); err != nil {
 				t.Fatal(err)
 			}
@@ -248,7 +248,7 @@ func TestHighlightIgnoresBorderWidth(t *testing.T) {
 			Type:       annotation.TextMarkupTypeHighlight,
 			QuadPoints: quads,
 		}
-		s := NewStyle(pdf.V2_0)
+		s := newGen(t, pdf.V2_0)
 		if err := s.AddAppearance(a); err != nil {
 			t.Fatal(err)
 		}

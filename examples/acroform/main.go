@@ -79,7 +79,16 @@ func writeForm(filename string) error {
 		return err
 	}
 
-	body := font.Must(standard.Helvetica.New())
+	appearances, err := fallback.NewStyle().New(pdfVersion)
+	if err != nil {
+		return err
+	}
+
+	// The widget appearances are drawn with the generator's own font, so the
+	// form names that instance in its default resources: the file then holds a
+	// single Helvetica, and the font a field's DA string names is the one which
+	// actually draws the field.
+	body := appearances.ContentFont
 	bold := font.Must(standard.HelveticaBold.New())
 
 	b := &formBuilder{
@@ -89,7 +98,7 @@ func writeForm(filename string) error {
 				Font: map[pdf.Name]font.Instance{"Helv": body},
 			},
 		},
-		appearances: fallback.NewStyle(pdfVersion),
+		appearances: appearances,
 		border:      &annotation.BorderStyle{Width: 1},
 		style:       &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: borderColor},
 		body:        body,
@@ -111,7 +120,7 @@ func writeForm(filename string) error {
 type formBuilder struct {
 	page        *document.Page
 	form        *acroform.InteractiveForm
-	appearances *fallback.Style
+	appearances *fallback.Generator
 	border      *annotation.BorderStyle
 	style       *appearance.Characteristics
 	body        font.Layouter

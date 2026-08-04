@@ -55,9 +55,14 @@ func run() error {
 		return err
 	}
 
+	style, err := fallback.NewStyle().New(pdf.V1_7)
+	if err != nil {
+		return err
+	}
+
 	w := &writer{
 		doc:   doc,
-		style: fallback.NewStyle(pdf.V1_7),
+		style: style,
 		font:  font.Must(standard.Helvetica.New()),
 	}
 
@@ -78,7 +83,7 @@ func run() error {
 type writer struct {
 	doc   *document.MultiPage
 	page  *document.Page
-	style *fallback.Style
+	style *fallback.Generator
 	font  font.Layouter
 	yPos  float64
 }

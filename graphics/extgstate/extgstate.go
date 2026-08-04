@@ -160,6 +160,40 @@ var extGStateBits = graphics.StateTextFont | graphics.StateTextKnockout | graphi
 	graphics.StateTransferFunction | graphics.StateHalftone | graphics.StateHalftoneOrigin |
 	graphics.StateFlatnessTolerance | graphics.StateSmoothnessTolerance
 
+// entryVersion lists the PDF version each graphics state parameter was
+// introduced in, in the order of ISO 32000-2 table 57.  Keys not listed are
+// available wherever the dictionary itself is, i.e. from PDF 1.2 onwards.
+//
+// A slice rather than a map, so that a dictionary with several out-of-version
+// entries always reports the same one.
+var entryVersion = []struct {
+	key     pdf.Name
+	version pdf.Version
+}{
+	{"LW", pdf.V1_3},
+	{"LC", pdf.V1_3},
+	{"LJ", pdf.V1_3},
+	{"ML", pdf.V1_3},
+	{"D", pdf.V1_3},
+	{"RI", pdf.V1_3},
+	{"op", pdf.V1_3},
+	{"OPM", pdf.V1_3},
+	{"Font", pdf.V1_3},
+	{"BG2", pdf.V1_3},
+	{"UCR2", pdf.V1_3},
+	{"TR2", pdf.V1_3},
+	{"FL", pdf.V1_3},
+	{"SM", pdf.V1_3},
+	{"BM", pdf.V1_4},
+	{"SMask", pdf.V1_4},
+	{"CA", pdf.V1_4},
+	{"ca", pdf.V1_4},
+	{"AIS", pdf.V1_4},
+	{"TK", pdf.V1_4},
+	{"UseBlackPtComp", pdf.V2_0},
+	{"HTO", pdf.V2_0},
+}
+
 // Equal reports whether two ExtGState values are equal.
 func (e *ExtGState) Equal(other *ExtGState) bool {
 	if e == nil || other == nil {
@@ -458,9 +492,6 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	if set&graphics.StateBlackGeneration != 0 {
 		if e.BlackGeneration == nil {
-			if err := pdf.CheckVersion(rm.Out(), "BG2 in ExtGState", pdf.V1_3); err != nil {
-				return nil, err
-			}
 			dict["BG2"] = pdf.Name("Default")
 		} else {
 			obj, err := rm.Embed(e.BlackGeneration)
@@ -476,9 +507,6 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	if set&graphics.StateUndercolorRemoval != 0 {
 		if e.UndercolorRemoval == nil {
-			if err := pdf.CheckVersion(rm.Out(), "UCR2 in ExtGState", pdf.V1_3); err != nil {
-				return nil, err
-			}
 			dict["UCR2"] = pdf.Name("Default")
 		} else {
 			obj, err := rm.Embed(e.UndercolorRemoval)
@@ -509,9 +537,6 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 				needsArray = true
 			}
 			if fn == nil {
-				if err := pdf.CheckVersion(rm.Out(), "TR2 in ExtGState", pdf.V1_3); err != nil {
-					return nil, err
-				}
 				key = "TR2"
 			} else if nIn, nOut := fn.Shape(); nIn != 1 || nOut != 1 {
 				return nil, fmt.Errorf("wrong transfer function shape (%d,%d) != (1,1)", nIn, nOut)
@@ -586,6 +611,16 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	} else {
 		if e.SmoothnessTolerance != 0 {
 			return nil, errors.New("unexpected SmoothnessTolerance value")
+		}
+	}
+
+	for _, entry := range entryVersion {
+		if _, ok := dict[entry.key]; !ok {
+			continue
+		}
+		err := pdf.CheckVersion(rm.Out(), string(entry.key)+" in ExtGState", entry.version)
+		if err != nil {
+			return nil, err
 		}
 	}
 

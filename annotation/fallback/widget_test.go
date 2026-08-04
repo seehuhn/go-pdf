@@ -126,7 +126,7 @@ func TestCombAppearance(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			w := combWidget("AB", 6, tc.align)
-			s := NewStyle(pdf.V2_0)
+			s := newGen(t, pdf.V2_0)
 			if err := s.AddAppearance(w); err != nil {
 				t.Fatal(err)
 			}
@@ -158,7 +158,7 @@ func TestCombAppearance(t *testing.T) {
 // border width the annotation never requested.
 func TestCombAppearanceNoBorder(t *testing.T) {
 	w := borderlessCombWidget("AB", 6, pdf.TextAlignLeft)
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	if err := s.AddAppearance(w); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestCombAppearanceNoBorder(t *testing.T) {
 // a value longer than MaxLen is truncated to the available cells.
 func TestCombOverlongValue(t *testing.T) {
 	w := combWidget("ABCDEFGH", 6, pdf.TextAlignLeft)
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	if err := s.AddAppearance(w); err != nil {
 		t.Fatal(err)
 	}

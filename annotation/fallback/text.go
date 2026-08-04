@@ -24,7 +24,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
-func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
+func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	// §12.5.6.4: text annotations behave as if NoZoom and NoRotate were
 	// always set, anchored at the upper-left corner of Rect.  Pin Rect to
 	// a 24×24 square at that corner so the §12.5.5 scale-to-Rect algorithm
@@ -41,11 +41,11 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		bgCol = stickyYellow
 	}
 
-	b := builder.New(content.Form, nil, s.version)
+	b := builder.New(content.Form, nil, g.version)
 
 	switch a.Icon {
 	case annotation.TextIconComment:
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
@@ -58,7 +58,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		}
 
 		b.TextBegin()
-		b.TextSetFont(s.iconFont, 23)
+		b.TextSetFont(g.icons(), 23)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
 		b.SetFillColor(quireInk)
@@ -68,7 +68,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		b.TextEnd()
 
 	case annotation.TextIconKey:
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
@@ -81,7 +81,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		}
 
 		b.TextBegin()
-		b.TextSetFont(s.iconFont, 25)
+		b.TextSetFont(g.icons(), 25)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
 		b.SetFillColor(quireInk)
@@ -92,7 +92,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	case annotation.TextIconNote, "":
 		delta := 7.0
 
-		b.SetExtGState(s.reset)
+		g.reset(b)
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)
 		if bgCol != nil {
@@ -125,7 +125,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		b.Stroke()
 
 	case annotation.TextIconHelp:
-		b.SetExtGState(s.reset)
+		g.reset(b)
 
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)
@@ -139,7 +139,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		}
 
 		b.TextBegin()
-		b.TextSetFont(s.iconFont, 23)
+		b.TextSetFont(g.icons(), 23)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
 		b.SetFillColor(quireInk)
@@ -148,7 +148,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		b.TextEnd()
 
 	case annotation.TextIconNewParagraph:
-		b.SetExtGState(s.reset)
+		g.reset(b)
 
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)
@@ -186,7 +186,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		b.Fill()
 
 	case annotation.TextIconParagraph:
-		b.SetExtGState(s.reset)
+		g.reset(b)
 
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)
@@ -200,7 +200,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		}
 
 		b.TextBegin()
-		b.TextSetFont(s.iconFont, 16)
+		b.TextSetFont(g.icons(), 16)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
 		b.SetFillColor(quireInk)
@@ -210,7 +210,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		b.TextEnd()
 
 	case annotation.TextIconInsert:
-		b.SetExtGState(s.reset)
+		g.reset(b)
 
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)
@@ -224,7 +224,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		}
 
 		b.TextBegin()
-		b.TextSetFont(s.iconFont, 16)
+		b.TextSetFont(g.icons(), 16)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
 		b.SetFillColor(quireInk)
@@ -234,7 +234,7 @@ func (s *Style) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		b.TextEnd()
 
 	default:
-		b.SetExtGState(s.reset)
+		g.reset(b)
 
 		b.SetLineWidth(0.5)
 		b.SetStrokeColor(quireInk2)

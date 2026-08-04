@@ -26,7 +26,7 @@ import (
 )
 
 func TestScreenIcon(t *testing.T) {
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	icon := &form.Form{BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 32, URy: 32}}
 	a := &annotation.Screen{
 		Common: annotation.Common{Rect: mediaRect},
@@ -52,7 +52,7 @@ func TestScreenIcon(t *testing.T) {
 }
 
 func TestScreenPlaceholder(t *testing.T) {
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	cases := map[string]*appearance.Characteristics{
 		"nil MK":      nil,
 		"MK, no icon": {},
@@ -82,7 +82,7 @@ func TestScreenPlaceholder(t *testing.T) {
 }
 
 func TestScreenZeroRect(t *testing.T) {
-	s := NewStyle(pdf.V2_0)
+	s := newGen(t, pdf.V2_0)
 	zero := pdf.Rectangle{LLx: 5, LLy: 5, URx: 5, URy: 5}
 	a := &annotation.Screen{Common: annotation.Common{Rect: zero}}
 
