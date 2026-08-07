@@ -165,8 +165,8 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	res := &afm.Metrics{
 		Glyphs:             newGlyphs,
 		Encoding:           encoding,
-		FontName:           info.PostScriptName(),
-		FullName:           info.FullName(),
+		FontName:           info.FontName,
+		FullName:           info.FullName,
 		CapHeight:          info.CapHeight.AsFloat(q),
 		XHeight:            info.XHeight.AsFloat(q),
 		Ascent:             info.Ascent.AsFloat(q),

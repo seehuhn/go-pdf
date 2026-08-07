@@ -89,7 +89,7 @@ func main() {
 		rev:        rev,
 	}
 
-	err = f.WriteHeader(tt.FullName(), fontFileName)
+	err = f.WriteHeader(tt.FullName, fontFileName)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -106,7 +106,7 @@ func checkInstanced(t *testing.T, d *dict.TrueType, coords map[string]float64) {
 	if inst.IsVariable() {
 		t.Fatal("instanced font is still variable")
 	}
-	wantPS := inst.PostScriptName()
+	wantPS := inst.FontName
 	if d.PostScriptName != wantPS {
 		t.Errorf("PostScriptName: got %q, want %q", d.PostScriptName, wantPS)
 	}
@@ -239,7 +239,7 @@ func TestVarFontComposite(t *testing.T) {
 	}
 
 	// descriptor carries the subset tag and the instance PostScript name
-	wantPS := inst.PostScriptName()
+	wantPS := inst.FontName
 	if d.PostScriptName != wantPS {
 		t.Errorf("PostScriptName: got %q, want %q", d.PostScriptName, wantPS)
 	}

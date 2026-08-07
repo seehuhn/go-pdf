@@ -56,12 +56,7 @@ func extractFontType1(c pdf.Cursor, obj pdf.Object) (*dict.Type1, error) {
 	if err != nil {
 		return nil, err
 	}
-	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
-		d.PostScriptName = m[2]
-		d.SubsetTag = m[1]
-	} else {
-		d.PostScriptName = string(baseFont)
-	}
+	d.SubsetTag, d.PostScriptName = subset.Split(string(baseFont))
 	// A multiple master instance name has spaces replaced by underscores
 	// (e.g. "MinionMM_366_465_11_"). We don't translate underscores back to
 	// spaces, since this convention is not mandated by the specification.
@@ -159,28 +154,6 @@ func repairType1(d *dict.Type1, r pdf.Getter) {
 		d.Name = ""
 	}
 
-	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
-	if m != nil {
-		if d.SubsetTag == "" {
-			d.SubsetTag = m[1]
-		}
-		if d.PostScriptName == "" {
-			d.PostScriptName = m[2]
-		}
-	} else if d.PostScriptName == "" {
-		d.PostScriptName = d.Descriptor.FontName
-	}
-	if d.PostScriptName == "" {
-		d.PostScriptName = "Font"
-	}
-	if !subset.IsValidTag(d.SubsetTag) {
-		d.SubsetTag = ""
-	}
-	// external fonts cannot be subsetted, so they must not carry a subset tag
-	// (the tag is dropped after the FontName-derived tag above, otherwise a
-	// "TAG+Name" external font would re-acquire one and fail to embed)
-	if d.FontFile == nil {
-		d.SubsetTag = ""
-	}
-	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
+	d.PostScriptName, d.SubsetTag =
+		resolveFontName(d.Descriptor, d.PostScriptName, d.SubsetTag, d.FontFile != nil)
 }

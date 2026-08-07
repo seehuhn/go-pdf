@@ -81,6 +81,8 @@ func makeTrueTypeFont(unitsPerEm uint16) font.Layouter {
 	// create font structure
 	info := &sfnt.Font{
 		FamilyName:         "SquareFont",
+		Subfamily:          "Regular",
+		FullName:           "SquareFont Regular",
 		Ascent:             funit.Int16(Ascent * scale),
 		Descent:            funit.Int16(Descent * scale),
 		LineGap:            funit.Int16((Leading - Ascent + Descent) * scale),

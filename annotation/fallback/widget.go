@@ -443,7 +443,7 @@ func (g *Generator) drawPushButton(w *annotation.Widget) (*form.Form, error) {
 	if w.Style != nil && w.Style.Caption != "" {
 		size := captionSize(height)
 		b.TextBegin()
-		b.TextSetFont(g.ContentFont, size)
+		b.TextSetFont(g.ContentFont(), size)
 		b.SetFillColor(quireInk)
 		b.TextFirstLine(0, height/2-size*0.33)
 		b.TextShowAligned(w.Style.Caption, width, 0.5)
@@ -494,7 +494,7 @@ func (g *Generator) drawSingleLine(b *builder.Builder, width, height, lw, pad fl
 	b.EndPath()
 
 	b.TextBegin()
-	b.TextSetFont(g.ContentFont, size)
+	b.TextSetFont(g.ContentFont(), size)
 	b.SetFillColor(col)
 	b.TextFirstLine(left, height/2-size*0.33)
 	b.TextShowAligned(text, contentWidth, quadFraction(fld.Align))
@@ -508,7 +508,7 @@ func (g *Generator) drawMultiline(b *builder.Builder, width, height, lw, pad flo
 	if fld.Value == "" {
 		return
 	}
-	F := g.ContentFont
+	F := g.ContentFont()
 	size, col := parseDA(fld.DefaultAppearance)
 	if size == 0 {
 		size = 11
@@ -585,7 +585,7 @@ func (g *Generator) drawComb(b *builder.Builder, width, height, lw float64, fld 
 	}
 	baseline := pdf.Round(height/2-size*0.33, 2)
 	b.TextBegin()
-	b.TextSetFont(g.ContentFont, size)
+	b.TextSetFont(g.ContentFont(), size)
 	b.SetFillColor(col)
 	prev := 0.0
 	for i := range k {
@@ -652,7 +652,7 @@ func (g *Generator) drawCombo(b *builder.Builder, width, height, lw, pad float64
 		}
 		left := lw + pad
 		b.TextBegin()
-		b.TextSetFont(g.ContentFont, size)
+		b.TextSetFont(g.ContentFont(), size)
 		b.SetFillColor(col)
 		b.TextFirstLine(left, height/2-size*0.33)
 		b.TextShowAligned(fld.Value, divX-left-pad, quadFraction(fld.Align))
@@ -667,7 +667,7 @@ func (g *Generator) drawListBox(b *builder.Builder, width, height, lw, pad float
 	if size == 0 {
 		size = 11
 	}
-	rowH := pdf.Round(g.ContentFont.GetGeometry().Leading*size, 2)
+	rowH := pdf.Round(g.ContentFont().GetGeometry().Leading*size, 2)
 	if rowH <= 0 {
 		rowH = size * 1.3
 	}
@@ -699,7 +699,7 @@ func (g *Generator) drawListBox(b *builder.Builder, width, height, lw, pad float
 			b.Fill()
 		}
 		b.TextBegin()
-		b.TextSetFont(g.ContentFont, size)
+		b.TextSetFont(g.ContentFont(), size)
 		b.SetFillColor(col)
 		b.TextFirstLine(left, rowBottom+(rowH-size)/2+size*0.2)
 		b.TextShow(fld.Options[i])

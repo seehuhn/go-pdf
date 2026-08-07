@@ -62,9 +62,9 @@ func TestEmbedSimple(t *testing.T) {
 		t.Fatalf("wrong font dictionary type: %T", dictObj)
 	}
 
-	if dict.PostScriptName != fontData.PostScriptName() {
+	if dict.PostScriptName != fontData.FontName {
 		t.Errorf("wrong PostScript name: expected %v, got %v",
-			fontData.PostScriptName(), dict.PostScriptName)
+			fontData.FontName, dict.PostScriptName)
 	}
 	if len(dict.SubsetTag) != 6 {
 		t.Errorf("wrong subset tag: %q", dict.SubsetTag)

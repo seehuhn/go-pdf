@@ -57,3 +57,26 @@ func TestDefaultWidth(t *testing.T) {
 		})
 	}
 }
+
+// The font name decides which glyph list a glyph name is looked up in:
+// ZapfDingbats names the pointing hand "a12", and that name means nothing in
+// any other font.  A font program taken out of a PDF file names the subset it
+// is, so the tag must not reach the decision.
+func TestNewSimpleIgnoresSubsetTag(t *testing.T) {
+	const pointingHand = "\u261e"
+
+	for _, name := range []string{"ZapfDingbats", "AAAAAA+ZapfDingbats"} {
+		enc := NewSimple(0, name, &pdfenc.Standard)
+
+		// The text is what the glyph name already implies, so no ToUnicode
+		// entry is needed: that is only true if the dingbats glyph list was
+		// used for both the code choice and the mapping.
+		if _, err := enc.Encode(1, "a12", pointingHand, 100); err != nil {
+			t.Fatal(err)
+		}
+		if tu := enc.ToUnicode(); tu != nil {
+			t.Errorf("%s: %q needed a ToUnicode entry, so the glyph name did not imply it",
+				name, pointingHand)
+		}
+	}
+}

@@ -38,7 +38,7 @@ func Type3() (font.Layouter, error) {
 		Glyphs: []*type3.Glyph{
 			{}, // .notdef
 		},
-		PostScriptName:     info.PostScriptName(),
+		PostScriptName:     info.FontName,
 		FontMatrix:         info.FontMatrix,
 		FontFamily:         info.FamilyName,
 		FontStretch:        info.Width,

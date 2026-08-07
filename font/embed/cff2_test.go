@@ -220,7 +220,7 @@ func TestEmbedCFF2AdobeVFPrototype(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPS := inst.PostScriptName()
+	wantPS := inst.FontName
 	if d.PostScriptName != wantPS {
 		t.Errorf("PostScriptName: got %q, want %q", d.PostScriptName, wantPS)
 	}

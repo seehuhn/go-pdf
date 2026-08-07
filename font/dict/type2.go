@@ -33,6 +33,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/mapping"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // CIDFontType2 holds the information from a Type 2 CIDFont dictionary.
@@ -99,16 +100,8 @@ func (d *CIDFontType2) validate() error {
 		return errors.New("missing font descriptor")
 	}
 
-	if d.PostScriptName == "" {
-		return errors.New("missing PostScript name")
-	}
-	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
-		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
-	}
-	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
-	if d.Descriptor.FontName != baseFont {
-		return fmt.Errorf("font name mismatch: %s != %s",
-			baseFont, d.Descriptor.FontName)
+	if err := validateFontName(d.Descriptor, d.PostScriptName, d.SubsetTag); err != nil {
+		return err
 	}
 
 	if d.SubsetTag != "" && d.FontFile == nil {
@@ -117,6 +110,9 @@ func (d *CIDFontType2) validate() error {
 
 	if d.FontFile == nil && d.CIDToGID != nil {
 		return errors.New("CIDToGIDMap not allowed for external font")
+	}
+	if len(d.CIDToGID) > limits.MaxCIDToGIDEntries {
+		return fmt.Errorf("CIDToGIDMap has %d entries", len(d.CIDToGID))
 	}
 
 	if d.Descriptor.MissingWidth != 0 {

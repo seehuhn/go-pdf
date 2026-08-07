@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/fontname"
 )
 
 // SimpleCFF represents a simple OpenType font with CFF outlines.
@@ -57,6 +58,13 @@ type SimpleCFF struct {
 }
 
 var _ font.Layouter = (*SimpleCFF)(nil)
+
+// PostScriptName returns the name by which the PDF file refers to this font.
+// A font program need not name itself, so the name may be one derived here
+// rather than one the font gave.
+func (f *SimpleCFF) PostScriptName() string {
+	return fontname.ForSFNT(f.Font)
+}
 
 // ResourceName returns the preferred resource-dictionary key for this font.
 // See [font.Instance.ResourceName].
@@ -101,7 +109,7 @@ func newSimpleCFF(info *sfnt.Font, opt *OptionsSimple) (*SimpleCFF, error) {
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
 	f.Simple = simpleenc.NewSimple(
 		notdefWidth,
-		info.PostScriptName(),
+		f.PostScriptName(),
 		&pdfenc.WinAnsi,
 	)
 
@@ -112,7 +120,7 @@ func newSimpleCFF(info *sfnt.Font, opt *OptionsSimple) (*SimpleCFF, error) {
 // extract the the glyph corresponding to a character identifier.
 func (f *SimpleCFF) FontInfo() any {
 	return &dict.FontInfoSimple{
-		PostScriptName: f.Font.PostScriptName(),
+		PostScriptName: f.PostScriptName(),
 		FontFile:       &glyphdata.Stream{},
 		Encoding:       f.Simple.Encoding(),
 		IsSymbolic:     f.isSymbolic(),
@@ -202,7 +210,7 @@ func (f *SimpleCFF) isSymbolic() bool {
 // makeDict creates the PDF font dictionary for this font.
 func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	if err := f.Simple.Error(); err != nil {
-		return nil, pdf.Errorf("font %q: %w", f.Font.PostScriptName(), err)
+		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
 	// get the CFF font data
@@ -211,18 +219,22 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
-	fontInfo := cffFont.FontInfo
 	outlines := cffFont.Outlines
+	srcTag, postScriptName := subset.Split(f.PostScriptName())
 
 	// subset the font, if needed
 	glyphs := f.Simple.Glyphs()
-	subsetTag := subset.Tag(glyphs, outlines.NumGlyphs())
+	subsetTag := subset.Retag(subset.Tag(glyphs, outlines.NumGlyphs()), srcTag)
+
+	// TagFontInfo copies, so the font information can be modified below without
+	// reaching the font this subset was made from
+	fontInfo := subset.TagFontInfo(cffFont.FontInfo, subsetTag, postScriptName)
 
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
 		subsetOutlines = outlines.Subset(glyphs)
 	} else {
-		subsetOutlines = clone(outlines)
+		subsetOutlines = outlines.Clone()
 	}
 
 	// convert to a simple font, if needed:
@@ -232,19 +244,11 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	subsetOutlines.ROS = nil
 	subsetOutlines.GIDToCID = nil
 	if len(subsetOutlines.FontMatrices) > 0 && subsetOutlines.FontMatrices[0] != matrix.Identity {
-		fontInfo = clone(fontInfo)
 		fontInfo.FontMatrix = subsetOutlines.FontMatrices[0].Mul(fontInfo.FontMatrix)
 	}
 	subsetOutlines.FontMatrices = nil
 	for gid, origGID := range glyphs { // fill in the glyph names
-		g := subsetOutlines.Glyphs[gid]
-		glyphName := f.Simple.GlyphName(origGID)
-		if g.Name == glyphName {
-			continue
-		}
-		g = clone(g)
-		g.Name = glyphName
-		subsetOutlines.Glyphs[gid] = g
+		subsetOutlines.SetGlyphName(glyph.ID(gid), f.Simple.GlyphName(origGID))
 	}
 	// The real encoding is set in the PDF font dictionary, so that readers can
 	// know the meaning of codes without having to parse the font file. Here we
@@ -276,7 +280,7 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	qvStem := subsetCFF.FontMatrix[3] * 1000
 
 	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, f.Font.PostScriptName()),
+		FontName:     subset.Join(subsetTag, postScriptName),
 		FontFamily:   subsetCFF.FamilyName,
 		FontStretch:  f.Font.Width,
 		FontWeight:   f.Font.Weight,
@@ -300,20 +304,15 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	}
 
 	fontDict := &dict.Type1{
-		PostScriptName: f.Font.PostScriptName(),
+		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Name:           f.Name,
 		Descriptor:     fd,
 		Encoding:       f.Simple.Encoding(),
 		Width:          widths,
-		ToUnicode:      f.Simple.ToUnicode(f.Font.PostScriptName()),
+		ToUnicode:      f.Simple.ToUnicode(),
 		FontFile:       cffglyphs.ToStream(subsetCFF, glyphdata.CFFSimple),
 	}
 
 	return fontDict, nil
-}
-
-func clone[T any](obj *T) *T {
-	new := *obj
-	return &new
 }

@@ -106,8 +106,39 @@ func TestContentFontIsTheOneReported(t *testing.T) {
 	if len(used) != 1 {
 		t.Fatalf("the appearance selects %d fonts, want 1", len(used))
 	}
-	if used[0] != gen.ContentFont {
+	if used[0] != gen.ContentFont() {
 		t.Error("the appearance used a font other than the reported ContentFont")
+	}
+}
+
+// The default content font is made only once an appearance needs it.  Most
+// documents have no annotation which draws text, and reading a font program
+// costs more than building the appearance streams that use it.
+func TestContentFontMadeOnFirstUse(t *testing.T) {
+	gen, err := NewStyle().New(pdf.V2_0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gen.contentFont != nil {
+		t.Error("the font was made before any appearance needed it")
+	}
+
+	// an annotation which draws no text leaves the font unmade
+	square := &annotation.Square{
+		Common: annotation.Common{Rect: pdf.Rectangle{URx: 20, URy: 20}},
+	}
+	if err := gen.AddAppearance(square); err != nil {
+		t.Fatal(err)
+	}
+	if gen.contentFont != nil {
+		t.Error("an annotation with no text made the font")
+	}
+
+	if err := gen.AddAppearance(textFieldWidget(t, "hello")); err != nil {
+		t.Fatal(err)
+	}
+	if gen.contentFont == nil {
+		t.Error("an annotation with text did not make the font")
 	}
 }
 
@@ -144,7 +175,7 @@ func TestContentFontMadeOncePerGenerator(t *testing.T) {
 	if calls != 2 {
 		t.Errorf("two generators asked for %d fonts, want 2", calls)
 	}
-	if first.ContentFont == second.ContentFont {
+	if first.ContentFont() == second.ContentFont() {
 		t.Error("two generators share one font instance")
 	}
 }

@@ -148,7 +148,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 
 	// render text content if present
 	if a.Contents != "" {
-		F := g.ContentFont
+		F := g.ContentFont()
 
 		clipLeft := inner.LLx + lw + freeTextPadding
 		clipBottom := inner.LLy + lw + freeTextPadding
@@ -217,7 +217,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	}
 
 	// set DA to match the font/size/color used in the appearance stream
-	fontName := b.FontName(g.ContentFont)
+	fontName := b.FontName(g.ContentFont())
 	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf %g %g %g rg",
 		fontName, freeTextFontSize,
 		quireInk[0], quireInk[1], quireInk[2])

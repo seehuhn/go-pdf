@@ -82,6 +82,8 @@ func Glyf() *sfnt.Font {
 
 	f := &sfnt.Font{
 		FamilyName:         "QuireMiniVar",
+		Subfamily:          "Regular",
+		FullName:           "QuireMiniVar Regular",
 		Width:              os2.WidthNormal,
 		Weight:             os2.WeightNormal,
 		IsRegular:          true,

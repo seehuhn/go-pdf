@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/subset"
 )
 
 // Simple manages the encoding and metadata of glyphs for simple PDF fonts.
@@ -56,8 +57,11 @@ type Simple struct {
 	glyphName     map[glyph.ID]string
 	glyphNameUsed map[string]bool
 
+	// fontName is the PostScript name of the font, without any subset tag.
+	// It decides which glyph list a glyph name is looked up in.
 	fontName string
-	baseEnc  *pdfenc.Encoding
+
+	baseEnc *pdfenc.Encoding
 
 	err error
 }
@@ -77,14 +81,20 @@ type codeInfo struct {
 //
 // The notdefWidth parameter is the default width of the ".notdef" glyph,
 // in PDF glyph space units.
+//
+// fontName is the name the font gives itself.  A font program taken out of a
+// PDF file names the subset it is rather than the font, so any subset tag is
+// dropped: the name is used to decide which glyph list a glyph name belongs
+// to, and that is a property of the font.
 func NewSimple(notdefWidth float64, fontName string, base *pdfenc.Encoding) *Simple {
+	_, psName := subset.Split(fontName)
 	gd := &Simple{
 		code:          make(map[gidText]byte),
 		info:          make(map[byte]*codeInfo),
 		notdef:        &codeInfo{GID: 0, Text: "", Width: notdefWidth},
 		glyphName:     make(map[glyph.ID]string),
 		glyphNameUsed: make(map[string]bool),
-		fontName:      fontName,
+		fontName:      psName,
 		baseEnc:       base,
 	}
 	gd.glyphName[0] = ".notdef"

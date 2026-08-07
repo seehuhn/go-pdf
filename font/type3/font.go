@@ -503,7 +503,7 @@ func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 		// FontBBox:   &pdf.Rectangle{},
 		FontMatrix: f.Font.FontMatrix,
 		Resources:  f.Font.Resources,
-		ToUnicode:  f.Simple.ToUnicode(f.Font.PostScriptName),
+		ToUnicode:  f.Simple.ToUnicode(),
 	}
 	for c, info := range f.Simple.MappedCodes() {
 		d.Width[c] = info.Width

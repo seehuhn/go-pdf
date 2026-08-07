@@ -21,11 +21,15 @@ import (
 	"testing"
 
 	"seehuhn.de/go/sfnt"
+	sfntcmap "seehuhn.de/go/sfnt/cmap"
+	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/opentype"
+	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -71,9 +75,9 @@ func TestEmbedSimple(t *testing.T) {
 				t.Fatalf("wrong font dictionary type: %T", dictObj)
 			}
 
-			if dict.PostScriptName != fontData.PostScriptName() {
+			if dict.PostScriptName != fontData.FontName {
 				t.Errorf("wrong PostScript name: expected %v, got %v",
-					fontData.PostScriptName(), dict.PostScriptName)
+					fontData.FontName, dict.PostScriptName)
 			}
 			if len(dict.SubsetTag) != 6 {
 				t.Errorf("wrong subset tag: %q", dict.SubsetTag)
@@ -163,5 +167,68 @@ func checkDescriptorMetrics(t *testing.T, fd *font.Descriptor, src *sfnt.Font) {
 		if tc.got != tc.want {
 			t.Errorf("%s: got %v, want %v", tc.name, tc.got, tc.want)
 		}
+	}
+}
+
+// The dictionary names the font by the PostScript name of the OpenType
+// wrapper, while the program embedded for it is the CFF table inside, which
+// carries a name of its own.  The two must agree, whether or not any glyphs
+// were dropped.
+func TestEmbeddedCFFTakesTheDictionaryName(t *testing.T) {
+	// small enough that the document can use every glyph, so that nothing is
+	// subsetted away and the name carries no tag
+	small, err := makefont.OpenType().Subset([]glyph.ID{0, 1, 2, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	subtable := sfntcmap.Format4{'A': 1, 'B': 2, 'C': 3}
+	small.CMapTable = sfntcmap.Table{
+		{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
+	}
+
+	// the wrapper is renamed, the CFF table inside it keeps the old name
+	small.FontName = "Test-Regular"
+
+	F, err := opentype.NewSimple(small, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+	ref, err := rm.Embed(F)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for gid := range glyph.ID(small.NumGlyphs()) {
+		if _, ok := F.Encode(gid, ""); !ok {
+			t.Fatalf("no code was allocated for glyph %d", gid)
+		}
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	fontDict, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := fontDict.(*dict.Type1)
+	if !ok {
+		t.Fatalf("unexpected font dictionary type %T", fontDict)
+	}
+	if d.SubsetTag != "" {
+		t.Fatalf("the font was subsetted to %q, so the untagged case is untested",
+			d.SubsetTag)
+	}
+
+	cffFont, err := cffglyphs.FromStream(d.FontFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := subset.Join(d.SubsetTag, d.PostScriptName)
+	if got := cffFont.FontInfo.FontName; got != want {
+		t.Errorf("the embedded program calls itself %q, want %q", got, want)
 	}
 }

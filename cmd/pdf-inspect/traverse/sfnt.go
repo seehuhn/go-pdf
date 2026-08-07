@@ -50,7 +50,7 @@ func (c *sfntCtx) Show() error {
 		return nil
 	}
 	fmt.Printf("Family Name: %s\n", c.font.FamilyName)
-	if name := c.font.PostScriptName(); name != "" {
+	if name := c.font.FontName; name != "" {
 		fmt.Printf("PostScript Name: %s\n", name)
 	}
 	fmt.Printf("Number of Glyphs: %d\n", c.font.NumGlyphs())

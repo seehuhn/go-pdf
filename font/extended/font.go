@@ -18,11 +18,7 @@
 package extended
 
 import (
-	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/postscript/afm"
-	pstype1 "seehuhn.de/go/postscript/type1"
-
-	"seehuhn.de/go/pdf/font/loader"
+	"seehuhn.de/go/pdf/font/internal/bundled"
 	"seehuhn.de/go/pdf/font/type1"
 )
 
@@ -49,90 +45,55 @@ const (
 
 // New returns a new font instance for the given extended font.
 //
+// The font data bundled with this package is immutable, so each font is read
+// and parsed at most once per process and the instances handed out are clones
+// sharing that data; see [type1.Instance.Clone].  An instance allocates
+// character codes of its own and so belongs to a single document, but the data
+// behind it does not: a caller must leave the shared data alone, since a change
+// to it reaches every other instance of the same font.
+//
 // An error is returned if the font data bundled with this package cannot be
 // loaded; this indicates a broken installation and should not happen for any
 // of the predefined [Font] constants.  Callers that treat this as an
 // invariant may wrap the call in [font.Must].
 func (f Font) New() (*type1.Instance, error) {
-	name := fontName[f]
+	return shared.Get(f)
+}
 
-	fontData, err := builtin.Open(name, loader.FontTypeType1)
+// shared holds the instance each extended font is cloned from, read on first
+// use.
+var shared = bundled.New(allExtendedFonts, Font.read)
+
+// read builds a font instance from the bundled font data.
+func (f Font) read() (*type1.Instance, error) {
+	psFont, metrics, err := bundled.Read(fontName[f])
 	if err != nil {
 		return nil, err
 	}
-	psFont, err := pstype1.Read(fontData)
+
+	bundled.FixUpMetrics(metrics)
+
+	res, err := type1.New(psFont, metrics)
 	if err != nil {
 		return nil, err
 	}
-	fontData.Close()
 
-	afmData, err := builtin.Open(name, loader.FontTypeAFM)
-	if err != nil {
-		return nil, err
-	}
-	metrics, err := afm.Read(afmData)
-	if err != nil {
-		return nil, err
-	}
-	afmData.Close()
+	res.IsSerif = isSerif[f]
 
-	// Some of the fonts wrongly have a non-zero bounding box for some of the
-	// whitespace glyphs.  We fix this here.
-	//
-	// Revisit this, once
-	// https://github.com/ArtifexSoftware/urw-base35-fonts/issues/48
-	// is resolved.
-	for _, name := range []string{"space", "uni00A0", "uni2002"} {
-		if g, ok := metrics.Glyphs[name]; ok {
-			g.BBox = rect.Rect{}
-		}
-	}
+	return res, nil
+}
 
-	// Some metrics missing from our .afm files.  We infer values for
-	// these from other metrics.
-	for _, name := range []string{"d", "bracketleft", "bar"} {
-		if glyph, ok := metrics.Glyphs[name]; ok {
-			y := glyph.BBox.URy
-			if y > metrics.Ascent {
-				metrics.Ascent = y
-			}
-		}
-	}
-	for _, name := range []string{"p", "bracketleft", "bar"} {
-		if glyph, ok := metrics.Glyphs[name]; ok {
-			y := glyph.BBox.LLy
-			if y < metrics.Descent {
-				metrics.Descent = y
-			}
-		}
-	}
-
-	// We add the standard ligatures here, just in case.
-	if !metrics.IsFixedPitch {
-		type lig struct {
-			left, right, result string
-		}
-		var all = []lig{
-			{"f", "f", "ff"},
-			{"f", "i", "fi"},
-			{"f", "l", "fl"},
-			{"ff", "i", "ffi"},
-			{"ff", "l", "ffl"},
-		}
-		for _, l := range all {
-			_, leftOk := metrics.Glyphs[l.left]
-			_, rightOk := metrics.Glyphs[l.right]
-			_, resOk := metrics.Glyphs[l.result]
-			if leftOk && rightOk && resOk {
-				if len(metrics.Glyphs[l.left].Ligatures) == 0 {
-					metrics.Glyphs[l.left].Ligatures = make(map[string]string)
-				}
-				metrics.Glyphs[l.left].Ligatures[l.right] = l.result
-			}
-		}
-	}
-
-	return type1.New(psFont, metrics)
+// isSerif records the fonts with serifs, for the descriptor flag of the same
+// name.  The Nimbus Mono PS designs follow Courier in having slab serifs.
+var isSerif = map[Font]bool{
+	NimbusMonoPSBold:       true,
+	NimbusMonoPSBoldItalic: true,
+	NimbusMonoPSItalic:     true,
+	NimbusMonoPSRegular:    true,
+	NimbusRomanBold:        true,
+	NimbusRomanBoldItalic:  true,
+	NimbusRomanItalic:      true,
+	NimbusRomanRegular:     true,
 }
 
 var fontName = map[Font]string{
@@ -171,5 +132,3 @@ var allExtendedFonts = []Font{
 	NimbusSansRegular,
 	StandardSymbolsPS,
 }
-
-var builtin = loader.NewFontLoader()

@@ -46,6 +46,7 @@ import (
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/fontname"
 )
 
 type OptionsComposite struct {
@@ -92,6 +93,13 @@ type Composite struct {
 }
 
 var _ font.Layouter = (*Composite)(nil)
+
+// PostScriptName returns the name by which the PDF file refers to this font.
+// A font program need not name itself, so the name may be one derived here
+// rather than one the font gave.
+func (f *Composite) PostScriptName() string {
+	return fontname.ForCFF(f.Font)
+}
 
 // ResourceName returns the empty string: composite CFF fonts produce a
 // CIDFontType0 dictionary, which has no /Name entry in the PDF spec.
@@ -276,9 +284,8 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 
 // makeDict creates the PDF font dictionary for this font.
 func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
-	fontInfo := f.Font.FontInfo
 	origOutlines := f.Font.Outlines
-	postScriptName := fontInfo.FontName
+	srcTag, postScriptName := subset.Split(f.PostScriptName())
 
 	// Subset the font, if needed.
 	// To minimise file size, we arrange the glyphs in order of increasing CID.
@@ -293,13 +300,17 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 	for i, cidVal := range cidList {
 		glyphs[i] = f.gidToCID.GID(cidVal)
 	}
-	subsetTag := subset.Tag(glyphs, origOutlines.NumGlyphs())
+	subsetTag := subset.Retag(subset.Tag(glyphs, origOutlines.NumGlyphs()), srcTag)
+
+	// TagFontInfo copies, so the font information can be modified below without
+	// reaching the font this subset was made from
+	fontInfo := subset.TagFontInfo(f.Font.FontInfo, subsetTag, postScriptName)
 
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
 		subsetOutlines = origOutlines.Subset(glyphs)
 	} else {
-		subsetOutlines = clone(origOutlines)
+		subsetOutlines = origOutlines.Clone()
 	}
 
 	ros := f.gidToCID.ROS()
@@ -316,7 +327,6 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 
 	if canUseSimple { // convert to simple font
 		if len(subsetOutlines.FontMatrices) > 0 && subsetOutlines.FontMatrices[0] != matrix.Identity {
-			fontInfo = clone(fontInfo)
 			fontInfo.FontMatrix = subsetOutlines.FontMatrices[0].Mul(fontInfo.FontMatrix)
 		}
 
@@ -432,9 +442,4 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 	}
 
 	return fontDict, nil
-}
-
-func clone[T any](obj *T) *T {
-	new := *obj
-	return &new
 }

@@ -58,12 +58,12 @@ type Style struct {
 	// annotations, for example for FreeText annotations.  A nil value selects
 	// the default, Helvetica.
 	//
-	// It is called once for each [Generator] and must return a new instance
-	// every time, since an instance belongs to the one document its generator
-	// serves, as described for [Generator].  A caller which instead wants to
-	// name the generator's font elsewhere in its document, for example in a
-	// default appearance string, can read [Generator.ContentFont] rather than
-	// supplying an instance here.
+	// It is called once for each [Generator], when the generator is made, and
+	// must return a new instance every time, since an instance belongs to the
+	// one document its generator serves, as described for [Generator].  A
+	// caller which instead wants to name the generator's font elsewhere in its
+	// document, for example in a default appearance string, can call
+	// [Generator.ContentFont] rather than supplying an instance here.
 	NewContentFont func() (font.Layouter, error)
 }
 
@@ -79,20 +79,21 @@ func NewStyle() *Style {
 // A Generator holds the font instances used in the streams it builds, so that
 // the document needs only one copy of each.  These instances allocate character
 // codes as text is laid out, which ties a Generator to one document and makes
-// it unsafe for concurrent use.  A caller writing the document out must build
-// every appearance stream before the fonts are written, since the codes are not
-// settled until then.
+// it unsafe for concurrent use.  A generator which needs a font it has not made
+// yet makes it there and then, so even an appearance which allocates no codes
+// must not be built alongside another.  A caller writing the document out must
+// build every appearance stream before the fonts are written, since the codes
+// are not settled until then.
 //
 // A caller which only draws the appearances, rather than writing them to a
 // file, is under the same one-document restriction: the streams share the
 // generator's fonts, so they cannot be mixed with those of another generator.
 type Generator struct {
-	// ContentFont is the font used to render the text content of annotations,
-	// for example for FreeText annotations.  It comes from the Style's
-	// NewContentFont.  A caller which needs to name the same font elsewhere in
-	// its document, for example in a default appearance string, can read it
-	// here rather than making a second instance.
-	ContentFont font.Layouter
+	// contentFont is the font used to render the text content of annotations.
+	// It comes from the Style's NewContentFont, or, where the style leaves that
+	// nil, from the default made on first use.  Use [Generator.ContentFont] to
+	// read it.
+	contentFont font.Layouter
 
 	// version is the PDF version targeted by the appearance streams.  It is
 	// passed through to [builder.New] so that operators the file cannot use
@@ -115,6 +116,21 @@ type Generator struct {
 	// or nil for a file which cannot express them.  One dictionary is shared by
 	// every appearance stream, so the file holds a single copy.
 	resetGS *extgstate.ExtGState
+}
+
+// ContentFont returns the font used to render the text content of annotations,
+// for example for FreeText annotations.  A caller which needs to name the same
+// font elsewhere in its document, for example in a default appearance string,
+// reads it here rather than making a second instance.
+//
+// Where the [Style] supplied no font of its own, the default is made on first
+// use: most documents have no annotation which needs it, and reading a font
+// program costs more than building the appearance streams that use it.
+func (g *Generator) ContentFont() font.Layouter {
+	if g.contentFont == nil {
+		g.contentFont = font.Must(standard.Helvetica.New())
+	}
+	return g.contentFont
 }
 
 // icons returns the font used for the symbols inside text annotation icons.
@@ -166,22 +182,17 @@ var _ annotation.AppearanceGenerator = (*Generator)(nil)
 // streams are built for that version, so that operators the file cannot use
 // are rejected at build time.
 //
-// An error is returned if the Style's content font cannot be made.
+// An error is returned if the Style's NewContentFont cannot make its font.  The
+// default content font is made on first use instead and cannot fail, since it
+// is one of the standard fonts bundled with this library.
 func (s *Style) New(version pdf.Version) (*Generator, error) {
-	var contentFont font.Layouter
-	var err error
-	if s.NewContentFont == nil {
-		contentFont, err = standard.Helvetica.New()
-	} else {
-		contentFont, err = s.NewContentFont()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	g := &Generator{
-		ContentFont: contentFont,
-		version:     version,
+	g := &Generator{version: version}
+	if s.NewContentFont != nil {
+		contentFont, err := s.NewContentFont()
+		if err != nil {
+			return nil, err
+		}
+		g.contentFont = contentFont
 	}
 	if version >= pdf.V1_4 {
 		g.resetGS = &extgstate.ExtGState{

@@ -22,11 +22,17 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 )
 
-func (t *Simple) ToUnicode(fontName string) *cmap.ToUnicodeFile {
+// ToUnicode returns the ToUnicode CMap for the codes allocated so far, or nil
+// if every code means what its glyph name already implies.
+//
+// The glyph names are read against the font name given to [NewSimple], which is
+// the same name [Simple.Encode] used: a code left out here because its text is
+// implied must be one the implication holds for.
+func (t *Simple) ToUnicode() *cmap.ToUnicodeFile {
 	m := make(map[charcode.Code]string)
 	for k, c := range t.code {
 		glyphName := t.glyphName[k.gid]
-		implied := names.ToUnicode(glyphName, fontName)
+		implied := names.ToUnicode(glyphName, t.fontName)
 		if k.text != implied {
 			m[charcode.Code(c)] = k.text
 		}

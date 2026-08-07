@@ -203,7 +203,7 @@ func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	totalPartHeight := v1 + v2 + v3 + v4
 
 	var parts []string
-	parts = append(parts, info.FullName())
+	parts = append(parts, info.FullName)
 	parts = append(parts, fmt.Sprintf("%d glyphs", info.NumGlyphs()))
 	if info.IsGlyf() {
 		parts = append(parts, "glyf outlines")

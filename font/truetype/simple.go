@@ -41,6 +41,7 @@ import (
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/fontname"
 )
 
 type OptionsSimple struct {
@@ -73,6 +74,13 @@ type Simple struct {
 }
 
 var _ font.Layouter = (*Simple)(nil)
+
+// PostScriptName returns the name by which the PDF file refers to this font.
+// A font program need not name itself, so the name may be one derived here
+// rather than one the font gave.
+func (f *Simple) PostScriptName() string {
+	return fontname.ForSFNT(f.Font)
+}
 
 // ResourceName returns the preferred resource-dictionary key for this font.
 // See [font.Instance.ResourceName].
@@ -121,7 +129,7 @@ func NewSimple(info *sfnt.Font, opt *OptionsSimple) (*Simple, error) {
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
 	f.Simple = simpleenc.NewSimple(
 		notdefWidth,
-		info.PostScriptName(),
+		f.PostScriptName(),
 		&pdfenc.WinAnsi,
 	)
 
@@ -250,18 +258,15 @@ func (f *Simple) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 func (f *Simple) makeDict() (*dict.TrueType, error) {
 	if err := f.Simple.Error(); err != nil {
-		return nil, pdf.Errorf("font %q: %w", f.Font.PostScriptName(), err)
+		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
 	// subset the font
-	origFont := f.Font.Clone()
-	origFont.CMapTable = nil
-	origFont.Gdef = nil
-	origFont.Gsub = nil
-	origFont.Gpos = nil
+	origFont := sfntglyphs.StripForEmbedding(f.Font)
 
 	glyphs := f.Simple.Glyphs()
-	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
+	srcTag, postScriptName := subset.Split(fontname.ForSFNT(origFont))
+	subsetTag := subset.Retag(subset.Tag(glyphs, origFont.NumGlyphs()), srcTag)
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
 		sf, err := origFont.Subset(glyphs)
@@ -308,7 +313,7 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 		var needsFormat12 bool
 		for _, origGid := range glyphs {
 			glyphName := f.Simple.GlyphName(origGid)
-			rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
+			rr := []rune(names.ToUnicode(glyphName, postScriptName))
 			if len(rr) != 1 {
 				continue
 			}
@@ -322,7 +327,7 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 			subtable := sfntcmap.Format4{}
 			for gid, origGid := range glyphs {
 				glyphName := f.Simple.GlyphName(origGid)
-				rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
+				rr := []rune(names.ToUnicode(glyphName, postScriptName))
 				if len(rr) != 1 {
 					continue
 				}
@@ -335,7 +340,7 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 			subtable := sfntcmap.Format12{}
 			for gid, origGid := range glyphs {
 				glyphName := f.Simple.GlyphName(origGid)
-				rr := []rune(names.ToUnicode(glyphName, subsetFont.PostScriptName()))
+				rr := []rune(names.ToUnicode(glyphName, postScriptName))
 				if len(rr) != 1 {
 					continue
 				}
@@ -355,8 +360,6 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 	xHeight := math.Round(float64(subsetFont.XHeight) * qv)
 
 	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
-
-	postScriptName := subsetFont.PostScriptName()
 
 	fd := &font.Descriptor{
 		FontName:     subset.Join(subsetTag, postScriptName),
@@ -378,6 +381,10 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 		MissingWidth: f.Simple.DefaultWidth(),
 	}
 
+	// the embedded program names itself the same as BaseFont and the
+	// descriptor's FontName, which for a subset carry the tag
+	subsetFont.FontName = subset.Join(subsetTag, postScriptName)
+
 	dict := &dict.TrueType{
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
@@ -385,7 +392,7 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 		Descriptor:     fd,
 		Encoding:       dictEnc,
 		FontFile:       sfntglyphs.ToStream(subsetFont, glyphdata.TrueType),
-		ToUnicode:      f.Simple.ToUnicode(postScriptName),
+		ToUnicode:      f.Simple.ToUnicode(),
 	}
 	for c, info := range f.Simple.MappedCodes() {
 		dict.Width[c] = info.Width

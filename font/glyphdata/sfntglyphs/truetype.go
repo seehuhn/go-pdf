@@ -26,6 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/font/subset"
 )
 
 // NewTrueTypeSelector returns a function that maps pseudo-CIDs to glyph IDs
@@ -151,6 +152,10 @@ func methodD(ll []ttLookup, font *sfnt.Font) []ttLookup {
 		return ll
 	}
 
+	// the tag names the subset, not the font, and the glyph list a name is
+	// looked up in is chosen by the name of the font
+	_, psName := subset.Split(font.FontName)
+
 	return append(ll, func(code byte, name string) (glyph.ID, bool) {
 		switch name {
 		case ".notdef":
@@ -159,7 +164,7 @@ func methodD(ll []ttLookup, font *sfnt.Font) []ttLookup {
 			return 0, false
 		}
 
-		s := names.ToUnicode(name, font.PostScriptName())
+		s := names.ToUnicode(name, psName)
 		rr := []rune(s)
 		if len(rr) != 1 {
 			return 0, false

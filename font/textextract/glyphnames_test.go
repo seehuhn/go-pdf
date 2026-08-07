@@ -112,7 +112,7 @@ func TestGlyphNameMappingSimpleTrueTypeBuiltin(t *testing.T) {
 
 	f := &mockFontInfoSimple{
 		fontInfo: &dict.FontInfoSimple{
-			PostScriptName: fontInfo.PostScriptName(),
+			PostScriptName: fontInfo.FontName,
 			FontFile:       stream,
 			Encoding:       encoding.Builtin,
 			IsSymbolic:     true,

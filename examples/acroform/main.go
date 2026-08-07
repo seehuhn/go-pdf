@@ -88,7 +88,7 @@ func writeForm(filename string) error {
 	// form names that instance in its default resources: the file then holds a
 	// single Helvetica, and the font a field's DA string names is the one which
 	// actually draws the field.
-	body := appearances.ContentFont
+	body := appearances.ContentFont()
 	bold := font.Must(standard.HelveticaBold.New())
 
 	b := &formBuilder{

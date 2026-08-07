@@ -38,13 +38,14 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/fontname"
 )
 
 // Instance is a Type 1 font instance which can be embedded into a PDF file.
 //
 // Use [New] to create new font instances.
 type Instance struct {
-	// Font is the font data to embed.
+	// Font is the font data to embed.  This must not be nil.
 	*type1.Font
 
 	// Metrics (optional) provides additional information which helps
@@ -134,24 +135,46 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 		nameGid[name] = glyph.ID(i)
 	}
 
+	// The metrics may name glyphs the font program does not have: the two come
+	// from separate files and need not agree, and a caller may have restricted
+	// the glyph set.  Such entries are skipped, since an unknown name would
+	// otherwise resolve to glyph ID 0 and quietly attach the ligature or the
+	// kern to ".notdef".
 	lig := make(map[glyph.Pair]glyph.ID)
 	kern := make(map[glyph.Pair]funit.Int16)
 	if metrics != nil {
 		for left, name := range glyphNames {
 			gi := metrics.Glyphs[name]
+			if gi == nil {
+				continue
+			}
 			for right, repl := range gi.Ligatures {
-				lig[glyph.Pair{Left: glyph.ID(left), Right: nameGid[right]}] = nameGid[repl]
+				rightGid, rightOK := nameGid[right]
+				replGid, replOK := nameGid[repl]
+				if !rightOK || !replOK {
+					continue
+				}
+				lig[glyph.Pair{Left: glyph.ID(left), Right: rightGid}] = replGid
 			}
 		}
 		for _, k := range metrics.Kern {
-			left, right := nameGid[k.Left], nameGid[k.Right]
+			left, leftOK := nameGid[k.Left]
+			right, rightOK := nameGid[k.Right]
+			if !leftOK || !rightOK {
+				continue
+			}
 			kern[glyph.Pair{Left: left, Right: right}] = k.Adjust
 		}
 	}
 
+	// The glyph list a name is looked up in is chosen by the name of the font,
+	// which a program taken out of a PDF file gives with a subset tag in front.
+	// The tag names the subset rather than the font, so it is dropped here.
+	_, psName := subset.Split(psFont.FontName)
+
 	cmap := make(map[rune]glyph.ID)
 	for gid, name := range glyphNames {
-		rr := []rune(names.ToUnicode(name, psFont.FontName))
+		rr := []rune(names.ToUnicode(name, psName))
 		if len(rr) != 1 {
 			continue
 		}
@@ -163,14 +186,6 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 		cmap[r] = glyph.ID(gid)
 	}
 
-	// Initialize encoding state - Type1 fonts are always simple fonts
-	notdefWidth := math.Round(widths[0] * 1000)
-	simple := simpleenc.NewSimple(
-		notdefWidth,
-		psFont.FontName,
-		&pdfenc.WinAnsi,
-	)
-
 	return &Instance{
 		Font:       psFont,
 		Metrics:    metrics,
@@ -179,8 +194,36 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 		lig:        lig,
 		kern:       kern,
 		cmap:       cmap,
-		Simple:     simple,
+		Simple:     newEncoder(fontname.ForType1(psFont), widths[0]),
 	}, nil
+}
+
+// newEncoder returns the encoding state of a fresh instance.  Type 1 fonts are
+// always simple fonts.  fontName is the name the font program gives itself, and
+// notdefWidth is the width of the ".notdef" glyph in text space units.
+func newEncoder(fontName string, notdefWidth float64) *simpleenc.Simple {
+	return simpleenc.NewSimple(
+		math.Round(notdefWidth*1000),
+		fontName,
+		&pdfenc.WinAnsi,
+	)
+}
+
+// Clone returns an instance which draws on the same font data but has an
+// encoding state of its own, for use in a different document.
+//
+// An instance allocates character codes as text is laid out, which is what ties
+// it to a single document.  Everything those codes are allocated from — the
+// font program, the metrics, and the widths, extents and glyph tables derived
+// from them — is read-only and is shared with the clone rather than built
+// again.  A caller which needs the same font in several documents can therefore
+// build it once and clone it for each, provided it treats the shared data as
+// read-only: a change to [Instance.Font] or [Instance.Metrics] reaches every
+// clone.
+func (f *Instance) Clone() *Instance {
+	other := *f
+	other.Simple = newEncoder(f.PostScriptName(), f.Widths[0])
+	return &other
 }
 
 // IsConsistent checks whether the font metrics are compatible with the
@@ -202,12 +245,13 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 	return true
 }
 
-// PostScriptName returns the PostScript name of the font.
+// PostScriptName returns the name by which the PDF file refers to this font.
+// This is the name of the font program, which is what the font dictionary
+// describes, repaired where the program names itself in a way a PostScript name
+// cannot be written.  The metrics are not consulted: they come from a separate
+// file and may name the font differently.
 func (f *Instance) PostScriptName() string {
-	if f.Metrics != nil {
-		return f.Metrics.FontName
-	}
-	return f.Font.FontInfo.FontName
+	return fontname.ForType1(f.Font)
 }
 
 // FontInfo returns information about the font file.
@@ -300,48 +344,53 @@ func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 func (f *Instance) makeFontDict() (*dict.Type1, error) {
 	if err := f.Simple.Error(); err != nil {
-		return nil, pdf.Errorf("font %q: %w", f.Font.FontName, err)
+		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
 	fontData := f.Font
 	metricsData := f.Metrics
 
-	var numGlyphs int
-	var postScriptName string
-	if metricsData != nil {
-		numGlyphs = metricsData.NumGlyphs()
-		postScriptName = metricsData.FontName
-	} else {
-		numGlyphs = fontData.NumGlyphs()
-		postScriptName = fontData.FontName
-	}
+	// The dictionary describes the program it carries, so both the name and the
+	// glyph count come from the font data: the glyph IDs a subset is made of
+	// index the program's glyph list, and it is the program which is renamed to
+	// match the dictionary.
+	numGlyphs := fontData.NumGlyphs()
+	srcTag, postScriptName := subset.Split(f.PostScriptName())
 
-	omitFontData := isStandard(postScriptName, f.Simple)
+	// A program which arrived as a subset was embedded on purpose, so it is
+	// kept even where one of the standard fonts has the same metrics: the tag
+	// says the file carried glyph outlines of its own, which need not look
+	// like the standard font they are metrically compatible with.
+	omitFontData := srcTag == "" && isStandard(postScriptName, f.Simple)
 
 	glyphs := f.Simple.Glyphs()
-	subsetTag := subset.Tag(glyphs, numGlyphs)
-
-	fontSubset := fontData
-	metricsSubset := metricsData
+	subsetTag := subset.Retag(subset.Tag(glyphs, numGlyphs), srcTag)
 	if omitFontData {
 		// only subset the font, if the font is embedded
 		subsetTag = ""
-	} else if subsetTag != "" {
-		if fontData != nil {
-			fontSubset = clone(fontData)
-			fontSubset.Outlines = clone(fontData.Outlines)
-			fontSubset.Glyphs = make(map[string]*type1.Glyph)
-			for _, gid := range glyphs {
-				glyphName := f.GlyphNames[gid]
-				if g, ok := fontData.Glyphs[glyphName]; ok {
-					fontSubset.Glyphs[glyphName] = g
-				}
+	}
+
+	// The program names itself the same as the /BaseFont and /FontName entries,
+	// tag and all, and by the repaired name where the one it arrived with
+	// cannot be written.  Both it and TagFontInfo copy, so the font data this
+	// instance shares with its clones is not renamed along with it.
+	fontSubset := clone(fontData)
+	fontSubset.FontInfo = subset.TagFontInfo(fontData.FontInfo, subsetTag, postScriptName)
+
+	metricsSubset := metricsData
+	if subsetTag != "" {
+		fontSubset.Outlines = clone(fontData.Outlines)
+		fontSubset.Glyphs = make(map[string]*type1.Glyph)
+		for _, gid := range glyphs {
+			glyphName := f.GlyphNames[gid]
+			if g, ok := fontData.Glyphs[glyphName]; ok {
+				fontSubset.Glyphs[glyphName] = g
 			}
-			fontSubset.Encoding = psenc.StandardEncoding[:]
 		}
+		fontSubset.Encoding = psenc.StandardEncoding[:]
 
 		if metricsData != nil {
-			metricsSubset := clone(metricsData)
+			metricsSubset = clone(metricsData)
 			metricsSubset.Glyphs = make(map[string]*afm.GlyphInfo)
 			for _, gid := range glyphs {
 				glyphName := f.GlyphNames[gid]
@@ -354,21 +403,21 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 	}
 
 	fd := &font.Descriptor{
-		FontName:   subset.Join(subsetTag, postScriptName),
-		IsSerif:    f.IsSerif,
-		IsSymbolic: f.Simple.IsSymbolic(),
+		FontName:     subset.Join(subsetTag, postScriptName),
+		FontFamily:   fontSubset.FamilyName,
+		FontWeight:   os2.WeightFromString(fontSubset.Weight),
+		IsFixedPitch: fontSubset.IsFixedPitch,
+		IsSerif:      f.IsSerif,
+		IsSymbolic:   f.Simple.IsSymbolic(),
+		IsItalic:     fontSubset.ItalicAngle != 0,
+		ForceBold:    fontSubset.Private.ForceBold,
+		FontBBox:     fontSubset.FontBBoxPDF().Rounded(),
+		ItalicAngle:  fontSubset.ItalicAngle,
+		StemV:        fontSubset.Private.StdVW,
+		StemH:        fontSubset.Private.StdHW,
 	}
-	if fontSubset != nil {
-		fd.FontFamily = fontSubset.FamilyName
-		fd.FontWeight = os2.WeightFromString(fontSubset.Weight)
-		fd.FontBBox = fontSubset.FontBBoxPDF().Rounded()
-		fd.IsItalic = fontSubset.ItalicAngle != 0
-		fd.ItalicAngle = fontSubset.ItalicAngle
-		fd.IsFixedPitch = fontSubset.IsFixedPitch
-		fd.ForceBold = fontSubset.Private.ForceBold
-		fd.StemV = fontSubset.Private.StdVW
-		fd.StemH = fontSubset.Private.StdHW
-	}
+
+	// the metrics describe the same font more precisely, where they are known
 	if metricsSubset != nil {
 		fd.FontBBox = metricsSubset.FontBBoxPDF().Rounded()
 		fd.CapHeight = math.Round(metricsSubset.CapHeight)
@@ -384,7 +433,7 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 		SubsetTag:      subsetTag,
 		Descriptor:     fd,
 		Encoding:       f.Simple.Encoding(),
-		ToUnicode:      f.Simple.ToUnicode(postScriptName),
+		ToUnicode:      f.Simple.ToUnicode(),
 		Name:           f.Name,
 	}
 	for c, info := range f.Simple.MappedCodes() {

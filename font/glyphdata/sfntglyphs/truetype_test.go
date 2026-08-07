@@ -236,3 +236,37 @@ func makePostNames(gid int, name string) []string {
 	names[gid] = name
 	return names
 }
+
+// Method D resolves a glyph name to a character and looks that up in the
+// font's (3,1) subtable.  Which glyph list the name belongs to is decided by
+// the name of the font, and a program taken out of a PDF file gives that name
+// with a subset tag in front.  The tag names the subset rather than the font,
+// so it must not reach the decision.
+func TestNewTrueTypeSelectorIgnoresSubsetTag(t *testing.T) {
+	// ZapfDingbats names the pointing hand "a12"; in any other font that name
+	// means nothing.
+	const pointingHand = '☞'
+	const gid = glyph.ID(7)
+	const code byte = 130
+
+	enc := encoding.Simple(func(c byte) string {
+		if c == code {
+			return "a12"
+		}
+		return ""
+	})
+
+	for _, name := range []string{"ZapfDingbats", "AAAAAA+ZapfDingbats"} {
+		font := ttFont(10, sfntcmap.Table{
+			{PlatformID: 3, EncodingID: 1}: encFormat4(pointingHand, gid),
+		}, nil)
+		font.FontName = name
+
+		sel := NewTrueTypeSelector(font, false, enc)
+		got, ok := sel(cid.CID(code) + 1)
+		if !ok || got != gid {
+			t.Errorf("%s: code %d selected glyph %d (ok=%v), want %d",
+				name, code, got, ok, gid)
+		}
+	}
+}

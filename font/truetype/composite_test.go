@@ -38,9 +38,9 @@ func TestCompositeRoundTrip(t *testing.T) {
 			fontData := makefont.TrueType()
 			d := embedTrueTypeComposite(t, v, fontData)
 
-			if d.PostScriptName != fontData.PostScriptName() {
+			if d.PostScriptName != fontData.FontName {
 				t.Errorf("PostScriptName: got %q, want %q",
-					d.PostScriptName, fontData.PostScriptName())
+					d.PostScriptName, fontData.FontName)
 			}
 			if len(d.SubsetTag) != 6 {
 				t.Errorf("SubsetTag: got %q, want 6 uppercase letters", d.SubsetTag)

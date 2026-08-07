@@ -95,12 +95,7 @@ func extractFontCIDType2(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType2, erro
 	if err != nil {
 		return nil, err
 	}
-	if m := subset.TagRegexp.FindStringSubmatch(string(baseFont)); m != nil {
-		d.PostScriptName = m[2]
-		d.SubsetTag = m[1]
-	} else {
-		d.PostScriptName = string(baseFont)
-	}
+	d.SubsetTag, d.PostScriptName = subset.Split(string(baseFont))
 
 	fdDict, err := c.DictTyped(cidFontDict["FontDescriptor"], "FontDescriptor")
 	if pdf.IsReadError(err) {
@@ -194,27 +189,8 @@ func repairCIDType2(d *dict.CIDFontType2) {
 		d.Descriptor = &font.Descriptor{}
 	}
 
-	m := subset.TagRegexp.FindStringSubmatch(d.Descriptor.FontName)
-	if m != nil {
-		if d.SubsetTag == "" {
-			d.SubsetTag = m[1]
-		}
-		if d.PostScriptName == "" {
-			d.PostScriptName = m[2]
-		}
-	} else if d.PostScriptName == "" {
-		d.PostScriptName = d.Descriptor.FontName
-	}
-	if d.PostScriptName == "" {
-		d.PostScriptName = "Font"
-	}
-	if !subset.IsValidTag(d.SubsetTag) {
-		d.SubsetTag = ""
-	}
-	if d.FontFile == nil {
-		d.SubsetTag = ""
-	}
-	d.Descriptor.FontName = subset.Join(d.SubsetTag, d.PostScriptName)
+	d.PostScriptName, d.SubsetTag =
+		resolveFontName(d.Descriptor, d.PostScriptName, d.SubsetTag, d.FontFile != nil)
 
 	if d.FontFile == nil {
 		d.CIDToGID = nil

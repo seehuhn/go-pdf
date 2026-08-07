@@ -131,3 +131,69 @@ func TestLigatures(t *testing.T) {
 		}
 	}
 }
+
+// TestNewIndependentEncoders checks that two instances of the same standard
+// font allocate character codes independently.  They share the font data, so
+// this is what keeps each usable in a document of its own.
+func TestNewIndependentEncoders(t *testing.T) {
+	first := font.Must(Helvetica.New())
+	second := font.Must(Helvetica.New())
+
+	if first.Simple == second.Simple {
+		t.Fatal("the two instances share their encoding state")
+	}
+
+	// lay out text with the first instance only
+	gid := first.Layout(nil, 10, "A").Seq[0].GID
+	if _, ok := first.Encode(gid, "A"); !ok {
+		t.Fatal("no code was allocated")
+	}
+	if first.Simple.CodesRemaining() == second.Simple.CodesRemaining() {
+		t.Error("a code allocated in one instance was taken from the other")
+	}
+}
+
+// TestNewSharesFontData checks that the instances of a standard font draw on
+// one copy of the font data, which is what makes [Font.New] cheap after the
+// first call.
+func TestNewSharesFontData(t *testing.T) {
+	first := font.Must(Helvetica.New())
+	second := font.Must(Helvetica.New())
+
+	if first.Font != second.Font {
+		t.Error("the font programs are not shared")
+	}
+	if first.Metrics != second.Metrics {
+		t.Error("the metrics are not shared")
+	}
+	if first.Geometry != second.Geometry {
+		t.Error("the geometry is not shared")
+	}
+}
+
+// The standard fonts are restricted to the character set the spec guarantees,
+// so the metrics must not keep kern pairs for the glyphs which were dropped:
+// a pair naming a glyph the font no longer has describes nothing.
+func TestKernMatchesGlyphs(t *testing.T) {
+	for _, f := range All {
+		F := font.Must(f.New())
+		for _, k := range F.Metrics.Kern {
+			if _, ok := F.Metrics.Glyphs[k.Left]; !ok {
+				t.Errorf("%s: kern pair for missing glyph %q", f, k.Left)
+				break
+			}
+			if _, ok := F.Metrics.Glyphs[k.Right]; !ok {
+				t.Errorf("%s: kern pair for missing glyph %q", f, k.Right)
+				break
+			}
+		}
+	}
+}
+
+// TestNewUnknownFont checks that a name which is not one of the 14 standard
+// fonts, and so has nothing to share, reports the missing data as an error.
+func TestNewUnknownFont(t *testing.T) {
+	if _, err := Font("NoSuchFont").New(); err == nil {
+		t.Error("expected an error for an unknown font")
+	}
+}

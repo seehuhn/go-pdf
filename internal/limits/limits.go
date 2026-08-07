@@ -250,6 +250,16 @@ const (
 	// CIDToGIDMap stream (= 65536 CIDs * 2 bytes/entry).
 	MaxCIDToGIDMapBytes = 128 << 10
 
+	// MaxCIDToGIDEntries caps the number of entries in a font's CIDToGIDMap.
+	// The map holds one entry for every CID from zero up to the largest one
+	// the font uses, so its size follows the largest CID rather than the
+	// number of glyphs, and a CID near the top of the 32-bit range would ask
+	// for gigabytes.  The cap is [MaxCIDToGIDMapBytes] expressed in entries,
+	// so that a map this library writes is one it can read back; it also
+	// covers every CID a TrueType font can resolve, since glyph indices are
+	// 16-bit.
+	MaxCIDToGIDEntries = MaxCIDToGIDMapBytes / 2
+
 	// MaxCMapBytes caps the decoded byte count of a CMap or ToUnicode
 	// stream.  Realistic CMaps are well under 100 KiB; 4 MiB leaves
 	// generous slack for unusually verbose mappings.

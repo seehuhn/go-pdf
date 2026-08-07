@@ -64,8 +64,15 @@ type convFont struct {
 type glyfConv struct {
 	src    *sfnt.Font
 	psName string
-	desc   *font.Descriptor
-	width  [256]float64 // per-code widths from the source font
+
+	// srcTag is the subset tag of the source font, or "" if the source
+	// embedded the whole font.  The source program is all this conversion
+	// sees, so it is the only evidence that the output is a subset when no
+	// further glyphs are dropped.
+	srcTag string
+
+	desc  *font.Descriptor
+	width [256]float64 // per-code widths from the source font
 }
 
 // reencode maps a shown string to the two-byte codes of the converted font and
@@ -194,6 +201,7 @@ func (c *converter) convertGlyfSimple(d *dict.TrueType) (*convFont, error) {
 		glyf: &glyfConv{
 			src:    sf,
 			psName: d.PostScriptName,
+			srcTag: d.SubsetTag,
 			desc:   d.Descriptor,
 			width:  d.Width,
 		},
@@ -217,25 +225,23 @@ func (c *converter) finalizeGlyf(cf *convFont) (pdf.Reference, error) {
 	}
 	slices.Sort(glyphs)
 
-	embedSrc := g.src.Clone()
-	embedSrc.CMapTable = nil
-	embedSrc.Gsub = nil
-	embedSrc.Gpos = nil
-	embedSrc.Gdef = nil
+	embedSrc := sfntglyphs.StripForEmbedding(g.src)
 	subsetFont, err := embedSrc.Subset(glyphs)
 	if err != nil {
 		return 0, err
 	}
 
-	// CIDToGIDMap: CID is the source glyph id, mapping to the subset position
-	maxCID := glyphs[len(glyphs)-1]
-	cidToGID := make([]glyph.ID, maxCID+1)
-	identity := true
-	for pos, srcGID := range glyphs {
-		cidToGID[srcGID] = glyph.ID(pos)
-		if int(srcGID) != pos {
-			identity = false
-		}
+	// The CIDs of the converted font are the source glyph ids, which is what
+	// reencode writes as the two-byte codes of the Identity-H CMap.  They are
+	// therefore 16-bit, and the map stays within the size a CIDToGIDMap may
+	// have.
+	cids := make([]cid.CID, len(glyphs))
+	for i, gid := range glyphs {
+		cids[i] = cid.CID(gid)
+	}
+	cidToGID, identity, err := subset.MakeCIDToGID(cids)
+	if err != nil {
+		return 0, err
 	}
 
 	ww := make(map[cmap.CID]float64, len(cf.used))
@@ -248,13 +254,24 @@ func (c *converter) finalizeGlyf(cf *convFont) (pdf.Reference, error) {
 		return 0, err
 	}
 
-	subsetTag := subset.Tag(glyphs, g.src.NumGlyphs())
+	subsetTag := subset.Retag(subset.Tag(glyphs, g.src.NumGlyphs()), g.srcTag)
 
 	// composite fonts require MissingWidth to be zero; the descriptor's font
 	// name must match the (new) subset tag
 	fd := *g.desc
 	fd.MissingWidth = 0
 	fd.FontName = subset.Join(subsetTag, g.psName)
+
+	// The embedded program names itself the same as BaseFont and the
+	// descriptor's FontName, which for a subset carry the tag.  A PDF file may
+	// name a font in a way a "name" table cannot, non-ASCII names being the
+	// common case; the dictionaries still carry that name, and the program is
+	// left unnamed rather than named something which does not match.
+	programName := subset.Join(subsetTag, g.psName)
+	if subsetFont.CheckFontName(programName) != nil {
+		programName = ""
+	}
+	subsetFont.FontName = programName
 
 	fontDict := &dict.CIDFontType2{
 		PostScriptName:  g.psName,

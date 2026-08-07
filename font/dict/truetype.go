@@ -84,16 +84,8 @@ func (d *TrueType) validate(w *pdf.Writer) error {
 		}
 	}
 
-	if d.PostScriptName == "" {
-		return errors.New("missing PostScript name")
-	}
-	if d.SubsetTag != "" && !subset.IsValidTag(d.SubsetTag) {
-		return fmt.Errorf("invalid subset tag: %s", d.SubsetTag)
-	}
-	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
-	if d.Descriptor.FontName != baseFont {
-		return fmt.Errorf("font name mismatch: %s != %s",
-			baseFont, d.Descriptor.FontName)
+	if err := validateFontName(d.Descriptor, d.PostScriptName, d.SubsetTag); err != nil {
+		return err
 	}
 
 	if d.SubsetTag != "" && d.FontFile == nil {

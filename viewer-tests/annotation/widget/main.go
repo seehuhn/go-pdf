@@ -107,7 +107,7 @@ func createDocument(filename string) error {
 
 	// the generator's font doubles as the form's "Helv", so the file holds one
 	// Helvetica and the DA strings name the font which draws the field values
-	H := style.ContentFont
+	H := style.ContentFont()
 	B := font.Must(standard.HelveticaBold.New())
 
 	wr := &writer{

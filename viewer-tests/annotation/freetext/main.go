@@ -93,7 +93,7 @@ func createDocument(filename string) error {
 	}
 
 	// register the content font in the page resources for DA-based rendering
-	fontName := page.FontName(w.style.ContentFont)
+	fontName := page.FontName(w.style.ContentFont())
 	da := fmt.Sprintf("/%s 12 Tf 0 g", fontName)
 
 	leStyles := []annotation.LineEndingStyle{

@@ -11,8 +11,8 @@ require (
 	seehuhn.de/go/geom v0.7.5-0.20260803175855-8b29a196a4f3
 	seehuhn.de/go/icc v0.7.4
 	seehuhn.de/go/membudget v0.7.4
-	seehuhn.de/go/postscript v0.7.5-0.20260804184157-0347e515a1c1
-	seehuhn.de/go/sfnt v0.7.5-0.20260718201544-631e66f45b5d
+	seehuhn.de/go/postscript v0.7.5-0.20260806200436-89e22957abb9
+	seehuhn.de/go/sfnt v0.7.5-0.20260806215210-8fa8e1886588
 	seehuhn.de/go/xmp v0.7.4
 )
 

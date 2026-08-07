@@ -152,7 +152,7 @@ func makeTestFont() (font.Instance, error) {
 		Supplement: 7,
 	}
 	fd := &font.Descriptor{
-		FontName:     "ABCDEF+" + subsetFont.PostScriptName(),
+		FontName:     "ABCDEF+" + subsetFont.FontName,
 		IsFixedPitch: subsetFont.IsFixedPitch(),
 		IsSerif:      subsetFont.IsSerif,
 		IsSymbolic:   false,
@@ -184,7 +184,7 @@ func makeTestFont() (font.Instance, error) {
 		},
 	}
 	dict := &dict.CIDFontType2{
-		PostScriptName:  subsetFont.PostScriptName(),
+		PostScriptName:  subsetFont.FontName,
 		SubsetTag:       "ABCDEF",
 		Descriptor:      fd,
 		ROS:             ros,

@@ -46,8 +46,8 @@ type Options struct {
 	HideMarkup bool
 
 	// Generator supplies appearance streams for printable annotations that lack
-	// one.  A nil value uses the fallback package's default style for the
-	// output version, see [fallback.NewStyle].
+	// one.  A nil value uses the default style, [fallback.NewStyle], with a
+	// generator for the output version.
 	Generator annotation.AppearanceGenerator
 }
 

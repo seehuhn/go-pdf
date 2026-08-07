@@ -41,6 +41,7 @@ import (
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/pdf/internal/fontname"
 )
 
 type OptionsComposite struct {
@@ -72,6 +73,13 @@ type Composite struct {
 }
 
 var _ font.Layouter = (*Composite)(nil)
+
+// PostScriptName returns the name by which the PDF file refers to this font.
+// A font program need not name itself, so the name may be one derived here
+// rather than one the font gave.
+func (f *Composite) PostScriptName() string {
+	return fontname.ForSFNT(f.Font)
+}
 
 // ResourceName returns the empty string: composite TrueType fonts produce a
 // CIDFontType2 dictionary, which has no /Name entry in the PDF spec.
@@ -211,13 +219,9 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 // makeDict creates the PDF font dictionary for this font.
 func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 	origFont := f.Font
-	postScriptName := origFont.PostScriptName()
+	srcTag, postScriptName := subset.Split(fontname.ForSFNT(origFont))
 
-	origFont = origFont.Clone()
-	origFont.CMapTable = nil
-	origFont.Gdef = nil
-	origFont.Gsub = nil
-	origFont.Gpos = nil
+	origFont = sfntglyphs.StripForEmbedding(origFont)
 
 	// Subset the font, if needed.
 	// To minimise file size, we arrange the glyphs in order of increasing CID.
@@ -232,7 +236,7 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 	for i, cidVal := range cidList {
 		glyphs[i] = f.gidToCID.GID(cidVal)
 	}
-	subsetTag := subset.Tag(glyphs, origFont.NumGlyphs())
+	subsetTag := subset.Retag(subset.Tag(glyphs, origFont.NumGlyphs()), srcTag)
 
 	var subsetFont *sfnt.Font
 	if subsetTag != "" {
@@ -282,14 +286,9 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 
 	// The `CIDToGIDMap` entry in the CIDFont dictionary specifies the mapping
 	// from CIDs to glyphs.
-	maxCID := cidList[len(cidList)-1]
-	isIdentity := true
-	cidToGID := make([]glyph.ID, maxCID+1)
-	for subsetGID, cidVal := range cidList {
-		if cidVal != cid.CID(subsetGID) {
-			isIdentity = false
-		}
-		cidToGID[cidVal] = glyph.ID(subsetGID)
+	cidToGID, isIdentity, err := subset.MakeCIDToGID(cidList)
+	if err != nil {
+		return nil, err
 	}
 
 	qv := 1000 / float64(subsetFont.UnitsPerEm)
@@ -319,6 +318,10 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 		CapHeight:    capHeight,
 		XHeight:      xHeight,
 	}
+
+	// the embedded program names itself the same as BaseFont and the
+	// descriptor's FontName, which for a subset carry the tag
+	subsetFont.FontName = subset.Join(subsetTag, postScriptName)
 
 	fontDict := &dict.CIDFontType2{
 		PostScriptName:  postScriptName,
