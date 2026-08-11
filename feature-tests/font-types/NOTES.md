@@ -72,9 +72,6 @@ and the `Subtype` entry in the font file stream dictionary is `OpenType`.
 There seems little reason to use this font type, since the font data
 could equally be embedded as a TrueType font.
 
-Glyf-based OpenType fonts seem not to be supported by the MacOS Preview
-application.
-
 ## Type 3 Fonts
 
 These fonts use `Type3` as the `Subtype` in the font dictionary.

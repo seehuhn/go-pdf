@@ -61,8 +61,19 @@ func createDocument(filename string) error {
 	var testFont [4]text.F
 	var testString [4]pdf.String
 
-	for i, unitsPerEm := range []float64{1000, 2000} {
-		F := makeTestFont(unitsPerEm, false)
+	// the same glyph under four font matrices: two scales, each upright and
+	// rotated.  The first two must render alike, and so must the last two.
+	variants := [4]struct {
+		unitsPerEm float64
+		rotate     bool
+	}{
+		{1000, false},
+		{2000, false},
+		{1000, true},
+		{2000, true},
+	}
+	for i, v := range variants {
+		F := makeTestFont(v.unitsPerEm, v.rotate)
 		testFont[i] = text.F{
 			Font:  F,
 			Size:  12,
@@ -79,24 +90,6 @@ func createDocument(filename string) error {
 			testString[i] = codec.AppendCode(testString[i], code)
 		}
 	}
-	for i, unitsPerEm := range []float64{1000, 2000} {
-		F := makeTestFont(unitsPerEm, true)
-		testFont[i+2] = text.F{
-			Font:  F,
-			Size:  12,
-			Color: blue,
-		}
-
-		gg := F.Layout(nil, 1, "AAA")
-		for _, g := range gg.Seq {
-			code, ok := F.Encode(g.GID, g.Text)
-			if !ok {
-				return fmt.Errorf("cannot encode glyph %v", g)
-			}
-			codec := F.Codec()
-			testString[i+2] = codec.AppendCode(testString[i+2], code)
-		}
-	}
 
 	text.Show(w.Builder,
 		text.M{X: 36, Y: 550},
@@ -105,18 +98,19 @@ func createDocument(filename string) error {
 			`PDF Type 3 fonts handle glyph space units differently from other
 			font types. While most fonts define 1000 glyph space units as
 			1 text space unit, Type 3 fonts use their font matrix to convert
-			between glyph and text space. This test verifies that viewers
-			implement this conversion correctly.`),
+			between glyph and text space. This test checks that go-pdf gets
+			this conversion right: the same text is written twice, once with
+			each of two font matrices, and the two must come out identical.`),
 		text.NL,
 		text.Wrap(340,
-			"The following two lines should should show three squares each,",
+			"The following two lines should show three squares each,",
 			"followed by an X, and should look the same:"),
 		text.M{X: 0, Y: -10},
 		testFont[0], testString[0], note, "X", text.NL,
 		text.M{X: 0, Y: -10},
 		testFont[1], testString[1], note, "X", text.NL,
 		text.Wrap(340,
-			"The following two lines should should show three rotated squares,",
+			"The following two lines should show three rotated squares,",
 			"followed by an X, and should look the same:"),
 		text.M{X: 0, Y: -10},
 		testFont[2], testString[2], note, "X", text.NL,

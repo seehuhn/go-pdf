@@ -33,7 +33,7 @@ import (
 	"seehuhn.de/go/pdf/oc"
 )
 
-// This viewer test generates a PDF showing an interactive logic circuit.
+// This test generates a PDF showing an interactive logic circuit.
 //
 // Three input squares (A, B, C) are clickable and toggle between dark (1)
 // and light (0). The output square (O) is computed via an OCMD visibility

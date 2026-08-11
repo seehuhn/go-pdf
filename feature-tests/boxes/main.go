@@ -36,7 +36,7 @@ func main() {
 }
 
 func doit() error {
-	page, err := document.CreateSinglePage("boxes.pdf", nil, pdf.V1_7, nil)
+	page, err := document.CreateSinglePage("test.pdf", nil, pdf.V1_7, nil)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func doit() error {
 
 	page.TextBegin()
 	page.TextFirstLine(10, 574)
-	page.TextShow("This text is outside the CropBox.  It will not be visible on most PDF viewers.")
+	page.TextShow("This text is outside the CropBox and should be hidden in normal display.")
 	page.TextEnd()
 
 	page.TextBegin()
@@ -141,9 +141,9 @@ func doit() error {
 	page.TextFirstLine(60, 336)
 	page.TextShow("In professional production, the TrimBox gives the outline of the finished page after trimming.")
 	page.TextSecondLine(0, -12*geom.Leading)
-	page.TextShow("On this page, the TrimBox is [100,500]×[100,500].  If your viewer supports BoxColorInfo,")
+	page.TextShow("On this page, the TrimBox is [100,500]×[100,500].  The page's BoxColorInfo asks viewers")
 	page.TextNextLine()
-	page.TextShow("the TrimBox may be shown in ")
+	page.TextShow("to outline the TrimBox in ")
 	page.SetFillColor(color.DeviceRGB{0.8, 0.4, 0})
 	page.TextShow("orange.")
 	page.SetFillColor(color.Black)
@@ -153,9 +153,9 @@ func doit() error {
 	page.TextFirstLine(60, 286)
 	page.TextShow("In professional production, the BleedBox gives the print area before trimming.")
 	page.TextSecondLine(0, -12*geom.Leading)
-	page.TextShow("On this page, the BleedBox is [85,515]×[85,515].  If your viewer supports BoxColorInfo,")
+	page.TextShow("On this page, the BleedBox is [85,515]×[85,515].  The page's BoxColorInfo asks viewers")
 	page.TextNextLine()
-	page.TextShow("the BleedBox may be shown in ")
+	page.TextShow("to outline the BleedBox in ")
 	page.SetFillColor(color.DeviceRGB{0, 0, 0.8})
 	page.TextShow("blue.")
 	page.SetFillColor(color.Black)
@@ -165,9 +165,9 @@ func doit() error {
 	page.TextFirstLine(60, 186)
 	page.TextShow("The final page box is the ArtBox.")
 	page.TextSecondLine(0, -12*geom.Leading)
-	page.TextShow("On this page, the ArtBox is [150,450]×[150,450].  If your viewer supports BoxColorInfo,")
+	page.TextShow("On this page, the ArtBox is [150,450]×[150,450].  The page's BoxColorInfo asks viewers")
 	page.TextNextLine()
-	page.TextShow("the ArtBox may be shown in ")
+	page.TextShow("to outline the ArtBox in ")
 	page.SetFillColor(color.DeviceRGB{0, 0.8, 0})
 	page.TextShow("green.")
 	page.TextEnd()

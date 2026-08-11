@@ -366,6 +366,9 @@ func parseNotes(fname string) ([]section, error) {
 			current.lines = append(current.lines, line)
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
 	if current.title != "" {
 		sections = append(sections, current)
 	}
