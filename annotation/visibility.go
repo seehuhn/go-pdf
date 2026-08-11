@@ -196,6 +196,31 @@ func NeverShown(a Annotation) bool {
 	return f&FlagNoView != 0 && f&(FlagToggleNoView|FlagPrint) == 0
 }
 
+// IsReply reports whether the annotation is a reply to another one, which a
+// processor shall not display on its own.  §12.5.6.2, table 172, requires
+// replies to be shown "together in the form of threaded comments" instead, so
+// a renderer leaves a reply's appearance out of the page and a viewer shows
+// its contents inside the thread of the annotation it replies to.
+//
+// Only the "R" relationship is a reply.  "Group" ties an annotation to a
+// parent for editing and for the shared pop-up, but the annotation is still
+// drawn in its own right.  An annotation with an IRT entry and no RT entry is
+// a reply, because "R" is the default.
+//
+// The annotation this one replies to is not resolved here.  Reading a page's
+// annotations ([seehuhn.de/go/pdf/annotation/decode.PageAnnotations]) clears
+// an IRT entry whose target is not an annotation on the same page, so a
+// malformed reference reads as an ordinary annotation rather than a reply to
+// a thread that does not exist.
+func IsReply(a Annotation) bool {
+	ma, isMarkup := a.(MarkupAnnotation)
+	if !isMarkup {
+		return false
+	}
+	m := ma.GetMarkup()
+	return m.InReplyTo != 0 && m.RT != "Group"
+}
+
 // invisibleUnknown reports whether the annotation is of a subtype the reader
 // does not know, which this library represents as [*Custom], and carries the
 // Invisible flag.  For those the flag hides the annotation in every context,

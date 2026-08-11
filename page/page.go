@@ -763,55 +763,10 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// Annots (optional; spec requires indirect references)
-	if annotsArray, err := pdf.Optional(c.Array(dict["Annots"])); err != nil {
+	if _, annots, err := decode.PageAnnotations(c, dict["Annots"]); err != nil {
 		return nil, err
 	} else {
-		pageRefs := map[pdf.Reference]bool{}
-		for _, item := range annotsArray {
-			ref, ok := item.(pdf.Reference)
-			if !ok {
-				continue
-			}
-			annot, err := pdf.Decode(c, item, decode.Annotation)
-			if err != nil {
-				// permissive: skip invalid annotations
-				continue
-			}
-			p.Annots = append(p.Annots, annot)
-			pageRefs[ref] = true
-		}
-		// Clear InReplyTo for markup annotations whose IRT target is
-		// not on this page.  The spec requires both annotations to be
-		// on the same page (table 172, "IRT").
-		type hasMarkup interface {
-			GetMarkup() *annotation.Markup
-		}
-		hasWidget := false
-		for _, ai := range p.Annots {
-			if _, ok := ai.(*annotation.Widget); ok {
-				hasWidget = true
-			}
-			m, ok := ai.(hasMarkup)
-			if !ok {
-				continue
-			}
-			markup := m.GetMarkup()
-			if markup.InReplyTo != 0 && !pageRefs[markup.InReplyTo] {
-				markup.InReplyTo = 0
-			}
-		}
-
-		// A widget annotation belongs to a form field. Decoding the interactive
-		// form links each widget to its field (annotation.Widget.Field); the
-		// page's widgets are already cached, so the form's top-down walk links
-		// them via cache hits without a cycle. DecodeExclusive single-flights
-		// so concurrent page decodes share one field tree. Errors are non-fatal: a
-		// malformed form must not break page decoding.
-		if hasWidget {
-			if m := c.Getter().GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
-				_, _ = pdf.DecodeExclusive(pdf.CursorAt(c.Extractor(), nil), m.Catalog.AcroForm, decode.Form)
-			}
-		}
+		p.Annots = annots
 	}
 
 	// AA (optional)

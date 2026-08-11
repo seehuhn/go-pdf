@@ -571,3 +571,187 @@ func TestFlattenMergedFieldValue(t *testing.T) {
 		t.Errorf("flattened merged field draws no text, so the value was lost:\n%s", body)
 	}
 }
+
+// TestFlattenDropsReplies checks that an annotation replying to another one is
+// not flattened into the print content.  §12.5.6.2 has replies shown as part
+// of their parent's thread rather than individually, so a reply's appearance
+// is drawn nowhere on screen and must not appear on paper either.  The "Group"
+// relationship is not a reply and is flattened as usual.
+func TestFlattenDropsReplies(t *testing.T) {
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	ap := apForm(t, w, "1 0 0 rg 0 0 40 40 re f\n")
+	rect := pdf.Array{pdf.Integer(10), pdf.Integer(10), pdf.Integer(50), pdf.Integer(50)}
+
+	parent := w.Alloc()
+	w.Put(parent, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Square"),
+		"Rect": rect, "F": pdf.Integer(4), "AP": pdf.Dict{"N": ap},
+	})
+	reply := w.Alloc()
+	w.Put(reply, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Square"),
+		"Rect": rect, "F": pdf.Integer(4), "AP": pdf.Dict{"N": ap},
+		"IRT": parent, "RT": pdf.Name("R"),
+	})
+	// a reply which leaves out /RT: "R" is the default, so it is one too
+	bareReply := w.Alloc()
+	w.Put(bareReply, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Square"),
+		"Rect": rect, "F": pdf.Integer(4), "AP": pdf.Dict{"N": ap},
+		"IRT": parent,
+	})
+	grouped := w.Alloc()
+	w.Put(grouped, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Square"),
+		"Rect": rect, "F": pdf.Integer(4), "AP": pdf.Dict{"N": ap},
+		"IRT": parent, "RT": pdf.Name("Group"),
+	})
+
+	pageRef := w.Alloc()
+	pagesRef := w.Alloc()
+	w.Put(pageRef, pdf.Dict{
+		"Type": pdf.Name("Page"), "Parent": pagesRef,
+		"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(200), pdf.Integer(200)},
+		"Annots":   pdf.Array{parent, reply, bareReply, grouped},
+	})
+	w.Put(pagesRef, pdf.Dict{"Type": pdf.Name("Pages"), "Kids": pdf.Array{pageRef}, "Count": pdf.Integer(1)})
+	w.GetMeta().Catalog.Pages = pagesRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := Write(&out, r, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// the parent and the group member are flattened, the two replies are not
+	got := pageContent(t, out.Bytes())
+	if n := strings.Count(got, " Do"); n != 2 {
+		t.Errorf("want 2 flattened annotations (parent and group member), got %d:\n%s", n, got)
+	}
+}
+
+// TestFlattenSplitFieldValue checks that a text field whose value lives in a
+// separate field dictionary (the widget as a /Kids entry, /V on the field) is
+// flattened with its value drawn.  The synthesized appearance reads the value
+// through the widget's form field, which reading the page's annotations links
+// up; a widget decoded on its own would print an empty box.
+func TestFlattenSplitFieldValue(t *testing.T) {
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	fieldRef := w.Alloc()
+	widgetRef := w.Alloc()
+	w.Put(fieldRef, pdf.Dict{
+		"FT": pdf.Name("Tx"), "T": pdf.TextString("split"),
+		"V": pdf.TextString("hello"), "DA": pdf.String("0 0 0 rg /Helv 12 Tf"),
+		"Kids": pdf.Array{widgetRef},
+	})
+	w.Put(widgetRef, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"),
+		"Rect":   pdf.Array{pdf.Integer(20), pdf.Integer(20), pdf.Integer(160), pdf.Integer(60)},
+		"F":      pdf.Integer(4), // Print
+		"Parent": fieldRef,
+	})
+	formRef := w.Alloc()
+	w.Put(formRef, pdf.Dict{"Fields": pdf.Array{fieldRef}})
+
+	pageRef := w.Alloc()
+	pagesRef := w.Alloc()
+	w.Put(pageRef, pdf.Dict{
+		"Type": pdf.Name("Page"), "Parent": pagesRef,
+		"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(200), pdf.Integer(200)},
+		"Annots":   pdf.Array{widgetRef},
+	})
+	w.Put(pagesRef, pdf.Dict{"Type": pdf.Name("Pages"), "Kids": pdf.Array{pageRef}, "Count": pdf.Integer(1)})
+	w.GetMeta().Catalog.Pages = pagesRef
+	w.GetMeta().Catalog.AcroForm = formRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := Write(&out, r, nil); err != nil {
+		t.Fatal(err)
+	}
+	res := out.Bytes()
+
+	rr, err := pdf.NewReader(bytes.NewReader(res), int64(len(res)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, page, err := pagetree.GetPage(rr, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur := pdf.NewCursor(rr)
+	resDict, _ := cur.Dict(page["Resources"])
+	xobjs, err := cur.Dict(resDict["XObject"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := cur.ReadAll(xobjs["PPAnnot0"], 1<<20)
+	if err != nil {
+		t.Fatalf("flattened widget does not resolve in output: %v", err)
+	}
+
+	// the field value is drawn, so the flattened form shows text
+	if !strings.Contains(string(body), "Tj") && !strings.Contains(string(body), "TJ") {
+		t.Errorf("flattened split field draws no text, so the value was lost:\n%s", body)
+	}
+}
+
+// TestFlattenDanglingReply checks that an annotation whose IRT entry names no
+// annotation on the page is flattened as an ordinary one.  Reading the page's
+// annotations clears such an entry (table 172 requires the target on the same
+// page), the same repair a screen render sees, so the printed page agrees
+// with the screen instead of dropping the mark over a reference that leads
+// nowhere.
+func TestFlattenDanglingReply(t *testing.T) {
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	ap := apForm(t, w, "1 0 0 rg 0 0 40 40 re f\n")
+	a := w.Alloc()
+	w.Put(a, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Square"),
+		"Rect": pdf.Array{pdf.Integer(10), pdf.Integer(10), pdf.Integer(50), pdf.Integer(50)},
+		"F":    pdf.Integer(4), "AP": pdf.Dict{"N": ap},
+		"IRT": pdf.NewReference(999, 0),
+	})
+
+	pageRef := w.Alloc()
+	pagesRef := w.Alloc()
+	w.Put(pageRef, pdf.Dict{
+		"Type": pdf.Name("Page"), "Parent": pagesRef,
+		"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(200), pdf.Integer(200)},
+		"Annots":   pdf.Array{a},
+	})
+	w.Put(pagesRef, pdf.Dict{"Type": pdf.Name("Pages"), "Kids": pdf.Array{pageRef}, "Count": pdf.Integer(1)})
+	w.GetMeta().Catalog.Pages = pagesRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := Write(&out, r, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	got := pageContent(t, out.Bytes())
+	if n := strings.Count(got, " Do"); n != 1 {
+		t.Errorf("want the annotation flattened despite the dangling IRT, got %d forms:\n%s", n, got)
+	}
+}

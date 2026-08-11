@@ -36,11 +36,18 @@ const coordDigits = 4
 // is appended after the page's own marks.  It returns the overlay content and
 // a map of the form XObjects it references, to be merged into the page's
 // resources.  reserved names the /XObject keys the page already uses, which the
-// overlay form names avoid.  Interactive, media and hidden annotations are
-// dropped; the rest are drawn from their normal appearance, synthesizing one
-// via the configured generator when the annotation has none.
+// overlay form names avoid.  Annotations that [converter.annotDropped] reports
+// are dropped; the rest are drawn from their normal appearance, synthesizing
+// one via the configured generator when the annotation has none.
+//
+// The annotations are read through [decode.PageAnnotations], the same
+// page-scoped decode a renderer uses, so what is flattened onto paper agrees
+// with what a screen render draws: a dangling IRT entry is cleared rather
+// than taken for a reply, and widgets are linked to their form fields, which
+// is what lets a synthesized appearance draw the value of a field stored
+// separately from its widget.
 func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bool) ([]byte, map[pdf.Name]pdf.Reference, error) {
-	annots, err := pdf.CursorAt(c.x, nil).Array(annotsObj)
+	refs, annots, err := decode.PageAnnotations(pdf.CursorAt(c.x, nil), annotsObj)
 	if err != nil || len(annots) == 0 {
 		return nil, nil, err
 	}
@@ -61,11 +68,7 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 		}
 	}
 
-	for _, item := range annots {
-		ai, err := pdf.Decode(pdf.CursorAt(c.x, nil), item, decode.Annotation)
-		if err != nil || ai == nil {
-			continue
-		}
+	for i, ai := range annots {
 		if c.annotDropped(ai) {
 			continue
 		}
@@ -88,7 +91,7 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 			continue
 		}
 
-		ref, err := c.embedAppearance(item, common.AppearanceState, ap, synthesized)
+		ref, err := c.embedAppearance(refs[i], common.AppearanceState, ap, synthesized)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -128,7 +131,7 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 // optional content removed).  A synthesized fallback is content the source
 // never held; it uses standard fonts and carries no optional content, so it is
 // embedded as built.
-func (c *converter) embedAppearance(item pdf.Object, state pdf.Name, ap *form.Form, synthesized bool) (pdf.Reference, error) {
+func (c *converter) embedAppearance(item pdf.Reference, state pdf.Name, ap *form.Form, synthesized bool) (pdf.Reference, error) {
 	if !synthesized {
 		if rawAP := c.rawNormalAppearance(item, state); rawAP != nil {
 			obj, err := c.convertXObject(rawAP, 0)
@@ -151,7 +154,7 @@ func (c *converter) embedAppearance(item pdf.Object, state pdf.Name, ap *form.Fo
 // annotation, honouring the appearance state /AS, or nil if there is none.
 // The result is the raw object (typically a reference), suitable for
 // convertXObject.
-func (c *converter) rawNormalAppearance(item pdf.Object, state pdf.Name) pdf.Object {
+func (c *converter) rawNormalAppearance(item pdf.Reference, state pdf.Name) pdf.Object {
 	cur := pdf.CursorAt(c.x, nil)
 	annotDict, err := cur.Dict(item)
 	if err != nil || annotDict == nil {
@@ -192,13 +195,23 @@ func (c *converter) reservedXObjectNames(srcRes pdf.Dict) map[pdf.Name]bool {
 }
 
 // annotDropped reports whether an annotation must not be flattened into print
-// content: interactive, media and link annotations, and any annotation that
-// the print visibility rules suppress.
+// content: interactive, media and link annotations, replies, and any
+// annotation that the print visibility rules suppress.
+//
+// A reply is dropped for the same reason a renderer leaves it off the screen
+// (§12.5.6.2): it is shown as part of the thread of the annotation it replies
+// to, never on its own.  Its appearance is normally the same icon as its
+// parent's and sits at the same rectangle, so flattening it would put a mark
+// on the paper that no viewer draws.  The reply's text belongs on paper only
+// through a summary of the thread, which this package does not produce.
 func (c *converter) annotDropped(ai annotation.Annotation) bool {
 	switch ai.(type) {
 	case *annotation.Link, *annotation.Popup,
 		*annotation.Screen, *annotation.Movie, *annotation.Sound,
 		*annotation.RichMedia, *annotation.Annot3D:
+		return true
+	}
+	if annotation.IsReply(ai) {
 		return true
 	}
 	return annotation.Suppressed(ai, true, false, c.hideMkp, c.ocState)

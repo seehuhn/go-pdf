@@ -96,7 +96,6 @@ func processFile(fname string) error {
 	}
 
 	x := pdf.NewExtractor(r)
-	c := pdf.NewCursor(r)
 	first := true
 
 	for pageNo := range numPages {
@@ -105,28 +104,21 @@ func processFile(fname string) error {
 			return err
 		}
 
-		annotsArray, err := c.Array(pageDict["Annots"])
-		if err != nil || annotsArray == nil {
+		refs, annots, err := decode.PageAnnotations(pdf.CursorAt(x, nil), pageDict["Annots"])
+		if err != nil {
 			continue
 		}
 
-		// decode all annotations, keep only markup types
+		// keep only markup annotations
 		var entries []annotEntry
-		for _, obj := range annotsArray {
-			ref, _ := obj.(pdf.Reference)
-
-			a, err := pdf.Decode(pdf.CursorAt(x, nil), obj, decode.Annotation)
-			if err != nil {
-				continue
-			}
-
+		for i, a := range annots {
 			m := getMarkup(a)
 			if m == nil {
 				continue
 			}
 
 			entries = append(entries, annotEntry{
-				ref:    ref,
+				ref:    refs[i],
 				annot:  a,
 				common: a.GetCommon(),
 				markup: m,

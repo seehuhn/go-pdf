@@ -16,7 +16,11 @@
 
 package annotation
 
-import "testing"
+import (
+	"testing"
+
+	"seehuhn.de/go/pdf"
+)
 
 // allFlags is one past the highest defined annotation flag, so ranging over it
 // covers every combination the flags word can take.
@@ -174,4 +178,33 @@ var visibilityContexts = []struct {
 	{name: "on screen"},
 	{name: "on hover", hover: true},
 	{name: "in print", forPrint: true},
+}
+
+// TestIsReply checks which relationships mark an annotation as a reply that a
+// processor shall not display on its own (§12.5.6.2, table 172).  "R" and an
+// absent RT both do, "Group" does not, and neither does an annotation with no
+// IRT entry at all.
+func TestIsReply(t *testing.T) {
+	const parent pdf.Reference = 42
+
+	cases := []struct {
+		name string
+		a    Annotation
+		want bool
+	}{
+		{"plain markup annotation", &Text{}, false},
+		{"reply, RT absent", &Text{Markup: Markup{InReplyTo: parent}}, true},
+		{"reply, RT=R", &Text{Markup: Markup{InReplyTo: parent, RT: "R"}}, true},
+		{"group member", &Text{Markup: Markup{InReplyTo: parent, RT: "Group"}}, false},
+		{"RT without IRT", &Text{Markup: Markup{RT: "R"}}, false},
+		{"non-markup annotation", &Link{}, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsReply(tc.a); got != tc.want {
+				t.Errorf("IsReply = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }

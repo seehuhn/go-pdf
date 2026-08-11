@@ -28,7 +28,8 @@
 //   - removes the content of optional-content groups that are switched off,
 //     and drops the optional-content machinery entirely;
 //   - flattens printable annotations into page content and drops
-//     interactive, media and hidden annotations;
+//     interactive, media and hidden annotations, as well as replies,
+//     which no viewer draws on the page;
 //   - strips tagged-PDF structure, metadata, navigation, and other data that
 //     does not affect the printed marks;
 //   - writes a fresh, unencrypted document.
