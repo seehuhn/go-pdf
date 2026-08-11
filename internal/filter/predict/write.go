@@ -18,6 +18,7 @@ package predict
 
 import (
 	"io"
+	"math"
 )
 
 // writer applies a prediction filter to the data written to it.
@@ -30,6 +31,9 @@ type writer struct {
 	prevValues []uint16 // Previous component values (TIFF predictor)
 	tempBuffer []byte   // Temporary buffer for partial data
 	tempLen    int      // Length of data in tempBuffer
+	encoded    []byte   // the encoded row passed to the underlying writer
+	filtered   []byte   // scratch row for trying PNG filters (predictor 15)
+	histogram  []int    // byte counts of the scratch row (predictor 15)
 }
 
 // NewWriter creates a new io.WriteCloser that applies the prediction filter with the
@@ -53,8 +57,15 @@ func (w *writer) initBuffers() {
 	p := w.params
 	w.tempBuffer = make([]byte, p.bytesPerRow()*2) // extra space for safety
 
+	// room for the PNG tag byte, which the TIFF predictor does not use
+	w.encoded = make([]byte, 1+p.bytesPerRow())
+
 	if p.Predictor >= 10 && p.Predictor <= 15 {
 		w.prevRow = make([]byte, p.bytesPerPixel()+p.bytesPerRow())
+		if p.Predictor == 15 {
+			w.filtered = make([]byte, p.bytesPerRow())
+			w.histogram = make([]int, 256)
+		}
 	} else if p.Predictor == 2 {
 		w.prevValues = make([]uint16, p.Colors)
 	}
@@ -96,7 +107,11 @@ func (w *writer) Write(data []byte) (n int, err error) {
 	return totalWritten, nil
 }
 
-// processRow processes a complete row of data
+// processRow processes a complete row of data.
+//
+// The encoded row is written into a buffer the writer reuses for every row,
+// so it stays valid only until the next call.  The underlying writer must not
+// retain it.
 func (w *writer) processRow(rowData []byte) error {
 	var encodedRow []byte
 	var err error
@@ -128,9 +143,12 @@ func (w *writer) processRow(rowData []byte) error {
 	return err
 }
 
-// applyTIFFPredictor applies TIFF horizontal differencing
+// applyTIFFPredictor applies TIFF horizontal differencing.
+//
+// Component-wise differencing at bit depths other than 1 and 8 follows the
+// spec.  Such files are rare, and some viewers have bugs in this area.
 func (w *writer) applyTIFFPredictor(rowData []byte) ([]byte, error) {
-	result := make([]byte, len(rowData))
+	result := w.encoded[:len(rowData)]
 	copy(result, rowData)
 
 	switch w.params.BitsPerComponent {
@@ -150,10 +168,13 @@ func (w *writer) applyTIFFPredictor(rowData []byte) ([]byte, error) {
 }
 
 func (w *writer) applyTIFF1Bit(data []byte) {
+	const compMask = 1 // the bits one component occupies
 	componentsPerRow := w.params.Colors * w.params.Columns
 
 	for byteIdx, original := range data {
-		var result byte
+		// start from the original byte: bits after the last component of
+		// the row are padding, and must survive unchanged
+		result := original
 
 		for fragIdx := range 8 {
 			componentIdx := byteIdx*8 + fragIdx
@@ -174,7 +195,7 @@ func (w *writer) applyTIFF1Bit(data []byte) {
 				predicted = current ^ byte(w.prevValues[colorIdx]&1)
 			}
 
-			result |= predicted << shift
+			result = result&^(compMask<<shift) | predicted<<shift
 			w.prevValues[colorIdx] = uint16(current)
 		}
 
@@ -183,10 +204,13 @@ func (w *writer) applyTIFF1Bit(data []byte) {
 }
 
 func (w *writer) applyTIFF2Bit(data []byte) {
+	const compMask = 0x03 // the bits one component occupies
 	componentsPerRow := w.params.Colors * w.params.Columns
 
 	for byteIdx, original := range data {
-		var result byte
+		// start from the original byte: bits after the last component of
+		// the row are padding, and must survive unchanged
+		result := original
 
 		for fragIdx := range 4 {
 			componentIdx := byteIdx*4 + fragIdx
@@ -207,7 +231,7 @@ func (w *writer) applyTIFF2Bit(data []byte) {
 				predicted = (current - byte(w.prevValues[colorIdx])) & 0x03
 			}
 
-			result |= predicted << shift
+			result = result&^(compMask<<shift) | predicted<<shift
 			w.prevValues[colorIdx] = uint16(current)
 		}
 
@@ -216,10 +240,13 @@ func (w *writer) applyTIFF2Bit(data []byte) {
 }
 
 func (w *writer) applyTIFF4Bit(data []byte) {
+	const compMask = 0x0F // the bits one component occupies
 	componentsPerRow := w.params.Colors * w.params.Columns
 
 	for byteIdx, original := range data {
-		var result byte
+		// start from the original byte: bits after the last component of
+		// the row are padding, and must survive unchanged
+		result := original
 
 		for fragIdx := range 2 {
 			componentIdx := byteIdx*2 + fragIdx
@@ -240,7 +267,7 @@ func (w *writer) applyTIFF4Bit(data []byte) {
 				predicted = (current - byte(w.prevValues[colorIdx])) & 0x0F
 			}
 
-			result |= predicted << shift
+			result = result&^(compMask<<shift) | predicted<<shift
 			w.prevValues[colorIdx] = uint16(current)
 		}
 
@@ -275,9 +302,19 @@ func (w *writer) applyTIFF16Bit(data []byte) {
 // applyPNGPredictor applies PNG prediction with specified algorithm
 func (w *writer) applyPNGPredictor(rowData []byte, algorithm byte) ([]byte, error) {
 	// PNG rows have tag byte + data
-	result := make([]byte, 1+len(rowData))
+	result := w.encoded[:1+len(rowData)]
 	result[0] = algorithm
 
+	w.filterRow(result[1:], rowData, algorithm)
+	w.storePrevRow(rowData)
+
+	return result, nil
+}
+
+// filterRow writes the filtered form of rowData to out, which must have room
+// for len(rowData) bytes.  The previous-row buffer is left untouched, so the
+// same row can be filtered again with a different algorithm.
+func (w *writer) filterRow(out, rowData []byte, algorithm byte) {
 	bytesPerPixel := w.params.bytesPerPixel()
 
 	for i := range rowData {
@@ -317,22 +354,63 @@ func (w *writer) applyPNGPredictor(rowData []byte, algorithm byte) ([]byte, erro
 			predictor = paethPredictor(left, up, upperLeft)
 		}
 
-		result[1+i] = byte(int(rowData[i]) - int(predictor))
+		out[i] = byte(int(rowData[i]) - int(predictor))
 	}
+}
 
-	// Update previous row buffer
+// storePrevRow keeps the unfiltered row, which supplies the "up" and
+// "upper left" neighbours of the next one.
+func (w *writer) storePrevRow(rowData []byte) {
+	bytesPerPixel := w.params.bytesPerPixel()
 	if len(w.prevRow) >= bytesPerPixel+len(rowData) {
 		copy(w.prevRow[bytesPerPixel:], rowData)
 	}
+}
+
+// applyPNGOptimumPredictor filters the row with each of the five PNG
+// algorithms and keeps the one whose residuals have the lowest entropy.
+// Ties go to the lowest algorithm number, leaving a row the filters cannot
+// improve on with the None filter.
+func (w *writer) applyPNGOptimumPredictor(rowData []byte) ([]byte, error) {
+	result := w.encoded[:1+len(rowData)]
+	scratch := w.filtered[:len(rowData)]
+
+	bestScore := math.Inf(-1)
+	for algorithm := byte(0); algorithm <= 4; algorithm++ {
+		w.filterRow(scratch, rowData, algorithm)
+		if score := w.rowScore(scratch); score > bestScore {
+			bestScore = score
+			result[0] = algorithm
+			copy(result[1:], scratch)
+		}
+	}
+
+	w.storePrevRow(rowData)
 
 	return result, nil
 }
 
-// applyPNGOptimumPredictor chooses the best PNG predictor for this row
-func (w *writer) applyPNGOptimumPredictor(rowData []byte) ([]byte, error) {
-	// Simple implementation: always use Sub (algorithm 1)
-	// A more sophisticated implementation would analyze the data
-	return w.applyPNGPredictor(rowData, 1)
+// rowScore rates a filtered row, higher being better.
+//
+// The entropy of the row is len(row)*log2(len(row)) - sum(c*log2(c)) bits,
+// taken over the counts c of the byte values which occur.  All candidates for
+// a row have the same length, so the leading term is a constant and dropping
+// it leaves the sum, which is largest where the entropy is smallest.
+func (w *writer) rowScore(row []byte) float64 {
+	for _, b := range row {
+		w.histogram[b]++
+	}
+
+	// the buckets are zeroed as they are read, so the histogram is ready for
+	// the next call without a separate clearing pass
+	score := 0.0
+	for i, c := range w.histogram {
+		if c > 1 {
+			score += float64(c) * math.Log2(float64(c))
+		}
+		w.histogram[i] = 0
+	}
+	return score
 }
 
 // paethPredictor implements the Paeth prediction algorithm

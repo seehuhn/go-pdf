@@ -157,8 +157,7 @@ func (r *reader) Read(p []byte) (n int, err error) {
 			return totalRead, decodeErr
 		}
 
-		// Store decoded data in output buffer
-		copy(r.outputBuffer, decodedRow)
+		// the decoders fill outputBuffer, so decodedRow aliases it
 		r.outputLen = len(decodedRow)
 		r.outputPos = 0
 	}
@@ -170,9 +169,12 @@ func (r *reader) Read(p []byte) (n int, err error) {
 	return totalRead, nil
 }
 
-// decodeTIFFRow decodes a TIFF predictor row
+// decodeTIFFRow decodes a TIFF predictor row.
+//
+// The row is decoded into the reader's output buffer, which the next call
+// overwrites.
 func (r *reader) decodeTIFFRow(encodedData []byte) ([]byte, error) {
-	result := make([]byte, len(encodedData))
+	result := r.outputBuffer[:len(encodedData)]
 	copy(result, encodedData)
 
 	switch r.params.BitsPerComponent {
@@ -197,11 +199,14 @@ func (r *reader) decodeTIFFRow(encodedData []byte) ([]byte, error) {
 }
 
 func (r *reader) decodeTIFF1Bit(data []byte) {
+	const compMask = 1 // the bits one component occupies
 	componentsPerRow := r.params.Colors * r.params.Columns
 
 	for byteIdx := range data {
 		original := data[byteIdx]
-		var result byte
+		// start from the original byte: bits after the last component of
+		// the row are padding, and must survive unchanged
+		result := original
 
 		for fragIdx := range 8 {
 			componentIdx := byteIdx*8 + fragIdx
@@ -222,7 +227,7 @@ func (r *reader) decodeTIFF1Bit(data []byte) {
 				current = encoded ^ byte(r.prevValues[colorIdx]&1)
 			}
 
-			result |= current << shift
+			result = result&^(compMask<<shift) | current<<shift
 			r.prevValues[colorIdx] = uint32(current)
 		}
 
@@ -231,11 +236,14 @@ func (r *reader) decodeTIFF1Bit(data []byte) {
 }
 
 func (r *reader) decodeTIFF2Bit(data []byte) {
+	const compMask = 0x03 // the bits one component occupies
 	componentsPerRow := r.params.Colors * r.params.Columns
 
 	for byteIdx := range data {
 		original := data[byteIdx]
-		var result byte
+		// start from the original byte: bits after the last component of
+		// the row are padding, and must survive unchanged
+		result := original
 
 		for fragIdx := range 4 {
 			componentIdx := byteIdx*4 + fragIdx
@@ -256,7 +264,7 @@ func (r *reader) decodeTIFF2Bit(data []byte) {
 				current = (encoded + byte(r.prevValues[colorIdx])) & 0x03
 			}
 
-			result |= current << shift
+			result = result&^(compMask<<shift) | current<<shift
 			r.prevValues[colorIdx] = uint32(current)
 		}
 
@@ -265,11 +273,14 @@ func (r *reader) decodeTIFF2Bit(data []byte) {
 }
 
 func (r *reader) decodeTIFF4Bit(data []byte) {
+	const compMask = 0x0F // the bits one component occupies
 	componentsPerRow := r.params.Colors * r.params.Columns
 
 	for byteIdx := range data {
 		original := data[byteIdx]
-		var result byte
+		// start from the original byte: bits after the last component of
+		// the row are padding, and must survive unchanged
+		result := original
 
 		for fragIdx := range 2 {
 			componentIdx := byteIdx*2 + fragIdx
@@ -290,7 +301,7 @@ func (r *reader) decodeTIFF4Bit(data []byte) {
 				current = (encoded + byte(r.prevValues[colorIdx])) & 0x0F
 			}
 
-			result |= current << shift
+			result = result&^(compMask<<shift) | current<<shift
 			r.prevValues[colorIdx] = uint32(current)
 		}
 
@@ -330,7 +341,11 @@ func (r *reader) decodeTIFF16Bit(data []byte) {
 	}
 }
 
-// decodePNGRow decodes a PNG predictor row
+// decodePNGRow decodes a PNG predictor row.
+//
+// The row is decoded into the reader's output buffer, which the next call
+// overwrites.  The previous-row buffer is separate, so the neighbours the
+// filters read stay intact while the current row is written.
 func (r *reader) decodePNGRow(encodedData []byte) ([]byte, error) {
 	if len(encodedData) == 0 {
 		return nil, io.EOF
@@ -340,7 +355,7 @@ func (r *reader) decodePNGRow(encodedData []byte) ([]byte, error) {
 	algorithm := encodedData[0]
 	rowData := encodedData[1:]
 
-	result := make([]byte, len(rowData))
+	result := r.outputBuffer[:len(rowData)]
 	bytesPerPixel := r.params.bytesPerPixel()
 
 	for i := range rowData {

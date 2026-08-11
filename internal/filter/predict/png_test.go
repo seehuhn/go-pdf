@@ -19,6 +19,7 @@ package predict
 import (
 	"bytes"
 	"io"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -551,6 +552,139 @@ func TestPNGOptimumPredictor(t *testing.T) {
 	if diff := cmp.Diff(originalData, decodedData); diff != "" {
 		t.Errorf("PNG Optimum round trip failed (-original +decoded):\n%s", diff)
 	}
+}
+
+// TestPNGOptimumPredictorSelection checks that predictor 15 chooses a filter
+// per row instead of using a fixed one: the filter must vary across rows, and
+// no row may score worse than it would under any of the five fixed PNG
+// predictors, measured the way the selection measures it.
+func TestPNGOptimumPredictorSelection(t *testing.T) {
+	params := Params{
+		Colors:           1,
+		BitsPerComponent: 8,
+		Columns:          8,
+		Predictor:        15,
+	}
+	const rowBytes = 8
+
+	data := []byte{
+		10, 20, 30, 40, 50, 60, 70, 80, // ramp: horizontal differencing wins
+		10, 20, 30, 40, 50, 60, 70, 80, // repeat of the row above: Up wins
+		200, 200, 200, 200, 200, 200, 200, 200, // constant
+		0, 255, 0, 255, 0, 255, 0, 255, // alternating
+	}
+
+	tags, scores := encodeAndScore(t, data, &params, rowBytes)
+
+	distinct := make(map[byte]bool)
+	for _, tag := range tags {
+		distinct[tag] = true
+	}
+	if len(distinct) < 2 {
+		t.Errorf("predictor 15 used %d distinct filter(s), want at least 2", len(distinct))
+	}
+
+	for _, fixed := range []int{10, 11, 12, 13, 14} {
+		fixedParams := params
+		fixedParams.Predictor = fixed
+		_, fixedScores := encodeAndScore(t, data, &fixedParams, rowBytes)
+		for row := range scores {
+			if scores[row] > fixedScores[row]+1e-9 {
+				t.Errorf("row %d: predictor 15 scored %g bits, predictor %d scored %g bits",
+					row, scores[row], fixed, fixedScores[row])
+			}
+		}
+	}
+}
+
+// TestPNGOptimumPredictorPackedData checks that the selection also runs below
+// 8 bits per component, where a byte packs several components: no row may
+// score worse than it would under any of the five fixed PNG predictors.
+func TestPNGOptimumPredictorPackedData(t *testing.T) {
+	for _, bpc := range []int{1, 2, 4} {
+		params := Params{
+			Colors:           3,
+			BitsPerComponent: bpc,
+			Columns:          8,
+			Predictor:        15,
+		}
+		rowBytes := (3 * bpc * 8) / 8
+
+		// a run of rows repeating the one above, where Up wins, followed by
+		// unrelated rows
+		data := make([]byte, 0, 6*rowBytes)
+		for row := range 6 {
+			for i := range rowBytes {
+				if row < 3 {
+					data = append(data, byte(i*37+11))
+				} else {
+					data = append(data, byte(i*13+row*57))
+				}
+			}
+		}
+
+		_, scores := encodeAndScore(t, data, &params, rowBytes)
+		if len(scores) != 6 {
+			t.Fatalf("bpc %d: got %d rows, want 6", bpc, len(scores))
+		}
+
+		for _, fixed := range []int{10, 11, 12, 13, 14} {
+			fixedParams := params
+			fixedParams.Predictor = fixed
+			_, fixedScores := encodeAndScore(t, data, &fixedParams, rowBytes)
+			for row := range scores {
+				if scores[row] > fixedScores[row]+1e-9 {
+					t.Errorf("bpc %d, row %d: predictor 15 scored %g bits, predictor %d scored %g bits",
+						bpc, row, scores[row], fixed, fixedScores[row])
+				}
+			}
+		}
+	}
+}
+
+// encodeAndScore encodes data with the given parameters and returns the filter
+// tag of each row together with the entropy of its residuals in bits, the
+// quantity the predictor 15 selection minimises.
+func encodeAndScore(t *testing.T, data []byte, params *Params, rowBytes int) ([]byte, []float64) {
+	t.Helper()
+
+	buf := &writeCloser{Buffer: &bytes.Buffer{}}
+	w, err := NewWriter(buf, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var tags []byte
+	var scores []float64
+	encoded := buf.Bytes()
+	for i := 0; i+rowBytes < len(encoded); i += rowBytes + 1 {
+		tags = append(tags, encoded[i])
+		scores = append(scores, rowEntropy(encoded[i+1:i+1+rowBytes]))
+	}
+	return tags, scores
+}
+
+// rowEntropy returns the order-0 entropy of row, in bits.
+func rowEntropy(row []byte) float64 {
+	var counts [256]int
+	for _, b := range row {
+		counts[b]++
+	}
+
+	n := float64(len(row))
+	total := 0.0
+	for _, c := range counts {
+		if c > 0 {
+			total -= float64(c) * math.Log2(float64(c)/n)
+		}
+	}
+	return total
 }
 
 func TestPNGDataSizeWithTagBytes(t *testing.T) {
