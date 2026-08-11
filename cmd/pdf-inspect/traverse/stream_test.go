@@ -125,7 +125,7 @@ func TestStreamNavigation(t *testing.T) {
 		},
 		{
 			name:        "stream dict key",
-			key:         "Length",
+			key:         "Type",
 			expectType:  "*traverse.objectCtx",
 			expectError: false,
 		},
@@ -139,8 +139,7 @@ func TestStreamNavigation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := pdf.NewStream(pdf.Dict{
-				"Type":   pdf.Name("XObject"),
-				"Length": pdf.Integer(100),
+				"Type": pdf.Name("XObject"),
 			}, []byte("test stream content"))
 
 			ctx := &objectCtx{obj: stream, r: nil} // Note: r is nil for this simple test
@@ -291,8 +290,8 @@ func TestObjectCtxKeysWithSpecialActions(t *testing.T) {
 			name: "stream with special actions",
 			obj: &pdf.Stream{
 				Dict: pdf.Dict{
-					"Type":   pdf.Name("XObject"),
-					"Length": pdf.Integer(100),
+					"Type":    pdf.Name("XObject"),
+					"Subtype": pdf.Name("Image"),
 				},
 			},
 			expected: []string{"`@encoded`", "`@raw`", "`dict`", "stream dict keys"},

@@ -840,6 +840,13 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 		l = trimTrailingEOL(origReader, start, l)
 	}
 
+	// /Length describes one serialisation of the stream rather than the
+	// stream itself, and the value above may have been repaired or recovered.
+	// Keeping it in the dictionary would leave two copies of the same fact
+	// which can disagree, so the recovered extent is the only one we keep;
+	// the writer computes /Length afresh.  See [Stream.Length].
+	delete(dict, "Length")
+
 	return &Stream{
 		Dict:   dict,
 		data:   origReader,

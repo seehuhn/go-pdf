@@ -320,10 +320,7 @@ func (c *objectCtx) explainSingleLine(obj pdf.Object) (string, error) {
 		} else {
 			parts = append(parts, "stream")
 		}
-		length, err := pdf.NewCursor(c.r).Integer(obj.Dict["Length"])
-		if err == nil {
-			parts = append(parts, fmt.Sprintf("%d bytes", length))
-		}
+		parts = append(parts, fmt.Sprintf("%d bytes", obj.Length()))
 		ff, ok := obj.Dict["Filter"]
 		if ok {
 			if name, err := pdf.NewCursor(c.r).Name(ff); err == nil {

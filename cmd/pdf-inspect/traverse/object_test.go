@@ -136,27 +136,27 @@ func TestObjectCtxNext(t *testing.T) {
 			name: "stream dict key",
 			obj: &pdf.Stream{
 				Dict: pdf.Dict{
-					"Type":   pdf.Name("XObject"),
-					"Length": pdf.Integer(100),
+					"Type":    pdf.Name("XObject"),
+					"Subtype": pdf.Name("Image"),
 				},
 			},
 			key: "dict",
 			expectedObj: pdf.Dict{
-				"Type":   pdf.Name("XObject"),
-				"Length": pdf.Integer(100),
+				"Type":    pdf.Name("XObject"),
+				"Subtype": pdf.Name("Image"),
 			},
 		},
 		{
 			name: "stream dictionary field",
 			obj: &pdf.Stream{
 				Dict: pdf.Dict{
-					"Type":   pdf.Name("XObject"),
-					"Length": pdf.Integer(100),
+					"Type":    pdf.Name("XObject"),
+					"Subtype": pdf.Name("Image"),
 				},
 			},
-			key:         "Length",
+			key:         "Subtype",
 			wantErr:     false,
-			expectedObj: pdf.Integer(100),
+			expectedObj: pdf.Name("Image"),
 		},
 		{
 			name: "stream invalid key",
@@ -253,8 +253,8 @@ func TestObjectCtxKeys(t *testing.T) {
 			name: "stream keys",
 			obj: &pdf.Stream{
 				Dict: pdf.Dict{
-					"Type":   pdf.Name("XObject"),
-					"Length": pdf.Integer(100),
+					"Type":    pdf.Name("XObject"),
+					"Subtype": pdf.Name("Image"),
 				},
 			},
 			expected: []string{"`@encoded`", "`@raw`", "`dict`", "stream dict keys"},

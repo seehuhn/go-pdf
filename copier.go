@@ -93,8 +93,6 @@ func (c *Copier) Copy(obj Native) (Native, error) {
 			res.data = bytes.NewReader(raw)
 			res.start = 0
 			res.length = int64(len(raw))
-			// remove stale Length so the writer recomputes it
-			delete(res.Dict, "Length")
 		case cryptUnsupportedCF:
 			return nil, errors.New(
 				"copying streams with non-Identity /Crypt filter is not yet supported")

@@ -171,6 +171,36 @@ func TestReferenceLoop(t *testing.T) {
 	}
 }
 
+// rawStream writes a stream object to w without going through
+// [Writer.OpenStream], which rejects a /Length that is not a direct
+// [Integer].  A conforming writer never produces such a file, so this is the
+// only way to build one for the reader tests below.
+//
+// Object framing is left to [streamWriter], so that these files stay in step
+// with the ones the library writes normally.  The wrapping which OpenStream
+// would add is skipped: the stream is written neither encrypted nor filtered,
+// so w must be an unencrypted writer and dict must describe unfiltered data.
+func rawStream(t *testing.T, w *Writer, ref Reference, dict Dict, body []byte) {
+	t.Helper()
+
+	if w.isEncrypted() {
+		t.Fatal("rawStream cannot write to an encrypted file")
+	}
+	err := w.setXRef(ref, &xRefEntry{Pos: w.w.pos, Generation: ref.Generation()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.w.ref = ref
+
+	sw := &streamWriter{parent: w, streamDict: dict, ref: ref}
+	if _, err := sw.Write(body); err != nil {
+		t.Fatal(err)
+	}
+	if err := sw.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestIndirectStreamLength(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w, err := NewWriter(buf, V1_7, nil)
@@ -187,18 +217,7 @@ func TestIndirectStreamLength(t *testing.T) {
 		"Length": sLength,
 	}
 	sRef := w.Alloc()
-	s, err := w.OpenStream(sRef, sDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = s.Write([]byte("123456"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	rawStream(t, w, sRef, sDict, []byte("123456"))
 	err = w.Put(sLength, Integer(6))
 	if err != nil {
 		t.Fatal(err)
@@ -220,8 +239,13 @@ func TestIndirectStreamLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sObj.Dict["Length"] != sLength {
-		t.Errorf("wrong stream length: got %v, want %v", sObj.Dict["Length"], sLength)
+	// the indirect /Length has to be resolved for the stream to be read at
+	// all; the entry itself does not survive into the Go representation
+	if _, present := sObj.Dict["Length"]; present {
+		t.Error("stream dictionary still carries a /Length entry")
+	}
+	if got := sObj.Length(); got != 6 {
+		t.Errorf("wrong stream length: got %d, want 6", got)
 	}
 	sData, err := io.ReadAll(sObj.NewReader())
 	if err != nil {
@@ -247,18 +271,7 @@ func TestStreamLengthInStream(t *testing.T) {
 		"Length": sLength,
 	}
 	sRef := w.Alloc()
-	s, err := w.OpenStream(sRef, sDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = s.Write([]byte("123456"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	rawStream(t, w, sRef, sDict, []byte("123456"))
 	err = w.WriteCompressed([]Reference{sLength}, Integer(6))
 	if err != nil {
 		t.Fatal(err)
@@ -280,8 +293,13 @@ func TestStreamLengthInStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sObj.Dict["Length"] != sLength {
-		t.Errorf("wrong stream length: got %v, want %v", sObj.Dict["Length"], sLength)
+	// the indirect /Length has to be resolved for the stream to be read at
+	// all; the entry itself does not survive into the Go representation
+	if _, present := sObj.Dict["Length"]; present {
+		t.Error("stream dictionary still carries a /Length entry")
+	}
+	if got := sObj.Length(); got != 6 {
+		t.Errorf("wrong stream length: got %d, want 6", got)
 	}
 	sData, err := io.ReadAll(sObj.NewReader())
 	if err != nil {
@@ -303,18 +321,7 @@ func TestStreamLengthCycle(t *testing.T) {
 		"Length": sLength,
 	}
 	sRef := w.Alloc()
-	s, err := w.OpenStream(sRef, sDict)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = s.Write([]byte("123456"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	rawStream(t, w, sRef, sDict, []byte("123456"))
 	err = w.Put(sLength, sLength) // infinite reference cycle
 	if err != nil {
 		t.Fatal(err)
@@ -373,19 +380,8 @@ func TestStreamLengthCycle2(t *testing.T) {
 		"First":  Integer(8),
 	}
 	sRef1 := w.Alloc()
-	s1, err := w.OpenStream(sRef1, sDict1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = s1.Write(fmt.Appendf(nil, "%d 0\n%d 2\n6\n90",
+	rawStream(t, w, sRef1, sDict1, fmt.Appendf(nil, "%d 0\n%d 2\n6\n90",
 		L1.Number(), xRef.Number()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s1.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 	sDict2 := Dict{
 		"Length": L1,
 		"Type":   Name("ObjStm"),
@@ -393,18 +389,7 @@ func TestStreamLengthCycle2(t *testing.T) {
 		"First":  Integer(4),
 	}
 	sRef2 := w.Alloc()
-	s2, err := w.OpenStream(sRef2, sDict2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = s2.Write(fmt.Appendf(nil, "%d 0\n12", L2.Number()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = s2.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	rawStream(t, w, sRef2, sDict2, fmt.Appendf(nil, "%d 0\n12", L2.Number()))
 	w.xref[L2.Number()] = &xRefEntry{
 		InStream: sRef2,
 		Pos:      0,

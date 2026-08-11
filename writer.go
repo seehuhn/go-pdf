@@ -514,15 +514,15 @@ func (w *Writer) Put(ref Reference, obj Object) error {
 	}
 
 	if stm, isStream := obj.(*Stream); isStream {
-		w, err := w.OpenStream(ref, stm.Dict)
+		ws, err := w.OpenStream(ref, stm.Dict)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(w, stm.NewReader())
+		_, err = io.Copy(ws, stm.NewReader())
 		if err != nil {
 			return err
 		}
-		err = w.Close()
+		err = ws.Close()
 		if err != nil {
 			return err
 		}
@@ -675,6 +675,16 @@ func checkCompressed(refs []Reference, objects []Object) error {
 // Filters are specified in order from outermost to innermost.
 // When reading, filters are applied in the given order.
 // When writing, filters are applied in reverse order.
+//
+// If dict contains a /Length entry, it must be a direct [Integer] giving the
+// number of bytes of stream data as they appear in the file.  Supplying the
+// value lets the writer emit the stream dictionary ahead of the data, which
+// saves an indirect object when the output cannot be seeked.  Closing the
+// returned writer reports an error if the value does not match the data
+// written; for all but the shortest streams the dictionary has been emitted
+// by then, so the output must be discarded if this happens.
+//
+// If /Length is absent, the writer determines the value itself.
 func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
 	if w.inStream {
 		return nil, errors.New("OpenStream() while stream is open")
@@ -729,10 +739,16 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 		streamDict[key] = inlined
 	}
 
+	// A caller-supplied /Length must be a value we can check against the data
+	// once it has been written.  A [Placeholder] is rejected along with every
+	// other type: the writer installs its own below, and one supplied here
+	// could do no better.
 	var length *Placeholder
-	if _, exists := streamDict["Length"]; !exists {
+	if lengthObj, exists := streamDict["Length"]; !exists {
 		length = NewPlaceholder(w, 12)
 		streamDict["Length"] = length
+	} else if _, isInteger := lengthObj.(Integer); !isInteger {
+		return nil, fmt.Errorf("Writer.OpenStream: /Length is %T, want Integer", lengthObj)
 	}
 
 	var streamBody io.WriteCloser = &streamWriter{

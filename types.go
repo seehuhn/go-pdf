@@ -894,11 +894,11 @@ func (d Dict) SortedKeys() []Name {
 // on-the-fly when the stream is decoded via [DecodeStream].
 //
 // Use [NewStream] to construct streams from in-memory data.
-// Use [Stream.NewReader] to obtain an independent reader over the raw data.
+// Use [Stream.NewReader] to obtain a reader for the raw data.
 type Stream struct {
 	Dict
 
-	data   io.ReaderAt // concurrent-safe data source
+	data   io.ReaderAt
 	start  int64
 	length int64
 
@@ -908,7 +908,12 @@ type Stream struct {
 }
 
 // NewStream creates a Stream from in-memory data.
+//
+// Any /Length entry in dict is dropped: the length of a stream is the length
+// of the data given here, and the writer records it when the stream is
+// written out.
 func NewStream(dict Dict, data []byte) *Stream {
+	delete(dict, "Length")
 	return &Stream{
 		Dict:   dict,
 		data:   bytes.NewReader(data),
@@ -916,7 +921,25 @@ func NewStream(dict Dict, data []byte) *Stream {
 	}
 }
 
-// NewReader returns a new, independent reader over the raw stream data.
+// Length returns the number of bytes of raw stream data held by x, which is
+// exactly the number of bytes [Stream.NewReader] yields.  The filters named
+// in /Filter have not been applied to these bytes.
+//
+// For a stream read from an encrypted file the bytes are still encrypted, so
+// the length is that of the encrypted form; decrypting may yield a different
+// number of bytes.  A stream produced by [Copier.Copy] from such a file holds
+// decrypted data, and the length is then that of the decrypted form.  In both
+// cases the value describes the bytes the stream currently holds.
+//
+// The stream dictionary does not carry a /Length entry.  A file may declare a
+// length which disagrees with the data actually present, so the value here is
+// the extent recovered when the stream was read, and it is what the writer
+// records when the stream is written out again.
+func (x *Stream) Length() int64 {
+	return x.length
+}
+
+// NewReader returns a new reader over the raw stream data.
 // Each call returns a reader with its own cursor, starting at position 0.
 // Concurrent calls are safe.
 func (x *Stream) NewReader() io.ReadSeeker {
@@ -941,10 +964,7 @@ func (x *Stream) String() string {
 	} else {
 		res = append(res, "Stream")
 	}
-	length, ok := x.Dict["Length"].(Integer)
-	if ok {
-		res = append(res, strconv.FormatInt(int64(length), 10)+" bytes")
-	}
+	res = append(res, strconv.FormatInt(x.length, 10)+" bytes")
 	switch filter := x.Dict["Filter"].(type) {
 	case Name:
 		res = append(res, string(filter))

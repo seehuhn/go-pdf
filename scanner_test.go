@@ -622,8 +622,13 @@ func TestStreamFromScanner(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected stream, got %T", stmObj)
 	}
-	if !Equal(stm.Dict, Dict{Name("Length"): Integer(5)}) {
+	// /Length is consumed while reading and does not become part of the
+	// stream's dictionary
+	if !Equal(stm.Dict, Dict{}) {
 		t.Errorf("wrong dict: %v", stm.Dict)
+	}
+	if got := stm.Length(); got != 5 {
+		t.Errorf("wrong stream length: got %d, want 5", got)
 	}
 	data, err := io.ReadAll(stm.NewReader())
 	if err != nil {
