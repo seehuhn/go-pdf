@@ -17,8 +17,8 @@
 package image
 
 import (
-	"errors"
 	"fmt"
+	"io"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
@@ -33,10 +33,6 @@ type Indexed struct {
 	Width      int
 	Height     int
 	ColorSpace color.Space
-
-	// Name is the PDF resource-dictionary key under which this image is
-	// referenced in content streams.  See [Dict.Name] for full semantics.
-	Name pdf.Name
 }
 
 // NewIndexed returns a new Indexed image of the given size.
@@ -61,10 +57,11 @@ func (im *Indexed) Subtype() pdf.Name {
 	return "Image"
 }
 
-// ResourceName returns the preferred resource-dictionary key for this image.
-// See [graphics.XObject.ResourceName].
+// ResourceName returns the empty string: Indexed does not expose a Name
+// field.  Callers who need a specific resource-dict key should wrap the image
+// in a [Dict] and set its Name field.  See [graphics.XObject.ResourceName].
 func (im *Indexed) ResourceName() pdf.Name {
-	return im.Name
+	return ""
 }
 
 // Embed adds the image to the PDF file.
@@ -82,45 +79,18 @@ func (im *Indexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 
-	csRef, err := rm.Embed(im.ColorSpace)
-	if err != nil {
-		return nil, err
+	// The image dictionary owns the choice of stream filter, so it is left to
+	// it rather than repeated here.
+	dict := &Dict{
+		Width:            im.Width,
+		Height:           im.Height,
+		ColorSpace:       im.ColorSpace,
+		BitsPerComponent: 8,
+		Data: NewFlateSource(im.Width, im.ColorSpace, 8,
+			func(w io.Writer) error {
+				_, err := w.Write(im.Pix)
+				return err
+			}),
 	}
-
-	imDict := pdf.Dict{
-		// "Type": pdf.Name("XObject"),
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(im.Width),
-		"Height":           pdf.Integer(im.Height),
-		"ColorSpace":       csRef,
-		"BitsPerComponent": pdf.Integer(8),
-	}
-	switch v := pdf.GetVersion(rm.Out()); {
-	case v == pdf.V1_0 && im.Name == "":
-		return nil, errors.New("missing image /Name field")
-	case v >= pdf.V2_0 && im.Name != "":
-		return nil, errors.New("unexpected /Name field")
-	}
-	if im.Name != "" {
-		imDict["Name"] = im.Name
-	}
-	filter := pdf.FilterCompress{
-		Columns:   im.Width,
-		Predictor: pdf.FlatePredictorPNGOptimum,
-	}
-	ref := rm.Alloc()
-	stream, err := rm.Out().OpenStream(ref, imDict, filter)
-	if err != nil {
-		return nil, err
-	}
-	_, err = stream.Write(im.Pix)
-	if err != nil {
-		return nil, err
-	}
-	err = stream.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	return ref, nil
+	return dict.Embed(rm)
 }

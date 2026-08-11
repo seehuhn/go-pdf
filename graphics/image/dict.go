@@ -71,6 +71,9 @@ type Dict struct {
 	// component values into the range of values appropriate for the image's
 	// color space. The slice must have twice the number of color components in
 	// the ColorSpace.
+	//
+	// On write, nil can be used as a shorthand for the color space dependent
+	// default Decode array.
 	Decode []float64
 
 	// Data holds the image pixel component values and controls how they are
@@ -527,15 +530,10 @@ func FromImage(img image.Image, colorSpace color.Space, bitsPerComponent int) *D
 		Height:           height,
 		ColorSpace:       colorSpace,
 		BitsPerComponent: bitsPerComponent,
-		Data: &FlateSource{
-			Predictor:        15,
-			Width:            width,
-			Colors:           colorSpace.Channels(),
-			BitsPerComponent: bitsPerComponent,
-			WriteData: func(w io.Writer) error {
+		Data: NewFlateSource(width, colorSpace, bitsPerComponent,
+			func(w io.Writer) error {
 				return writeImageData(w, img, colorSpace, bitsPerComponent)
-			},
-		},
+			}),
 	}
 }
 

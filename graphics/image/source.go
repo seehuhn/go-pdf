@@ -23,6 +23,7 @@ import (
 	"io"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // FlateSource writes raw pixel data to a PDF stream, compressed with
@@ -33,11 +34,11 @@ type FlateSource struct {
 	// with each row starting at a new byte boundary.
 	WriteData func(io.Writer) error
 
-	// Predictor selects the PNG predictor applied before Flate
-	// compression.  Common values are 15 (PNG optimum, used for colour
-	// images) and 12 (PNG up, used for grayscale soft-mask data).
-	// A zero value disables the predictor.
-	Predictor int
+	// Predictor selects the PNG predictor applied before Flate compression.
+	// Both a zero value and [pdf.FlatePredictorNone] disable the predictor.
+	// [NewFlateSource] fills this in from the colour space and bit depth;
+	// callers who want a different predictor can overwrite it.
+	Predictor pdf.FlatePredictor
 
 	// Width is the number of pixels per row, used as the Columns
 	// parameter for PNG prediction.
@@ -50,6 +51,36 @@ type FlateSource struct {
 	// BitsPerComponent is the number of bits per sample, used as the
 	// BitsPerComponent parameter for PNG prediction.
 	BitsPerComponent int
+}
+
+// NewFlateSource returns a source for image data.
+//
+// The image has width pixels per row, is in the given colour space and at the
+// given bit depth.
+func NewFlateSource(width int, cs color.Space, bitsPerComponent int, writeData func(io.Writer) error) *FlateSource {
+	return &FlateSource{
+		WriteData:        writeData,
+		Predictor:        flatePredictorFor(cs, bitsPerComponent),
+		Width:            width,
+		Colors:           cs.Channels(),
+		BitsPerComponent: bitsPerComponent,
+	}
+}
+
+// flatePredictorFor picks a PNG predictor for image data in the given colour
+// space at the given bit depth.
+func flatePredictorFor(cs color.Space, bitsPerComponent int) pdf.FlatePredictor {
+	// a sample is a palette position rather than a brightness, so the
+	// difference between neighbours carries no information
+	if cs.Family() == color.FamilyIndexed {
+		return pdf.FlatePredictorNone
+	}
+	// a byte holds several samples, and differencing whole bytes across
+	// sample boundaries costs more than it saves
+	if bitsPerComponent < 8 {
+		return pdf.FlatePredictorNone
+	}
+	return pdf.FlatePredictorPNGOptimum
 }
 
 // Pixels returns the raw, uncompressed pixel data.
@@ -73,9 +104,11 @@ func (s *FlateSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict p
 		return errors.New("FlateSource.WriteData is nil")
 	}
 
+	// Colors, BitsPerComponent and Columns are only allowed alongside a real
+	// predictor; setting them otherwise is a write-time error.
 	parms := pdf.FilterCompress{}
-	if s.Predictor != 0 {
-		parms.Predictor = pdf.FlatePredictor(s.Predictor)
+	if s.Predictor != 0 && s.Predictor != pdf.FlatePredictorNone {
+		parms.Predictor = s.Predictor
 		if s.Colors > 0 {
 			parms.Colors = s.Colors
 		}
@@ -110,15 +143,35 @@ type CCITTFaxSource struct {
 	// parameter for the CCITTFax filter.
 	Width int
 
-	// K controls the encoding algorithm: negative values select
-	// CCITT Group 4 (two-dimensional), zero selects Group 3
-	// one-dimensional, and positive K selects Group 3 mixed
-	// encoding.  Group 4 (K = -1) is recommended for most uses as
-	// it compresses significantly better than Group 3.
+	// K controls the encoding algorithm: negative values select CCITT
+	// Group 4 (two-dimensional), zero selects Group 3 one-dimensional, and
+	// positive K selects Group 3 mixed encoding.
+	//
+	// Group 4 is the right choice for data written to a file, and
+	// [NewCCITTFaxSource] selects it.  It compresses better than either
+	// Group 3 mode on any image with enough vertical structure to be worth
+	// encoding this way; where it does not, the image is one this filter
+	// expands rather than compresses.  The Group 3 modes restart the encoding
+	// periodically so that a transmission error damages only part of the
+	// image, which is of no use once the data is stored in a file.
+	//
+	// The zero value selects Group 3 one-dimensional.
 	K int
 
 	// BlackIs1, if true, sets BlackIs1=true in the filter parameters.
 	BlackIs1 bool
+}
+
+// NewCCITTFaxSource returns a source for 1-bit image data.
+//
+// The image has width pixels per row.  The data is encoded with CCITT
+// Group 4; see the K field for why the other modes are not offered here.
+func NewCCITTFaxSource(width int, writeData func(io.Writer) error) *CCITTFaxSource {
+	return &CCITTFaxSource{
+		WriteData: writeData,
+		Width:     width,
+		K:         -1,
+	}
 }
 
 // Pixels returns the raw, uncompressed pixel data.

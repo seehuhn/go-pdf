@@ -392,15 +392,10 @@ func FromImageAlpha(img image.Image, bitsPerComponent int) *SoftMask {
 		Width:            width,
 		Height:           height,
 		BitsPerComponent: bitsPerComponent,
-		Source: &FlateSource{
-			Predictor:        12,
-			Width:            width,
-			Colors:           1,
-			BitsPerComponent: bitsPerComponent,
-			WriteData: func(w io.Writer) error {
+		Source: NewFlateSource(width, color.SpaceDeviceGray, bitsPerComponent,
+			func(w io.Writer) error {
 				return writeSoftMaskData(w, img, bitsPerComponent)
-			},
-		},
+			}),
 	}
 }
 

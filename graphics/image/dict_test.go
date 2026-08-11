@@ -59,7 +59,7 @@ var testCases = []struct {
 			Height:           50,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
-			Data: &FlateSource{Predictor: 15, Width: 100, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 100, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Simple test pattern: alternating red and blue pixels
 				for y := range 50 {
 					for x := range 100 {
@@ -89,7 +89,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
 			Interpolate:      true,
-			Data: &FlateSource{Predictor: 15, Width: 25, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 25, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Gradient pattern
 				for y := range 25 {
 					for x := range 25 {
@@ -112,7 +112,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceCMYK,
 			BitsPerComponent: 8,
 			Decode:           []float64{0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0},
-			Data: &FlateSource{Predictor: 15, Width: 10, Colors: 4, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 10, Colors: 4, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Simple CMYK test pattern
 				for y := range 10 {
 					for x := range 10 {
@@ -138,7 +138,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			Intent:           graphics.RenderingIntent("Perceptual"),
-			Data: &FlateSource{Predictor: 15, Width: 20, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 20, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Solid color
 				for range 20 * 20 {
 					if _, err := w.Write([]byte{128, 64, 192}); err != nil {
@@ -158,7 +158,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			MaskColors:       []uint16{0, 10, 0, 10, 0, 10}, // mask near-black pixels
-			Data: &FlateSource{Predictor: 15, Width: 15, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 15, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Pattern with some pixels that will be masked
 				for y := range 15 {
 					for x := range 15 {
@@ -191,7 +191,7 @@ var testCases = []struct {
 				Width:            8,
 				Height:           8,
 				BitsPerComponent: 8,
-				Source: &FlateSource{Predictor: 12, Width: 8, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+				Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 8, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 					// Alpha gradient
 					for y := range 8 {
 						for x := range 8 {
@@ -204,7 +204,7 @@ var testCases = []struct {
 					return nil
 				}},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 8, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 8, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// RGB data
 				for y := range 8 {
 					for x := range 8 {
@@ -233,7 +233,7 @@ var testCases = []struct {
 				Height:           4,
 				BitsPerComponent: 8,
 				Matte:            []float64{0.5, 0.3, 0.7}, // RGB matte color
-				Source: &FlateSource{Predictor: 12, Width: 4, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+				Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 4, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 					// Simple alpha pattern
 					for i := range 16 {
 						alpha := uint8((i % 4) * 85)
@@ -244,7 +244,7 @@ var testCases = []struct {
 					return nil
 				}},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Pre-blended RGB data
 				for range 16 {
 					r := uint8(200)
@@ -266,7 +266,7 @@ var testCases = []struct {
 			Height:           16,
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 1,
-			Data: &FlateSource{Predictor: 15, Width: 16, Colors: 1, BitsPerComponent: 1, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 16, Colors: 1, BitsPerComponent: 1, WriteData: func(w io.Writer) error {
 				// Checkerboard pattern in 1-bit
 				buf := NewPixelRow(16, 1)
 				for y := range 16 {
@@ -291,7 +291,7 @@ var testCases = []struct {
 			Height:           5,
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
-			Data: &FlateSource{Predictor: 15, Width: 5, Colors: 3, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 5, Colors: 3, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
 				// High precision RGB data
 				buf := NewPixelRow(5*3, 16) // 5 pixels * 3 channels
 				for y := range 5 {
@@ -327,7 +327,7 @@ var testCases = []struct {
 						Height:           12,
 						ColorSpace:       color.SpaceDeviceRGB,
 						BitsPerComponent: 8,
-						Data: &FlateSource{Predictor: 15, Width: 12, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+						Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 12, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 							// RGB version
 							for i := range 144 {
 								val := uint8(i * 255 / 143)
@@ -340,7 +340,7 @@ var testCases = []struct {
 					},
 				},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 12, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 12, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Grayscale version
 				for i := range 144 {
 					val := uint8(i * 255 / 143)
@@ -367,7 +367,7 @@ var testCases = []struct {
 						Height:           4,
 						ColorSpace:       color.SpaceDeviceRGB,
 						BitsPerComponent: 8,
-						Data: &FlateSource{Predictor: 15, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+						Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 							for range 16 {
 								if _, err := w.Write([]byte{100, 150, 200}); err != nil {
 									return err
@@ -379,7 +379,7 @@ var testCases = []struct {
 					DefaultForPrinting: true,
 				},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 4, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 4, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				for range 16 {
 					if _, err := w.Write([]byte{128}); err != nil {
 						return err
@@ -404,7 +404,7 @@ var testCases = []struct {
 						Height:           4,
 						ColorSpace:       color.SpaceDeviceRGB,
 						BitsPerComponent: 8,
-						Data: &FlateSource{Predictor: 15, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+						Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 							for range 16 {
 								if _, err := w.Write([]byte{50, 100, 150}); err != nil {
 									return err
@@ -419,7 +419,7 @@ var testCases = []struct {
 					},
 				},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 4, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 4, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				for range 16 {
 					if _, err := w.Write([]byte{64}); err != nil {
 						return err
@@ -438,7 +438,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
 			// Skip metadata for now - requires properly initialized XMP packet
-			Data: &FlateSource{Predictor: 15, Width: 8, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 8, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Simple pattern
 				for i := range 64 {
 					val := uint8(i * 4)
@@ -474,7 +474,7 @@ var testCases = []struct {
 				},
 				SingleUse: false,
 			},
-			Data: &FlateSource{Predictor: 15, Width: 6, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 6, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Geospatial RGB data
 				for y := range 6 {
 					for x := range 6 {
@@ -502,7 +502,7 @@ var testCases = []struct {
 				Name:   "TestLayer",
 				Intent: []pdf.Name{"View"},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 10, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 10, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// Simple RGB pattern
 				for i := range 100 {
 					r := uint8((i * 3) % 256)
@@ -525,7 +525,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
 			StructParent:     optional.NewUInt(0),
-			Data: &FlateSource{Predictor: 15, Width: 1, Colors: 3, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 1, Colors: 3, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{0, 1, 2, 3, 4, 5})
 				return err
 			}},
@@ -540,7 +540,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 16,
 			StructParent:     optional.NewUInt(42),
-			Data: &FlateSource{Predictor: 15, Width: 1, Colors: 3, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 1, Colors: 3, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{0, 1, 2, 3, 4, 5})
 				return err
 			}},
@@ -557,7 +557,7 @@ var testCases = []struct {
 			MaskImage: &Mask{
 				Width:  4,
 				Height: 4,
-				Source: &CCITTFaxSource{Width: 4, K: -1, WriteData: func(w io.Writer) error {
+				Source: NewCCITTFaxSource(4, func(w io.Writer) error {
 					// 4x4 1-bit mask: checkerboard
 					buf := NewPixelRow(4, 1)
 					for y := range 4 {
@@ -570,9 +570,9 @@ var testCases = []struct {
 						}
 					}
 					return nil
-				}},
+				}),
 			},
-			Data: &FlateSource{Predictor: 15, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 4, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				for range 16 {
 					if _, err := w.Write([]byte{100, 150, 200}); err != nil {
 						return err
@@ -597,7 +597,7 @@ var testCases = []struct {
 					AFRelationship:  file.RelationshipData,
 				},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{10, 20, 30, 40})
 				return err
 			}},
@@ -615,7 +615,7 @@ var testCases = []struct {
 				ID: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
 					0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10},
 			},
-			Data: &FlateSource{Predictor: 15, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{50, 100, 150, 200})
 				return err
 			}},
@@ -630,10 +630,104 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceGray,
 			BitsPerComponent: 8,
 			Name:             "Im0",
-			Data: &FlateSource{Predictor: 15, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				_, err := w.Write([]byte{0, 255, 128, 64})
 				return err
 			}},
+		},
+	},
+
+	// The cases below use [NewFlateSource] rather than a literal, so that the
+	// predictor each one gets is the one the library picks for it.  Their
+	// widths leave spare bits at the end of a row, which a predictor has to
+	// carry through untouched.
+	{
+		name:    "2-bit grayscale",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:            5,
+			Height:           4,
+			ColorSpace:       color.SpaceDeviceGray,
+			BitsPerComponent: 2,
+			Data: NewFlateSource(5, color.SpaceDeviceGray, 2, func(w io.Writer) error {
+				buf := NewPixelRow(5, 2)
+				for y := range 4 {
+					buf.Reset()
+					for x := range 5 {
+						buf.AppendBits(uint16((x + y) % 4))
+					}
+					if _, err := w.Write(buf.Bytes()); err != nil {
+						return err
+					}
+				}
+				return nil
+			}),
+		},
+	},
+	{
+		name:    "4-bit RGB",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:            3,
+			Height:           3,
+			ColorSpace:       color.SpaceDeviceRGB,
+			BitsPerComponent: 4,
+			Data: NewFlateSource(3, color.SpaceDeviceRGB, 4, func(w io.Writer) error {
+				buf := NewPixelRow(3*3, 4)
+				for y := range 3 {
+					buf.Reset()
+					for x := range 3 {
+						buf.AppendBits(uint16(x * 5))
+						buf.AppendBits(uint16(y * 5))
+						buf.AppendBits(uint16((x + y) % 16))
+					}
+					if _, err := w.Write(buf.Bytes()); err != nil {
+						return err
+					}
+				}
+				return nil
+			}),
+		},
+	},
+	{
+		name:    "indexed 8-bit",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:            4,
+			Height:           3,
+			ColorSpace:       testPalette,
+			BitsPerComponent: 8,
+			Data: NewFlateSource(4, testPalette, 8, func(w io.Writer) error {
+				pix := make([]byte, 4*3)
+				for i := range pix {
+					pix[i] = byte(i % 4)
+				}
+				_, err := w.Write(pix)
+				return err
+			}),
+		},
+	},
+	{
+		name:    "indexed 4-bit",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:            5,
+			Height:           3,
+			ColorSpace:       testPalette,
+			BitsPerComponent: 4,
+			Data: NewFlateSource(5, testPalette, 4, func(w io.Writer) error {
+				buf := NewPixelRow(5, 4)
+				for y := range 3 {
+					buf.Reset()
+					for x := range 5 {
+						buf.AppendBits(uint16((x + y) % 4))
+					}
+					if _, err := w.Write(buf.Bytes()); err != nil {
+						return err
+					}
+				}
+				return nil
+			}),
 		},
 	},
 }
@@ -759,6 +853,9 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 			pixB, errB := b.Pixels()
 			return errA == nil && errB == nil && bytes.Equal(pixA, pixB)
 		}),
+		// colour spaces carry unexported state, e.g. the palette of an
+		// indexed space, so compare them by what they mean
+		cmp.Comparer(color.SpacesEqual),
 	}
 
 	if diff := cmp.Diff(data, decoded, opts...); diff != "" {
@@ -1445,7 +1542,7 @@ func TestDictJPXRoundTrip(t *testing.T) {
 // write-time rejections.
 func TestDictRejectInvalidWriteCombinations(t *testing.T) {
 	rgbData := &FlateSource{
-		Predictor: 15, Width: 1, Colors: 3, BitsPerComponent: 8,
+		Predictor: pdf.FlatePredictorPNGOptimum, Width: 1, Colors: 3, BitsPerComponent: 8,
 		WriteData: func(w io.Writer) error {
 			_, err := w.Write([]byte{0, 0, 0})
 			return err
@@ -1576,5 +1673,31 @@ func TestExtractDictDCTDimensionMismatch(t *testing.T) {
 	const want = 32 * 32 * 3
 	if len(pixels) != want {
 		t.Errorf("Pixels() returned %d bytes, want %d (W·H·nComp = 32·32·3)", len(pixels), want)
+	}
+}
+
+// TestDictNameRejectedAt2_0 checks that /Name, which PDF 2.0 removed, is
+// refused at that version.
+//
+// The companion rule that PDF 1.0 requires a /Name cannot be reached: every
+// colour space needs PDF 1.1, and a non-JPX image needs a colour space, so no
+// image XObject can be written at PDF 1.0 in the first place.
+func TestDictNameRejectedAt2_0(t *testing.T) {
+	d := &Dict{
+		Width:            2,
+		Height:           1,
+		ColorSpace:       color.SpaceDeviceGray,
+		BitsPerComponent: 8,
+		Name:             "Im1",
+		Data: NewFlateSource(2, color.SpaceDeviceGray, 8, func(w io.Writer) error {
+			_, err := w.Write([]byte{0, 255})
+			return err
+		}),
+	}
+
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+	if _, err := rm.Embed(d); err == nil {
+		t.Error("no error for a /Name at PDF 2.0")
 	}
 }

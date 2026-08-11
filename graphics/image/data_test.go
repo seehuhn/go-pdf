@@ -22,6 +22,7 @@ import (
 	"io"
 	"testing"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -132,7 +133,7 @@ func TestDataLoadRGB8(t *testing.T) {
 		Height:           2,
 		ColorSpace:       color.SpaceDeviceRGB,
 		BitsPerComponent: 8,
-		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 			// row 0: red, green
 			// row 1: blue, white
 			_, err := w.Write([]byte{
@@ -174,7 +175,7 @@ func TestDataLoadCMYK8(t *testing.T) {
 		Height:           1,
 		ColorSpace:       color.SpaceDeviceCMYK,
 		BitsPerComponent: 8,
-		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 4, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 4, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 			// cyan, black
 			_, err := w.Write([]byte{
 				255, 0, 0, 0, 0, 0, 0, 255,
@@ -207,7 +208,7 @@ func TestDataLoad1Bit(t *testing.T) {
 		Height:           1,
 		ColorSpace:       color.SpaceDeviceGray,
 		BitsPerComponent: 1,
-		Data: &FlateSource{Predictor: 15, Width: 8, Colors: 1, BitsPerComponent: 1, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 8, Colors: 1, BitsPerComponent: 1, WriteData: func(w io.Writer) error {
 			// 10101010 = 0xAA
 			_, err := w.Write([]byte{0xAA})
 			return err
@@ -239,7 +240,7 @@ func TestDataLoad16Bit(t *testing.T) {
 		Height:           1,
 		ColorSpace:       color.SpaceDeviceGray,
 		BitsPerComponent: 16,
-		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 1, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 1, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
 			// pixel 0: 0x0000 = 0, pixel 1: 0xFFFF = 1
 			_, err := w.Write([]byte{0, 0, 0xFF, 0xFF})
 			return err
@@ -269,7 +270,7 @@ func TestDataLoadDecode(t *testing.T) {
 		ColorSpace:       color.SpaceDeviceGray,
 		BitsPerComponent: 8,
 		Decode:           []float64{1, 0}, // inverted
-		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 			// sample 0 -> decode[0]=1, sample 255 -> decode[1]=0
 			_, err := w.Write([]byte{0, 255})
 			return err
@@ -303,7 +304,7 @@ func TestDataLoadShortDecode(t *testing.T) {
 		ColorSpace:       color.SpaceDeviceRGB, // needs len(Decode) == 6
 		BitsPerComponent: 8,
 		Decode:           []float64{0, 1}, // too short
-		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 			_, err := w.Write([]byte{
 				255, 0, 0, 0, 255, 0,
 				0, 0, 255, 255, 255, 255,
@@ -345,7 +346,7 @@ func TestDataLoadLongDecode(t *testing.T) {
 		ColorSpace:       color.SpaceDeviceGray,
 		BitsPerComponent: 8,
 		Decode:           []float64{1, 0, 9, 9}, // inverted, with surplus entries
-		Data: &FlateSource{Predictor: 15, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 2, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 			_, err := w.Write([]byte{0, 255})
 			return err
 		}},
@@ -420,7 +421,7 @@ func TestDataLoadPatternError(t *testing.T) {
 		Height:           1,
 		ColorSpace:       color.SpacePatternColored,
 		BitsPerComponent: 8,
-		Data: &FlateSource{Predictor: 15, Width: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+		Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 			return nil
 		}},
 	}

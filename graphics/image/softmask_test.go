@@ -37,7 +37,7 @@ var softMaskTests = []struct {
 			Width:            100,
 			Height:           50,
 			BitsPerComponent: 8,
-			Source: &FlateSource{Predictor: 12, Width: 100, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 100, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// generate test pattern
 				buf := make([]byte, 100*50)
 				for i := range buf {
@@ -54,7 +54,7 @@ var softMaskTests = []struct {
 			Width:            32,
 			Height:           16,
 			BitsPerComponent: 1,
-			Source: &FlateSource{Predictor: 12, Width: 32, Colors: 1, BitsPerComponent: 1, WriteData: func(w io.Writer) error {
+			Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 32, Colors: 1, BitsPerComponent: 1, WriteData: func(w io.Writer) error {
 				// generate 1-bit test pattern (checkerboard)
 				buf := NewPixelRow(32, 1)
 				for y := range 16 {
@@ -78,7 +78,7 @@ var softMaskTests = []struct {
 			Height:           32,
 			BitsPerComponent: 4,
 			Decode:           []float64{1.0, 0.0}, // inverted
-			Source: &FlateSource{Predictor: 12, Width: 64, Colors: 1, BitsPerComponent: 4, WriteData: func(w io.Writer) error {
+			Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 64, Colors: 1, BitsPerComponent: 4, WriteData: func(w io.Writer) error {
 				// generate 4-bit test pattern
 				buf := NewPixelRow(64, 4)
 				for y := range 32 {
@@ -102,7 +102,7 @@ var softMaskTests = []struct {
 			Height:           25,
 			BitsPerComponent: 8,
 			Interpolate:      true,
-			Source: &FlateSource{Predictor: 12, Width: 25, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 25, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// radial gradient
 				buf := make([]byte, 25*25)
 				center := 12.0
@@ -127,7 +127,7 @@ var softMaskTests = []struct {
 			Height:           30,
 			BitsPerComponent: 8,
 			Matte:            []float64{0.5, 0.3, 0.8}, // RGB matte color
-			Source: &FlateSource{Predictor: 12, Width: 40, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
+			Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 40, Colors: 1, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
 				// diagonal gradient
 				buf := make([]byte, 40*30)
 				for y := range 30 {
@@ -147,7 +147,7 @@ var softMaskTests = []struct {
 			Width:            16,
 			Height:           8,
 			BitsPerComponent: 2,
-			Source: &FlateSource{Predictor: 12, Width: 16, Colors: 1, BitsPerComponent: 2, WriteData: func(w io.Writer) error {
+			Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 16, Colors: 1, BitsPerComponent: 2, WriteData: func(w io.Writer) error {
 				// generate 2-bit test pattern
 				buf := NewPixelRow(16, 2)
 				for y := range 8 {
@@ -170,7 +170,7 @@ var softMaskTests = []struct {
 			Width:            10,
 			Height:           5,
 			BitsPerComponent: 16,
-			Source: &FlateSource{Predictor: 12, Width: 10, Colors: 1, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
+			Source: &FlateSource{Predictor: pdf.FlatePredictorPNGUp, Width: 10, Colors: 1, BitsPerComponent: 16, WriteData: func(w io.Writer) error {
 				// write 16-bit samples
 				buf := make([]byte, 10*5*2) // 2 bytes per sample
 				for i := 0; i < len(buf); i += 2 {

@@ -72,17 +72,11 @@ func (im *Lab8) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		Height:           im.Height,
 		ColorSpace:       cs,
 		BitsPerComponent: 8,
-		Decode:           []float64{0, 100, -100, 100, -100, 100},
-		Data: &pdfimage.FlateSource{
-			Predictor:        15,
-			Width:            im.Width,
-			Colors:           3,
-			BitsPerComponent: 8,
-			WriteData: func(w io.Writer) error {
+		Data: pdfimage.NewFlateSource(im.Width, cs, 8,
+			func(w io.Writer) error {
 				_, err := w.Write(im.PixData)
 				return err
-			},
-		},
+			}),
 		Interpolate: true,
 	}
 	return dict.Embed(e)

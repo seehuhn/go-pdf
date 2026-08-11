@@ -118,13 +118,9 @@ func FromImageMask(img image.Image) *Mask {
 	return &Mask{
 		Width:  width,
 		Height: height,
-		Source: &CCITTFaxSource{
-			Width: width,
-			K:     -1, // Group 4
-			WriteData: func(w io.Writer) error {
-				return writeImageMaskData(w, img)
-			},
-		},
+		Source: NewCCITTFaxSource(width, func(w io.Writer) error {
+			return writeImageMaskData(w, img)
+		}),
 	}
 }
 

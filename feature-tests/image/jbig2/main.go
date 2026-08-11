@@ -670,11 +670,8 @@ func bitmapToGrayImage(bm *bitmap.Bitmap) *pdfimg.Dict {
 		ColorSpace:       color.SpaceDeviceGray,
 		BitsPerComponent: 1,
 		Decode:           []float64{1, 0}, // bitmap 1=black → gray 0.0=black
-		Data: &pdfimg.FlateSource{
-			Width:            bm.Width(),
-			Colors:           1,
-			BitsPerComponent: 1,
-			WriteData: func(w io.Writer) error {
+		Data: pdfimg.NewFlateSource(bm.Width(), color.SpaceDeviceGray, 1,
+			func(w io.Writer) error {
 				stride := (bm.Width() + 7) / 8
 				for y := 0; y < bm.Height(); y++ {
 					_, err := w.Write(bm.Pix[y*bm.Stride : y*bm.Stride+stride])
@@ -683,8 +680,7 @@ func bitmapToGrayImage(bm *bitmap.Bitmap) *pdfimg.Dict {
 					}
 				}
 				return nil
-			},
-		},
+			}),
 	}
 }
 

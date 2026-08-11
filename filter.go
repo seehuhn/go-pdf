@@ -231,6 +231,9 @@ func (f FilterRunLength) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io
 type FlatePredictor int
 
 // Predictor values as defined by PDF spec Table 10.
+//
+// Some PDF viewers seem to have poor support for [FlatePredictorTIFF] at bit
+// depths other than 1 and 8.
 const (
 	FlatePredictorNone       FlatePredictor = 1
 	FlatePredictorTIFF       FlatePredictor = 2
