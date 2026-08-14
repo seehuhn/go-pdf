@@ -16,21 +16,24 @@
 
 package printprep
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/geom/matrix"
+
+	"seehuhn.de/go/pdf"
+)
 
 // maxResourceDepth bounds recursion through nested form XObjects and patterns,
 // protecting against cycles and pathologically deep nesting in malformed input.
 const maxResourceDepth = 40
 
-// form XObject dictionary keys that are carried over.  Content-defining keys
-// (Length, Filter, DecodeParms) are rewritten, Resources is converted, and
-// everything else (metadata, structure, optional content, piece info, ...) is
-// dropped.
+// form XObject dictionary keys that are carried over verbatim.  Content-defining
+// keys (Length, Filter, DecodeParms) are rewritten, Resources is converted,
+// BBox and Matrix are written as decoded (see [converter.normalizeBBoxMatrix]),
+// and everything else (metadata, structure, optional content, piece info, ...)
+// is dropped.
 var keepFormKeys = []pdf.Name{
 	"Subtype",
 	"FormType",
-	"BBox",
-	"Matrix",
 	"Group",
 }
 
@@ -165,6 +168,9 @@ func (c *converter) buildFormAt(outRef pdf.Reference, stm *pdf.Stream, depth int
 		}
 		dict[key] = cv
 	}
+	if err := c.normalizeBBoxMatrix(dict, stm.Dict); err != nil {
+		return 0, err
+	}
 	if newRes != nil {
 		dict["Resources"] = newRes
 	}
@@ -261,6 +267,9 @@ func (c *converter) buildPatternAt(outRef pdf.Reference, stm *pdf.Stream, depth 
 		}
 		dict[key] = cv
 	}
+	if err := c.normalizeBBoxMatrix(dict, stm.Dict); err != nil {
+		return 0, err
+	}
 	if newRes != nil {
 		dict["Resources"] = newRes
 	}
@@ -276,6 +285,38 @@ func (c *converter) buildPatternAt(outRef pdf.Reference, stm *pdf.Stream, depth 
 		return 0, err
 	}
 	return outRef, nil
+}
+
+// normalizeBBoxMatrix sets the /BBox and /Matrix entries of a rewritten
+// content-carrying stream (a form XObject or a tiling pattern) to the values
+// the decoder reads from src, replacing any verbatim copies already in dict.
+// Anything computed from the decoded stream -- the placement of a flattened
+// annotation appearance, a render checked against the printed page -- then
+// agrees with the output.  For well-formed entries the values are unchanged;
+// a repair (a malformed matrix read as the identity, a reversed box put in
+// order) reaches the output because the repaired value is the one held in
+// memory, as everywhere in the library.  An unreadable BBox has no repaired
+// value and is kept verbatim, best-effort.
+func (c *converter) normalizeBBoxMatrix(dict, src pdf.Dict) error {
+	cur := pdf.CursorAt(c.x, nil)
+	if bbox, err := cur.Rectangle(src["BBox"]); err == nil && bbox != nil {
+		dict["BBox"] = bbox
+	} else if nv, ok := src["BBox"].(pdf.Native); ok {
+		cv, err := c.copy.Copy(nv)
+		if err != nil {
+			return err
+		}
+		dict["BBox"] = cv
+	}
+	delete(dict, "Matrix") // an identity matrix is written by omission
+	if m, err := cur.Matrix(src["Matrix"]); err == nil &&
+		m != matrix.Identity && m != matrix.Zero {
+		dict["Matrix"] = pdf.Array{
+			pdf.Number(m[0]), pdf.Number(m[1]), pdf.Number(m[2]),
+			pdf.Number(m[3]), pdf.Number(m[4]), pdf.Number(m[5]),
+		}
+	}
+	return nil
 }
 
 // copyNative copies a value through the copier, skipping non-Native values

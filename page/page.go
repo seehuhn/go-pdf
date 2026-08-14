@@ -62,6 +62,26 @@ const (
 	Rotate270
 )
 
+// RotationFromDegrees returns the Rotation for a /Rotate value read from a
+// file.  The value is normalized modulo 360, so that -90 gives Rotate270 and
+// 450 gives Rotate90.  A page rotation must be a multiple of 90; any other
+// value yields Rotate0.
+//
+// The result is never RotateInherit: an absent /Rotate entry, not a value,
+// is what selects inheritance.
+func RotationFromDegrees(deg int) Rotation {
+	switch ((deg % 360) + 360) % 360 {
+	case 90:
+		return Rotate90
+	case 180:
+		return Rotate180
+	case 270:
+		return Rotate270
+	default:
+		return Rotate0
+	}
+}
+
 // Degrees returns the rotation in degrees.
 // For RotateInherit, this returns 0 (the default inherited value).
 func (r Rotation) Degrees() int {
@@ -705,21 +725,7 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 		if err != nil {
 			return nil, err
 		}
-		// Normalize to 0, 90, 180, 270
-		deg := ((int(rotate) % 360) + 360) % 360
-		switch deg {
-		case 0:
-			p.Rotate = Rotate0
-		case 90:
-			p.Rotate = Rotate90
-		case 180:
-			p.Rotate = Rotate180
-		case 270:
-			p.Rotate = Rotate270
-		default:
-			// Invalid values default to Rotate0
-			p.Rotate = Rotate0
-		}
+		p.Rotate = RotationFromDegrees(int(rotate))
 	}
 	// If Rotate key is absent, p.Rotate remains RotateInherit (zero value)
 

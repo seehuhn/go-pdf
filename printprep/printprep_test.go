@@ -18,6 +18,7 @@ package printprep
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -201,5 +202,100 @@ func TestWriteFromEncrypted(t *testing.T) {
 	}
 	if rr.GetMeta().Trailer["Encrypt"] != nil {
 		t.Error("output is still encrypted")
+	}
+}
+
+// rotatedSource builds a one-page document whose page carries the given
+// /Rotate value verbatim, and whose page-tree node carries parentRotate.
+// A nil value omits the entry.
+func rotatedSource(t *testing.T, pageRotate, parentRotate pdf.Object) *pdf.Reader {
+	t.Helper()
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	contentRef := w.Alloc()
+	stm, err := w.OpenStream(contentRef, pdf.Dict{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(stm, "0 0 1 rg 10 10 40 20 re f\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	pageRef, pagesRef := w.Alloc(), w.Alloc()
+	pageDict := pdf.Dict{
+		"Type": pdf.Name("Page"), "Parent": pagesRef,
+		"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(200), pdf.Integer(300)},
+		"Contents": contentRef,
+	}
+	if pageRotate != nil {
+		pageDict["Rotate"] = pageRotate
+	}
+	w.Put(pageRef, pageDict)
+
+	pagesDict := pdf.Dict{
+		"Type": pdf.Name("Pages"), "Kids": pdf.Array{pageRef}, "Count": pdf.Integer(1),
+	}
+	if parentRotate != nil {
+		pagesDict["Rotate"] = parentRotate
+	}
+	w.Put(pagesRef, pagesDict)
+	w.GetMeta().Catalog.Pages = pagesRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+// TestWriteRotate checks the /Rotate entry of the output page.  The value is
+// the one printprep reads, not the one the file gives: the flattened
+// annotations are placed under that reading, so the page must agree with it.
+// A value which is not a multiple of 90 reads as no rotation and is left out.
+func TestWriteRotate(t *testing.T) {
+	cases := []struct {
+		name         string
+		pageRotate   pdf.Object
+		parentRotate pdf.Object
+		want         pdf.Object
+	}{
+		{name: "absent"},
+		{name: "upright", pageRotate: pdf.Integer(0)},
+		{name: "quarterTurn", pageRotate: pdf.Integer(90), want: pdf.Integer(90)},
+		{name: "negative", pageRotate: pdf.Integer(-90), want: pdf.Integer(270)},
+		{name: "fullTurnPlus", pageRotate: pdf.Integer(450), want: pdf.Integer(90)},
+		{name: "notAMultipleOf90", pageRotate: pdf.Integer(45)},
+		{name: "real", pageRotate: pdf.Real(180), want: pdf.Integer(180)},
+		{name: "malformed", pageRotate: pdf.Name("sideways")},
+		{name: "inherited", parentRotate: pdf.Integer(270), want: pdf.Integer(270)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := rotatedSource(t, tc.pageRotate, tc.parentRotate)
+
+			var out bytes.Buffer
+			if err := Write(&out, r, nil); err != nil {
+				t.Fatal(err)
+			}
+			res := out.Bytes()
+			rr, err := pdf.NewReader(bytes.NewReader(res), int64(len(res)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, pageDict, err := pagetree.GetPage(rr, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := pageDict["Rotate"]; got != tc.want {
+				t.Errorf("output /Rotate = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

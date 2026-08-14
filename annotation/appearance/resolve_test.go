@@ -17,6 +17,7 @@
 package appearance
 
 import (
+	"math"
 	"testing"
 
 	"seehuhn.de/go/geom/matrix"
@@ -252,6 +253,81 @@ func TestAppearanceToRect(t *testing.T) {
 	}
 }
 
+// TestAppearanceXObjectToRect checks the placement used when the appearance is
+// drawn as a form XObject: the Do operator applies the form matrix, so the
+// matrix must carry the form's own coordinates into the rectangle only once.
+// Composing it with the form matrix therefore has to reproduce [ToRect].
+func TestAppearanceXObjectToRect(t *testing.T) {
+	rect := pdf.Rectangle{LLx: 100, LLy: 200, URx: 220, URy: 260}
+
+	cases := []struct {
+		name   string
+		bbox   pdf.Rectangle
+		matrix matrix.Matrix
+	}{
+		{
+			name:   "identity",
+			bbox:   pdf.Rectangle{URx: 24, URy: 24},
+			matrix: matrix.Identity,
+		},
+		{
+			name:   "zeroMatrix",
+			bbox:   pdf.Rectangle{URx: 24, URy: 24},
+			matrix: matrix.Zero,
+		},
+		{
+			// the case which distinguishes the two: a quarter turn applied
+			// twice lands the appearance at right angles to the rectangle
+			name:   "quarterTurn",
+			bbox:   pdf.Rectangle{URx: 60, URy: 30},
+			matrix: matrix.RotateDeg(90),
+		},
+		{
+			name:   "rotated",
+			bbox:   pdf.Rectangle{URx: 40, URy: 10},
+			matrix: matrix.RotateDeg(30),
+		},
+		{
+			name:   "scaledAndTranslated",
+			bbox:   pdf.Rectangle{LLx: -10, LLy: 5, URx: 30, URy: 45},
+			matrix: matrix.Scale(2, 3).Mul(matrix.Translate(-17, 42)),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ap := testForm(tc.bbox, tc.matrix)
+
+			m, ok := XObjectToRect(ap, rect)
+			if !ok {
+				t.Fatal("no appearance to draw")
+			}
+
+			formMatrix := tc.matrix
+			if formMatrix == matrix.Zero {
+				formMatrix = matrix.Identity
+			}
+			// what the Do operator ends up applying
+			effective := formMatrix.Mul(m)
+
+			want, ok := ToRect(ap, rect)
+			if !ok {
+				t.Fatal("no appearance to draw")
+			}
+			for i := range effective {
+				if math.Abs(effective[i]-want[i]) > 1e-9 {
+					t.Fatalf("effective matrix = %v, want %v", effective, want)
+				}
+			}
+
+			got := mappedBounds(tc.bbox, effective)
+			if !got.NearlyEqual(&rect, 1e-9) {
+				t.Errorf("mapped bounding box = %s, want %s", &got, &rect)
+			}
+		})
+	}
+}
+
 // TestAppearanceToRectNothingToDraw checks the cases where there is nothing to
 // draw and no matrix to draw it with.
 func TestAppearanceToRectNothingToDraw(t *testing.T) {
@@ -288,6 +364,9 @@ func TestAppearanceToRectNothingToDraw(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if _, ok := ToRect(tc.ap, rect); ok {
 				t.Error("got a matrix for an appearance with nothing to draw")
+			}
+			if _, ok := XObjectToRect(tc.ap, rect); ok {
+				t.Error("got an XObject matrix for an appearance with nothing to draw")
 			}
 		})
 	}

@@ -65,12 +65,39 @@ func (d *Dict) Resolve(state pdf.Name, kind Kind) *form.Form {
 // and the result is scaled and translated to align with rect.  The second
 // return value is false when the appearance has no content or its transformed
 // bounding box is degenerate, in which case there is nothing to draw.
+//
+// This is the matrix for drawing the form's content stream directly.  A caller
+// which instead invokes the form as a form XObject needs [XObjectToRect].
 func ToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
-	if ap == nil || ap.Content == nil {
+	formMatrix, a, ok := rectMapping(ap, rect)
+	if !ok {
 		return matrix.Matrix{}, false
 	}
+	return formMatrix.Mul(a), true
+}
 
-	formMatrix := ap.Matrix
+// XObjectToRect returns the matrix for placing an appearance form in the
+// annotation rectangle when the form is drawn as a form XObject, with the
+// Do operator.  It leaves out the form matrix, which Do applies of its own
+// accord; [ToRect] here would apply that matrix twice.  The second return
+// value is false in the same cases as for [ToRect].
+func XObjectToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
+	_, a, ok := rectMapping(ap, rect)
+	if !ok {
+		return matrix.Matrix{}, false
+	}
+	return a, true
+}
+
+// rectMapping splits the appearance-to-rectangle mapping of §12.5.5 into the
+// form matrix and the matrix A which carries the transformed appearance box
+// onto rect.  Their product maps form coordinates into the rectangle.
+func rectMapping(ap *form.Form, rect pdf.Rectangle) (formMatrix, a matrix.Matrix, ok bool) {
+	if ap == nil || ap.Content == nil {
+		return matrix.Matrix{}, matrix.Matrix{}, false
+	}
+
+	formMatrix = ap.Matrix
 	if formMatrix == (matrix.Matrix{}) {
 		formMatrix = matrix.Identity
 	}
@@ -88,7 +115,7 @@ func ToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
 	tbW := tbURx - tbLLx
 	tbH := tbURy - tbLLy
 	if tbW == 0 || tbH == 0 {
-		return matrix.Matrix{}, false
+		return matrix.Matrix{}, matrix.Matrix{}, false
 	}
 
 	// matrix A maps the transformed appearance box to the annotation rectangle
@@ -96,7 +123,6 @@ func ToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
 	sy := (rect.URy - rect.LLy) / tbH
 	tx := rect.LLx - tbLLx*sx
 	ty := rect.LLy - tbLLy*sy
-	a2 := matrix.Matrix{sx, 0, 0, sy, tx, ty}
 
-	return formMatrix.Mul(a2), true
+	return formMatrix, matrix.Matrix{sx, 0, 0, sy, tx, ty}, true
 }

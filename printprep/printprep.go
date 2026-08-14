@@ -54,10 +54,11 @@ type Options struct {
 // page dictionary keys that affect the printed marks and are carried over.
 // Everything else (metadata, structure, navigation, interactivity, prepress
 // boxes, thumbnails, timestamps, ...) is dropped.
+// /Rotate is not among them: it is written from the value read for the
+// annotation placement, see [converter.convertPage].
 var keepPageKeys = []pdf.Name{
 	"MediaBox",
 	"CropBox",
-	"Rotate",
 	"Group",
 	"UserUnit",
 	"OutputIntents",
@@ -241,6 +242,13 @@ func (c *converter) convertPage(src pdf.Dict) (pdf.Dict, error) {
 		dict[key] = cv
 	}
 
+	// the rotation as read, which the output page carries and the flattened
+	// annotations are placed under
+	rotate := pageRotation(c.x, src)
+	if rotate != 0 {
+		dict["Rotate"] = pdf.Integer(rotate)
+	}
+
 	srcRes, _ := pdf.CursorAt(c.x, nil).Dict(src["Resources"])
 	fc := c.newFontContext(srcRes)
 
@@ -258,7 +266,8 @@ func (c *converter) convertPage(src pdf.Dict) (pdf.Dict, error) {
 	}
 
 	// annotations: flatten printable ones into an overlay after the page marks
-	overlay, annotForms, err := c.flattenAnnots(src["Annots"], c.reservedXObjectNames(srcRes))
+	overlay, annotForms, err := c.flattenAnnots(src["Annots"],
+		c.reservedXObjectNames(srcRes), rotate)
 	if err != nil {
 		return nil, err
 	}

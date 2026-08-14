@@ -835,3 +835,33 @@ func FuzzRoundTrip(f *testing.F) {
 		roundTripTest(t, pdf.V1_7, p)
 	})
 }
+
+// TestRotationFromDegrees checks the normalization of a /Rotate value read
+// from a file: values outside 0, 90, 180 and 270 are brought into that set
+// modulo 360, and anything left over counts as no rotation.
+func TestRotationFromDegrees(t *testing.T) {
+	cases := []struct {
+		in   int
+		want Rotation
+	}{
+		{0, Rotate0},
+		{90, Rotate90},
+		{180, Rotate180},
+		{270, Rotate270},
+		{360, Rotate0},
+		{450, Rotate90},
+		{-90, Rotate270},
+		{-360, Rotate0},
+		{-450, Rotate270},
+		{720, Rotate0},
+		{45, Rotate0},  // not a multiple of 90
+		{-45, Rotate0}, // likewise, and negative
+		{1, Rotate0},
+		{89, Rotate0},
+	}
+	for _, tc := range cases {
+		if got := RotationFromDegrees(tc.in); got != tc.want {
+			t.Errorf("RotationFromDegrees(%d) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}

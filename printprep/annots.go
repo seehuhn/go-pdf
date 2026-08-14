@@ -20,12 +20,14 @@ import (
 	"bytes"
 	"fmt"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/annotation/decode"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/page"
 )
 
 // coordDigits is the precision to which flattened-annotation transform matrices
@@ -46,7 +48,7 @@ const coordDigits = 4
 // than taken for a reply, and widgets are linked to their form fields, which
 // is what lets a synthesized appearance draw the value of a field stored
 // separately from its widget.
-func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bool) ([]byte, map[pdf.Name]pdf.Reference, error) {
+func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bool, rotate int) ([]byte, map[pdf.Name]pdf.Reference, error) {
 	refs, annots, err := decode.PageAnnotations(pdf.CursorAt(c.x, nil), annotsObj)
 	if err != nil || len(annots) == 0 {
 		return nil, nil, err
@@ -86,9 +88,23 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 		if ap == nil || ap.Content == nil {
 			continue
 		}
-		m, ok := appearance.ToRect(ap, common.Rect)
+		// the appearance is drawn as a form XObject below, so the placement
+		// leaves out the form matrix, which the Do operator applies
+		m, ok := appearance.XObjectToRect(ap, common.Rect)
 		if !ok {
 			continue
+		}
+
+		// NoRotate (§12.5.3): the appearance must not turn with the page.
+		// Flattened marks do turn with it, so the placement cancels the page
+		// rotation about the corner the flag keeps fixed, the upper-left one
+		// of the rectangle.  The flag is taken as a text annotation carries it,
+		// implicitly (§12.5.6.4), which is what a renderer draws.
+		if rotate != 0 && annotation.EffectiveFlags(ai)&annotation.FlagNoRotate != 0 {
+			ulX, ulY := common.Rect.LLx, common.Rect.URy
+			m = m.Mul(matrix.Translate(-ulX, -ulY).
+				RotateDeg(float64(rotate)).
+				Translate(ulX, ulY))
 		}
 
 		ref, err := c.embedAppearance(refs[i], common.AppearanceState, ap, synthesized)
@@ -130,21 +146,31 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 // as page and form-XObject content (glyf fonts converted to Identity-H, off
 // optional content removed).  A synthesized fallback is content the source
 // never held; it uses standard fonts and carries no optional content, so it is
-// embedded as built.
+// embedded as built.  Nothing else is ever embedded: an appearance is either
+// the source stream, converted, or one this package generated.
 func (c *converter) embedAppearance(item pdf.Reference, state pdf.Name, ap *form.Form, synthesized bool) (pdf.Reference, error) {
-	if !synthesized {
-		if rawAP := c.rawNormalAppearance(item, state); rawAP != nil {
-			obj, err := c.convertXObject(rawAP, 0)
-			if err != nil {
-				return 0, err
-			}
-			ref, _ := obj.(pdf.Reference)
-			return ref, nil
+	if synthesized {
+		obj, err := c.rm.Embed(ap)
+		if err != nil {
+			return 0, nil // best-effort: leave the annotation undrawn
 		}
+		ref, _ := obj.(pdf.Reference)
+		return ref, nil
 	}
-	obj, err := c.rm.Embed(ap)
+
+	rawAP := c.rawNormalAppearance(item, state)
+	if rawAP == nil {
+		// This cannot happen: decode and rawNormalAppearance read the same
+		// dictionary entries of the same annotation, selected by the same
+		// decoded appearance state, so an appearance that decoded with
+		// content is found here too.  Should a future decode repair break
+		// that, the annotation is left undrawn -- a visible gap -- rather
+		// than embedded without the conversions the doc comment promises.
+		return 0, nil
+	}
+	obj, err := c.convertXObject(rawAP, 0)
 	if err != nil {
-		return 0, nil // best-effort: leave the annotation undrawn
+		return 0, err
 	}
 	ref, _ := obj.(pdf.Reference)
 	return ref, nil
@@ -194,9 +220,27 @@ func (c *converter) reservedXObjectNames(srcRes pdf.Dict) map[pdf.Name]bool {
 	return names
 }
 
+// pageRotation returns the clockwise rotation of a page in degrees, normalized
+// to 0, 90, 180 or 270.  A value the file gives outside those, or none at all,
+// counts as no rotation.  The output page is written with this value rather
+// than the one the file gives, so that it agrees with the placement of the
+// annotations flattened onto it.
+func pageRotation(x *pdf.Extractor, src pdf.Dict) int {
+	rotate, err := pdf.CursorAt(x, nil).Integer(src["Rotate"])
+	if err != nil {
+		return 0
+	}
+	return page.RotationFromDegrees(int(rotate)).Degrees()
+}
+
 // annotDropped reports whether an annotation must not be flattened into print
-// content: interactive, media and link annotations, replies, and any
-// annotation that the print visibility rules suppress.
+// content: a reply, or an annotation the print visibility rules suppress.
+//
+// The subtype does not enter into it.  What prints is what the Print flag
+// asks for (§12.5.3): a link or a media annotation carrying that flag and a
+// normal appearance puts the same marks on paper as any other annotation, and
+// one with no appearance and no synthesized fallback is left undrawn by the
+// caller.  This matches the annotations a renderer draws for a printed page.
 //
 // A reply is dropped for the same reason a renderer leaves it off the screen
 // (§12.5.6.2): it is shown as part of the thread of the annotation it replies
@@ -205,12 +249,6 @@ func (c *converter) reservedXObjectNames(srcRes pdf.Dict) map[pdf.Name]bool {
 // on the paper that no viewer draws.  The reply's text belongs on paper only
 // through a summary of the thread, which this package does not produce.
 func (c *converter) annotDropped(ai annotation.Annotation) bool {
-	switch ai.(type) {
-	case *annotation.Link, *annotation.Popup,
-		*annotation.Screen, *annotation.Movie, *annotation.Sound,
-		*annotation.RichMedia, *annotation.Annot3D:
-		return true
-	}
 	if annotation.IsReply(ai) {
 		return true
 	}

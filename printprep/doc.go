@@ -27,9 +27,10 @@
 //     font constructions (see the font policy in [Write]);
 //   - removes the content of optional-content groups that are switched off,
 //     and drops the optional-content machinery entirely;
-//   - flattens printable annotations into page content and drops
-//     interactive, media and hidden annotations, as well as replies,
-//     which no viewer draws on the page;
+//   - flattens printable annotations into page content, synthesizing an
+//     appearance where the file has none, and drops those the print
+//     visibility rules suppress, as well as replies, which no viewer draws
+//     on their own;
 //   - strips tagged-PDF structure, metadata, navigation, and other data that
 //     does not affect the printed marks;
 //   - writes a fresh, unencrypted document.

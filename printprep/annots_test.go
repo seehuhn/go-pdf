@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -173,10 +174,12 @@ func TestFlattenAnnots(t *testing.T) {
 		t.Error("Annots survived on the flattened page")
 	}
 
-	// exactly one annotation (the printable square) was flattened into content
+	// the two printable annotations were flattened into content, the hidden
+	// one was not: the link prints through a synthesized appearance, since a
+	// renderer draws one for it as well
 	got := pageContent(t, res)
-	if n := strings.Count(got, " Do"); n != 1 {
-		t.Errorf("want 1 flattened annotation Do, got %d:\n%s", n, got)
+	if n := strings.Count(got, " Do"); n != 2 {
+		t.Errorf("want 2 flattened annotation Do, got %d:\n%s", n, got)
 	}
 	if !strings.Contains(got, "PPAnnot0") {
 		t.Errorf("printable square not flattened:\n%s", got)
@@ -753,5 +756,184 @@ func TestFlattenDanglingReply(t *testing.T) {
 	got := pageContent(t, out.Bytes())
 	if n := strings.Count(got, " Do"); n != 1 {
 		t.Errorf("want the annotation flattened despite the dangling IRT, got %d forms:\n%s", n, got)
+	}
+}
+
+// TestFlattenAppearanceMatrix checks the placement of an appearance which
+// carries a form matrix.  The matrix is applied by the Do operator which draws
+// the flattened form, so a placement including it as well would turn the
+// appearance twice and land it beside its rectangle -- invisible on an upright
+// page, where the matrix is normally the identity, but not on a rotated one,
+// where a pre-rotated layout puts a quarter turn in every appearance.
+func TestFlattenAppearanceMatrix(t *testing.T) {
+	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+	// a 40x20 appearance turned a quarter turn: the transformed box is 20x40,
+	// the shape of the annotation rectangle below
+	formMatrix := matrix.RotateDeg(90)
+	apRef := w.Alloc()
+	stm, err := w.OpenStream(apRef, pdf.Dict{
+		"Type":    pdf.Name("XObject"),
+		"Subtype": pdf.Name("Form"),
+		"BBox":    pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(40), pdf.Integer(20)},
+		"Matrix": pdf.Array{
+			pdf.Number(formMatrix[0]), pdf.Number(formMatrix[1]),
+			pdf.Number(formMatrix[2]), pdf.Number(formMatrix[3]),
+			pdf.Number(formMatrix[4]), pdf.Number(formMatrix[5]),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.WriteString(stm, "1 0 0 rg 0 0 40 20 re f\n")
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	rect := pdf.Rectangle{LLx: 100, LLy: 200, URx: 120, URy: 240}
+	square := w.Alloc()
+	w.Put(square, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Square"),
+		"Rect": pdf.Array{
+			pdf.Number(rect.LLx), pdf.Number(rect.LLy),
+			pdf.Number(rect.URx), pdf.Number(rect.URy),
+		},
+		"F":  pdf.Integer(4), // Print
+		"AP": pdf.Dict{"N": apRef},
+	})
+
+	contentRef := w.Alloc()
+	cstm, _ := w.OpenStream(contentRef, pdf.Dict{})
+	io.WriteString(cstm, "q 0 0 1 rg 5 5 10 10 re f Q\n")
+	cstm.Close()
+
+	pageRef := w.Alloc()
+	pagesRef := w.Alloc()
+	w.Put(pageRef, pdf.Dict{
+		"Type": pdf.Name("Page"), "Parent": pagesRef,
+		"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(300), pdf.Integer(300)},
+		"Contents": contentRef,
+		"Annots":   pdf.Array{square},
+	})
+	w.Put(pagesRef, pdf.Dict{"Type": pdf.Name("Pages"), "Kids": pdf.Array{pageRef}, "Count": pdf.Integer(1)})
+	w.GetMeta().Catalog.Pages = pagesRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := Write(&out, r, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// what the flattened page ends up drawing the appearance with
+	effective := formMatrix.Mul(ctmAtFirstXObject(t, out.Bytes()))
+	got := drawnBounds(t, pdf.Rectangle{URx: 40, URy: 20}, effective)
+	if !got.NearlyEqual(&rect, 1e-6) {
+		t.Errorf("appearance drawn over %s, want %s", &got, &rect)
+	}
+}
+
+// TestFlattenNoRotateOnRotatedPage checks that an annotation which must not
+// turn with the page keeps its orientation once flattened.  Flattened marks are
+// page content and so follow /Rotate; the placement has to cancel it about the
+// upper-left corner of the rectangle, which the flag holds fixed (§12.5.3).
+// A text annotation carries the flag implicitly (§12.5.6.4) and is treated the
+// same way.
+func TestFlattenNoRotateOnRotatedPage(t *testing.T) {
+	cases := []struct {
+		name    string
+		subtype pdf.Name
+		flags   pdf.Integer
+	}{
+		{name: "explicit", subtype: "Square", flags: 4 | 16}, // Print, NoRotate
+		{name: "implicitForText", subtype: "Text", flags: 4}, // Print
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+
+			// a 40x20 appearance filling a 40x20 rectangle
+			apRef := w.Alloc()
+			stm, err := w.OpenStream(apRef, pdf.Dict{
+				"Type":    pdf.Name("XObject"),
+				"Subtype": pdf.Name("Form"),
+				"BBox":    pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(40), pdf.Integer(20)},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			io.WriteString(stm, "1 0 0 rg 0 0 40 20 re f\n")
+			if err := stm.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			annot := w.Alloc()
+			w.Put(annot, pdf.Dict{
+				"Type": pdf.Name("Annot"), "Subtype": tc.subtype,
+				"Rect": pdf.Array{pdf.Integer(100), pdf.Integer(200), pdf.Integer(140), pdf.Integer(220)},
+				"F":    tc.flags,
+				"AP":   pdf.Dict{"N": apRef},
+			})
+
+			contentRef := w.Alloc()
+			cstm, _ := w.OpenStream(contentRef, pdf.Dict{})
+			io.WriteString(cstm, "q 0 0 1 rg 5 5 10 10 re f Q\n")
+			cstm.Close()
+
+			pageRef := w.Alloc()
+			pagesRef := w.Alloc()
+			w.Put(pageRef, pdf.Dict{
+				"Type": pdf.Name("Page"), "Parent": pagesRef,
+				"MediaBox": pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(300), pdf.Integer(300)},
+				"Rotate":   pdf.Integer(90),
+				"Contents": contentRef,
+				"Annots":   pdf.Array{annot},
+			})
+			w.Put(pagesRef, pdf.Dict{"Type": pdf.Name("Pages"), "Kids": pdf.Array{pageRef}, "Count": pdf.Integer(1)})
+			w.GetMeta().Catalog.Pages = pagesRef
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			r, err := pdf.NewReader(buf, int64(len(buf.Data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out bytes.Buffer
+			if err := Write(&out, r, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			// the rectangle turned a quarter turn about its upper-left corner
+			// (100, 220), which stays where it is
+			want := pdf.Rectangle{LLx: 100, LLy: 220, URx: 120, URy: 260}
+			got := drawnBounds(t, pdf.Rectangle{URx: 40, URy: 20},
+				ctmAtFirstXObject(t, out.Bytes()))
+			if !got.NearlyEqual(&want, 1e-6) {
+				t.Errorf("appearance drawn over %s, want %s", &got, &want)
+			}
+		})
+	}
+}
+
+// drawnBounds returns the smallest upright rectangle containing the image of
+// bbox under m.
+func drawnBounds(t *testing.T, bbox pdf.Rectangle, m matrix.Matrix) pdf.Rectangle {
+	t.Helper()
+	ll := m.Apply(vec.Vec2{X: bbox.LLx, Y: bbox.LLy})
+	lr := m.Apply(vec.Vec2{X: bbox.URx, Y: bbox.LLy})
+	ul := m.Apply(vec.Vec2{X: bbox.LLx, Y: bbox.URy})
+	ur := m.Apply(vec.Vec2{X: bbox.URx, Y: bbox.URy})
+	return pdf.Rectangle{
+		LLx: min(ll.X, lr.X, ul.X, ur.X),
+		LLy: min(ll.Y, lr.Y, ul.Y, ur.Y),
+		URx: max(ll.X, lr.X, ul.X, ur.X),
+		URy: max(ll.Y, lr.Y, ul.Y, ur.Y),
 	}
 }
