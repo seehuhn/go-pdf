@@ -247,13 +247,6 @@ var actionTestCases = []pdf.Action{
 			{Op: OCGOperationON, Groups: []*oc.Group{testOCG2}},
 		},
 	},
-	// an operation name from outside the specification
-	&SetOCGState{
-		State: []OCGStateChange{
-			{Op: "Flip", Groups: []*oc.Group{testOCG1}},
-		},
-	},
-
 	// Rendition
 	// OP 1 (stop) needs no rendition R, but OP still requires AN.
 	&Rendition{

@@ -18,6 +18,7 @@ package action
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	"seehuhn.de/go/pdf"
@@ -45,7 +46,8 @@ const (
 
 // OCGStateChange applies an operation to a set of optional content groups.
 type OCGStateChange struct {
-	// Op is the operation to apply to Groups.  It must be set.
+	// Op is the operation to apply to Groups.  It must be one of
+	// [OCGOperationON], [OCGOperationOFF], or [OCGOperationToggle].
 	Op OCGOperation
 
 	// Groups lists the optional content groups the operation applies to.
@@ -83,8 +85,10 @@ func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	state := pdf.Array{}
 	for _, change := range a.State {
-		if change.Op == "" {
-			return nil, errors.New("SetOCGState action has empty operation")
+		switch change.Op {
+		case OCGOperationON, OCGOperationOFF, OCGOperationToggle:
+		default:
+			return nil, fmt.Errorf("invalid SetOCGState operation %q", change.Op)
 		}
 		if len(change.Groups) == 0 {
 			return nil, errors.New("SetOCGState operation must have groups")
@@ -134,7 +138,10 @@ func decodeSetOCGState(c pdf.Cursor, dict pdf.Dict) (*SetOCGState, error) {
 	// Each sequence in the array starts with an operation name, followed by
 	// the groups the operation applies to.  Entries which are neither a
 	// non-empty name nor a group are skipped, as are groups appearing before
-	// the first operation.
+	// the first operation.  The set of operations is closed, so a name from
+	// outside it is dropped together with its groups; it still ends the
+	// preceding sequence, matching a viewer which applies each name only
+	// until the next one.
 	var state []OCGStateChange
 	cur := -1
 	for _, obj := range stateArray {
@@ -143,8 +150,13 @@ func decodeSetOCGState(c pdf.Cursor, dict pdf.Dict) (*SetOCGState, error) {
 			return nil, err
 		}
 		if op != "" {
-			state = append(state, OCGStateChange{Op: OCGOperation(op)})
-			cur = len(state) - 1
+			switch OCGOperation(op) {
+			case OCGOperationON, OCGOperationOFF, OCGOperationToggle:
+				state = append(state, OCGStateChange{Op: OCGOperation(op)})
+				cur = len(state) - 1
+			default:
+				cur = -1
+			}
 			continue
 		}
 		if cur < 0 {

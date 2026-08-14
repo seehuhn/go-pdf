@@ -46,6 +46,10 @@ func TestSetOCGStateEncodeInvalid(t *testing.T) {
 			name:  "nil group",
 			state: []OCGStateChange{{Op: OCGOperationON, Groups: []*oc.Group{nil}}},
 		},
+		{
+			name:  "operation outside the specification",
+			state: []OCGStateChange{{Op: "Flip", Groups: []*oc.Group{group}}},
+		},
 	}
 
 	for _, tc := range cases {
@@ -83,7 +87,8 @@ func TestSetOCGStateEncodeEmpty(t *testing.T) {
 
 // TestSetOCGStateDecodeRepair checks that State arrays are read as far as
 // they make sense: malformed entries are dropped, an operation name from
-// outside the specification is kept, and what survives can be written again.
+// outside the specification is dropped together with its groups, and what
+// survives can be written again.
 func TestSetOCGStateDecodeRepair(t *testing.T) {
 	cases := []struct {
 		name string
@@ -111,15 +116,23 @@ func TestSetOCGStateDecodeRepair(t *testing.T) {
 			},
 		},
 		{
-			name: "operation outside the specification is kept",
+			name: "operation outside the specification is dropped",
 			state: func(g1, g2 pdf.Object) pdf.Array {
 				return pdf.Array{pdf.Name("Flip"), g1, pdf.Name("OFF"), g2}
 			},
 			want: func(g1, g2 *oc.Group) []OCGStateChange {
-				return []OCGStateChange{
-					{Op: "Flip", Groups: []*oc.Group{g1}},
-					{Op: OCGOperationOFF, Groups: []*oc.Group{g2}},
-				}
+				return []OCGStateChange{{Op: OCGOperationOFF, Groups: []*oc.Group{g2}}}
+			},
+		},
+		{
+			// the unknown name still ends the preceding sequence, so its
+			// groups do not fall to the previous operation
+			name: "operation outside the specification delimits",
+			state: func(g1, g2 pdf.Object) pdf.Array {
+				return pdf.Array{pdf.Name("ON"), g1, pdf.Name("Flip"), g2}
+			},
+			want: func(g1, g2 *oc.Group) []OCGStateChange {
+				return []OCGStateChange{{Op: OCGOperationON, Groups: []*oc.Group{g1}}}
 			},
 		},
 		{
