@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -44,7 +46,7 @@ func (a *URI) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.URI == "" {
-		return nil, pdf.Error("URI action must have a non-empty URI")
+		return nil, errors.New("URI action must have a non-empty URI")
 	}
 
 	dict := pdf.Dict{

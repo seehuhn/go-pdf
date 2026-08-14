@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -41,7 +43,7 @@ func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.JS == nil {
-		return nil, pdf.Error("JavaScript action must have JS entry")
+		return nil, errors.New("JavaScript action must have JS entry")
 	}
 	js, err := rm.Embed(*a.JS)
 	if err != nil {

@@ -1472,12 +1472,15 @@ types:
     pdfType: array
     required: true
     introduced: '1.5'
-    goType: pdf.Array
-    purpose: 'State is an array of operations and OCG references.
-
-      Format: [name, ocg1, ocg2, ..., name, ocg3, ...]
-
-      where name is ON, OFF, or Toggle.'
+    refTypes:
+    - type: OptContentGroup
+      collection: array
+    goType: '[]action.OCGStateChange'
+    purpose: 'State lists the changes to perform, in order. A group may appear
+      more than once, in which case the last change to it wins. Each Go element
+      holds one operation together with the groups it applies to; in PDF these
+      are flattened into a single array of names and group references. The
+      operation is ON, OFF or Toggle.'
   - goName: IgnoreRBGroups
     pdfKey: PreserveRB
     pdfType: boolean

@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
@@ -56,7 +58,7 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.D == nil {
-		return nil, pdf.Error("GoToE action must have D entry")
+		return nil, errors.New("GoToE action must have D entry")
 	}
 
 	destObj, err := a.D.Encode(rm)

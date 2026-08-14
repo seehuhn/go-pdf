@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -42,7 +44,7 @@ func (a *GoToDp) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.DPart == 0 {
-		return nil, pdf.Error("GoToDp action must have a DPart reference")
+		return nil, errors.New("GoToDp action must have a DPart reference")
 	}
 
 	dict := pdf.Dict{

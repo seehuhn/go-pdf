@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -42,7 +44,7 @@ func (a *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.N == "" {
-		return nil, pdf.Error("Named action must have a non-empty name")
+		return nil, errors.New("Named action must have a non-empty name")
 	}
 
 	dict := pdf.Dict{

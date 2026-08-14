@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -84,7 +86,7 @@ func (t *TargetNamedChild) encodeTargetSafe(rm *pdf.ResourceManager, visited map
 	visited[t] = true
 
 	if len(t.Name) == 0 {
-		return nil, pdf.Error("TargetNamedChild must have a non-empty Name")
+		return nil, errors.New("TargetNamedChild must have a non-empty Name")
 	}
 
 	dict := pdf.Dict{
@@ -129,10 +131,10 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 	visited[t] = true
 
 	if t.Page == nil {
-		return nil, pdf.Error("TargetAnnotationChild must have a Page")
+		return nil, errors.New("TargetAnnotationChild must have a Page")
 	}
 	if t.Annotation == nil {
-		return nil, pdf.Error("TargetAnnotationChild must have an Annotation")
+		return nil, errors.New("TargetAnnotationChild must have an Annotation")
 	}
 
 	dict := pdf.Dict{

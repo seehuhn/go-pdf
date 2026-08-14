@@ -115,20 +115,6 @@ func run() error {
 	}
 	page.Out.GetMeta().Catalog.OCProperties = ocRef
 
-	// embed OCG references for SetOCGState actions
-	refA, err := page.RM.Embed(groupA)
-	if err != nil {
-		return err
-	}
-	refB, err := page.RM.Embed(groupB)
-	if err != nil {
-		return err
-	}
-	refC, err := page.RM.Embed(groupC)
-	if err != nil {
-		return err
-	}
-
 	// layout constants
 	const (
 		sq   = 30.0 // input/output square size
@@ -225,11 +211,11 @@ func run() error {
 
 	page.SetLineWidth(1)
 	drawSquare(page, F, inX, yA-sqH, sq, groupA)
-	addToggleLink(page, inX, yA-sqH, sq, refA)
+	addToggleLink(page, inX, yA-sqH, sq, groupA)
 	drawSquare(page, F, inX, yB-sqH, sq, groupB)
-	addToggleLink(page, inX, yB-sqH, sq, refB)
+	addToggleLink(page, inX, yB-sqH, sq, groupB)
 	drawSquare(page, F, inX, yC-sqH, sq, groupC)
-	addToggleLink(page, inX, yC-sqH, sq, refC)
+	addToggleLink(page, inX, yC-sqH, sq, groupC)
 
 	// --- draw intermediate squares ---
 
@@ -287,7 +273,7 @@ func drawSquare(page *document.Page, F *type1.Instance, x, y, size float64, cond
 }
 
 // addToggleLink adds a link annotation that toggles an OCG on click.
-func addToggleLink(page *document.Page, x, y, size float64, ref pdf.Native) {
+func addToggleLink(page *document.Page, x, y, size float64, group *oc.Group) {
 	link := &annotation.Link{
 		Common: annotation.Common{
 			Rect: pdf.Rectangle{
@@ -298,7 +284,9 @@ func addToggleLink(page *document.Page, x, y, size float64, ref pdf.Native) {
 			},
 		},
 		Action: &action.SetOCGState{
-			State: pdf.Array{pdf.Name("Toggle"), ref},
+			State: []action.OCGStateChange{
+				{Op: action.OCGOperationToggle, Groups: []*oc.Group{group}},
+			},
 		},
 		Highlight: annotation.HighlightNone,
 	}

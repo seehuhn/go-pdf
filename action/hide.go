@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -47,7 +49,7 @@ func (a *Hide) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.T == nil {
-		return nil, pdf.Error("Hide action must specify target annotations")
+		return nil, errors.New("Hide action must specify target annotations")
 	}
 
 	dict := pdf.Dict{

@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 )
@@ -43,7 +45,7 @@ func (a *ImportData) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.F == nil {
-		return nil, pdf.Error("ImportData action must have F entry")
+		return nil, errors.New("ImportData action must have F entry")
 	}
 
 	fn, err := rm.Embed(a.F)

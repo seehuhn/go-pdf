@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -47,7 +49,7 @@ func (a *SubmitForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.F == nil {
-		return nil, pdf.Error("SubmitForm action must have F entry")
+		return nil, errors.New("SubmitForm action must have F entry")
 	}
 
 	dict := pdf.Dict{

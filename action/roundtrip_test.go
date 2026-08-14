@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/media"
 	"seehuhn.de/go/pdf/movie"
+	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/transition"
 	"seehuhn.de/go/pdf/sound"
@@ -50,6 +51,15 @@ var testSound = &sound.Sound{
 		},
 	},
 }
+
+// Test groups for the SetOCGState action cases.  Intent is spelled out
+// because reading a group materialises the default, so leaving it unset
+// would make the round-trip comparison fail on the default alone.
+var (
+	testOCG1 = &oc.Group{Name: "layer 1", Intent: []pdf.Name{"View"}}
+	testOCG2 = &oc.Group{Name: "layer 2", Intent: []pdf.Name{"View"}}
+	testOCG3 = &oc.Group{Name: "layer 3", Intent: []pdf.Name{"Design"}}
+)
 
 var actionTestCases = []pdf.Action{
 	// GoTo
@@ -204,13 +214,43 @@ var actionTestCases = []pdf.Action{
 	&ImportData{F: &file.Specification{FileName: "data.fdf", AFRelationship: "Unspecified"}},
 
 	// SetOCGState
-	&SetOCGState{State: pdf.Array{pdf.Name("ON"), pdf.Reference(1)}},
-	&SetOCGState{State: pdf.Array{pdf.Name("OFF"), pdf.Reference(1)}, IgnoreRBGroups: true},
-	&SetOCGState{State: pdf.Array{pdf.Name("Toggle"), pdf.Reference(1), pdf.Reference(2)}},
+	&SetOCGState{},
 	&SetOCGState{
-		State: pdf.Array{
-			pdf.Name("ON"), pdf.Reference(1), pdf.Reference(2),
-			pdf.Name("OFF"), pdf.Reference(3),
+		State: []OCGStateChange{{Op: OCGOperationON, Groups: []*oc.Group{testOCG1}}},
+	},
+	&SetOCGState{
+		State:          []OCGStateChange{{Op: OCGOperationOFF, Groups: []*oc.Group{testOCG1}}},
+		IgnoreRBGroups: true,
+	},
+	&SetOCGState{
+		State: []OCGStateChange{
+			{Op: OCGOperationToggle, Groups: []*oc.Group{testOCG1, testOCG2}},
+		},
+	},
+	&SetOCGState{
+		State: []OCGStateChange{
+			{Op: OCGOperationON, Groups: []*oc.Group{testOCG1, testOCG2}},
+			{Op: OCGOperationOFF, Groups: []*oc.Group{testOCG3}},
+		},
+	},
+	// §12.6.4.13, EXAMPLE 2: the same group twice, so the order matters
+	&SetOCGState{
+		State: []OCGStateChange{
+			{Op: OCGOperationOFF, Groups: []*oc.Group{testOCG1}},
+			{Op: OCGOperationToggle, Groups: []*oc.Group{testOCG1}},
+		},
+	},
+	// two sequences carrying the same operation
+	&SetOCGState{
+		State: []OCGStateChange{
+			{Op: OCGOperationON, Groups: []*oc.Group{testOCG1}},
+			{Op: OCGOperationON, Groups: []*oc.Group{testOCG2}},
+		},
+	},
+	// an operation name from outside the specification
+	&SetOCGState{
+		State: []OCGStateChange{
+			{Op: "Flip", Groups: []*oc.Group{testOCG1}},
 		},
 	},
 

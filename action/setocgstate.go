@@ -17,18 +17,48 @@
 package action
 
 import (
+	"errors"
+	"slices"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/oc"
 )
 
 // PDF 2.0 sections: 12.6.2 12.6.4.13
 
+// OCGOperation specifies how the state of optional content groups is changed.
+//
+// An OCGOperation written to a PDF file must be one of [OCGOperationON],
+// [OCGOperationOFF], or [OCGOperationToggle].
+type OCGOperation pdf.Name
+
+const (
+	// OCGOperationON turns the groups on.
+	OCGOperationON OCGOperation = "ON"
+
+	// OCGOperationOFF turns the groups off.
+	OCGOperationOFF OCGOperation = "OFF"
+
+	// OCGOperationToggle reverses the state of the groups.
+	OCGOperationToggle OCGOperation = "Toggle"
+)
+
+// OCGStateChange applies an operation to a set of optional content groups.
+type OCGStateChange struct {
+	// Op is the operation to apply to Groups.  It must be set.
+	Op OCGOperation
+
+	// Groups lists the optional content groups the operation applies to.
+	// At least one group must be given.
+	Groups []*oc.Group
+}
+
 // SetOCGState represents a set-OCG-state action that sets the state of
 // optional content groups.
 type SetOCGState struct {
-	// State is an array of operations and OCG references.
-	// Format: [name, ocg1, ocg2, ..., name, ocg3, ...]
-	// where name is ON, OFF, or Toggle.
-	State pdf.Array
+	// State lists the changes to perform, in order.  A group may appear more
+	// than once, in which case the last change to it wins.
+	State []OCGStateChange
 
 	// IgnoreRBGroups, when true, causes radio-button state relationships
 	// between optional content groups to be ignored.
@@ -50,13 +80,32 @@ func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "SetOCGState action", pdf.V1_5); err != nil {
 		return nil, err
 	}
-	if a.State == nil {
-		return nil, pdf.Error("SetOCGState action must have State entry")
+
+	state := pdf.Array{}
+	for _, change := range a.State {
+		if change.Op == "" {
+			return nil, errors.New("SetOCGState action has empty operation")
+		}
+		if len(change.Groups) == 0 {
+			return nil, errors.New("SetOCGState operation must have groups")
+		}
+
+		state = append(state, pdf.Name(change.Op))
+		for _, group := range change.Groups {
+			if group == nil {
+				return nil, errors.New("SetOCGState action has nil group")
+			}
+			ref, err := rm.Embed(group)
+			if err != nil {
+				return nil, err
+			}
+			state = append(state, ref)
+		}
 	}
 
 	dict := pdf.Dict{
 		"S":     pdf.Name(TypeSetOCGState),
-		"State": a.State,
+		"State": state,
 	}
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Action")
@@ -77,12 +126,46 @@ func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeSetOCGState(c pdf.Cursor, dict pdf.Dict) (*SetOCGState, error) {
-	state, err := c.Array(dict["State"])
+	stateArray, err := pdf.Optional(c.Array(dict["State"]))
 	if err != nil {
 		return nil, err
 	}
-	if state == nil {
-		state = pdf.Array{} // empty state = no-op action
+
+	// Each sequence in the array starts with an operation name, followed by
+	// the groups the operation applies to.  Entries which are neither a
+	// non-empty name nor a group are skipped, as are groups appearing before
+	// the first operation.
+	var state []OCGStateChange
+	cur := -1
+	for _, obj := range stateArray {
+		op, err := pdf.Optional(c.Name(obj))
+		if err != nil {
+			return nil, err
+		}
+		if op != "" {
+			state = append(state, OCGStateChange{Op: OCGOperation(op)})
+			cur = len(state) - 1
+			continue
+		}
+		if cur < 0 {
+			continue
+		}
+
+		group, err := pdf.DecodeOptional(c, obj, oc.ExtractGroup)
+		if err != nil {
+			return nil, err
+		} else if group == nil {
+			continue
+		}
+		state[cur].Groups = append(state[cur].Groups, group)
+	}
+
+	// drop operations which ended up without groups
+	state = slices.DeleteFunc(state, func(change OCGStateChange) bool {
+		return len(change.Groups) == 0
+	})
+	if len(state) == 0 {
+		state = nil
 	}
 
 	ignoreRB := false // default: preserve radio-button groups

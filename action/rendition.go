@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/media"
 	"seehuhn.de/go/pdf/optional"
@@ -82,17 +84,17 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	if op, ok := a.OP.Get(); ok {
 		if op > 4 {
-			return nil, pdf.Error("Rendition action OP must be 0-4")
+			return nil, errors.New("Rendition action OP must be 0-4")
 		}
 		if a.AN == 0 {
-			return nil, pdf.Error("Rendition action requires AN when OP is present")
+			return nil, errors.New("Rendition action requires AN when OP is present")
 		}
 		if (op == 0 || op == 4) && a.R == nil {
-			return nil, pdf.Error("Rendition action requires R when OP is 0 or 4")
+			return nil, errors.New("Rendition action requires R when OP is 0 or 4")
 		}
 		dict["OP"] = pdf.Integer(op)
 	} else if a.JS == nil {
-		return nil, pdf.Error("Rendition action requires OP or JS")
+		return nil, errors.New("Rendition action requires OP or JS")
 	}
 
 	if a.JS != nil {

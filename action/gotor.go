@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
@@ -58,10 +60,10 @@ func (a *GoToR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.F == nil {
-		return nil, pdf.Error("GoToR action must have F entry")
+		return nil, errors.New("GoToR action must have F entry")
 	}
 	if a.D == nil {
-		return nil, pdf.Error("GoToR action must have D entry")
+		return nil, errors.New("GoToR action must have D entry")
 	}
 
 	fn, err := rm.Embed(a.F)

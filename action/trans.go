@@ -17,6 +17,8 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/page/transition"
 )
@@ -43,7 +45,7 @@ func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if a.Trans == nil {
-		return nil, pdf.Error("Trans action must have Trans entry")
+		return nil, errors.New("Trans action must have Trans entry")
 	}
 
 	transObj, err := rm.Embed(a.Trans)
