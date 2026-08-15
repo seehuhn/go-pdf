@@ -290,10 +290,10 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 			channels, img.BitsPerComponent) {
 			return nil, pdf.Error("image data exceeds size limit")
 		}
-		// the encoded-bytes cap admits up to 64× expansion into the
-		// per-channel float64 buffer at bpc=1; cap the decoded form
+		// the encoded-bytes cap admits up to 32× expansion into the
+		// per-channel float32 buffer at bpc=1; cap the decoded form
 		// separately to bound decoder memory use
-		if limits.ImageDecodedFloat64ExceedsLimit(img.Width, img.Height, channels) {
+		if limits.ImageDecodedExceedsLimit(img.Width, img.Height, channels) {
 			return nil, pdf.Error("image decoded data exceeds size limit")
 		}
 	}

@@ -66,20 +66,20 @@ func ImagePixelsExceedLimit(width, height int) bool {
 	return int64(width)*int64(height) > MaxImagePixels
 }
 
-// ImageDecodedFloat64ExceedsLimit reports whether decoding an image with
-// the given dimensions into a per-channel float64 buffer would exceed
-// MaxImageDecodedFloat64Bytes.  The buffer size is width × height ×
-// channels × 8 bytes.  The check guards against amplification: the
-// encoded-bytes cap [ImageBytesExceedLimit] allows decoded float64
-// buffers up to 64× larger than the encoded stream at bpc=1, so a
+// ImageDecodedExceedsLimit reports whether decoding an image with
+// the given dimensions into a per-channel float32 buffer would exceed
+// MaxImageDecodedBytes.  The buffer size is width × height ×
+// channels × 4 bytes.  The check guards against amplification: the
+// encoded-bytes cap [ImageBytesExceedLimit] allows decoded float32
+// buffers up to 32× larger than the encoded stream at bpc=1, so a
 // stand-alone cap on the decoded form is needed.  Returns false if any
 // argument is non-positive.
-func ImageDecodedFloat64ExceedsLimit(width, height, channels int) bool {
+func ImageDecodedExceedsLimit(width, height, channels int) bool {
 	if width <= 0 || height <= 0 || channels <= 0 {
 		return false
 	}
 	// multiply in float64 to avoid integer overflow
-	return float64(width)*float64(height)*float64(channels) > MaxImageDecodedFloat64Bytes/8
+	return float64(width)*float64(height)*float64(channels) > MaxImageDecodedBytes/4
 }
 
 // imageDecodedBytes returns ⌈W × channels × bpc / 8⌉ × H, the decoded
@@ -181,13 +181,13 @@ const (
 	// XObject, inline image, or thumbnail.
 	MaxImageBytes = 256 << 20
 
-	// MaxImageDecodedFloat64Bytes caps the size of a per-channel float64
+	// MaxImageDecodedBytes caps the size of a per-channel float32
 	// pixel buffer obtained by fully expanding an image's bit-packed
 	// samples into floats.  At bpc=1 the expansion ratio over the encoded
-	// form is 64×, so the [MaxImageBytes] cap on encoded data is not
-	// sufficient.  At 2 GiB this admits 8K UHD CMYK (~1 GiB) with
+	// form is 32×, so the [MaxImageBytes] cap on encoded data is not
+	// sufficient.  At 2 GiB this admits 8K UHD CMYK (~0.5 GiB) with
 	// headroom while rejecting clearly malicious amplification.
-	MaxImageDecodedFloat64Bytes = 2 << 30
+	MaxImageDecodedBytes = 2 << 30
 
 	// MaxImagePixels caps the pixel count (width × height) of a single
 	// image.  This bound is independent of channel count and bit depth,
@@ -203,7 +203,7 @@ const (
 	// set exceeds a handful of components (Hexachrome uses 6, NChannel
 	// extends CMYK with a small number of spot colorants).  The cap
 	// stops a malicious /DeviceN declaration from amplifying the
-	// per-channel float64 buffer that image decoding allocates, and
+	// per-channel float32 buffer that image decoding allocates, and
 	// also bounds the soft-mask Matte array (one entry per channel).
 	MaxImageChannels = 32
 

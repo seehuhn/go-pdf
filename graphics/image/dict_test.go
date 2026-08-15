@@ -954,21 +954,22 @@ func FuzzDictRoundTrip(f *testing.F) {
 	})
 }
 
-// TestExtractDictDecodedFloat64Oversize verifies that an image dict
-// whose per-channel float64 decode buffer would exceed
-// limits.MaxImageDecodedFloat64Bytes is rejected, even when the
-// encoded-byte and pixel-count caps both pass.  At bpc=1 the float64
-// expansion ratio is 64×, so a CMYK image just under the pixel cap
-// passes ImageBytesExceedLimit (~64 MiB encoded) yet would allocate
-// ~4 GiB of float64s in Load().
-func TestExtractDictDecodedFloat64Oversize(t *testing.T) {
+// TestExtractDictDecodedOversize verifies that a CMYK image dict right at
+// the decoded-buffer boundary is rejected.  Decoded samples are stored as
+// float32 (4 bytes each), so limits.MaxImageDecodedBytes/4 admits exactly
+// limits.MaxImagePixels pixels at 4 channels -- the most channels an image
+// dict can have, since DeviceN images are unimplemented.  So for every
+// colour space image dicts currently support, the pixel-count cap trips
+// no later than the decoded-buffer cap; this dict sits one pixel row past
+// that shared boundary.
+func TestExtractDictDecodedOversize(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	ref := w.Alloc()
 	body, err := w.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
 		"Width":            pdf.Integer(16384),
-		"Height":           pdf.Integer(8191),
+		"Height":           pdf.Integer(8193),
 		"BitsPerComponent": pdf.Integer(1),
 		"ColorSpace":       pdf.Name("DeviceCMYK"),
 		"Filter":           pdf.Name("FlateDecode"),
@@ -985,7 +986,7 @@ func TestExtractDictDecodedFloat64Oversize(t *testing.T) {
 
 	x := pdf.NewExtractor(w)
 	if _, err := ExtractDict(pdf.CursorAt(x, nil), ref, false); err == nil {
-		t.Fatal("expected error for float64-oversize image dict, got nil")
+		t.Fatal("expected error for oversize image dict, got nil")
 	}
 }
 

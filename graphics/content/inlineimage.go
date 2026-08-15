@@ -227,7 +227,7 @@ func InlineImageColorSpace(dict pdf.Dict, res *Resources) color.Space {
 // [limits.MaxImageWidth] or [limits.MaxImageHeight], whose
 // pixel count exceeds [limits.MaxImagePixels], whose declared pixel
 // data exceeds [limits.MaxImageBytes], or whose decoded per-channel
-// float64 buffer exceeds [limits.MaxImageDecodedFloat64Bytes].  These
+// float32 buffer exceeds [limits.MaxImageDecodedBytes].  These
 // checks match the caps enforced for image XObjects.
 func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 	width := getInlineImageInt(dict, "W", "Width")
@@ -267,9 +267,9 @@ func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 	if limits.ImageBytesExceedLimit(width, height, channels, bpc) {
 		return &pdf.MalformedFileError{Err: errors.New("inline image data exceeds size limit")}
 	}
-	// the encoded-bytes cap admits up to 64× expansion into the per-channel
-	// float64 buffer at bpc=1; cap the decoded form separately
-	if limits.ImageDecodedFloat64ExceedsLimit(width, height, channels) {
+	// the encoded-bytes cap admits up to 32× expansion into the per-channel
+	// float32 buffer at bpc=1; cap the decoded form separately
+	if limits.ImageDecodedExceedsLimit(width, height, channels) {
 		return &pdf.MalformedFileError{Err: errors.New("inline image decoded data exceeds size limit")}
 	}
 	return nil

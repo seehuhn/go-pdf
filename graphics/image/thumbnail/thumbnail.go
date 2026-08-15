@@ -137,9 +137,9 @@ func ExtractThumbnail(c pdf.Cursor, obj pdf.Object, _ bool) (*Thumbnail, error) 
 	}
 	thumb.BitsPerComponent = int(bpc)
 
-	// the pixel-count cap still admits a multi-GiB per-channel float64
+	// the pixel-count cap still admits a multi-GiB per-channel float32
 	// buffer at 4 channels; cap the decoded form separately
-	if limits.ImageDecodedFloat64ExceedsLimit(thumb.Width, thumb.Height, cs.Channels()) {
+	if limits.ImageDecodedExceedsLimit(thumb.Width, thumb.Height, cs.Channels()) {
 		return nil, pdf.Error("thumbnail decoded data exceeds size limit")
 	}
 

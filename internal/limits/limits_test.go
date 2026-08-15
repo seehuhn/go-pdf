@@ -18,7 +18,7 @@ package limits
 
 import "testing"
 
-func TestImageDecodedFloat64ExceedsLimit(t *testing.T) {
+func TestImageDecodedExceedsLimit(t *testing.T) {
 	cases := []struct {
 		name                    string
 		width, height, channels int
@@ -36,12 +36,31 @@ func TestImageDecodedFloat64ExceedsLimit(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ImageDecodedFloat64ExceedsLimit(tc.width, tc.height, tc.channels)
+			got := ImageDecodedExceedsLimit(tc.width, tc.height, tc.channels)
 			if got != tc.want {
-				t.Errorf("ImageDecodedFloat64ExceedsLimit(%d, %d, %d) = %v, want %v",
+				t.Errorf("ImageDecodedExceedsLimit(%d, %d, %d) = %v, want %v",
 					tc.width, tc.height, tc.channels, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestImageDecodedExceedsLimitBoundary checks the admissible pixel count
+// against MaxImageDecodedBytes/4 directly: w*h*channels*4 <= 2 GiB must
+// admit, and exceeding it must reject.
+func TestImageDecodedExceedsLimitBoundary(t *testing.T) {
+	const channels = 4
+	maxElems := int64(MaxImageDecodedBytes) / 4 / channels // per-channel elements admitted
+
+	w := int(maxElems)
+	h := 1
+	if ImageDecodedExceedsLimit(w, h, channels) {
+		t.Errorf("ImageDecodedExceedsLimit(%d, %d, %d) = true, want false (at boundary)", w, h, channels)
+	}
+
+	w++
+	if !ImageDecodedExceedsLimit(w, h, channels) {
+		t.Errorf("ImageDecodedExceedsLimit(%d, %d, %d) = false, want true (just over boundary)", w, h, channels)
 	}
 }
 

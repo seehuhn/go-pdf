@@ -37,11 +37,11 @@ var (
 // using native PDF color objects.
 type Data struct {
 	// Pix holds pixel values in the color space specified by CS.
-	// Each pixel occupies NComp consecutive float64 values.
+	// Each pixel occupies NComp consecutive float32 values.
 	// The pixel at (x, y) starts at Pix[(y-Rect.Min.Y)*Stride + (x-Rect.Min.X)*NComp].
-	Pix []float64
+	Pix []float32
 
-	// Stride is the number of float64 elements per row.
+	// Stride is the number of float32 elements per row.
 	Stride int
 
 	// Rect is the image bounds.
@@ -59,13 +59,15 @@ type Data struct {
 func NewData(cs color.Space, width, height int) *Data {
 	ncomp := cs.Channels()
 	stride := width * ncomp
-	pix := make([]float64, height*stride)
+	pix := make([]float32, height*stride)
 
 	// fill with default color values
 	defVals, _ := color.Values(cs.Default())
 	if len(defVals) == ncomp {
 		for i := 0; i < width*height; i++ {
-			copy(pix[i*ncomp:], defVals)
+			for c, v := range defVals {
+				pix[i*ncomp+c] = float32(v)
+			}
 		}
 	}
 
@@ -99,7 +101,11 @@ func (d *Data) At(x, y int) gocolor.Color {
 		return d.CS.Default()
 	}
 	offset := ry*d.Stride + rx*d.NComp
-	return color.FromValues(d.CS, d.Pix[offset:offset+d.NComp], nil)
+	vals := make([]float64, d.NComp)
+	for c, v := range d.Pix[offset : offset+d.NComp] {
+		vals[c] = float64(v)
+	}
+	return color.FromValues(d.CS, vals, nil)
 }
 
 // Set sets the color at position (x, y).
@@ -115,13 +121,15 @@ func (d *Data) Set(x, y int, c gocolor.Color) {
 	converted := d.CS.Convert(c)
 	vals, _ := color.Values(converted.(color.Color))
 	offset := ry*d.Stride + rx*d.NComp
-	copy(d.Pix[offset:], vals[:d.NComp])
+	for i := range d.NComp {
+		d.Pix[offset+i] = float32(vals[i])
+	}
 }
 
 // SampleNearest writes the nearest-neighbor pixel value into dst.
 // Coordinates are in pixel space where pixel (i,j) is centered at (i+0.5, j+0.5).
 // Out-of-bounds coordinates are clamped to the image edge.
-func (d *Data) SampleNearest(x, y float64, dst []float64) {
+func (d *Data) SampleNearest(x, y float64, dst []float32) {
 	w := d.Rect.Dx()
 	h := d.Rect.Dy()
 	ix := clampInt(int(math.Floor(x)), 0, w-1)
@@ -133,7 +141,7 @@ func (d *Data) SampleNearest(x, y float64, dst []float64) {
 // SampleBilinear writes bilinearly interpolated pixel values into dst.
 // Coordinates are in pixel space where pixel (i,j) is centered at (i+0.5, j+0.5).
 // Out-of-bounds coordinates are clamped to the image edge.
-func (d *Data) SampleBilinear(x, y float64, dst []float64) {
+func (d *Data) SampleBilinear(x, y float64, dst []float32) {
 	w := d.Rect.Dx()
 	h := d.Rect.Dy()
 
@@ -143,8 +151,8 @@ func (d *Data) SampleBilinear(x, y float64, dst []float64) {
 
 	x0 := int(math.Floor(fx))
 	y0 := int(math.Floor(fy))
-	dx := fx - float64(x0)
-	dy := fy - float64(y0)
+	dx := float32(fx - float64(x0))
+	dy := float32(fy - float64(y0))
 
 	// clamp to valid pixel range
 	x0c := clampInt(x0, 0, w-1)
@@ -176,10 +184,14 @@ func (d *Data) ToRGBA() *image.RGBA {
 	w := d.Rect.Dx()
 	h := d.Rect.Dy()
 	out := image.NewRGBA(d.Rect)
+	vals := make([]float64, d.NComp)
 	for y := range h {
 		for x := range w {
 			offset := y*d.Stride + x*d.NComp
-			c := color.FromValues(d.CS, d.Pix[offset:offset+d.NComp], nil)
+			for i, v := range d.Pix[offset : offset+d.NComp] {
+				vals[i] = float64(v)
+			}
+			c := color.FromValues(d.CS, vals, nil)
 			r, g, b, a := c.RGBA()
 			i := out.PixOffset(x+d.Rect.Min.X, y+d.Rect.Min.Y)
 			out.Pix[i+0] = uint8(r >> 8)
@@ -238,8 +250,8 @@ func (d *Dict) Load() (*Data, error) {
 
 	width, height := d.Width, d.Height
 	bpc := d.BitsPerComponent
-	pix := make([]float64, width*height*ncomp)
-	vals := make([]float64, ncomp)
+	pix := make([]float32, width*height*ncomp)
+	vals := make([]float32, ncomp)
 
 	for y := range height {
 		for x := range width {
@@ -262,7 +274,7 @@ func (d *Dict) Load() (*Data, error) {
 // readSamples reads n color component values for pixel (x, y) from raw image
 // data, applying the Decode mapping to produce color space values.
 // bpc is assumed to be one of the supported depths (1, 2, 4, 8, or 16).
-func readSamples(data []byte, width, n, bpc, x, y int, decode, values []float64) {
+func readSamples(data []byte, width, n, bpc, x, y int, decode []float64, values []float32) {
 	switch bpc {
 	case 8:
 		rowStart := y * width * n
@@ -271,9 +283,9 @@ func readSamples(data []byte, width, n, bpc, x, y int, decode, values []float64)
 			idx := pixStart + c
 			if idx < len(data) {
 				s := float64(data[idx]) / 255
-				values[c] = decode[2*c] + s*(decode[2*c+1]-decode[2*c])
+				values[c] = float32(decode[2*c] + s*(decode[2*c+1]-decode[2*c]))
 			} else {
-				values[c] = decode[2*c]
+				values[c] = float32(decode[2*c])
 			}
 		}
 	case 16:
@@ -283,9 +295,9 @@ func readSamples(data []byte, width, n, bpc, x, y int, decode, values []float64)
 			idx := pixStart + c*2
 			if idx+1 < len(data) {
 				s := float64(uint16(data[idx])<<8|uint16(data[idx+1])) / 65535
-				values[c] = decode[2*c] + s*(decode[2*c+1]-decode[2*c])
+				values[c] = float32(decode[2*c] + s*(decode[2*c+1]-decode[2*c]))
 			} else {
-				values[c] = decode[2*c]
+				values[c] = float32(decode[2*c])
 			}
 		}
 	case 1, 2, 4:
@@ -300,9 +312,9 @@ func readSamples(data []byte, width, n, bpc, x, y int, decode, values []float64)
 			bitOffset := (samplesPerByte - 1 - sampleIdx%samplesPerByte) * bpc
 			if byteIdx < len(data) {
 				s := float64((data[byteIdx]>>bitOffset)&mask) / maxVal
-				values[c] = decode[2*c] + s*(decode[2*c+1]-decode[2*c])
+				values[c] = float32(decode[2*c] + s*(decode[2*c+1]-decode[2*c]))
 			} else {
-				values[c] = decode[2*c]
+				values[c] = float32(decode[2*c])
 			}
 		}
 	}

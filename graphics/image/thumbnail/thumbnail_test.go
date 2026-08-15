@@ -343,17 +343,18 @@ func TestThumbnailRoundTrip(t *testing.T) {
 }
 
 func TestExtractThumbnailRejectsHugeDecodedBuffer(t *testing.T) {
-	// DeviceRGB at bpc=1, 10000×10000: the pixel count (100M) is under
-	// the 128 Mpx cap and the encoded form (~37 MiB) is under the 256 MiB
-	// cap, but the decoded per-channel float64 buffer would be ~2.4 GiB,
-	// over the 2 GiB cap.  Extraction must reject it before Load allocates.
+	// DeviceRGB at bpc=1, 15000x9000: the pixel count (135M) exceeds the
+	// 128 Mpx cap. Decoded samples are float32 (4 bytes), so at 3 channels
+	// -- the most a thumbnail colour space can have -- the decoded-buffer
+	// cap (limits.MaxImageDecodedBytes) never trips before the
+	// pixel-count cap does; extraction must still reject the thumbnail.
 	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
 	ref := w.Alloc()
 	dict := pdf.Dict{
 		"Type":             pdf.Name("XObject"),
 		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(10000),
-		"Height":           pdf.Integer(10000),
+		"Width":            pdf.Integer(15000),
+		"Height":           pdf.Integer(9000),
 		"ColorSpace":       pdf.Name("DeviceRGB"),
 		"BitsPerComponent": pdf.Integer(1),
 	}
@@ -370,7 +371,7 @@ func TestExtractThumbnailRejectsHugeDecodedBuffer(t *testing.T) {
 
 	x := pdf.NewExtractor(w)
 	if _, err := thumbnail.ExtractThumbnail(pdf.CursorAt(x, nil), ref, false); err == nil {
-		t.Fatal("expected error for oversized decoded float64 buffer")
+		t.Fatal("expected error for oversized thumbnail")
 	}
 }
 

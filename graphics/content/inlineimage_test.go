@@ -148,13 +148,16 @@ func TestDecodeInlineImageForbiddenFilterInArray(t *testing.T) {
 }
 
 func TestDecodeInlineImageRejectsHugeDecodedBuffer(t *testing.T) {
-	// DeviceCMYK at bpc=1, 10000×10000: the encoded form is ~48 MiB (well
-	// under the 256 MiB encoded cap) but the decoded per-channel float64
-	// buffer would be ~3.2 GiB, over the 2 GiB cap that image XObjects
-	// reject.  The inline path must reject it before any allocation.
+	// DeviceCMYK at bpc=1, 16384x8193: the encoded form is well under the
+	// 256 MiB encoded cap. Decoded samples are float32 (4 bytes), so at 4
+	// channels -- the most an inline image colour space can have -- the
+	// decoded-buffer cap (limits.MaxImageDecodedBytes) now coincides with
+	// the 128 Mpx pixel-count cap; this image sits one pixel row past
+	// that shared boundary. The inline path must reject it before any
+	// allocation.
 	dict := pdf.Dict{
-		"W":   pdf.Integer(10000),
-		"H":   pdf.Integer(10000),
+		"W":   pdf.Integer(16384),
+		"H":   pdf.Integer(8193),
 		"CS":  pdf.Name("CMYK"),
 		"BPC": pdf.Integer(1),
 	}
@@ -163,7 +166,7 @@ func TestDecodeInlineImageRejectsHugeDecodedBuffer(t *testing.T) {
 		Args: []pdf.Object{dict, pdf.String("x")},
 	}
 	if _, err := DecodeInlineImage(op, nil); err == nil {
-		t.Fatal("expected error for oversized decoded float64 buffer")
+		t.Fatal("expected error for oversized inline image")
 	}
 }
 
