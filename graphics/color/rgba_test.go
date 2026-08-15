@@ -107,10 +107,11 @@ func TestCIERoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var v [1]float64
 	for _, val := range []float64{0, 0.25, 0.5, 0.75, 1} {
 		c := s.New(val)
 		X, Y, Z := c.ToXYZ()
-		v := s.FromXYZ(X, Y, Z)
+		s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
 		if math.Abs(v[0]-val) > 1e-6 {
 			t.Errorf("CalGray round-trip for %g: got %g", val, v[0])
 		}
@@ -125,7 +126,8 @@ func TestCalRGBRoundTrip(t *testing.T) {
 
 	c := s.New(0.3, 0.5, 0.7)
 	X, Y, Z := c.ToXYZ()
-	v := s.FromXYZ(X, Y, Z)
+	var v [3]float64
+	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
 	if math.Abs(v[0]-0.3) > 1e-6 ||
 		math.Abs(v[1]-0.5) > 1e-6 ||
 		math.Abs(v[2]-0.7) > 1e-6 {
@@ -144,7 +146,8 @@ func TestLabRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	X, Y, Z := c.ToXYZ()
-	v := s.FromXYZ(X, Y, Z)
+	var v [3]float64
+	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
 	if math.Abs(v[0]-50) > 0.01 ||
 		math.Abs(v[1]-20) > 0.01 ||
 		math.Abs(v[2]+30) > 0.01 {

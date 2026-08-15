@@ -114,9 +114,13 @@ func (s spaceSRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) 
 }
 
 // FromXYZ converts D50-adapted CIE XYZ to sRGB component values.
-func (s spaceSRGB) FromXYZ(X, Y, Z float64) []float64 {
-	r, g, b := xyzToSRGB(X, Y, Z)
-	return []float64{r, g, b}
+//
+// The result is written to dst, which must have space for three components.
+//
+// ws is unused, but must be non-nil for consistency with the other colour
+// spaces; the zero value &icc.Workspace{} is valid.
+func (s spaceSRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
+	dst[0], dst[1], dst[2] = xyzToSRGB(X, Y, Z)
 }
 
 type colorSRGB [3]float64

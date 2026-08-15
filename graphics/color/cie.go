@@ -122,21 +122,29 @@ func (s *SpaceCalGray) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // FromXYZ converts D50-adapted CIE XYZ to a CalGray component value.
-func (s *SpaceCalGray) FromXYZ(X, Y, Z float64) []float64 {
+//
+// The result is written to dst, which must have space for one component.
+//
+// ws is unused, but must be non-nil for consistency with the other colour
+// spaces; the zero value &icc.Workspace{} is valid.
+func (s *SpaceCalGray) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
 	_, Ya, _ := bradfordAdapt(X, Y, Z, WhitePointD50, s.WhitePoint[:])
 	yNorm := Ya / s.WhitePoint[1]
-	if yNorm <= 0 {
-		return []float64{0}
+	switch {
+	case yNorm <= 0:
+		dst[0] = 0
+	case yNorm >= 1:
+		dst[0] = 1
+	default:
+		dst[0] = clamp(math.Pow(yNorm, 1.0/s.Gamma), 0, 1)
 	}
-	if yNorm >= 1 {
-		return []float64{1}
-	}
-	return []float64{clamp(math.Pow(yNorm, 1.0/s.Gamma), 0, 1)}
 }
 
 // ColorFromXYZ converts D50-adapted CIE XYZ coordinates to a CalGray color.
 func (s *SpaceCalGray) ColorFromXYZ(X, Y, Z float64) Color {
-	return colorCalGray{Space: s, Value: s.FromXYZ(X, Y, Z)[0]}
+	var v [1]float64
+	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	return colorCalGray{Space: s, Value: v[0]}
 }
 
 // Embed adds the color space to a PDF file.
@@ -302,14 +310,20 @@ func (s *SpaceCalRGB) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // FromXYZ converts D50-adapted CIE XYZ coordinates to CalRGB component values.
-func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64) []float64 {
+//
+// The result is written to dst, which must have space for three components.
+//
+// ws is unused, but must be non-nil for consistency with the other colour
+// spaces; the zero value &icc.Workspace{} is valid.
+func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
 	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.WhitePoint[:])
 
 	// invert the matrix (stored in column-major order in matrix field)
 	m := s.Matrix
 	det := m[0]*(m[4]*m[8]-m[5]*m[7]) - m[3]*(m[1]*m[8]-m[2]*m[7]) + m[6]*(m[1]*m[5]-m[2]*m[4])
 	if det == 0 {
-		return []float64{0, 0, 0}
+		dst[0], dst[1], dst[2] = 0, 0, 0
+		return
 	}
 	invDet := 1.0 / det
 
@@ -330,21 +344,16 @@ func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64) []float64 {
 	C := i20*X + i21*Y + i22*Z
 
 	// apply inverse gamma
-	r := invGamma(A, s.Gamma[0])
-	g := invGamma(B, s.Gamma[1])
-	b := invGamma(C, s.Gamma[2])
-
-	return []float64{
-		clamp(r, 0, 1),
-		clamp(g, 0, 1),
-		clamp(b, 0, 1),
-	}
+	dst[0] = clamp(invGamma(A, s.Gamma[0]), 0, 1)
+	dst[1] = clamp(invGamma(B, s.Gamma[1]), 0, 1)
+	dst[2] = clamp(invGamma(C, s.Gamma[2]), 0, 1)
 }
 
 // ColorFromXYZ converts D50-adapted CIE XYZ coordinates to a CalRGB color.
 func (s *SpaceCalRGB) ColorFromXYZ(X, Y, Z float64) Color {
-	v := s.FromXYZ(X, Y, Z)
-	return colorCalRGB{Space: s, Values: [3]float64{v[0], v[1], v[2]}}
+	var v [3]float64
+	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	return colorCalRGB{Space: s, Values: v}
 }
 
 func invGamma(v, gamma float64) float64 {
@@ -620,7 +629,12 @@ func (c colorLab) RGBA() (r, g, b, a uint32) {
 
 // FromXYZ converts D50-adapted CIE XYZ coordinates to Lab component values.
 // Values outside the valid range are clamped.
-func (s *SpaceLab) FromXYZ(X, Y, Z float64) []float64 {
+//
+// The result is written to dst, which must have space for three components.
+//
+// ws is unused, but must be non-nil for consistency with the other colour
+// spaces; the zero value &icc.Workspace{} is valid.
+func (s *SpaceLab) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
 	X, Y, Z = bradfordAdapt(X, Y, Z, WhitePointD50, s.WhitePoint[:])
 
 	XW, YW, ZW := s.WhitePoint[0], s.WhitePoint[1], s.WhitePoint[2]
@@ -636,17 +650,16 @@ func (s *SpaceLab) FromXYZ(X, Y, Z float64) []float64 {
 	bStar := 200 * (M - N)
 
 	// clamp to valid ranges
-	LStar = clamp(LStar, 0, 100)
-	aStar = clamp(aStar, s.Ranges[0], s.Ranges[1])
-	bStar = clamp(bStar, s.Ranges[2], s.Ranges[3])
-
-	return []float64{LStar, aStar, bStar}
+	dst[0] = clamp(LStar, 0, 100)
+	dst[1] = clamp(aStar, s.Ranges[0], s.Ranges[1])
+	dst[2] = clamp(bStar, s.Ranges[2], s.Ranges[3])
 }
 
 // ColorFromXYZ converts D50-adapted CIE XYZ coordinates to a Lab color.
 func (s *SpaceLab) ColorFromXYZ(X, Y, Z float64) Color {
-	v := s.FromXYZ(X, Y, Z)
-	return colorLab{Space: s, Values: [3]float64{v[0], v[1], v[2]}}
+	var v [3]float64
+	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	return colorLab{Space: s, Values: v}
 }
 
 // labG is the forward transfer function (used in ToXYZ).

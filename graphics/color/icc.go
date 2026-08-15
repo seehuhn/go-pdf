@@ -192,23 +192,24 @@ func (s *SpaceICCBased) getTransform() *icc.Transform {
 }
 
 // FromXYZ converts D50-adapted CIE XYZ to ICC-based component values.
-func (s *SpaceICCBased) FromXYZ(X, Y, Z float64) []float64 {
+//
+// The result is written to dst, which must have space for N components.
+//
+// ws supplies reusable scratch buffers to avoid per-call allocation in a
+// hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
+// and must not be used from more than one goroutine at a time.
+func (s *SpaceICCBased) FromXYZ(X, Y, Z float64, dst []float64, ws *icc.Workspace) {
 	t := s.getTransform()
-
-	var values []float64
-	if t != nil && t.CanFromXYZ() {
-		values = make([]float64, t.Channels())
-		t.FromXYZ(X, Y, Z, values, &icc.Workspace{})
+	if t != nil && t.CanFromXYZ() && t.Channels() == s.N {
+		t.FromXYZ(X, Y, Z, dst[:s.N], ws)
 	} else {
-		values = s.fallbackFromXYZ(X, Y, Z)
+		s.fallbackFromXYZ(X, Y, Z, dst[:s.N])
 	}
 
-	result := make([]float64, s.N)
-	for i := 0; i < s.N && i < len(values); i++ {
+	for i := range s.N {
 		lo, hi := s.Ranges[2*i], s.Ranges[2*i+1]
-		result[i] = clamp(values[i]*(hi-lo)+lo, lo, hi)
+		dst[i] = clamp(dst[i]*(hi-lo)+lo, lo, hi)
 	}
-	return result
 }
 
 // Convert converts a color to the ICC-based color space.
@@ -220,39 +221,24 @@ func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 
 	X, Y, Z := ColorToXYZ(c)
-	values := s.FromXYZ(X, Y, Z)
 
 	result := colorICCBased{Space: s}
-	copy(result.Values[:], values)
+	s.FromXYZ(X, Y, Z, result.Values[:s.N], &icc.Workspace{})
 	return result
 }
 
-func (s *SpaceICCBased) fallbackFromXYZ(X, Y, Z float64) []float64 {
+func (s *SpaceICCBased) fallbackFromXYZ(X, Y, Z float64, dst []float64) {
 	// simple fallback: convert XYZ to sRGB-like values
 	r, g, b := xyzToSRGB(X, Y, Z)
 	switch s.N {
 	case 1:
-		// grayscale: use luminance
-		return []float64{0.299*r + 0.587*g + 0.114*b}
+		dst[0] = rgbToGray(r, g, b)
 	case 3:
-		return []float64{r, g, b}
+		dst[0], dst[1], dst[2] = r, g, b
 	case 4:
-		// CMYK approximation
-		cyan := 1 - r
-		magenta := 1 - g
-		yellow := 1 - b
-		k := min(cyan, min(magenta, yellow))
-		if k >= 1 {
-			return []float64{0, 0, 0, 1}
-		}
-		return []float64{
-			(cyan - k) / (1 - k),
-			(magenta - k) / (1 - k),
-			(yellow - k) / (1 - k),
-			k,
-		}
+		rgbToCMYK(r, g, b, dst)
 	default:
-		return make([]float64, s.N)
+		clear(dst)
 	}
 }
 

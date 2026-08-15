@@ -72,13 +72,11 @@ func (s spaceDeviceGray) Convert(c stdcolor.Color) stdcolor.Color {
 		return g
 	}
 
-	// use luminance formula: 0.299R + 0.587G + 0.114B
 	r32, g32, b32, _ := c.RGBA()
 	r := float64(r32) / 65535.0
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
-	gray := 0.299*r + 0.587*g + 0.114*b
-	return DeviceGray(clamp01(gray))
+	return DeviceGray(clamp01(rgbToGray(r, g, b)))
 }
 
 // ToXYZ converts a gray value to CIE XYZ tristimulus values
@@ -89,9 +87,35 @@ func (s spaceDeviceGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z flo
 }
 
 // FromXYZ converts D50-adapted CIE XYZ to a DeviceGray component value.
-func (s spaceDeviceGray) FromXYZ(X, Y, Z float64) []float64 {
-	r, g, b := xyzToSRGB(X, Y, Z)
-	return []float64{0.299*r + 0.587*g + 0.114*b}
+//
+// The result is written to dst, which must have space for one component.
+//
+// ws is unused, but must be non-nil for consistency with the other colour
+// spaces; the zero value &icc.Workspace{} is valid.
+func (s spaceDeviceGray) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
+	dst[0] = rgbToGray(xyzToSRGB(X, Y, Z))
+}
+
+// rgbToGray converts sRGB components to a DeviceGray value.
+func rgbToGray(r, g, b float64) float64 {
+	return 0.299*r + 0.587*g + 0.114*b
+}
+
+// rgbToCMYK converts sRGB components to CMYK with undercolour removal.
+// The four components are written to dst.
+func rgbToCMYK(r, g, b float64, dst []float64) {
+	cyan := 1 - r
+	magenta := 1 - g
+	yellow := 1 - b
+	k := min(cyan, magenta, yellow)
+	if k >= 1 {
+		dst[0], dst[1], dst[2], dst[3] = 0, 0, 0, 1
+		return
+	}
+	dst[0] = (cyan - k) / (1 - k)
+	dst[1] = (magenta - k) / (1 - k)
+	dst[2] = (yellow - k) / (1 - k)
+	dst[3] = k
 }
 
 // DeviceGray is a color in the DeviceGray color space.
@@ -179,9 +203,13 @@ func (s spaceDeviceRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z floa
 }
 
 // FromXYZ converts D50-adapted CIE XYZ to DeviceRGB component values.
-func (s spaceDeviceRGB) FromXYZ(X, Y, Z float64) []float64 {
-	r, g, b := xyzToSRGB(X, Y, Z)
-	return []float64{r, g, b}
+//
+// The result is written to dst, which must have space for three components.
+//
+// ws is unused, but must be non-nil for consistency with the other colour
+// spaces; the zero value &icc.Workspace{} is valid.
+func (s spaceDeviceRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
+	dst[0], dst[1], dst[2] = xyzToSRGB(X, Y, Z)
 }
 
 // DeviceRGB is a color in the DeviceRGB color space.
@@ -253,32 +281,18 @@ func (s spaceDeviceCMYK) Convert(c stdcolor.Color) stdcolor.Color {
 		return cmyk
 	}
 
-	// RGB to CMY, then undercolor removal
 	r32, g32, b32, _ := c.RGBA()
 	r := float64(r32) / 65535.0
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
 
-	cyan := 1 - r
-	magenta := 1 - g
-	yellow := 1 - b
-
-	// undercolor removal: extract black component
-	k := min(cyan, min(magenta, yellow))
-	if k >= 1 {
-		return DeviceCMYK{0, 0, 0, 1}
-	}
-
-	// adjust CMY values
-	cyan = (cyan - k) / (1 - k)
-	magenta = (magenta - k) / (1 - k)
-	yellow = (yellow - k) / (1 - k)
-
+	var cmyk [4]float64
+	rgbToCMYK(r, g, b, cmyk[:])
 	return DeviceCMYK{
-		clamp01(cyan),
-		clamp01(magenta),
-		clamp01(yellow),
-		clamp01(k),
+		clamp01(cmyk[0]),
+		clamp01(cmyk[1]),
+		clamp01(cmyk[2]),
+		clamp01(cmyk[3]),
 	}
 }
 
@@ -307,20 +321,19 @@ func cmykXform() *icc.Transform {
 }
 
 // FromXYZ converts D50-adapted CIE XYZ to DeviceCMYK component values.
-func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64) []float64 {
+//
+// The result is written to dst, which must have space for four components.
+//
+// ws supplies reusable scratch buffers to avoid per-call allocation in a
+// hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
+// and must not be used from more than one goroutine at a time.
+func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64, dst []float64, ws *icc.Workspace) {
 	if t := cmykXform(); t != nil && t.CanFromXYZ() {
-		out := make([]float64, 4)
-		t.FromXYZ(X, Y, Z, out, &icc.Workspace{})
-		return out
+		t.FromXYZ(X, Y, Z, dst[:4], ws)
+		return
 	}
-	// fallback: naive sRGB to CMYK
 	r, g, b := xyzToSRGB(X, Y, Z)
-	c, m, y := 1-r, 1-g, 1-b
-	k := min(c, min(m, y))
-	if k >= 1 {
-		return []float64{0, 0, 0, 1}
-	}
-	return []float64{(c - k) / (1 - k), (m - k) / (1 - k), (y - k) / (1 - k), k}
+	rgbToCMYK(r, g, b, dst)
 }
 
 // DeviceCMYK is a color in the DeviceCMYK color space.

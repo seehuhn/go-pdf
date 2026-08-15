@@ -37,4 +37,19 @@
 //
 // Each color space is represented by an object of type [Space], which
 // has a method New() to create colors in that color space.
+//
+// # Interpretation of the device color spaces
+//
+// The values of a device color space describe the colorants of an output
+// device, so the color they produce depends on the device and the PDF
+// specification assigns them no colorimetric meaning.  Converting them to
+// CIE XYZ, as ToXYZ and FromXYZ do, therefore requires a choice.  This
+// package interprets DeviceGray and DeviceRGB as sRGB, and DeviceCMYK
+// through a built-in CMYK profile.  The Convert methods, which implement
+// the [image/color.Model] interface, do not use the profile: they map RGB
+// to inks directly, so that converting a large image does not depend on
+// the profile's gamut mapping.  A file can ask for a different
+// interpretation by naming DefaultGray, DefaultRGB or DefaultCMYK in the
+// ColorSpace subdictionary of a resource dictionary; applying those
+// entries is the responsibility of the consumer, not of this package.
 package color
