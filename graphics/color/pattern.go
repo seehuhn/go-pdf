@@ -63,11 +63,11 @@ func (s spacePatternColored) Channels() int {
 	return 0
 }
 
-// ComponentRanges returns nil, nil since colored patterns have no
-// numeric components.
+// ComponentRange panics.  Colored patterns have no numeric components, so
+// Channels returns 0 and no component index is valid.
 // This implements the [Space] interface.
-func (s spacePatternColored) ComponentRanges() (lo, hi []float64) {
-	return nil, nil
+func (s spacePatternColored) ComponentRange(i int) (lo, hi float64) {
+	panic("colored pattern has no color components")
 }
 
 // Embed adds the color space to a PDF file.
@@ -162,10 +162,10 @@ func (s spacePatternUncolored) Channels() int {
 	return s.base.Channels()
 }
 
-// ComponentRanges delegates to the underlying color space.
+// ComponentRange delegates to the underlying color space.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) ComponentRanges() (lo, hi []float64) {
-	return s.base.ComponentRanges()
+func (s spacePatternUncolored) ComponentRange(i int) (lo, hi float64) {
+	return s.base.ComponentRange(i)
 }
 
 // Embed adds the pattern color space to the PDF file.

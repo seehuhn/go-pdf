@@ -77,7 +77,7 @@ func ExtractStyle(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Style, error) {
 	style := &Style{}
 	style.SingleUse = isDirect
 
-	// color (clamp to valid range [0.0, 1.0])
+	// color (clipped to the valid range [0.0, 1.0])
 	if cArray, err := pdf.Optional(c.Array(dict["C"])); err != nil {
 		return nil, err
 	} else if len(cArray) >= 3 {
@@ -85,9 +85,9 @@ func ExtractStyle(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Style, error) {
 		g, _ := c.Number(cArray[1])
 		b, _ := c.Number(cArray[2])
 		style.Color = color.DeviceRGB{
-			clamp(r, 0, 1),
-			clamp(g, 0, 1),
-			clamp(b, 0, 1),
+			color.ClipComponent(r, 0, 1),
+			color.ClipComponent(g, 0, 1),
+			color.ClipComponent(b, 0, 1),
 		}
 	}
 
@@ -206,13 +206,3 @@ const (
 	// StyleDashed represents a dashed line style.
 	StyleDashed LineStyle = "D"
 )
-
-func clamp(v, lo, hi float64) float64 {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}

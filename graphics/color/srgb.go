@@ -41,10 +41,10 @@ func (s spaceSRGB) Channels() int {
 	return 3
 }
 
-// ComponentRanges returns the value ranges of the sRGB components.
+// ComponentRange returns the value range of an sRGB component.
 // This implements the [Space] interface.
-func (s spaceSRGB) ComponentRanges() (lo, hi []float64) {
-	return []float64{0, 0, 0}, []float64{1, 1, 1}
+func (s spaceSRGB) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Embed adds the color space to a PDF file.
@@ -111,7 +111,7 @@ func (s spaceSRGB) Convert(c stdcolor.Color) stdcolor.Color {
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
 func (s spaceSRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	return srgbToXYZ(clamp01(values[0]), clamp01(values[1]), clamp01(values[2]))
+	return srgbToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
 }
 
 // FromXYZ converts PCS-adapted CIE XYZ to sRGB component values.

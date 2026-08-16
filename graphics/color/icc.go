@@ -38,10 +38,6 @@ type SpaceICCBased struct {
 
 	def []float64
 
-	// cached, immutable component ranges (see ComponentRanges)
-	rangesOnce         sync.Once
-	rangesLo, rangesHi []float64
-
 	// cached bidirectional transform for ToXYZ/FromXYZ
 	transformOnce sync.Once
 	transform     *icc.Transform
@@ -102,22 +98,11 @@ func (s *SpaceICCBased) Channels() int {
 	return s.N
 }
 
-// ComponentRanges returns the per-component value ranges stored in the
+// ComponentRange returns the value range of component i, as stored in the
 // Range entry of the ICC-based color space.
 // This implements the [Space] interface.
-//
-// The returned slices are cached and shared; callers must not modify them.
-func (s *SpaceICCBased) ComponentRanges() (lo, hi []float64) {
-	s.rangesOnce.Do(func() {
-		n := s.N
-		s.rangesLo = make([]float64, n)
-		s.rangesHi = make([]float64, n)
-		for i := range n {
-			s.rangesLo[i] = s.Ranges[2*i]
-			s.rangesHi[i] = s.Ranges[2*i+1]
-		}
-	})
-	return s.rangesLo, s.rangesHi
+func (s *SpaceICCBased) ComponentRange(i int) (lo, hi float64) {
+	return s.Ranges[2*i], s.Ranges[2*i+1]
 }
 
 // Default returns the default color in an ICC-based color space.
@@ -208,7 +193,7 @@ func (s *SpaceICCBased) FromXYZ(X, Y, Z float64, dst []float64, ws *icc.Workspac
 
 	for i := range s.N {
 		lo, hi := s.Ranges[2*i], s.Ranges[2*i+1]
-		dst[i] = clamp(dst[i]*(hi-lo)+lo, lo, hi)
+		dst[i] = ClipComponent(dst[i]*(hi-lo)+lo, lo, hi)
 	}
 }
 
@@ -270,7 +255,7 @@ func (s *SpaceICCBased) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z floa
 		if hi > lo {
 			// clamping the normalised value adjusts a component outside
 			// Ranges to the nearest value the colour space allows
-			norm[i] = clamp01((values[i] - lo) / (hi - lo))
+			norm[i] = clip01((values[i] - lo) / (hi - lo))
 		}
 	}
 

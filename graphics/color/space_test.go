@@ -1127,15 +1127,15 @@ func TestExtractSpaceRepairsCIEParameters(t *testing.T) {
 			// parameters which overflow do so only at the far end of the
 			// range, where the midpoint alone stays finite.
 			ws := &icc.Workspace{}
-			lo, hi := space.ComponentRanges()
 			n := space.Channels()
 			for corner := range 1 << n {
 				vals := make([]float64, n)
 				for i := range vals {
+					lo, hi := space.ComponentRange(i)
 					if corner&(1<<i) != 0 {
-						vals[i] = hi[i]
+						vals[i] = hi
 					} else {
-						vals[i] = lo[i]
+						vals[i] = lo
 					}
 				}
 				X, Y, Z := space.ToXYZ(vals, ws)
@@ -1254,7 +1254,7 @@ func TestFactoryOutputSurvivesRoundTrip(t *testing.T) {
 }
 
 // TestToXYZClampsEveryImplementation checks the [Space.ToXYZ] contract across
-// every colour space family: a component outside ComponentRanges converts to
+// every colour space family: a component outside ComponentRange converts to
 // exactly what the nearest value inside the range converts to, and the result
 // is finite.
 //
@@ -1270,17 +1270,25 @@ func TestToXYZClampsEveryImplementation(t *testing.T) {
 			if n == 0 {
 				return // colored patterns carry no components
 			}
-			lo, hi := space.ComponentRanges()
-
 			for _, tc := range []struct {
 				name string
 				at   func(i int) float64
 				edge func(i int) float64
 			}{
-				{"below", func(i int) float64 { return lo[i] - 1 - (hi[i] - lo[i]) },
-					func(i int) float64 { return lo[i] }},
-				{"above", func(i int) float64 { return hi[i] + 1 + (hi[i] - lo[i]) },
-					func(i int) float64 { return hi[i] }},
+				{"below", func(i int) float64 {
+					lo, hi := space.ComponentRange(i)
+					return lo - 1 - (hi - lo)
+				}, func(i int) float64 {
+					lo, _ := space.ComponentRange(i)
+					return lo
+				}},
+				{"above", func(i int) float64 {
+					lo, hi := space.ComponentRange(i)
+					return hi + 1 + (hi - lo)
+				}, func(i int) float64 {
+					_, hi := space.ComponentRange(i)
+					return hi
+				}},
 			} {
 				out := make([]float64, n)
 				edge := make([]float64, n)

@@ -45,11 +45,9 @@ type Space interface {
 	// This returns 0 for colored tiling patterns and shading patterns.
 	Channels() int
 
-	// ComponentRanges returns the per-component value ranges for colors
-	// in this space.  Component i takes values in [lo[i], hi[i]].
-	// The slices have length Channels(); for color spaces with no
-	// components, both slices are nil.
-	ComponentRanges() (lo, hi []float64)
+	// ComponentRange returns the value range of component i, which must be
+	// less than Channels().  The component takes values in [lo, hi].
+	ComponentRange(i int) (lo, hi float64)
 
 	// Default returns the default color of the color space.
 	Default() Color
@@ -58,7 +56,7 @@ type Space interface {
 	// to the white point of the ICC Profile Connection Space,
 	// [icc.PCSWhitePoint].
 	//
-	// A component outside the range reported by ComponentRanges is adjusted
+	// A component outside the range reported by ComponentRange is adjusted
 	// to the nearest value within it.  Callers therefore need not clamp, and
 	// the result is always finite.  The input is not modified.
 	//

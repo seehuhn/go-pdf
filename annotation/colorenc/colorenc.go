@@ -29,16 +29,11 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
-// clamp01 restricts a colour component to the valid range 0.0 to 1.0.
-func clamp01(v float64) float64 {
-	return min(1, max(0, v))
-}
-
 // Extract converts a device-colour array into a [color.Color].
 //
 // The number of array elements selects the colour space: 1 for DeviceGray,
 // 3 for DeviceRGB, and 4 for DeviceCMYK. A missing object or an empty array
-// yields a nil colour. Component values are clamped to the range 0.0 to 1.0.
+// yields a nil colour. Component values are clipped to the range 0.0 to 1.0.
 func Extract(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 	a, _ := c.Array(obj)
 	if a == nil {
@@ -48,7 +43,7 @@ func Extract(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 	colors := make([]float64, len(a))
 	for i, colorVal := range a {
 		if num, err := c.Number(colorVal); err == nil {
-			colors[i] = clamp01(num)
+			colors[i] = color.ClipComponent(num, 0, 1)
 		}
 	}
 
@@ -104,7 +99,7 @@ func Encode(c color.Color) (pdf.Array, error) {
 
 // ExtractRGB converts a 3-element device-colour array into a DeviceRGB
 // [color.Color]. A missing object or an empty array yields a nil colour;
-// arrays of any other length are rejected. Component values are clamped to
+// arrays of any other length are rejected. Component values are clipped to
 // the range 0.0 to 1.0.
 func ExtractRGB(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 	a, _ := c.Array(obj)
@@ -123,7 +118,7 @@ func ExtractRGB(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 	colors := make([]float64, 3)
 	for i, colorVal := range a {
 		if num, err := c.Number(colorVal); err == nil {
-			colors[i] = clamp01(num)
+			colors[i] = color.ClipComponent(num, 0, 1)
 		}
 	}
 

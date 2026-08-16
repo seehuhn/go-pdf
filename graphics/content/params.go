@@ -256,24 +256,26 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		}
 
 	case OpSetStrokeColor, OpSetStrokeColorN: // SC, SCN
+		space := p.StrokeColor.ColorSpace()
 		values, pat := s.parseColorArgs(args)
-		p.StrokeColor = color.FromValues(p.StrokeColor.ColorSpace(), values, pat)
+		p.StrokeColor = color.FromValues(space, color.ClipComponents(space, values), pat)
 		s.GState.Set |= graphics.StateStrokeColor
 
 	case OpSetFillColor, OpSetFillColorN: // sc, scn
+		space := p.FillColor.ColorSpace()
 		values, pat := s.parseColorArgs(args)
-		p.FillColor = color.FromValues(p.FillColor.ColorSpace(), values, pat)
+		p.FillColor = color.FromValues(space, color.ClipComponents(space, values), pat)
 		s.GState.Set |= graphics.StateFillColor
 
 	case OpSetStrokeGray: // G
 		if gray, ok := getNumber(args, 0); ok {
-			p.StrokeColor = color.DeviceGray(gray)
+			p.StrokeColor = color.DeviceGray(clip01(gray))
 			s.GState.Set |= graphics.StateStrokeColor
 		}
 
 	case OpSetFillGray: // g
 		if gray, ok := getNumber(args, 0); ok {
-			p.FillColor = color.DeviceGray(gray)
+			p.FillColor = color.DeviceGray(clip01(gray))
 			s.GState.Set |= graphics.StateFillColor
 		}
 
@@ -282,7 +284,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		g, ok2 := getNumber(args, 1)
 		b, ok3 := getNumber(args, 2)
 		if ok1 && ok2 && ok3 {
-			p.StrokeColor = color.DeviceRGB{r, g, b}
+			p.StrokeColor = color.DeviceRGB{clip01(r), clip01(g), clip01(b)}
 			s.GState.Set |= graphics.StateStrokeColor
 		}
 
@@ -291,7 +293,7 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		g, ok2 := getNumber(args, 1)
 		b, ok3 := getNumber(args, 2)
 		if ok1 && ok2 && ok3 {
-			p.FillColor = color.DeviceRGB{r, g, b}
+			p.FillColor = color.DeviceRGB{clip01(r), clip01(g), clip01(b)}
 			s.GState.Set |= graphics.StateFillColor
 		}
 
@@ -301,7 +303,8 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		y, ok3 := getNumber(args, 2)
 		k, ok4 := getNumber(args, 3)
 		if ok1 && ok2 && ok3 && ok4 {
-			p.StrokeColor = color.DeviceCMYK{c, m, y, k}
+			p.StrokeColor = color.DeviceCMYK{
+				clip01(c), clip01(m), clip01(y), clip01(k)}
 			s.GState.Set |= graphics.StateStrokeColor
 		}
 
@@ -311,10 +314,23 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		y, ok3 := getNumber(args, 2)
 		k, ok4 := getNumber(args, 3)
 		if ok1 && ok2 && ok3 && ok4 {
-			p.FillColor = color.DeviceCMYK{c, m, y, k}
+			p.FillColor = color.DeviceCMYK{
+				clip01(c), clip01(m), clip01(y), clip01(k)}
 			s.GState.Set |= graphics.StateFillColor
 		}
 	}
+}
+
+// The colour a content stream sets is a numeric graphics state parameter, and
+// such parameters are stored clipped into the range their colour space allows.
+// Values outside that range therefore never reach the painting operators, and
+// a colour read from a file is one the same file could have specified.
+//
+// clip01 clips a component of a device colour space to [0, 1].  The operators
+// below take their components as separate operands, so this is used rather
+// than [color.ClipComponents], which would need a slice built for it.
+func clip01(v float64) float64 {
+	return color.ClipComponent(v, 0, 1)
 }
 
 // getColorSpace returns the color space for the given name.

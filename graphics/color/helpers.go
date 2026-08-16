@@ -220,7 +220,7 @@ func repairLabRanges(x []float64) []float64 {
 	}
 	out := slices.Clone(x)
 	for i, v := range out {
-		out[i] = clamp(v, -maxLabRange, maxLabRange)
+		out[i] = ClipComponent(v, -maxLabRange, maxLabRange)
 	}
 	// clamping can collapse a range, which the loop below then replaces
 	for i := 0; i < 4; i += 2 {

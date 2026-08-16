@@ -19,10 +19,12 @@ package content
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 )
 
 func TestNewState_Page(t *testing.T) {
@@ -472,5 +474,115 @@ func TestCmInsideText_AppliesToCTM(t *testing.T) {
 	if s.GState.TextLineMatrix != wantTm {
 		t.Errorf("TextLineMatrix changed: got %v, want %v (Tlm untouched by cm)",
 			s.GState.TextLineMatrix, wantTm)
+	}
+}
+
+// TestColorOperandsClipped checks that the colour operators store a value
+// clipped into the range the colour space allows, as §8.4.1 requires for the
+// numeric parameters of the graphics state.  Without this an out-of-range
+// operand reaches the painting operators, where a negative component sent
+// through a gamma or a cube yields a NaN.
+func TestColorOperandsClipped(t *testing.T) {
+	lab, err := color.Lab(color.WhitePointD65, nil, []float64{-60, 60, -70, 70})
+	if err != nil {
+		t.Fatal(err)
+	}
+	indexed, err := color.Indexed([]color.Color{
+		color.DeviceRGB{0, 0, 0},
+		color.DeviceRGB{1, 1, 1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := &Resources{ColorSpace: map[pdf.Name]color.Space{
+		"L": lab,
+		"I": indexed,
+	}}
+
+	for _, tc := range []struct {
+		name string
+		ops  []any
+		want []float64
+	}{
+		{
+			name: "gray above",
+			ops:  []any{OpSetFillGray, []pdf.Object{n(1.5)}},
+			want: []float64{1},
+		},
+		{
+			name: "gray below",
+			ops:  []any{OpSetFillGray, []pdf.Object{n(-0.5)}},
+			want: []float64{0},
+		},
+		{
+			name: "rgb mixed",
+			ops:  []any{OpSetFillRGB, []pdf.Object{n(-0.5), n(0.25), n(2)}},
+			want: []float64{0, 0.25, 1},
+		},
+		{
+			name: "cmyk above",
+			ops:  []any{OpSetFillCMYK, []pdf.Object{n(2), n(0.5), n(-1), n(0)}},
+			want: []float64{1, 0.5, 0, 0},
+		},
+		{
+			// L* is bounded by the space, a* and b* by its Range entry
+			name: "lab outside range",
+			ops: []any{
+				OpSetFillColorSpace, []pdf.Object{pdf.Name("L")},
+				OpSetFillColor, []pdf.Object{n(120), n(-90), n(90)},
+			},
+			want: []float64{100, -60, 70},
+		},
+		{
+			name: "indexed above hival",
+			ops: []any{
+				OpSetFillColorSpace, []pdf.Object{pdf.Name("I")},
+				OpSetFillColorN, []pdf.Object{n(7)},
+			},
+			want: []float64{1},
+		},
+		{
+			// an out-of-range index yields no colour in the base space, which
+			// used to leave the graphics state holding a nil colour for the
+			// next colour operator to dereference
+			name: "indexed out of range, then set again",
+			ops: []any{
+				OpSetFillColorSpace, []pdf.Object{pdf.Name("I")},
+				OpSetFillColorN, []pdf.Object{n(7)},
+				OpSetFillColorN, []pdf.Object{n(0)},
+			},
+			want: []float64{0},
+		},
+		{
+			name: "indexed below zero",
+			ops: []any{
+				OpSetFillColorSpace, []pdf.Object{pdf.Name("I")},
+				OpSetFillColorN, []pdf.Object{n(-3)},
+			},
+			want: []float64{0},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := NewState(Page, res)
+			applyOps(s, tc.ops...)
+
+			got, _ := color.Values(s.GState.FillColor)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("fill colour not clipped (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestColorOperandsClippedStroking checks that the stroking operators clip
+// too, since they share the code path with the nonstroking ones.
+func TestColorOperandsClippedStroking(t *testing.T) {
+	s := NewState(Page, &Resources{})
+	applyOps(s, OpSetStrokeRGB, []pdf.Object{n(-1), n(0.5), n(4)})
+
+	want := []float64{0, 0.5, 1}
+	got, _ := color.Values(s.GState.StrokeColor)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("stroke colour not clipped (-want +got):\n%s", diff)
 	}
 }

@@ -52,10 +52,10 @@ func (s spaceDeviceGray) Channels() int {
 	return 1
 }
 
-// ComponentRanges returns the value range of the gray component.
+// ComponentRange returns the value range of the gray component.
 // This implements the [Space] interface.
-func (s spaceDeviceGray) ComponentRanges() (lo, hi []float64) {
-	return []float64{0}, []float64{1}
+func (s spaceDeviceGray) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Default returns the black in the DeviceGray color space.
@@ -76,14 +76,14 @@ func (s spaceDeviceGray) Convert(c stdcolor.Color) stdcolor.Color {
 	r := float64(r32) / 65535.0
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
-	return DeviceGray(clamp01(rgbToGray(r, g, b)))
+	return DeviceGray(clip01(rgbToGray(r, g, b)))
 }
 
 // ToXYZ converts a gray value to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // A value outside [0, 1] is adjusted to the nearest valid value.
 func (s spaceDeviceGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	v := clamp01(values[0])
+	v := clip01(values[0])
 	return srgbToXYZ(v, v, v)
 }
 
@@ -168,10 +168,10 @@ func (s spaceDeviceRGB) Channels() int {
 	return 3
 }
 
-// ComponentRanges returns the value ranges of the RGB components.
+// ComponentRange returns the value range of an RGB component.
 // This implements the [Space] interface.
-func (s spaceDeviceRGB) ComponentRanges() (lo, hi []float64) {
-	return []float64{0, 0, 0}, []float64{1, 1, 1}
+func (s spaceDeviceRGB) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Default returns the black in the DeviceRGB color space.
@@ -200,7 +200,7 @@ func (s spaceDeviceRGB) Convert(c stdcolor.Color) stdcolor.Color {
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
 func (s spaceDeviceRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	return srgbToXYZ(clamp01(values[0]), clamp01(values[1]), clamp01(values[2]))
+	return srgbToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
 }
 
 // FromXYZ converts PCS-adapted CIE XYZ to DeviceRGB component values.
@@ -262,10 +262,10 @@ func (s spaceDeviceCMYK) Channels() int {
 	return 4
 }
 
-// ComponentRanges returns the value ranges of the CMYK components.
+// ComponentRange returns the value range of a CMYK component.
 // This implements the [Space] interface.
-func (s spaceDeviceCMYK) ComponentRanges() (lo, hi []float64) {
-	return []float64{0, 0, 0, 0}, []float64{1, 1, 1, 1}
+func (s spaceDeviceCMYK) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Default returns the black in the DeviceCMYK color space.
@@ -290,10 +290,10 @@ func (s spaceDeviceCMYK) Convert(c stdcolor.Color) stdcolor.Color {
 	var cmyk [4]float64
 	rgbToCMYK(r, g, b, cmyk[:])
 	return DeviceCMYK{
-		clamp01(cmyk[0]),
-		clamp01(cmyk[1]),
-		clamp01(cmyk[2]),
-		clamp01(cmyk[3]),
+		clip01(cmyk[0]),
+		clip01(cmyk[1]),
+		clip01(cmyk[2]),
+		clip01(cmyk[3]),
 	}
 }
 
@@ -303,7 +303,7 @@ func (s spaceDeviceCMYK) Convert(c stdcolor.Color) stdcolor.Color {
 func (s spaceDeviceCMYK) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	cmyk := ws.Scratch(slotClamp, 4)
 	for i := range 4 {
-		cmyk[i] = clamp01(values[i])
+		cmyk[i] = clip01(values[i])
 	}
 	return deviceCMYKToXYZ(cmyk, ws)
 }

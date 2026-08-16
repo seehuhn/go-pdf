@@ -97,9 +97,9 @@ func labToCMYK(L, A, B float64) (c, m, y, k float64) {
 
 	k = 1 - max(r, g, b)
 	if k < 1 {
-		c = clampFloat((1-r-k)/(1-k), 0, 1)
-		m = clampFloat((1-g-k)/(1-k), 0, 1)
-		y = clampFloat((1-b-k)/(1-k), 0, 1)
+		c = color.ClipComponent((1-r-k)/(1-k), 0, 1)
+		m = color.ClipComponent((1-g-k)/(1-k), 0, 1)
+		y = color.ClipComponent((1-b-k)/(1-k), 0, 1)
 	}
-	return c, m, y, clampFloat(k, 0, 1)
+	return c, m, y, color.ClipComponent(k, 0, 1)
 }

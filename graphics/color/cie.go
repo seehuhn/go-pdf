@@ -95,10 +95,10 @@ func (s *SpaceCalGray) Channels() int {
 	return 1
 }
 
-// ComponentRanges returns the value range of the gray component.
+// ComponentRange returns the value range of the gray component.
 // This implements the [Space] interface.
-func (s *SpaceCalGray) ComponentRanges() (lo, hi []float64) {
-	return []float64{0}, []float64{1}
+func (s *SpaceCalGray) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Default returns the black in the CalGray color space.
@@ -167,7 +167,7 @@ func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // adapted to the Profile Connection Space white point.
 // A value outside [0, 1] is adjusted to the nearest valid value.
 func (s *SpaceCalGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	A := applyGamma(clamp(values[0], 0, 1), s.Gamma)
+	A := applyGamma(clip01(values[0]), s.Gamma)
 	X = s.WhitePoint[0] * A
 	Y = s.WhitePoint[1] * A
 	Z = s.WhitePoint[2] * A
@@ -332,9 +332,9 @@ func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) 
 	A, B, C := inv.inverse.applyT(X, Y, Z)
 
 	// apply inverse gamma
-	dst[0] = clamp(invGamma(A, s.Gamma[0]), 0, 1)
-	dst[1] = clamp(invGamma(B, s.Gamma[1]), 0, 1)
-	dst[2] = clamp(invGamma(C, s.Gamma[2]), 0, 1)
+	dst[0] = clip01(invGamma(A, s.Gamma[0]))
+	dst[1] = clip01(invGamma(B, s.Gamma[1]))
+	dst[2] = clip01(invGamma(C, s.Gamma[2]))
 }
 
 // ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a CalRGB color.
@@ -372,10 +372,10 @@ func (s *SpaceCalRGB) Channels() int {
 	return 3
 }
 
-// ComponentRanges returns the value ranges of the RGB components.
+// ComponentRange returns the value range of an RGB component.
 // This implements the [Space] interface.
-func (s *SpaceCalRGB) ComponentRanges() (lo, hi []float64) {
-	return []float64{0, 0, 0}, []float64{1, 1, 1}
+func (s *SpaceCalRGB) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Default returns the black in the CalRGB color space.
@@ -394,9 +394,9 @@ func (s *SpaceCalRGB) Family() pdf.Name {
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
 func (s *SpaceCalRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	A := applyGamma(clamp(values[0], 0, 1), s.Gamma[0])
-	B := applyGamma(clamp(values[1], 0, 1), s.Gamma[1])
-	C := applyGamma(clamp(values[2], 0, 1), s.Gamma[2])
+	A := applyGamma(clip01(values[0]), s.Gamma[0])
+	B := applyGamma(clip01(values[1]), s.Gamma[1])
+	C := applyGamma(clip01(values[2]), s.Gamma[2])
 
 	m := s.Matrix
 	X = m[0]*A + m[3]*B + m[6]*C
@@ -533,13 +533,14 @@ func (s *SpaceLab) Channels() int {
 	return 3
 }
 
-// ComponentRanges returns the value ranges of the L*, a*, and b*
-// components.  L* is in [0, 100]; a* and b* use the Range entry stored
-// on the space.
+// ComponentRange returns the value range of the L*, a*, or b* component.
+// L* is in [0, 100]; a* and b* use the Range entry stored on the space.
 // This implements the [Space] interface.
-func (s *SpaceLab) ComponentRanges() (lo, hi []float64) {
-	return []float64{0, s.Ranges[0], s.Ranges[2]},
-		[]float64{100, s.Ranges[1], s.Ranges[3]}
+func (s *SpaceLab) ComponentRange(i int) (lo, hi float64) {
+	if i == 0 {
+		return 0, 100
+	}
+	return s.Ranges[2*i-2], s.Ranges[2*i-1]
 }
 
 // Convert converts a color to the Lab color space.
@@ -599,9 +600,9 @@ func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // Values outside [0, 100] for L* or outside Ranges for a* and b* are
 // adjusted to the nearest valid value.
 func (s *SpaceLab) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	LStar := clamp(values[0], 0, 100)
-	aStar := clamp(values[1], s.Ranges[0], s.Ranges[1])
-	bStar := clamp(values[2], s.Ranges[2], s.Ranges[3])
+	LStar := ClipComponent(values[0], 0, 100)
+	aStar := ClipComponent(values[1], s.Ranges[0], s.Ranges[1])
+	bStar := ClipComponent(values[2], s.Ranges[2], s.Ranges[3])
 	XW, YW, ZW := s.WhitePoint[0], s.WhitePoint[1], s.WhitePoint[2]
 
 	common := (LStar + 16) / 116
@@ -660,10 +661,10 @@ func (s *SpaceLab) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
 	aStar := 500 * (L - M)
 	bStar := 200 * (M - N)
 
-	// clamp to valid ranges
-	dst[0] = clamp(LStar, 0, 100)
-	dst[1] = clamp(aStar, s.Ranges[0], s.Ranges[1])
-	dst[2] = clamp(bStar, s.Ranges[2], s.Ranges[3])
+	// clip to valid ranges
+	dst[0] = ClipComponent(LStar, 0, 100)
+	dst[1] = ClipComponent(aStar, s.Ranges[0], s.Ranges[1])
+	dst[2] = ClipComponent(bStar, s.Ranges[2], s.Ranges[3])
 }
 
 // ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a Lab color.
@@ -688,14 +689,4 @@ func labF(t float64) float64 {
 		return math.Cbrt(t)
 	}
 	return (841.0/108.0)*t + 4.0/29.0
-}
-
-func clamp(x, min, max float64) float64 {
-	if x < min {
-		return min
-	}
-	if x > max {
-		return max
-	}
-	return x
 }

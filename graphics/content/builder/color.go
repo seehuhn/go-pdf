@@ -17,6 +17,7 @@
 package builder
 
 import (
+	"fmt"
 	"strings"
 
 	"seehuhn.de/go/pdf"
@@ -55,7 +56,18 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 		}
 	}
 
+	method := "SetStrokeColor"
+	if fill {
+		method = "SetFillColor"
+	}
+
 	cs := c.ColorSpace()
+	values, pattern := color.Values(c)
+	if err := checkComponentRanges(method, cs, values); err != nil {
+		b.Err = err
+		return
+	}
+
 	var needsColorSpace bool
 	switch cs.Family() {
 	case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
@@ -84,7 +96,6 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 	if cur != c {
 		var args []pdf.Object
 
-		values, pattern := color.Values(c)
 		op := color.Operator(c)
 		for _, val := range values {
 			args = append(args, pdf.Number(val))
@@ -98,9 +109,6 @@ func (b *Builder) setColor(c color.Color, fill bool) {
 		}
 		if fill {
 			op = strings.ToLower(op)
-			b.State.GState.FillColor = c
-		} else {
-			b.State.GState.StrokeColor = c
 		}
 		b.emit(content.OpName(op), args...)
 	}
@@ -120,4 +128,27 @@ func (b *Builder) DrawShading(shading graphics.Shading) {
 	}
 	name := b.getShadingName(shading)
 	b.emit(content.OpShading, name)
+}
+
+// checkComponentRanges reports an error if a colour has components outside the
+// range its colour space allows.  The method name is used in the error message.
+//
+// The reader clips such components into range when it reads a content stream,
+// as §8.4.1 requires for the numeric parameters of the graphics state.  Writing
+// them would therefore produce a file describing a colour other than the one
+// the caller asked for.  The builder tracks its own graphics state by replaying
+// each emitted operator through that same reader, so without this check the
+// tracked colour and the caller's would silently disagree.
+func checkComponentRanges(method string, cs color.Space, values []float64) error {
+	for i := range min(len(values), cs.Channels()) {
+		lo, hi := cs.ComponentRange(i)
+		// asking the reader's own clip whether it would change the value keeps
+		// the two in step; a NaN is caught because it compares unequal to
+		// everything, including itself
+		if color.ClipComponent(values[i], lo, hi) != values[i] {
+			return fmt.Errorf("%s: component %d = %g outside [%g, %g]",
+				method, i, values[i], lo, hi)
+		}
+	}
+	return nil
 }

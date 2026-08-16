@@ -23,7 +23,6 @@ import (
 	stdcolor "image/color"
 	"math"
 	"slices"
-	"sync"
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
@@ -116,16 +115,15 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 	if IsPattern(space) || space.Family() == FamilyIndexed {
 		return nil, fmt.Errorf("Indexed: invalid base color space %s", space.Family())
 	}
-	min, max := space.ComponentRanges()
-
-	lookup := make(pdf.String, 0, len(colors)*len(min))
+	lookup := make(pdf.String, 0, len(colors)*space.Channels())
 	for _, color := range colors {
 		if color.ColorSpace() != space {
 			return nil, errors.New("Indexed: inconsistent color spaces")
 		}
 		v, _ := Values(color)
 		for i, x := range v {
-			b := int(math.Floor((x - min[i]) / (max[i] - min[i]) * 256))
+			min, max := space.ComponentRange(i)
+			b := int(math.Floor((x - min) / (max - min) * 256))
 			if b < 0 {
 				b = 0
 			} else if b > 255 {
@@ -154,11 +152,10 @@ func (s *SpaceIndexed) Channels() int {
 	return 1
 }
 
-// ComponentRanges returns the valid range of palette indices,
-// [0, NumCol-1].
+// ComponentRange returns the valid range of palette indices, [0, NumCol-1].
 // This implements the [Space] interface.
-func (s *SpaceIndexed) ComponentRanges() (lo, hi []float64) {
-	return []float64{0}, []float64{float64(s.NumCol - 1)}
+func (s *SpaceIndexed) ComponentRange(i int) (lo, hi float64) {
+	return 0, float64(s.NumCol - 1)
 }
 
 // Embed adds the color space to a PDF file.
@@ -246,12 +243,11 @@ func (s *SpaceIndexed) lookupValues(index int, ws *icc.Workspace) []float64 {
 		return vals
 	}
 
-	lo, hi := base.ComponentRanges()
-
 	vals := ws.Scratch(slotIdx, n)
 	for i := range n {
+		lo, hi := base.ComponentRange(i)
 		b := float64(s.lookup[offset+i])
-		vals[i] = lo[i] + (b/255.0)*(hi[i]-lo[i])
+		vals[i] = lo + (b/255.0)*(hi-lo)
 	}
 	return vals
 }
@@ -359,10 +355,10 @@ func (s *SpaceSeparation) Channels() int {
 	return 1
 }
 
-// ComponentRanges returns the tint range, [0, 1].
+// ComponentRange returns the tint range, [0, 1].
 // This implements the [Space] interface.
-func (s *SpaceSeparation) ComponentRanges() (lo, hi []float64) {
-	return []float64{0}, []float64{1}
+func (s *SpaceSeparation) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Embed adds the color space to a PDF file.
@@ -413,7 +409,7 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 	lum := 0.299*r + 0.587*g + 0.114*b
 
 	// tint: 0 = no ink (light), 1 = full ink (dark)
-	tint := clamp01(1 - lum)
+	tint := clip01(1 - lum)
 	return colorSeparation{Space: s, Tint: tint}
 }
 
@@ -423,7 +419,7 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 func (s *SpaceSeparation) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	_, n := s.Transform.Shape()
 	alt := ws.Scratch(slotAlt, n)
-	s.Transform.Apply(alt, clamp01(values[0]))
+	s.Transform.Apply(alt, clip01(values[0]))
 	return s.Alternate.ToXYZ(alt, ws)
 }
 
@@ -486,10 +482,6 @@ type SpaceDeviceN struct {
 	// about the color space components (Subtype, Colorants, Process, MixingHints).
 	// If Subtype is "NChannel", additional entries are required.
 	Attributes pdf.Dict
-
-	// cached, immutable component ranges (see ComponentRanges)
-	rangesOnce         sync.Once
-	rangesLo, rangesHi []float64
 }
 
 // DeviceN returns a new DeviceN color space.
@@ -561,20 +553,10 @@ func (s *SpaceDeviceN) Channels() int {
 	return len(s.Colorants)
 }
 
-// ComponentRanges returns per-colorant tint ranges, each [0, 1].
+// ComponentRange returns the tint range of a colorant, [0, 1].
 // This implements the [Space] interface.
-//
-// The returned slices are cached and shared; callers must not modify them.
-func (s *SpaceDeviceN) ComponentRanges() (lo, hi []float64) {
-	s.rangesOnce.Do(func() {
-		n := s.Channels()
-		s.rangesLo = make([]float64, n)
-		s.rangesHi = make([]float64, n)
-		for i := range n {
-			s.rangesHi[i] = 1
-		}
-	})
-	return s.rangesLo, s.rangesHi
+func (s *SpaceDeviceN) ComponentRange(i int) (lo, hi float64) {
+	return 0, 1
 }
 
 // Embed adds the color space to a PDF file.
@@ -640,7 +622,7 @@ func (s *SpaceDeviceN) Convert(c stdcolor.Color) stdcolor.Color {
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
 	lum := 0.299*r + 0.587*g + 0.114*b
-	tint := clamp01(1 - lum)
+	tint := clip01(1 - lum)
 
 	values := make([]float64, s.Channels())
 	for i := range values {
@@ -673,7 +655,7 @@ func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float
 	nIn, n := s.Transform.Shape()
 	tint := ws.Scratch(slotTint, nIn)
 	for i := range nIn {
-		tint[i] = clamp01(values[i])
+		tint[i] = clip01(values[i])
 	}
 	alt := ws.Scratch(slotAlt, n)
 	s.Transform.Apply(alt, tint...)

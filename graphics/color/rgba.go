@@ -74,7 +74,7 @@ func xyzToSRGB(X, Y, Z float64) (r, g, b float64) {
 	r = srgbGamma(rLin)
 	g = srgbGamma(gLin)
 	b = srgbGamma(bLin)
-	return clamp01(r), clamp01(g), clamp01(b)
+	return clip01(r), clip01(g), clip01(b)
 }
 
 func srgbGamma(v float64) float64 {
@@ -306,17 +306,7 @@ func primaryMatrix(primaries [3][2]float64, white []float64) mat3 {
 	return out
 }
 
-func clamp01(v float64) float64 {
-	if v < 0 {
-		return 0
-	}
-	if v > 1 {
-		return 1
-	}
-	return v
-}
-
 // toUint32 converts a float64 in [0,1] to uint32 in [0,0xffff].
 func toUint32(v float64) uint32 {
-	return uint32(clamp01(v)*0xffff + 0.5)
+	return uint32(clip01(v)*0xffff + 0.5)
 }

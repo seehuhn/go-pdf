@@ -38,11 +38,11 @@ func TestToXYZWorkspaceEquivalence(t *testing.T) {
 		if n == 0 {
 			continue // pattern spaces take no component values
 		}
-		lo, hi := cs.ComponentRanges()
 		values := make([]float64, n)
 		for _, frac := range []float64{0, 0.25, 0.5, 0.75, 1} {
 			for i := range n {
-				values[i] = lo[i] + frac*(hi[i]-lo[i])
+				lo, hi := cs.ComponentRange(i)
+				values[i] = lo + frac*(hi-lo)
 			}
 			wantX, wantY, wantZ := cs.ToXYZ(values, &icc.Workspace{})
 			gotX, gotY, gotZ := cs.ToXYZ(values, dirty)
