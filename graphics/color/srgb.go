@@ -108,12 +108,13 @@ func (s spaceSRGB) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // ToXYZ converts sRGB values to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// Values outside [0, 1] are adjusted to the nearest valid value.
 func (s spaceSRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	return srgbToXYZ(values[0], values[1], values[2])
+	return srgbToXYZ(clamp01(values[0]), clamp01(values[1]), clamp01(values[2]))
 }
 
-// FromXYZ converts D50-adapted CIE XYZ to sRGB component values.
+// FromXYZ converts PCS-adapted CIE XYZ to sRGB component values.
 //
 // The result is written to dst, which must have space for three components.
 //
@@ -140,7 +141,7 @@ func (c colorSRGB) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c colorSRGB) ToXYZ() (X, Y, Z float64) {
 	return spaceSRGB{}.ToXYZ(c[:], &icc.Workspace{})
 }

@@ -80,13 +80,14 @@ func (s spaceDeviceGray) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // ToXYZ converts a gray value to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// A value outside [0, 1] is adjusted to the nearest valid value.
 func (s spaceDeviceGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	v := values[0]
+	v := clamp01(values[0])
 	return srgbToXYZ(v, v, v)
 }
 
-// FromXYZ converts D50-adapted CIE XYZ to a DeviceGray component value.
+// FromXYZ converts PCS-adapted CIE XYZ to a DeviceGray component value.
 //
 // The result is written to dst, which must have space for one component.
 //
@@ -128,10 +129,9 @@ func (c DeviceGray) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c DeviceGray) ToXYZ() (X, Y, Z float64) {
-	v := float64(c)
-	return srgbToXYZ(v, v, v)
+	return spaceDeviceGray{}.ToXYZ([]float64{float64(c)}, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -197,12 +197,13 @@ func (s spaceDeviceRGB) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // ToXYZ converts RGB values to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// Values outside [0, 1] are adjusted to the nearest valid value.
 func (s spaceDeviceRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	return srgbToXYZ(values[0], values[1], values[2])
+	return srgbToXYZ(clamp01(values[0]), clamp01(values[1]), clamp01(values[2]))
 }
 
-// FromXYZ converts D50-adapted CIE XYZ to DeviceRGB component values.
+// FromXYZ converts PCS-adapted CIE XYZ to DeviceRGB component values.
 //
 // The result is written to dst, which must have space for three components.
 //
@@ -222,7 +223,7 @@ func (c DeviceRGB) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c DeviceRGB) ToXYZ() (X, Y, Z float64) {
 	return spaceDeviceRGB{}.ToXYZ(c[:], &icc.Workspace{})
 }
@@ -297,9 +298,14 @@ func (s spaceDeviceCMYK) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // ToXYZ converts CMYK values to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// Values outside [0, 1] are adjusted to the nearest valid value.
 func (s spaceDeviceCMYK) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	return deviceCMYKToXYZ(values, ws)
+	cmyk := ws.Scratch(slotClamp, 4)
+	for i := range 4 {
+		cmyk[i] = clamp01(values[i])
+	}
+	return deviceCMYKToXYZ(cmyk, ws)
 }
 
 var (
@@ -320,7 +326,7 @@ func cmykXform() *icc.Transform {
 	return cmykTransform
 }
 
-// FromXYZ converts D50-adapted CIE XYZ to DeviceCMYK component values.
+// FromXYZ converts PCS-adapted CIE XYZ to DeviceCMYK component values.
 //
 // The result is written to dst, which must have space for four components.
 //
@@ -347,11 +353,11 @@ func (c DeviceCMYK) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 // It uses the built-in CMYK profile when available, otherwise falls back
 // to a naive CMYK to sRGB conversion.
 func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
-	return deviceCMYKToXYZ(c[:], &icc.Workspace{})
+	return spaceDeviceCMYK{}.ToXYZ(c[:], &icc.Workspace{})
 }
 
 func deviceCMYKToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {

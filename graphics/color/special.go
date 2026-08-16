@@ -27,6 +27,7 @@ import (
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // == Indexed ================================================================
@@ -256,7 +257,8 @@ func (s *SpaceIndexed) lookupValues(index int, ws *icc.Workspace) []float64 {
 }
 
 // ToXYZ converts an indexed color value to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// An index outside [0, NumCol-1] is adjusted to the nearest valid value.
 func (s *SpaceIndexed) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	index := int(math.Round(values[0]))
 	if index < 0 {
@@ -278,7 +280,7 @@ func (c colorIndexed) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c colorIndexed) ToXYZ() (X, Y, Z float64) {
 	return c.Space.ToXYZ([]float64{float64(c.Index)}, &icc.Workspace{})
 }
@@ -416,11 +418,12 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // ToXYZ converts a separation tint value to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// A tint outside [0, 1] is adjusted to the nearest valid value.
 func (s *SpaceSeparation) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	_, n := s.Transform.Shape()
 	alt := ws.Scratch(slotAlt, n)
-	s.Transform.Apply(alt, values[0])
+	s.Transform.Apply(alt, clamp01(values[0]))
 	return s.Alternate.ToXYZ(alt, ws)
 }
 
@@ -436,7 +439,7 @@ func (c colorSeparation) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
 	return c.Space.ToXYZ([]float64{c.Tint}, &icc.Workspace{})
 }
@@ -495,6 +498,12 @@ type SpaceDeviceN struct {
 // alternate color space, tint transformation function, and attributes
 // dictionary (optional).
 func DeviceN(names []pdf.Name, alternate Space, trfm pdf.Function, attr pdf.Dict) (*SpaceDeviceN, error) {
+	// the same cap the read path applies, so that a space built here can be
+	// read back from the file it is written to
+	if len(names) > limits.MaxImageChannels {
+		return nil, errors.New("DeviceN: too many colorants")
+	}
+
 	seen := make(map[pdf.Name]bool)
 	for _, name := range names {
 		if name == "None" {
@@ -509,7 +518,7 @@ func DeviceN(names []pdf.Name, alternate Space, trfm pdf.Function, attr pdf.Dict
 		seen[name] = true
 	}
 
-	if alternate == nil || IsSpecial(alternate) {
+	if IsSpecial(alternate) {
 		return nil, errors.New("DeviceN: invalid alternate color space")
 	}
 
@@ -658,11 +667,16 @@ func (s *SpaceDeviceN) New(x []float64) Color {
 }
 
 // ToXYZ converts DeviceN tint values to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// Tints outside [0, 1] are adjusted to the nearest valid value.
 func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	_, n := s.Transform.Shape()
+	nIn, n := s.Transform.Shape()
+	tint := ws.Scratch(slotTint, nIn)
+	for i := range nIn {
+		tint[i] = clamp01(values[i])
+	}
 	alt := ws.Scratch(slotAlt, n)
-	s.Transform.Apply(alt, values...)
+	s.Transform.Apply(alt, tint...)
 	return s.Alternate.ToXYZ(alt, ws)
 }
 
@@ -681,7 +695,7 @@ func (c colorDeviceN) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
 	return c.Space.ToXYZ(c.get(), &icc.Workspace{})
 }

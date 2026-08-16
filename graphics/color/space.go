@@ -54,8 +54,13 @@ type Space interface {
 	// Default returns the default color of the color space.
 	Default() Color
 
-	// ToXYZ converts component values to CIE XYZ tristimulus values
-	// adapted to the D50 illuminant (the ICC Profile Connection Space).
+	// ToXYZ converts component values to CIE XYZ tristimulus values adapted
+	// to the white point of the ICC Profile Connection Space,
+	// [icc.PCSWhitePoint].
+	//
+	// A component outside the range reported by ComponentRanges is adjusted
+	// to the nearest value within it.  Callers therefore need not clamp, and
+	// the result is always finite.  The input is not modified.
 	//
 	// ws supplies reusable scratch buffers to avoid per-call allocation in a
 	// hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
@@ -149,9 +154,9 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 		}
 
 	case FamilyCalGray:
-		whitePoint := d.getArrayN("WhitePoint", 3)
-		blackPoint := d.getArrayN("BlackPoint", 3) // optional
-		gamma := d.getOptionalNumber("Gamma", 1.0)
+		whitePoint := repairWhitePoint(d.getArrayN("WhitePoint", 3))
+		blackPoint := repairBlackPoint(d.getArrayN("BlackPoint", 3)) // optional
+		gamma := repairGamma(d.getOptionalNumber("Gamma", 1.0))
 
 		res, err = CalGray(whitePoint, blackPoint, gamma)
 		if err != nil {
@@ -159,19 +164,20 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 		}
 
 	case FamilyCalRGB:
-		whitePoint := d.getArrayN("WhitePoint", 3)
-		blackPoint := d.getArrayN("BlackPoint", 3)
-		gamma := d.getArrayN("Gamma", 3)
-		matrix := d.getArrayN("Matrix", 9)
+		whitePoint := repairWhitePoint(d.getArrayN("WhitePoint", 3))
+		blackPoint := repairBlackPoint(d.getArrayN("BlackPoint", 3))
+		gamma := repairGammaArray(d.getArrayN("Gamma", 3))
+		matrix := repairMatrix(d.getArrayN("Matrix", 9))
+
 		res, err = CalRGB(whitePoint, blackPoint, gamma, matrix)
 		if err != nil {
 			d.SetError(&pdf.MalformedFileError{Err: err})
 		}
 
 	case FamilyLab:
-		whitePoint := d.getArrayN("WhitePoint", 3)
-		blackPoint := d.getArrayN("BlackPoint", 3)
-		Range := d.getArrayN("Range", 4)
+		whitePoint := repairWhitePoint(d.getArrayN("WhitePoint", 3))
+		blackPoint := repairBlackPoint(d.getArrayN("BlackPoint", 3))
+		Range := repairLabRanges(d.getArrayN("Range", 4))
 
 		res, err = Lab(whitePoint, blackPoint, Range)
 		if err != nil {
@@ -321,7 +327,8 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 			}
 		}
 
-		res, err = DeviceN(colorants, alternate, trfm, attr)
+		res, err = DeviceN(colorants, alternate, trfm,
+			repairDeviceNAttributes(attr))
 		if err != nil {
 			d.SetError(&pdf.MalformedFileError{Err: err})
 		}
@@ -452,6 +459,10 @@ func (d *decoder) MarkAsInvalid() {
 	}
 }
 
+// getOptionalNumber returns a number-valued entry, or defValue if the entry is
+// missing or is not a number.  Malformed data is reported as absent, so that a
+// colour space built from it is still returned to the caller; errors which do
+// not stem from malformed data are still recorded.
 func (d *decoder) getOptionalNumber(entry pdf.Name, defValue float64) float64 {
 	if d.err != nil {
 		return defValue
@@ -464,12 +475,22 @@ func (d *decoder) getOptionalNumber(entry pdf.Name, defValue float64) float64 {
 
 	x, err := d.c.Number(obj)
 	if err != nil {
-		d.SetError(err)
+		if !pdf.IsMalformed(err) {
+			d.SetError(err)
+		}
 		return defValue
 	}
 	return x
 }
 
+// getArrayN returns the first n numbers of an array-valued entry, or nil if
+// the entry is missing, is not an array, or holds fewer than n elements.
+// An element which is not a number is reported as zero.
+//
+// Malformed data is never reported as an error here.  The caller repairs the
+// result instead, so that a colour space with a malformed parameter is still
+// returned rather than making the whole file unreadable.  Errors which do not
+// stem from malformed data are still recorded.
 func (d *decoder) getArrayN(entry pdf.Name, n int) []float64 {
 	if d.err != nil {
 		return nil
@@ -482,23 +503,25 @@ func (d *decoder) getArrayN(entry pdf.Name, n int) []float64 {
 
 	arr, err := d.c.Array(obj)
 	if err != nil {
-		d.SetError(err)
+		if !pdf.IsMalformed(err) {
+			d.SetError(err)
+		}
 		return nil
 	}
 
-	if len(arr) != n {
-		d.SetError(&pdf.MalformedFileError{
-			Err: fmt.Errorf("expected array of length %d, got %d", n, len(arr)),
-		})
+	if len(arr) < n {
 		return nil
 	}
 
 	res := make([]float64, n)
-	for i, elem := range arr {
+	for i, elem := range arr[:n] {
 		x, err := d.c.Number(elem)
 		if err != nil {
-			d.SetError(err)
-			return nil
+			if !pdf.IsMalformed(err) {
+				d.SetError(err)
+				return nil
+			}
+			continue // leave the entry zero, for the caller to repair
 		}
 		res[i] = x
 	}

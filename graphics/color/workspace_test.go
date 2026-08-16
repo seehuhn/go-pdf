@@ -94,6 +94,17 @@ func TestToXYZWorkspaceZeroAlloc(t *testing.T) {
 		t.Errorf("Indexed-of-ICCBased ToXYZ with workspace: got %v allocs/op, want 0", n)
 	}
 
+	// Indexed→DeviceN→DeviceCMYK is the chain in which DeviceN and DeviceCMYK
+	// share the slotClamp buffer; both clamp through the workspace rather than
+	// a local slice, so this stays allocation-free too.
+	idxCMYK := indexedDeviceNCMYK()
+	idxCMYK.ToXYZ(idxIn, ws)
+	if n := testing.AllocsPerRun(100, func() {
+		idxCMYK.ToXYZ(idxIn, ws)
+	}); n != 0 {
+		t.Errorf("Indexed-of-DeviceN-of-DeviceCMYK ToXYZ: got %v allocs/op, want 0", n)
+	}
+
 	if n := testing.AllocsPerRun(100, func() {
 		idxDN.ToXYZ(idxIn, ws)
 	}); n != 0 {

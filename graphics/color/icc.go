@@ -191,7 +191,7 @@ func (s *SpaceICCBased) getTransform() *icc.Transform {
 	return s.transform
 }
 
-// FromXYZ converts D50-adapted CIE XYZ to ICC-based component values.
+// FromXYZ converts PCS-adapted CIE XYZ to ICC-based component values.
 //
 // The result is written to dst, which must have space for N components.
 //
@@ -259,7 +259,8 @@ func (s *SpaceICCBased) New(values []float64) (Color, error) {
 }
 
 // ToXYZ converts ICC-based color values to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
+// Values outside Ranges are adjusted to the nearest valid value.
 func (s *SpaceICCBased) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	// normalise values from Ranges to [0,1] using caller-provided scratch
 	norm := ws.Scratch(slotNorm, s.N)
@@ -267,7 +268,9 @@ func (s *SpaceICCBased) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z floa
 		norm[i] = 0
 		lo, hi := s.Ranges[2*i], s.Ranges[2*i+1]
 		if hi > lo {
-			norm[i] = (values[i] - lo) / (hi - lo)
+			// clamping the normalised value adjusts a component outside
+			// Ranges to the nearest value the colour space allows
+			norm[i] = clamp01((values[i] - lo) / (hi - lo))
 		}
 	}
 
@@ -308,7 +311,7 @@ func (c colorICCBased) Components() []float64 {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
 	return c.Space.ToXYZ(c.Values[:c.Space.N], &icc.Workspace{})
 }

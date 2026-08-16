@@ -18,6 +18,7 @@ package color
 
 import (
 	"image/color"
+	"math"
 	"testing"
 
 	"seehuhn.de/go/icc"
@@ -205,5 +206,81 @@ func testDeviceNTransform() pdf.Function {
 		Domain:  []float64{0, 1, 0, 1},
 		Range:   []float64{0, 1, 0, 1, 0, 1},
 		Program: "pop pop 0.5 0.5 0.5",
+	}
+}
+
+// TestWhitePointsFromChromaticity checks the white points against the
+// chromaticity coordinates their documentation names.  Nothing else in the
+// package depends on the exact values, so without this a typo would go
+// unnoticed until it reached a PDF file.
+func TestWhitePointsFromChromaticity(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		x, y float64
+		want []float64
+	}{
+		{"WhitePointD50", 0.34567, 0.35850, WhitePointD50},
+		{"WhitePointD65", 0.3127, 0.3290, WhitePointD65},
+	} {
+		want := []float64{tc.x / tc.y, 1, (1 - tc.x - tc.y) / tc.y}
+		for i, w := range want {
+			if math.Abs(tc.want[i]-w) > 5e-8 {
+				t.Errorf("%s[%d] = %g, want %g", tc.name, i, tc.want[i], w)
+			}
+		}
+	}
+}
+
+// TestColorToXYZTreatsForeignColorsAsSRGB checks the documented fallback in
+// [ColorToXYZ]: a colour which is not a PDF colour is interpreted as sRGB, so
+// that a standard library colour converts the same way DeviceRGB would.
+func TestColorToXYZTreatsForeignColorsAsSRGB(t *testing.T) {
+	for _, c := range []color.Color{
+		color.RGBA{R: 0x33, G: 0x80, B: 0xcc, A: 0xff},
+		color.Gray{Y: 0x40},
+		color.NRGBA{R: 0xff, G: 0x00, B: 0x80, A: 0xff},
+	} {
+		X, Y, Z := ColorToXYZ(c)
+
+		r, g, b, _ := c.RGBA()
+		wantX, wantY, wantZ := SpaceDeviceRGB.ToXYZ([]float64{
+			float64(r) / 65535, float64(g) / 65535, float64(b) / 65535,
+		}, &icc.Workspace{})
+
+		if X != wantX || Y != wantY || Z != wantZ {
+			t.Errorf("%v -> (%g, %g, %g), want (%g, %g, %g)",
+				c, X, Y, Z, wantX, wantY, wantZ)
+		}
+	}
+
+	// a PDF colour uses its own conversion rather than the fallback
+	X, Y, Z := ColorToXYZ(DeviceGray(0.25))
+	wantX, wantY, wantZ := DeviceGray(0.25).ToXYZ()
+	if X != wantX || Y != wantY || Z != wantZ {
+		t.Errorf("DeviceGray -> (%g, %g, %g), want (%g, %g, %g)",
+			X, Y, Z, wantX, wantY, wantZ)
+	}
+}
+
+// TestColorToXYZMatchesSpace checks that a colour converts the same way
+// whether it is asked directly or through its colour space.  The device
+// colours used to answer differently for components outside [0, 1], because
+// [DeviceGray.ToXYZ] and [DeviceCMYK.ToXYZ] converted on their own instead of
+// going through the space, and so skipped its clamping.
+func TestColorToXYZMatchesSpace(t *testing.T) {
+	ws := &icc.Workspace{}
+
+	for _, c := range []Color{
+		DeviceGray(0.5), DeviceGray(-0.5), DeviceGray(1.5),
+		DeviceRGB{0.2, 0.4, 0.6}, DeviceRGB{-1, 0.5, 2},
+		DeviceCMYK{0.1, 0.2, 0.3, 0.4}, DeviceCMYK{-1, 0.5, 2, 0},
+	} {
+		values, _ := Values(c)
+		X, Y, Z := c.ToXYZ()
+		wantX, wantY, wantZ := c.ColorSpace().ToXYZ(values, ws)
+		if X != wantX || Y != wantY || Z != wantZ {
+			t.Errorf("%v: colour gave (%g, %g, %g), space gave (%g, %g, %g)",
+				c, X, Y, Z, wantX, wantY, wantZ)
+		}
 	}
 }

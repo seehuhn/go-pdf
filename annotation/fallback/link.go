@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
-	"seehuhn.de/go/pdf/internal/colconv"
 )
 
 func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
@@ -135,22 +134,22 @@ func getDarkLightCol(col color.Color) (dark, light color.Color) {
 	s := col.ColorSpace()
 	switch s.Family() {
 	case color.FamilyDeviceGray:
-		L := colconv.DeviceGrayToL(components[0])
+		L := grayToL(components[0])
 		darkL, lightL := getDarkLightL(L)
-		dark = color.DeviceGray(pdf.Round(colconv.LToDeviceGray(darkL), 2))
-		light = color.DeviceGray(pdf.Round(colconv.LToDeviceGray(lightL), 2))
+		dark = color.DeviceGray(pdf.Round(lToGray(darkL), 2))
+		light = color.DeviceGray(pdf.Round(lToGray(lightL), 2))
 	case color.FamilyDeviceRGB:
-		L, a, b := colconv.DeviceRGBToLAB(components[0], components[1], components[2])
+		L, a, b := rgbToLab(components[0], components[1], components[2])
 		darkL, lightL := getDarkLightL(L)
-		r1, g1, b1 := colconv.LABToDeviceRGB(darkL, a, b)
-		r2, g2, b2 := colconv.LABToDeviceRGB(lightL, a, b)
+		r1, g1, b1 := labToRGB(darkL, a, b)
+		r2, g2, b2 := labToRGB(lightL, a, b)
 		dark = color.DeviceRGB{pdf.Round(r1, 2), pdf.Round(g1, 2), pdf.Round(b1, 2)}
 		light = color.DeviceRGB{pdf.Round(r2, 2), pdf.Round(g2, 2), pdf.Round(b2, 2)}
 	case color.FamilyDeviceCMYK:
-		L, a, b := colconv.DeviceCMYKToLAB(components[0], components[1], components[2], components[3])
+		L, a, b := cmykToLab(components[0], components[1], components[2], components[3])
 		darkL, lightL := getDarkLightL(L)
-		c1, m1, y1, k1 := colconv.LABToDeviceCMYK(darkL, a, b)
-		c2, m2, y2, k2 := colconv.LABToDeviceCMYK(lightL, a, b)
+		c1, m1, y1, k1 := labToCMYK(darkL, a, b)
+		c2, m2, y2, k2 := labToCMYK(lightL, a, b)
 		dark = color.DeviceCMYK{pdf.Round(c1, 2), pdf.Round(m1, 2), pdf.Round(y1, 2), pdf.Round(k1, 2)}
 		light = color.DeviceCMYK{pdf.Round(c2, 2), pdf.Round(m2, 2), pdf.Round(y2, 2), pdf.Round(k2, 2)}
 	default:

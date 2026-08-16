@@ -97,8 +97,8 @@ func (s spacePatternColored) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // ToXYZ returns a placeholder mid-gray in CIE XYZ tristimulus values
-// adapted to the D50 illuminant, since the actual color depends on the
-// pattern content.
+// adapted to the Profile Connection Space white point, since the actual
+// color depends on the pattern content.
 func (s spacePatternColored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	return srgbToXYZ(0.5, 0.5, 0.5)
 }
@@ -121,7 +121,7 @@ func (colorColoredPattern) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 // For colored patterns, returns a neutral mid-gray since the actual color
 // depends on the pattern content which is not available here.
 func (colorColoredPattern) ToXYZ() (X, Y, Z float64) {
@@ -208,7 +208,7 @@ func (s spacePatternUncolored) Convert(c stdcolor.Color) stdcolor.Color {
 }
 
 // ToXYZ converts the base color values to CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (s spacePatternUncolored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	return s.base.ToXYZ(values, ws)
 }
@@ -240,7 +240,7 @@ func (c colorUncoloredPattern) ColorSpace() Space {
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
-// adapted to the D50 illuminant.
+// adapted to the Profile Connection Space white point.
 func (c colorUncoloredPattern) ToXYZ() (X, Y, Z float64) {
 	return c.Col.ToXYZ()
 }

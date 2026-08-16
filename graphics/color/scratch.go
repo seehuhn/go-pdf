@@ -25,7 +25,16 @@ package color
 // Separation/DeviceN, so slotAlt never nests within itself; nested Indexed reuses
 // slotIdx safely because the index is read before the slot is overwritten.)
 const (
-	slotNorm = iota // SpaceICCBased: device→[0,1] normalisation
-	slotAlt         // Separation/DeviceN: tint-transform alternate output
-	slotIdx         // Indexed: palette-lookup result
+	slotNorm  = iota // SpaceICCBased: device→[0,1] normalisation
+	slotAlt          // Separation/DeviceN: tint-transform alternate output
+	slotIdx          // Indexed: palette-lookup result
+	slotClamp        // DeviceCMYK: components clamped to their range
+	slotTint         // Separation/DeviceN: tints clamped to their range
 )
+
+// DeviceN and DeviceCMYK get separate slots even though a chain such as
+// Indexed → DeviceN → DeviceCMYK could share one: DeviceN has consumed its
+// clamped tints by the time the tint transform returns, so sharing would in
+// fact be safe.  That argument is too fine to rest on, and no test
+// distinguishes a correct sharing from a wrong one, so each space keeps its
+// own buffer.

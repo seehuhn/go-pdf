@@ -21,8 +21,10 @@ import (
 	"fmt"
 	stdcolor "image/color"
 	"math"
+	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
@@ -104,6 +106,11 @@ var testColorSpaces = []Space{
 	// Type 4 tint transform.  This exercises the nested
 	// Indexed→DeviceN→Type4 path through ToXYZ with and without a Workspace.
 	indexedDeviceNType4(),
+
+	// Indexed→DeviceN→DeviceCMYK is the deepest chain in which two spaces
+	// share the slotClamp scratch buffer, so it checks that the sharing does
+	// not corrupt the tints DeviceN has already consumed.
+	indexedDeviceNCMYK(),
 }
 
 // indexedDeviceNType4 builds an Indexed colour space over a two-colorant
@@ -114,6 +121,21 @@ func indexedDeviceNType4() Space {
 		Domain:  []float64{0, 1, 0, 1},
 		Range:   []float64{0, 1, 0, 1, 0, 1},
 		Program: "0.5",
+	}, nil)).(*SpaceDeviceN)
+	return must(Indexed([]Color{
+		dn.New([]float64{0.2, 0.8}),
+		dn.New([]float64{0.6, 0.3}),
+	}))
+}
+
+// indexedDeviceNCMYK builds an Indexed colour space over a two-colorant
+// DeviceN whose alternate is DeviceCMYK.  Both DeviceN and DeviceCMYK clamp
+// their components into the shared slotClamp buffer.
+func indexedDeviceNCMYK() Space {
+	dn := must(DeviceN([]pdf.Name{"a", "b"}, SpaceDeviceCMYK, &function.Type4{
+		Domain:  []float64{0, 1, 0, 1},
+		Range:   []float64{0, 1, 0, 1, 0, 1, 0, 1},
+		Program: "2 copy 0.25 0.5",
 	}, nil)).(*SpaceDeviceN)
 	return must(Indexed([]Color{
 		dn.New([]float64{0.2, 0.8}),
@@ -746,5 +768,617 @@ func TestExtractSpaceDeepChainBounded(t *testing.T) {
 	x := pdf.NewExtractor(w)
 	if _, err := ExtractSpace(pdf.CursorAt(x, nil), refs[0], false); !pdf.IsMalformed(err) {
 		t.Errorf("err = %v, want malformed", err)
+	}
+}
+
+// TestExtractSpaceRepairsGamma verifies that reading stays permissive after
+// the [CalGray] and [CalRGB] factory functions were tightened: a file giving a
+// non-positive gamma is repaired to the default rather than rejected, and the
+// repaired value is what a later write emits.
+func TestExtractSpaceRepairsGamma(t *testing.T) {
+	wp := pdf.Array{pdf.Real(0.9642), pdf.Real(1), pdf.Real(0.8249)}
+	for _, tc := range []struct {
+		name string
+		obj  pdf.Object
+		want []float64
+	}{
+		{
+			name: "CalGray zero gamma",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": wp,
+				"Gamma":      pdf.Real(0),
+			}},
+			want: []float64{1},
+		},
+		{
+			name: "CalGray negative gamma",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": wp,
+				"Gamma":      pdf.Real(-2.2),
+			}},
+			want: []float64{1},
+		},
+		{
+			name: "CalRGB zero gamma",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": wp,
+				"Gamma":      pdf.Array{pdf.Real(0), pdf.Real(2.2), pdf.Real(-1)},
+			}},
+			want: []float64{1, 2.2, 1},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			x := pdf.NewExtractor(r)
+			space, err := ExtractSpace(pdf.CursorAt(x, nil), tc.obj, false)
+			if err != nil {
+				t.Fatalf("read rejected a repairable gamma: %v", err)
+			}
+
+			var got []float64
+			switch s := space.(type) {
+			case *SpaceCalGray:
+				got = []float64{s.Gamma}
+			case *SpaceCalRGB:
+				got = s.Gamma[:]
+			default:
+				t.Fatalf("got %T", space)
+			}
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("gamma not repaired (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestExtractSpaceRepairsCIEParameters checks that reading a CIE-based colour
+// space repairs parameters the factory functions reject, instead of failing.
+// The factory functions stay strict; a file which is already invalid is read
+// as closely as its data allows.
+func TestExtractSpaceRepairsCIEParameters(t *testing.T) {
+	goodWP := pdf.Array{pdf.Real(0.9642), pdf.Real(1), pdf.Real(0.8249)}
+	half := math.MaxFloat64 / 2
+	num := func(x ...float64) pdf.Array {
+		a := make(pdf.Array, len(x))
+		for i, v := range x {
+			a[i] = pdf.Real(v)
+		}
+		return a
+	}
+
+	for _, tc := range []struct {
+		name  string
+		obj   pdf.Object
+		check func(t *testing.T, s Space)
+	}{
+		{
+			name: "white point scaled to Y=1",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": num(0.9642, 0.999, 0.8249)}},
+			check: func(t *testing.T, s Space) {
+				got := s.(*SpaceCalGray).WhitePoint
+				want := [3]float64{0.9642 / 0.999, 1, 0.8249 / 0.999}
+				if got != want {
+					t.Errorf("white point = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "white point with Z=0 replaced",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": num(0.9642, 1, 0)}},
+			check: func(t *testing.T, s Space) {
+				got := s.(*SpaceCalGray).WhitePoint
+				if got != [3]float64(icc.PCSWhitePoint) {
+					t.Errorf("white point = %v, want the PCS white point", got)
+				}
+			},
+		},
+		{
+			name: "white point missing entirely",
+			obj:  pdf.Array{pdf.Name("CalRGB"), pdf.Dict{}},
+			check: func(t *testing.T, s Space) {
+				got := s.(*SpaceCalRGB).WhitePoint
+				if got != [3]float64(icc.PCSWhitePoint) {
+					t.Errorf("white point = %v, want the PCS white point", got)
+				}
+			},
+		},
+		{
+			name: "negative black point clamped",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": goodWP, "BlackPoint": num(-0.1, 0.2, -3)}},
+			check: func(t *testing.T, s Space) {
+				want := [3]float64{0, 0.2, 0}
+				if got := s.(*SpaceCalRGB).BlackPoint; got != want {
+					t.Errorf("black point = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "inverted Lab range swapped",
+			obj: pdf.Array{pdf.Name("Lab"), pdf.Dict{
+				"WhitePoint": goodWP, "Range": num(100, -100, 30, -30)}},
+			check: func(t *testing.T, s Space) {
+				want := [4]float64{-100, 100, -30, 30}
+				if got := s.(*SpaceLab).Ranges; got != want {
+					t.Errorf("ranges = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "degenerate Lab range replaced",
+			obj: pdf.Array{pdf.Name("Lab"), pdf.Dict{
+				"WhitePoint": goodWP, "Range": num(0, 0, -30, 30)}},
+			check: func(t *testing.T, s Space) {
+				want := [4]float64{-100, 100, -30, 30}
+				if got := s.(*SpaceLab).Ranges; got != want {
+					t.Errorf("ranges = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "short white point replaced",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": num(0.9642, 1)}},
+			check: func(t *testing.T, s Space) {
+				got := s.(*SpaceCalGray).WhitePoint
+				if got != [3]float64(icc.PCSWhitePoint) {
+					t.Errorf("white point = %v, want the PCS white point", got)
+				}
+			},
+		},
+		{
+			name: "white point with trailing junk truncated",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": num(0.9642, 1, 0.8249, 5)}},
+			check: func(t *testing.T, s Space) {
+				want := [3]float64{0.9642, 1, 0.8249}
+				if got := s.(*SpaceCalGray).WhitePoint; got != want {
+					t.Errorf("white point = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "non-numeric white point element",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": pdf.Array{pdf.Real(0.9642), pdf.Name("x"), pdf.Real(0.8249)}}},
+			check: func(t *testing.T, s Space) {
+				got := s.(*SpaceCalGray).WhitePoint
+				if got != [3]float64(icc.PCSWhitePoint) {
+					t.Errorf("white point = %v, want the PCS white point", got)
+				}
+			},
+		},
+		{
+			name: "white point which is not an array",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": pdf.Real(1)}},
+			check: func(t *testing.T, s Space) {
+				got := s.(*SpaceCalRGB).WhitePoint
+				if got != [3]float64(icc.PCSWhitePoint) {
+					t.Errorf("white point = %v, want the PCS white point", got)
+				}
+			},
+		},
+		{
+			name: "non-numeric gamma",
+			obj: pdf.Array{pdf.Name("CalGray"), pdf.Dict{
+				"WhitePoint": goodWP, "Gamma": pdf.Name("x")}},
+			check: func(t *testing.T, s Space) {
+				if got := s.(*SpaceCalGray).Gamma; got != 1 {
+					t.Errorf("gamma = %g, want 1", got)
+				}
+			},
+		},
+		{
+			name: "short Lab range replaced",
+			obj: pdf.Array{pdf.Name("Lab"), pdf.Dict{
+				"WhitePoint": goodWP, "Range": num(-100, 100)}},
+			check: func(t *testing.T, s Space) {
+				want := [4]float64{-100, 100, -100, 100}
+				if got := s.(*SpaceLab).Ranges; got != want {
+					t.Errorf("ranges = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "short gamma array replaced",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": goodWP, "Gamma": num(2.2)}},
+			check: func(t *testing.T, s Space) {
+				want := [3]float64{1, 1, 1}
+				if got := s.(*SpaceCalRGB).Gamma; got != want {
+					t.Errorf("gamma = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "short matrix replaced by identity",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": goodWP, "Matrix": num(1, 0)}},
+			check: func(t *testing.T, s Space) {
+				want := [9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}
+				if got := s.(*SpaceCalRGB).Matrix; got != want {
+					t.Errorf("matrix = %v, want the identity", got)
+				}
+			},
+		},
+		{
+			// the scanner rejects a numeric literal too large for a float64,
+			// so an infinity can only reach ExtractSpace through the object
+			// API, as it does here
+			name: "infinite Lab range replaced",
+			obj: pdf.Array{pdf.Name("Lab"), pdf.Dict{
+				"WhitePoint": goodWP,
+				"Range": pdf.Array{pdf.Real(math.Inf(-1)), pdf.Real(math.Inf(1)),
+					pdf.Real(-30), pdf.Real(30)}}},
+			check: func(t *testing.T, s Space) {
+				want := [4]float64{-100, 100, -100, 100}
+				if got := s.(*SpaceLab).Ranges; got != want {
+					t.Errorf("ranges = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			// A matrix which cannot be inverted collapses the colour space
+			// onto a plane or a line: with repeated columns every colour comes
+			// out the same saturated hue, and with an all-zero matrix every
+			// colour, white included, comes out black.  Substituting the
+			// identity renders such a file plausibly instead.
+			name: "singular matrix replaced by identity",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": goodWP,
+				"Matrix":     num(1, 0, 0, 1, 0, 0, 1, 0, 0)}},
+			check: func(t *testing.T, s Space) {
+				want := [9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}
+				if got := s.(*SpaceCalRGB).Matrix; got != want {
+					t.Errorf("matrix = %v, want the identity", got)
+				}
+			},
+		},
+		{
+			name: "all-zero matrix replaced by identity",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": goodWP,
+				"Matrix":     num(0, 0, 0, 0, 0, 0, 0, 0, 0)}},
+			check: func(t *testing.T, s Space) {
+				want := [9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}
+				if got := s.(*SpaceCalRGB).Matrix; got != want {
+					t.Errorf("matrix = %v, want the identity", got)
+				}
+				// white must not come out black
+				X, Y, Z := s.ToXYZ([]float64{1, 1, 1}, &icc.Workspace{})
+				if X <= 0 || Y <= 0 || Z <= 0 {
+					t.Errorf("white -> (%g, %g, %g)", X, Y, Z)
+				}
+			},
+		},
+		{
+			// labG cubes a*/500, so a range this wide sends the tristimulus
+			// values to an infinity, which the chromatic adaptation then
+			// turns into a NaN.  A 301-digit literal fits in a PDF file.
+			name: "oversized Lab range narrowed",
+			obj: pdf.Array{pdf.Name("Lab"), pdf.Dict{
+				"WhitePoint": goodWP,
+				"Range":      num(-1e300, 1e300, -30, 30)}},
+			check: func(t *testing.T, s Space) {
+				want := [4]float64{-maxLabRange, maxLabRange, -30, 30}
+				if got := s.(*SpaceLab).Ranges; got != want {
+					t.Errorf("ranges = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			// a range which collapses when it is narrowed has nothing left to
+			// keep, so the default takes over
+			name: "Lab range beyond the bound replaced",
+			obj: pdf.Array{pdf.Name("Lab"), pdf.Dict{
+				"WhitePoint": goodWP,
+				"Range":      num(1e300, 2e300, -30, 30)}},
+			check: func(t *testing.T, s Space) {
+				want := [4]float64{-100, 100, -30, 30}
+				if got := s.(*SpaceLab).Ranges; got != want {
+					t.Errorf("ranges = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			// labG scales the white point by up to about 1.7, so an absurd
+			// white point overflows even with the default range
+			name: "oversized white point replaced",
+			obj: pdf.Array{pdf.Name("Lab"), pdf.Dict{
+				"WhitePoint": num(1.7e308, 1, 1.7e308)}},
+			check: func(t *testing.T, s Space) {
+				got := s.(*SpaceLab).WhitePoint
+				if got != [3]float64(icc.PCSWhitePoint) {
+					t.Errorf("white point = %v, want the PCS white point", got)
+				}
+			},
+		},
+		{
+			// entries this large are invertible and finite, but the rows add
+			// up to an infinity, which the chromatic adaptation then turns
+			// into a NaN.  A 309-digit literal fits in a PDF file.
+			name: "overflowing matrix replaced by identity",
+			obj: pdf.Array{pdf.Name("CalRGB"), pdf.Dict{
+				"WhitePoint": goodWP,
+				"Matrix": num(1, -1, -half/2, -half, -half/2, -half,
+					-half, 1, -half)}},
+			check: func(t *testing.T, s Space) {
+				want := [9]float64{1, 0, 0, 0, 1, 0, 0, 0, 1}
+				if got := s.(*SpaceCalRGB).Matrix; got != want {
+					t.Errorf("matrix = %v, want the identity", got)
+				}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			x := pdf.NewExtractor(r)
+			space, err := ExtractSpace(pdf.CursorAt(x, nil), tc.obj, false)
+			if err != nil {
+				t.Fatalf("read failed instead of repairing: %v", err)
+			}
+			tc.check(t, space)
+
+			// The repaired space must convert every representable colour to
+			// finite values.  The extremes matter as much as the middle: the
+			// parameters which overflow do so only at the far end of the
+			// range, where the midpoint alone stays finite.
+			ws := &icc.Workspace{}
+			lo, hi := space.ComponentRanges()
+			n := space.Channels()
+			for corner := range 1 << n {
+				vals := make([]float64, n)
+				for i := range vals {
+					if corner&(1<<i) != 0 {
+						vals[i] = hi[i]
+					} else {
+						vals[i] = lo[i]
+					}
+				}
+				X, Y, Z := space.ToXYZ(vals, ws)
+				if !allFinite([]float64{X, Y, Z}) {
+					t.Errorf("repaired space gave %v -> (%g, %g, %g)",
+						vals, X, Y, Z)
+				}
+			}
+
+			// the repaired value is what a later write emits, so a second
+			// read yields the same space again
+			spaceRoundTrip(t, pdf.V2_0, space)
+		})
+	}
+}
+
+// TestFactoryOutputSurvivesRoundTrip checks the write→read direction of the
+// consistency invariant: a colour space the factory functions accept can be
+// written and read back unchanged.  Where the two sides disagree the library
+// produces a file describing something other than what it holds in memory —
+// silently, when the reader repairs the value, and fatally when the reader
+// rejects the file outright.
+func TestFactoryOutputSurvivesRoundTrip(t *testing.T) {
+	// values a caller might plausibly reach for, at and beyond the bounds the
+	// read path enforces
+	for _, tc := range []struct {
+		name  string
+		build func() (Space, error)
+	}{
+		{"CalGray large white point", func() (Space, error) {
+			return CalGray([]float64{1e5, 1, 1e5}, nil, 1)
+		}},
+		{"CalGray infinite white point", func() (Space, error) {
+			return CalGray([]float64{math.Inf(1), 1, 1}, nil, 1)
+		}},
+		{"CalGray infinite gamma", func() (Space, error) {
+			return CalGray(WhitePointD65, nil, math.Inf(1))
+		}},
+		{"CalGray NaN gamma", func() (Space, error) {
+			return CalGray(WhitePointD65, nil, math.NaN())
+		}},
+		{"CalGray infinite black point", func() (Space, error) {
+			return CalGray(WhitePointD65, []float64{math.Inf(1), 0, 0}, 1)
+		}},
+		{"CalRGB NaN gamma", func() (Space, error) {
+			return CalRGB(WhitePointD65, nil, []float64{math.NaN(), math.NaN(), math.NaN()}, nil)
+		}},
+		{"CalRGB infinite gamma", func() (Space, error) {
+			return CalRGB(WhitePointD65, nil, []float64{math.Inf(1), 1, 1}, nil)
+		}},
+		{"CalRGB NaN matrix", func() (Space, error) {
+			m := []float64{math.NaN(), 0, 0, 0, math.NaN(), 0, 0, 0, math.NaN()}
+			return CalRGB(WhitePointD65, nil, nil, m)
+		}},
+		{"CalRGB overflowing matrix", func() (Space, error) {
+			h := math.MaxFloat64 / 2
+			m := []float64{h, 0, 0, h, h, 0, h, 0, h}
+			return CalRGB(WhitePointD65, nil, nil, m)
+		}},
+		{"CalRGB singular matrix", func() (Space, error) {
+			return CalRGB(WhitePointD65, nil, nil, []float64{1, 0, 0, 1, 0, 0, 1, 0, 0})
+		}},
+		{"Lab NaN ranges", func() (Space, error) {
+			n := math.NaN()
+			return Lab(WhitePointD65, nil, []float64{n, n, n, n})
+		}},
+		{"Lab infinite ranges", func() (Space, error) {
+			return Lab(WhitePointD65, nil,
+				[]float64{math.Inf(-1), math.Inf(1), math.Inf(-1), math.Inf(1)})
+		}},
+		{"Lab oversized ranges", func() (Space, error) {
+			return Lab(WhitePointD65, nil, []float64{-1e6, 1e6, -1e6, 1e6})
+		}},
+		{"DeviceN beyond the channel cap", func() (Space, error) {
+			n := limits.MaxImageChannels + 1
+			names := make([]pdf.Name, n)
+			for i := range names {
+				names[i] = pdf.Name(fmt.Sprintf("c%d", i))
+			}
+			domain := make([]float64, 0, 2*n)
+			for range n {
+				domain = append(domain, 0, 1)
+			}
+			return DeviceN(names, SpaceDeviceRGB, &function.Type4{
+				Domain:  domain,
+				Range:   []float64{0, 1, 0, 1, 0, 1},
+				Program: "0.5 0.5 0.5",
+			}, nil)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			space, err := tc.build()
+			if err != nil {
+				// rejected by the factory: the file is never written, which
+				// is the outcome the invariant asks for
+				return
+			}
+
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
+			obj, err := rm.Embed(space)
+			if err != nil {
+				t.Fatalf("accepted by the factory but not embeddable: %v", err)
+			}
+			x := pdf.NewExtractor(w)
+			back, err := ExtractSpace(pdf.CursorAt(x, nil), obj, false)
+			if err != nil {
+				t.Fatalf("wrote a colour space its own reader rejects: %v", err)
+			}
+			if !SpacesEqual(space, back) {
+				t.Errorf("read back as a different colour space:\n written %#v\n read    %#v",
+					space, back)
+			}
+		})
+	}
+}
+
+// TestToXYZClampsEveryImplementation checks the [Space.ToXYZ] contract across
+// every colour space family: a component outside ComponentRanges converts to
+// exactly what the nearest value inside the range converts to, and the result
+// is finite.
+//
+// The families used to disagree — the CIE ones clamped because §8.6.5.2–.4 say
+// so, while the device ones passed a negative component straight into the sRGB
+// transfer function — which left callers unable to rely on the interface alone.
+func TestToXYZClampsEveryImplementation(t *testing.T) {
+	ws := &icc.Workspace{}
+
+	for i, space := range testColorSpaces {
+		t.Run(fmt.Sprintf("%02d-%s", i, space.Family()), func(t *testing.T) {
+			n := space.Channels()
+			if n == 0 {
+				return // colored patterns carry no components
+			}
+			lo, hi := space.ComponentRanges()
+
+			for _, tc := range []struct {
+				name string
+				at   func(i int) float64
+				edge func(i int) float64
+			}{
+				{"below", func(i int) float64 { return lo[i] - 1 - (hi[i] - lo[i]) },
+					func(i int) float64 { return lo[i] }},
+				{"above", func(i int) float64 { return hi[i] + 1 + (hi[i] - lo[i]) },
+					func(i int) float64 { return hi[i] }},
+			} {
+				out := make([]float64, n)
+				edge := make([]float64, n)
+				for j := range n {
+					out[j] = tc.at(j)
+					edge[j] = tc.edge(j)
+				}
+				keep := slices.Clone(out)
+
+				X, Y, Z := space.ToXYZ(out, ws)
+				Xe, Ye, Ze := space.ToXYZ(edge, ws)
+
+				if X != Xe || Y != Ye || Z != Ze {
+					t.Errorf("%s: %v -> (%g, %g, %g), but %v -> (%g, %g, %g)",
+						tc.name, out, X, Y, Z, edge, Xe, Ye, Ze)
+				}
+				if !allFinite([]float64{X, Y, Z}) {
+					t.Errorf("%s: %v -> (%g, %g, %g)", tc.name, out, X, Y, Z)
+				}
+				if !slices.Equal(out, keep) {
+					t.Errorf("%s: ToXYZ modified its input: %v -> %v",
+						tc.name, keep, out)
+				}
+			}
+		})
+	}
+}
+
+// TestExtractDeviceNRepairsAttributes checks that an attributes dictionary a
+// file cannot be trusted to get right does not make the whole colour space
+// unreadable.  PDF carries developer-defined extensions (7.12), so a key
+// outside Table 70 is expected in real files; [DeviceN] stays strict about it,
+// and the read path drops the entry instead.
+func TestExtractDeviceNRepairsAttributes(t *testing.T) {
+	tint := pdf.Dict{
+		"FunctionType": pdf.Integer(2),
+		"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+		"C0":           pdf.Array{pdf.Real(0), pdf.Real(0), pdf.Real(0)},
+		"C1":           pdf.Array{pdf.Real(1), pdf.Real(1), pdf.Real(1)},
+		"N":            pdf.Real(1),
+	}
+
+	for _, tc := range []struct {
+		name string
+		attr pdf.Dict
+		want pdf.Dict
+	}{
+		{
+			name: "developer extension dropped",
+			attr: pdf.Dict{"ACME_Private": pdf.Integer(1)},
+			want: nil,
+		},
+		{
+			name: "known entries kept alongside an unknown one",
+			attr: pdf.Dict{
+				"Subtype":      pdf.Name("NChannel"),
+				"ACME_Private": pdf.Integer(1),
+			},
+			want: pdf.Dict{"Subtype": pdf.Name("NChannel")},
+		},
+		{
+			name: "unknown subtype falls back to the default",
+			attr: pdf.Dict{"Subtype": pdf.Name("Bogus")},
+			want: nil,
+		},
+		{
+			name: "subtype of the wrong type falls back to the default",
+			attr: pdf.Dict{"Subtype": pdf.Integer(3)},
+			want: nil,
+		},
+		{
+			name: "empty dictionary",
+			attr: pdf.Dict{},
+			want: nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := pdf.Array{
+				pdf.Name("DeviceN"),
+				pdf.Array{pdf.Name("spot")},
+				pdf.Name("DeviceRGB"),
+				tint,
+				tc.attr,
+			}
+
+			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			x := pdf.NewExtractor(r)
+			space, err := ExtractSpace(pdf.CursorAt(x, nil), obj, false)
+			if err != nil {
+				t.Fatalf("read failed instead of repairing: %v", err)
+			}
+			if diff := cmp.Diff(tc.want, space.(*SpaceDeviceN).Attributes); diff != "" {
+				t.Errorf("attributes not repaired (-want +got):\n%s", diff)
+			}
+
+			// the repaired value is what a later write emits, so a second
+			// read yields the same space again
+			spaceRoundTrip(t, pdf.V2_0, space)
+		})
 	}
 }

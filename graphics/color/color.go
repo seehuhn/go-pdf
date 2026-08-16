@@ -29,8 +29,9 @@ import (
 type Color interface {
 	ColorSpace() Space
 
-	// ToXYZ returns the colour as CIE XYZ tristimulus values
-	// adapted to the D50 illuminant (the ICC Profile Connection Space).
+	// ToXYZ returns the colour as CIE XYZ tristimulus values adapted to the
+	// white point of the ICC Profile Connection Space, [icc.PCSWhitePoint].
+	// This is close to but not the same as [WhitePointD50].
 	ToXYZ() (X, Y, Z float64)
 
 	gocolor.Color
@@ -206,18 +207,23 @@ var (
 // Some commonly used white points.
 // These vectors can be used for the white point argument of the
 // [CalGray], [CalRGB], and [Lab] functions.
+//
+// Both are the tristimulus values of the illuminant, obtained from its CIE
+// 1931 chromaticity coordinates as X = x/y, Y = 1, Z = (1-x-y)/y.  Neither is
+// the white point of a colour space this package converts through: see
+// [icc.PCSWhitePoint] for the reference white of the XYZ values ToXYZ returns.
 var (
-	// WhitePointD50 represents the D50 whitepoint.
+	// WhitePointD50 represents the D50 whitepoint, from the chromaticity
+	// coordinates x = 0.34567, y = 0.35850.
 	// This is often used in the printing industry.
-	// The given values are CIE 1931 XYZ coordinates.
 	//
 	// https://en.wikipedia.org/wiki/Standard_illuminant#Illuminant_series_D
 	WhitePointD50 = []float64{0.964212, 1.0, 0.8251883}
 
-	// WhitePointD65 represents the D65 whitepoint.
+	// WhitePointD65 represents the D65 whitepoint, from the chromaticity
+	// coordinates x = 0.3127, y = 0.3290.
 	// This is often used in the computer industry.
-	// The given values are CIE 1931 XYZ coordinates.
 	//
-	// https://en.wikipedia.org/wiki/Illuminant_D65
-	WhitePointD65 = []float64{0.95047, 1.0, 1.08883}
+	// https://en.wikipedia.org/wiki/Standard_illuminant#Illuminant_series_D
+	WhitePointD65 = []float64{0.9504559, 1.0, 1.0890578}
 )
