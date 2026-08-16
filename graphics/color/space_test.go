@@ -605,6 +605,62 @@ func TestSpaceConvertKnownValues(t *testing.T) {
 	})
 }
 
+// TestConvertGrayWeights pins the weights PDF prescribes for reducing an RGB
+// colour to a single value, 0.3 red + 0.59 green + 0.11 blue.  Each primary
+// isolates one weight.  Separation and DeviceN reduce the same way but use the
+// complement, since ink increases as the colour gets darker.
+func TestConvertGrayWeights(t *testing.T) {
+	tint := &function.Type2{
+		XMin: 0,
+		XMax: 1,
+		C0:   []float64{1, 1, 1},
+		C1:   []float64{0, 0, 0},
+		N:    1,
+	}
+	sep := must(Separation("ink", SpaceDeviceRGB, tint)).(*SpaceSeparation)
+	devN := must(DeviceN([]pdf.Name{"ink"}, SpaceDeviceRGB, tint, nil)).(*SpaceDeviceN)
+
+	cases := []struct {
+		name string
+		c    stdcolor.Color
+		gray float64
+	}{
+		{"red", stdcolor.RGBA{R: 255, A: 255}, 0.3},
+		{"green", stdcolor.RGBA{G: 255, A: 255}, 0.59},
+		{"blue", stdcolor.RGBA{B: 255, A: 255}, 0.11},
+	}
+
+	const tol = 1e-9
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gray, ok := SpaceDeviceGray.Convert(tc.c).(DeviceGray)
+			if !ok {
+				t.Fatalf("expected DeviceGray, got %T", SpaceDeviceGray.Convert(tc.c))
+			}
+			if math.Abs(float64(gray)-tc.gray) > tol {
+				t.Errorf("DeviceGray = %g, want %g", gray, tc.gray)
+			}
+
+			want := 1 - tc.gray
+			s, ok := sep.Convert(tc.c).(colorSeparation)
+			if !ok {
+				t.Fatalf("expected colorSeparation, got %T", sep.Convert(tc.c))
+			}
+			if math.Abs(s.Tint-want) > tol {
+				t.Errorf("separation tint = %g, want %g", s.Tint, want)
+			}
+
+			d, ok := devN.Convert(tc.c).(colorDeviceN)
+			if !ok {
+				t.Fatalf("expected colorDeviceN, got %T", devN.Convert(tc.c))
+			}
+			if got := d.get()[0]; math.Abs(got-want) > tol {
+				t.Errorf("DeviceN tint = %g, want %g", got, want)
+			}
+		})
+	}
+}
+
 // TestSpaceConvertRoundTrip tests that converting a colour back and forth
 // produces stable results.
 func TestSpaceConvertRoundTrip(t *testing.T) {

@@ -406,7 +406,7 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 	r := float64(r32) / 65535.0
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
-	lum := 0.299*r + 0.587*g + 0.114*b
+	lum := rgbToGray(r, g, b)
 
 	// tint: 0 = no ink (light), 1 = full ink (dark)
 	tint := clip01(1 - lum)
@@ -621,7 +621,7 @@ func (s *SpaceDeviceN) Convert(c stdcolor.Color) stdcolor.Color {
 	r := float64(r32) / 65535.0
 	g := float64(g32) / 65535.0
 	b := float64(b32) / 65535.0
-	lum := 0.299*r + 0.587*g + 0.114*b
+	lum := rgbToGray(r, g, b)
 	tint := clip01(1 - lum)
 
 	values := make([]float64, s.Channels())

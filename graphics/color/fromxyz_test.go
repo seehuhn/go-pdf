@@ -61,13 +61,26 @@ func TestDeviceFromXYZRoundTrip(t *testing.T) {
 }
 
 // TestDeviceGrayFromXYZ checks that a chromatic colour is reduced to gray by
-// the same weights the Convert method uses.
+// the weights PDF prescribes, 0.3 red + 0.59 green + 0.11 blue, applied to the
+// component values rather than to their luminance.  A colorimetric reduction
+// would put red at 0.51 instead.
 func TestDeviceGrayFromXYZ(t *testing.T) {
-	X, Y, Z := DeviceRGB{1, 0, 0}.ToXYZ()
-	got := make([]float64, 1)
-	SpaceDeviceGray.FromXYZ(X, Y, Z, got, &icc.Workspace{})
-	if math.Abs(got[0]-0.299) > 1e-5 {
-		t.Errorf("gray value of red = %g, want 0.299", got[0])
+	for _, tc := range []struct {
+		rgb  DeviceRGB
+		want float64
+	}{
+		{DeviceRGB{1, 0, 0}, 0.3},
+		{DeviceRGB{0, 1, 0}, 0.59},
+		{DeviceRGB{0, 0, 1}, 0.11},
+		{DeviceRGB{1, 1, 1}, 1},
+		{DeviceRGB{0.8, 0.4, 0.2}, 0.3*0.8 + 0.59*0.4 + 0.11*0.2},
+	} {
+		X, Y, Z := tc.rgb.ToXYZ()
+		got := make([]float64, 1)
+		SpaceDeviceGray.FromXYZ(X, Y, Z, got, &icc.Workspace{})
+		if math.Abs(got[0]-tc.want) > 1e-5 {
+			t.Errorf("gray value of %v = %g, want %g", tc.rgb, got[0], tc.want)
+		}
 	}
 }
 

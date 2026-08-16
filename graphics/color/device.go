@@ -97,12 +97,15 @@ func (s spaceDeviceGray) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspac
 	dst[0] = rgbToGray(xyzToSRGB(X, Y, Z))
 }
 
-// rgbToGray converts sRGB components to a DeviceGray value.
+// rgbToGray converts DeviceRGB components to a DeviceGray value, using the
+// weights PDF prescribes for the conversion.  They are the NTSC luma
+// coefficients rounded to two digits; the exact ones would shift the result by
+// up to one part in 250.
 func rgbToGray(r, g, b float64) float64 {
-	return 0.299*r + 0.587*g + 0.114*b
+	return 0.3*r + 0.59*g + 0.11*b
 }
 
-// rgbToCMYK converts sRGB components to CMYK with undercolour removal.
+// rgbToCMYK converts DeviceRGB components to CMYK with undercolour removal.
 // The four components are written to dst.
 func rgbToCMYK(r, g, b float64, dst []float64) {
 	cyan := 1 - r
