@@ -18,6 +18,8 @@ package main
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -257,7 +259,10 @@ func (c *Concat) prepareForm(r *pdf.Reader, cp *pdf.Copier) ([]preparedField, ma
 			if c.usedFontNames == nil {
 				c.usedFontNames = map[pdf.Name]bool{}
 			}
-			for name, fontObj := range fonts {
+			// sorted: copying allocates object numbers, and a name
+			// collision picks a fresh name from the order seen here
+			for _, name := range slices.Sorted(maps.Keys(fonts)) {
+				fontObj := fonts[name]
 				fontRef, ok := fontObj.(pdf.Reference)
 				if !ok {
 					continue // form fonts are indirect; skip an inline oddity

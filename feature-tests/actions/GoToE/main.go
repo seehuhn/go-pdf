@@ -20,7 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"time"
 
 	"seehuhn.de/go/pdf"
@@ -157,7 +159,10 @@ func generateChildPDF(docName string, embeddedChild []byte, nav *navInfo) ([]byt
 	}
 
 	if embeddedChild != nil {
-		for name, info := range nav.tree {
+		// sorted: the loop stops at the first match, so map order would pick
+		// an arbitrary child
+		for _, name := range slices.Sorted(maps.Keys(nav.tree)) {
+			info := nav.tree[name]
 			if info.parent == docName {
 				if err := embedFile(doc, name, embeddedChild); err != nil {
 					return nil, err

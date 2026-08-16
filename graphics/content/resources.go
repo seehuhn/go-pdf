@@ -19,6 +19,7 @@ package content
 import (
 	"fmt"
 	"maps"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -75,6 +76,10 @@ var _ pdf.Embedder = (*Resources)(nil)
 // Embed writes r to the PDF file as a resource dictionary.  Returns the
 // dictionary directly when [Resources.SingleUse] is set, or an indirect
 // reference otherwise.
+//
+// Each category is embedded in sorted key order.  Embedding allocates object
+// numbers, so iterating the maps directly would give a different file on every
+// run.
 func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// validate PDF version constraints
 	if len(r.Shading) > 0 {
@@ -100,7 +105,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed ExtGState
 	if len(r.ExtGState) > 0 {
 		extGStateDict := pdf.Dict{}
-		for name, gs := range r.ExtGState {
+		for _, name := range slices.Sorted(maps.Keys(r.ExtGState)) {
+			gs := r.ExtGState[name]
 			ref, err := rm.Embed(gs)
 			if err != nil {
 				return nil, err
@@ -113,7 +119,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed ColorSpace
 	if len(r.ColorSpace) > 0 {
 		colorSpaceDict := pdf.Dict{}
-		for name, cs := range r.ColorSpace {
+		for _, name := range slices.Sorted(maps.Keys(r.ColorSpace)) {
+			cs := r.ColorSpace[name]
 			ref, err := rm.Embed(cs)
 			if err != nil {
 				return nil, err
@@ -126,7 +133,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed Pattern
 	if len(r.Pattern) > 0 {
 		patternDict := pdf.Dict{}
-		for name, pat := range r.Pattern {
+		for _, name := range slices.Sorted(maps.Keys(r.Pattern)) {
+			pat := r.Pattern[name]
 			ref, err := rm.Embed(pat)
 			if err != nil {
 				return nil, err
@@ -139,7 +147,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed Shading
 	if len(r.Shading) > 0 {
 		shadingDict := pdf.Dict{}
-		for name, sh := range r.Shading {
+		for _, name := range slices.Sorted(maps.Keys(r.Shading)) {
+			sh := r.Shading[name]
 			ref, err := rm.Embed(sh)
 			if err != nil {
 				return nil, err
@@ -152,7 +161,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed XObject
 	if len(r.XObject) > 0 {
 		xobjectDict := pdf.Dict{}
-		for name, xobj := range r.XObject {
+		for _, name := range slices.Sorted(maps.Keys(r.XObject)) {
+			xobj := r.XObject[name]
 			ref, err := rm.Embed(xobj)
 			if err != nil {
 				return nil, err
@@ -165,7 +175,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed Font
 	if len(r.Font) > 0 {
 		fontDict := pdf.Dict{}
-		for name, f := range r.Font {
+		for _, name := range slices.Sorted(maps.Keys(r.Font)) {
+			f := r.Font[name]
 			ref, err := rm.Embed(f)
 			if err != nil {
 				return nil, err
@@ -178,7 +189,8 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed Properties
 	if len(r.Properties) > 0 {
 		propertiesDict := pdf.Dict{}
-		for name, props := range r.Properties {
+		for _, name := range slices.Sorted(maps.Keys(r.Properties)) {
+			props := r.Properties[name]
 			ref, err := rm.Embed(props)
 			if err != nil {
 				return nil, err

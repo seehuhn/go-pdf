@@ -47,8 +47,10 @@ func (c *converter) convertResources(resObj pdf.Object, depth int, fontDict pdf.
 		return nil, err
 	}
 
+	// sorted: converting a value allocates an object number
 	out := pdf.Dict{}
-	for key, val := range src {
+	for _, key := range src.SortedKeys() {
+		val := src[key]
 		switch key {
 		case "Font":
 			// converted by the content walk; unused fonts are dropped
@@ -90,8 +92,10 @@ func (c *converter) convertXObjects(obj pdf.Object, depth int) (pdf.Object, erro
 	if err != nil || src == nil {
 		return nil, err
 	}
+	// sorted: converting a value allocates an object number
 	out := pdf.Dict{}
-	for name, val := range src {
+	for _, name := range src.SortedKeys() {
+		val := src[name]
 		cv, err := c.convertXObject(val, depth)
 		if err != nil {
 			return nil, err
@@ -198,8 +202,10 @@ func (c *converter) convertPatterns(obj pdf.Object, depth int) (pdf.Object, erro
 	if err != nil || src == nil {
 		return nil, err
 	}
+	// sorted: converting a value allocates an object number
 	out := pdf.Dict{}
-	for name, val := range src {
+	for _, name := range src.SortedKeys() {
+		val := src[name]
 		cv, err := c.convertPattern(val, depth)
 		if err != nil {
 			return nil, err
@@ -251,8 +257,10 @@ func (c *converter) buildPatternAt(outRef pdf.Reference, stm *pdf.Stream, depth 
 		return 0, err
 	}
 
+	// sorted: copying a value allocates an object number
 	dict := pdf.Dict{}
-	for key, val := range stm.Dict {
+	for _, key := range stm.Dict.SortedKeys() {
+		val := stm.Dict[key]
 		switch key {
 		case "Length", "Filter", "DecodeParms", "Resources":
 			continue

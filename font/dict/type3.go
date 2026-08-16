@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"maps"
+	"slices"
 
 	"seehuhn.de/go/geom/matrix"
 
@@ -140,9 +142,11 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{ref}
 
-	// Write CharProc streams and build the CharProcs dictionary.
+	// Write CharProc streams and build the CharProcs dictionary.  The glyph
+	// names are sorted because the loop allocates object numbers.
 	charProcsDict := make(pdf.Dict, len(d.CharProcs))
-	for name, cp := range d.CharProcs {
+	for _, name := range slices.Sorted(maps.Keys(d.CharProcs)) {
+		cp := d.CharProcs[name]
 		if cp == nil {
 			continue
 		}

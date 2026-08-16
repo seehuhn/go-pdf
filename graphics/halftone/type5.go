@@ -19,6 +19,8 @@ package halftone
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
@@ -161,7 +163,9 @@ func (h *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	dict["Default"] = defaultEmbedded
 
-	for colorant, ht := range h.Colorants {
+	// The colorants are sorted because embedding allocates object numbers.
+	for _, colorant := range slices.Sorted(maps.Keys(h.Colorants)) {
+		ht := h.Colorants[colorant]
 		switch colorant {
 		case "Type", "HalftoneType", "HalftoneName", "Default":
 			return nil, fmt.Errorf("invalid colorant name %q", colorant)

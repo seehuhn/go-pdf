@@ -17,6 +17,9 @@
 package file
 
 import (
+	"maps"
+	"slices"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/collection"
 	"seehuhn.de/go/pdf/graphics/image/thumbnail"
@@ -346,10 +349,12 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["V"] = pdf.Boolean(spec.Volatile)
 	}
 
-	// EmbeddedFiles (EF)
+	// EmbeddedFiles (EF).  Embedding allocates object numbers, so the keys
+	// are sorted to keep the output reproducible.
 	if spec.EmbeddedFiles != nil {
 		efDict := pdf.Dict{}
-		for key, stream := range spec.EmbeddedFiles {
+		for _, key := range slices.Sorted(maps.Keys(spec.EmbeddedFiles)) {
+			stream := spec.EmbeddedFiles[key]
 			if stream != nil {
 				ref, err := rm.Embed(stream)
 				if err != nil {
@@ -474,7 +479,8 @@ func extractRelatedFiles(c pdf.Cursor, rfDict pdf.Dict) (map[string][]RelatedFil
 func encodeRelatedFiles(rm *pdf.EmbedHelper, relatedFiles map[string][]RelatedFile) (pdf.Dict, error) {
 	rfDict := pdf.Dict{}
 
-	for key, files := range relatedFiles {
+	for _, key := range slices.Sorted(maps.Keys(relatedFiles)) {
+		files := relatedFiles[key]
 		var array pdf.Array
 		for _, file := range files {
 			array = append(array, pdf.TextString(file.Name))
@@ -522,8 +528,10 @@ func (spec *Specification) CanBeAF(v pdf.Version) error {
 		return pdf.Errorf("file specification must have at least one file name")
 	}
 
-	// Check embedded file requirements (per spec 14.13.2)
-	for key, stream := range spec.EmbeddedFiles {
+	// Check embedded file requirements (per spec 14.13.2).  The keys are
+	// sorted so that a file with several faults always reports the same one.
+	for _, key := range slices.Sorted(maps.Keys(spec.EmbeddedFiles)) {
+		stream := spec.EmbeddedFiles[key]
 		if stream == nil {
 			continue
 		}

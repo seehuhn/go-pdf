@@ -32,6 +32,7 @@ package printermark
 import (
 	"fmt"
 	"maps"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -81,8 +82,10 @@ func (a *Attributes) FillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
 	}
 
 	if len(a.Colorants) > 0 {
+		// The colorants are sorted because embedding allocates object numbers.
 		colorants := pdf.Dict{}
-		for name, space := range a.Colorants {
+		for _, name := range slices.Sorted(maps.Keys(a.Colorants)) {
+			space := a.Colorants[name]
 			if space == nil {
 				return fmt.Errorf("colorant %q has no colour space", name)
 			}

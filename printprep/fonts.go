@@ -18,6 +18,7 @@ package printprep
 
 import (
 	"errors"
+	"maps"
 	"math"
 	"slices"
 
@@ -123,8 +124,10 @@ func (fc *fontContext) use(name pdf.Name) *convFont {
 // subdict finalizes the used fonts and returns the converted /Font resource
 // subdictionary, or nil if no fonts were used.
 func (fc *fontContext) subdict() (pdf.Object, error) {
+	// sorted: finalising a font allocates an object number
 	out := pdf.Dict{}
-	for name, cf := range fc.conv {
+	for _, name := range slices.Sorted(maps.Keys(fc.conv)) {
+		cf := fc.conv[name]
 		if cf == nil {
 			continue
 		}

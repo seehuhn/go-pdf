@@ -33,6 +33,7 @@ package appearance
 import (
 	"errors"
 	"maps"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -322,8 +323,10 @@ func embedEntry(e *pdf.EmbedHelper, single *form.Form, byState map[pdf.Name]*for
 		return e.Embed(single)
 	}
 
+	// The states are sorted because embedding allocates object numbers.
 	res := pdf.Dict{}
-	for state, f := range byState {
+	for _, state := range slices.Sorted(maps.Keys(byState)) {
+		f := byState[state]
 		// an annotation selects its appearance with the AS entry, which an
 		// empty name cannot fill, so such a state could never be shown
 		if state == "" {

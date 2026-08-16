@@ -91,11 +91,17 @@ func (p *MediaPlayers) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Type"] = pdf.Name("MediaPlayers")
 	}
 
-	for key, infos := range map[pdf.Name][]*MediaPlayerInfo{
-		"MU": p.MustUse,
-		"A":  p.Allowed,
-		"NU": p.NotUsed,
+	// A slice rather than a map: the loop allocates object numbers, so a map
+	// would give a different file on every run.
+	for _, entry := range []struct {
+		key   pdf.Name
+		infos []*MediaPlayerInfo
+	}{
+		{"MU", p.MustUse},
+		{"A", p.Allowed},
+		{"NU", p.NotUsed},
 	} {
+		key, infos := entry.key, entry.infos
 		if len(infos) == 0 {
 			continue
 		}

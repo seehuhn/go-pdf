@@ -18,6 +18,8 @@ package pieceinfo
 
 import (
 	"errors"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -60,8 +62,10 @@ func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, nil
 	}
 
+	// The entries are sorted because embedding allocates object numbers.
 	result := pdf.Dict{}
-	for name, data := range p.Entries {
+	for _, name := range slices.Sorted(maps.Keys(p.Entries)) {
+		data := p.Entries[name]
 		dataDict := pdf.Dict{
 			"LastModified": pdf.Date(data.LastModified()),
 		}

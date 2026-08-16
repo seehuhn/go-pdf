@@ -46,7 +46,7 @@ func NewCopier(w *Writer, r Getter) *Copier {
 
 // Copy copies an object from the source file to the target file, recursively.
 //
-// The returned object is guaranteed to be the same type as the input object,
+// The returned object is guaranteed to be the same type as the input object.
 func (c *Copier) Copy(obj Native) (Native, error) {
 	switch x := obj.(type) {
 	case Dict:
@@ -105,10 +105,15 @@ func (c *Copier) Copy(obj Native) (Native, error) {
 	}
 }
 
-// CopyDict copies a dictionary from the source file to the target file,
+// CopyDict copies a dictionary from the source file to the target file.
+//
+// The keys are visited in the order [Dict.SortedKeys] returns them.  Copying a
+// reference allocates an object number in the target file, so map order would
+// make the output depend on the run.
 func (c *Copier) CopyDict(obj Dict) (Dict, error) {
 	res := Dict{}
-	for key, val := range obj {
+	for _, key := range obj.SortedKeys() {
+		val := obj[key]
 		repl, err := c.Copy(val.AsPDF(c.w.GetOptions()))
 		if err != nil {
 			return nil, err
@@ -173,7 +178,7 @@ func inlineFilterRefs(r Getter, val Object) (Native, error) {
 	return out, nil
 }
 
-// CopyArray copies an array from the source file to the target file,
+// CopyArray copies an array from the source file to the target file.
 func (c *Copier) CopyArray(obj Array) (Array, error) {
 	var res Array
 	for _, val := range obj {
@@ -190,7 +195,7 @@ func (c *Copier) CopyArray(obj Array) (Array, error) {
 	return res, nil
 }
 
-// CopyReference copies a reference from the source file to the target file,
+// CopyReference copies a reference from the source file to the target file.
 //
 // This method shortens chains of indirect references, the returned reference
 // always points to a direct object.
