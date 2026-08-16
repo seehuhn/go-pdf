@@ -18,6 +18,7 @@ package oc
 
 import (
 	"errors"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 )
@@ -96,11 +97,15 @@ func ExtractProperties(c pdf.Cursor, obj pdf.Object, _ bool) (*Properties, error
 				continue
 			}
 			// per spec, alternate configs inherit Order and RBGroups from D
+			// when the entry is absent.  An empty array is not absent: it
+			// says "present nothing", and must not be filled in.
+			// Shallow-copy the slices so that appending to one configuration
+			// does not affect another.
 			if config.Order == nil {
-				config.Order = p.D.Order
+				config.Order = slices.Clone(p.D.Order)
 			}
 			if config.RBGroups == nil {
-				config.RBGroups = p.D.RBGroups
+				config.RBGroups = slices.Clone(p.D.RBGroups)
 			}
 			p.Configs = append(p.Configs, config)
 		}
@@ -124,8 +129,7 @@ func (p *Properties) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if p.D.BaseState != "" && p.D.BaseState != BaseStateON {
 		return nil, errors.New("default configuration BaseState must be ON")
 	}
-	if len(p.D.Intent) == 1 && p.D.Intent[0] != "View" ||
-		len(p.D.Intent) > 1 {
+	if p.D.Intent != nil && (len(p.D.Intent) != 1 || p.D.Intent[0] != "View") {
 		return nil, errors.New("default configuration Intent must be View")
 	}
 

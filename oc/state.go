@@ -45,6 +45,11 @@ type ViewerContext struct {
 // GroupStates tracks the visibility state of optional content groups.
 // Groups present in the map participate in visibility decisions;
 // groups absent from the map have no effect on visibility (always shown).
+//
+// The zero value is an empty state in which no group participates, and can be
+// used and modified directly.  A nil *GroupStates is equally valid and behaves
+// the same way, except that it cannot be modified.  Use
+// [Configuration.DefaultState] to obtain the states a configuration prescribes.
 type GroupStates struct {
 	state  map[*Group]bool // present = participates; true = ON, false = OFF
 	manual map[*Group]bool // groups set manually by the user
@@ -71,6 +76,9 @@ func (s *GroupStates) Participates(g *Group) bool {
 
 // SetState sets the visibility of a group, making it participate.
 func (s *GroupStates) SetState(g *Group, on bool) {
+	if s.state == nil {
+		s.state = make(map[*Group]bool)
+	}
 	s.state[g] = on
 }
 
@@ -78,7 +86,7 @@ func (s *GroupStates) SetState(g *Group, on bool) {
 // overridden by the user. Groups with manual overrides are not affected
 // by [Configuration.ApplyViewUsage].
 func (s *GroupStates) SetManualState(g *Group, on bool) {
-	s.state[g] = on
+	s.SetState(g, on)
 	if s.manual == nil {
 		s.manual = make(map[*Group]bool)
 	}
@@ -343,12 +351,20 @@ func evaluateLanguage(groups []*Group, sysLang language.Tag) map[*Group]bool {
 
 // ApplyViewUsage re-evaluates all View-event AS dicts with runtime context
 // and updates the state accordingly. Groups with manual overrides are
-// not affected.
+// not affected, and neither are groups whose intent does not match the
+// configuration's: [Configuration.DefaultState] excludes those from the state,
+// and a usage application must not bring them back.
 //
-// If ctx is nil, this is a no-op.
+// If ctx is nil, or if state is nil and thus cannot be modified, this is a
+// no-op.
 func (c *Configuration) ApplyViewUsage(state *GroupStates, ctx *ViewerContext) {
-	if ctx == nil || len(c.AS) == 0 {
+	if ctx == nil || state == nil || len(c.AS) == 0 {
 		return
+	}
+
+	// groups the configuration considers at all
+	considers := func(g *Group) bool {
+		return intentOverlaps(g.Intent, c.Intent)
 	}
 
 	// collect recommendations per group, ANDing across AS dicts
@@ -360,7 +376,7 @@ func (c *Configuration) ApplyViewUsage(state *GroupStates, ctx *ViewerContext) {
 
 		// per-group evaluation for non-Language categories
 		for _, g := range ua.OCGs {
-			if g.Usage == nil || state.IsManual(g) {
+			if g.Usage == nil || !considers(g) || state.IsManual(g) {
 				continue
 			}
 			on, ok := evaluateUsage(g.Usage, ua.Category, ctx)
@@ -375,9 +391,18 @@ func (c *Configuration) ApplyViewUsage(state *GroupStates, ctx *ViewerContext) {
 			}
 		}
 
-		// collective language evaluation
+		// Collective language evaluation, over the considered groups only:
+		// an excluded group must not influence the best-match choice either.
+		// A manually overridden group, by contrast, still takes part in the
+		// choice — it merely keeps its own state afterwards.
 		if slices.Contains(ua.Category, CategoryLanguage) && ctx.Lang != language.Und {
-			langRecs := evaluateLanguage(ua.OCGs, ctx.Lang)
+			candidates := make([]*Group, 0, len(ua.OCGs))
+			for _, g := range ua.OCGs {
+				if considers(g) {
+					candidates = append(candidates, g)
+				}
+			}
+			langRecs := evaluateLanguage(candidates, ctx.Lang)
 			for g, on := range langRecs {
 				if state.IsManual(g) {
 					continue

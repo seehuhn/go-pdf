@@ -18,6 +18,7 @@ package outline
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -542,4 +543,67 @@ func buildOutline(t *testing.T, n int, item func(i int, refs []pdf.Reference) pd
 		t.Fatal(err)
 	}
 	return r
+}
+
+// TestColorOutOfRange checks that colour components outside the range the
+// spec allows are clamped on read, so that anything the reader accepts can
+// be written back out through the strict writer.
+func TestColorOutOfRange(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	rootRef := w.Alloc()
+	itemRef := w.Alloc()
+	err := w.Put(itemRef, pdf.Dict{
+		"Title":  pdf.TextString("out of range"),
+		"Parent": rootRef,
+		"C":      pdf.Array{pdf.Number(2.5), pdf.Number(-1), pdf.Number(0.5)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(rootRef, pdf.Dict{
+		"Type":  pdf.Name("Outlines"),
+		"First": itemRef,
+		"Last":  itemRef,
+		"Count": pdf.Integer(1),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	o, err := pdf.Decode(pdf.CursorAt(x, nil), rootRef, Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := color.DeviceRGB{1, 0, 0.5}
+	if got := o.Items[0].Color; got != want {
+		t.Errorf("got colour %v, want %v", got, want)
+	}
+
+	// the clamped value must survive the strict writer
+	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w2)
+	if _, err := o.Encode(rm); err != nil {
+		t.Errorf("re-encoding a value read from a file failed: %v", err)
+	}
+}
+
+// TestColorNaN checks that a NaN colour component is rejected by the writer.
+// NaN passes any "out of range" test phrased with < and >, but has no valid
+// PDF representation.
+func TestColorNaN(t *testing.T) {
+	o := &Outline{
+		Items: []*Item{{
+			Title: "not a number",
+			Color: color.DeviceRGB{math.NaN(), 0, 0},
+		}},
+	}
+
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+	if _, err := o.Encode(rm); err == nil {
+		t.Error("expected an error for a NaN colour component")
+	}
 }

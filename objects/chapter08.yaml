@@ -4308,7 +4308,10 @@ types:
     pdfKey: Order
     pdfType: array
     required: false
+    default: '[]'
     introduced: '1.5'
+    notes: default applies to the default configuration; in other configuration
+      dictionaries the default is the Order value of the default configuration
   - goName: ListMode
     goType: ListMode
     pdfKey: ListMode
@@ -4324,7 +4327,10 @@ types:
     pdfKey: RBGroups
     pdfType: array
     required: false
+    default: '[]'
     introduced: '1.5'
+    notes: default applies to the default configuration; in other configuration
+      dictionaries the default is the RBGroups value of the default configuration
   - goName: Locked
     goType: '[]*Group'
     pdfKey: Locked

@@ -77,14 +77,26 @@ type Configuration struct {
 	// Content controlled by groups with no matching intent is always shown.
 	// The special value "All" matches every group intent.
 	//
-	// On write, nil can be used as a shorthand for "View".
+	// A nil value is a shorthand for "View".  A non-nil empty value means that
+	// no group participates in visibility decisions at all, so that all
+	// content is shown.
 	Intent []pdf.Name
 
 	// AS (optional) lists usage application dictionaries for automatic
 	// state management.
 	AS []*UsageApplication
 
-	// Order (optional) specifies the presentation hierarchy for a user interface.
+	// Order (optional) specifies the presentation hierarchy for a user
+	// interface.  Groups not listed are not presented.
+	//
+	// A nil value means the entry is absent; a non-nil empty value means that
+	// no group at all is presented.
+	//
+	// An absent Order in an alternate configuration takes its value from the
+	// default configuration.  This inheritance applies on read only:
+	// [ExtractProperties] fills the field in from [Properties.D], whereas
+	// writing embeds whatever the field holds, verbatim.  In the default
+	// configuration an absent Order is equivalent to an empty one.
 	Order []OrderItem
 
 	// ListMode (optional) controls which groups are displayed.
@@ -92,7 +104,13 @@ type Configuration struct {
 	ListMode ListMode
 
 	// RBGroups (optional) lists collections of groups that follow a
-	// radio-button paradigm.
+	// radio-button paradigm: at most one group of each collection is ON at a
+	// time.  Inner slices must not be empty.
+	//
+	// A nil value means the entry is absent; a non-nil empty value means that
+	// no such collection exists.  As for Order, an absent RBGroups in an
+	// alternate configuration is inherited from the default configuration on
+	// read only, and is written back out verbatim.
 	RBGroups [][]*Group
 
 	// Locked (optional, PDF 1.6) lists groups locked in the user interface.
@@ -195,12 +213,19 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 	}
 
 	// Order (optional)
+	//
+	// An empty array means "present no groups" and must stay distinct from an
+	// absent Order, which in an alternate configuration inherits the value
+	// from the default configuration.
 	if orderArr, err := pdf.Optional(c.Array(dict["Order"])); err != nil {
 		return nil, err
-	} else if len(orderArr) > 0 {
+	} else if orderArr != nil {
 		cfg.Order, err = extractOrderItems(c, orderArr)
 		if err != nil {
 			return nil, err
+		}
+		if cfg.Order == nil {
+			cfg.Order = []OrderItem{}
 		}
 	}
 
@@ -217,9 +242,12 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 	}
 
 	// RBGroups (optional)
+	//
+	// As for Order, an empty array is distinct from an absent entry.
 	if rbArr, err := pdf.Optional(c.Array(dict["RBGroups"])); err != nil {
 		return nil, err
-	} else {
+	} else if rbArr != nil {
+		cfg.RBGroups = [][]*Group{}
 		for _, item := range rbArr {
 			inner, err := pdf.Optional(c.Array(item))
 			if err != nil {
@@ -302,8 +330,11 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Intent (omit when nil or default "View")
 	switch {
-	case len(c.Intent) == 0 || len(c.Intent) == 1 && c.Intent[0] == "View":
+	case c.Intent == nil || len(c.Intent) == 1 && c.Intent[0] == "View":
 		// default, omit
+	case len(c.Intent) == 0:
+		// explicitly no intents: no group participates
+		dict["Intent"] = pdf.Array{}
 	case len(c.Intent) == 1:
 		dict["Intent"] = c.Intent[0]
 	default:
@@ -327,8 +358,8 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["AS"] = asArr
 	}
 
-	// Order
-	if len(c.Order) > 0 {
+	// Order (omit when nil, empty array when empty)
+	if c.Order != nil {
 		orderArr, err := embedOrderItems(rm, c.Order)
 		if err != nil {
 			return nil, err
@@ -350,8 +381,8 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, errors.New("invalid ListMode value")
 	}
 
-	// RBGroups
-	if len(c.RBGroups) > 0 {
+	// RBGroups (omit when nil, empty array when empty)
+	if c.RBGroups != nil {
 		rbArr := make(pdf.Array, len(c.RBGroups))
 		for i, groups := range c.RBGroups {
 			if len(groups) == 0 {

@@ -344,3 +344,79 @@ func FuzzPropertiesRoundTrip(f *testing.F) {
 		testPropertiesRoundTrip(t, pdf.GetVersion(r), data)
 	})
 }
+
+// An alternate configuration inherits Order and RBGroups from the default
+// configuration only when the entry is absent.  An empty array says
+// "present nothing" and must be kept.
+func TestPropertiesOrderInheritance(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+
+	groupRef := w.Alloc()
+	err := w.Put(groupRef, pdf.Dict{
+		"Type": pdf.Name("OCG"),
+		"Name": pdf.TextString("Layer 1"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	propRef := w.Alloc()
+	err = w.Put(propRef, pdf.Dict{
+		"OCGs": pdf.Array{groupRef},
+		"D": pdf.Dict{
+			"Order":    pdf.Array{groupRef},
+			"RBGroups": pdf.Array{pdf.Array{groupRef}},
+		},
+		"Configs": pdf.Array{
+			pdf.Dict{"Name": pdf.TextString("absent")},
+			pdf.Dict{
+				"Name":     pdf.TextString("empty"),
+				"Order":    pdf.Array{},
+				"RBGroups": pdf.Array{},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	p, err := pdf.Decode(pdf.CursorAt(x, nil), propRef, ExtractProperties)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Configs) != 2 {
+		t.Fatalf("got %d alternate configurations, want 2", len(p.Configs))
+	}
+
+	absent := p.Configs[0]
+	if len(absent.Order) != 1 || len(absent.RBGroups) != 1 {
+		t.Errorf("absent entries not inherited from D: Order=%v RBGroups=%v",
+			absent.Order, absent.RBGroups)
+	}
+
+	empty := p.Configs[1]
+	if empty.Order == nil || len(empty.Order) != 0 {
+		t.Errorf("empty Order not kept: %#v", empty.Order)
+	}
+	if empty.RBGroups == nil || len(empty.RBGroups) != 0 {
+		t.Errorf("empty RBGroups not kept: %#v", empty.RBGroups)
+	}
+}
+
+// A default configuration with an explicitly empty Intent is invalid:
+// if present, its value has to be View.
+func TestPropertiesDefaultIntentEmpty(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	rm := pdf.NewResourceManager(w)
+	p := &Properties{
+		OCGs: []*Group{propGroup1},
+		D: &Configuration{
+			BaseState: BaseStateON,
+			Intent:    []pdf.Name{},
+		},
+	}
+	if _, err := rm.Embed(p); err == nil {
+		t.Error("expected error for an empty default configuration Intent")
+	}
+}

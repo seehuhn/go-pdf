@@ -239,6 +239,26 @@ var (
 			},
 		},
 		{
+			// absent Intent, Order and RBGroups
+			name:    "absent_arrays",
+			version: pdf.V1_5,
+			data: &Configuration{
+				BaseState: BaseStateON,
+			},
+		},
+		{
+			// empty Intent, Order and RBGroups arrays are explicit and must
+			// stay distinct from absent ones
+			name:    "explicitly_empty_arrays",
+			version: pdf.V1_5,
+			data: &Configuration{
+				BaseState: BaseStateON,
+				Intent:    []pdf.Name{},
+				Order:     []OrderItem{},
+				RBGroups:  [][]*Group{},
+			},
+		},
+		{
 			name:    "complex",
 			version: pdf.V1_6,
 			data: &Configuration{
@@ -343,17 +363,14 @@ func normalizeConfiguration(c *Configuration) {
 	if len(c.OFF) == 0 {
 		c.OFF = nil
 	}
-	if len(c.Intent) == 0 {
-		c.Intent = nil
+	// nil Intent is a shorthand for the value the reader always produces;
+	// an empty Intent is meaningful and must not be collapsed.  The same
+	// goes for Order and RBGroups, which are left untouched here.
+	if c.Intent == nil {
+		c.Intent = []pdf.Name{"View"}
 	}
 	if len(c.AS) == 0 {
 		c.AS = nil
-	}
-	if len(c.Order) == 0 {
-		c.Order = nil
-	}
-	if len(c.RBGroups) == 0 {
-		c.RBGroups = nil
 	}
 	if len(c.Locked) == 0 {
 		c.Locked = nil

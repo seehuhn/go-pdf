@@ -45,6 +45,9 @@ type Item struct {
 
 	// Color specifies the color for the outline entry's text.
 	// Components must be in the range 0.0 to 1.0.
+	//
+	// The zero value is black, which is also the value a PDF processor uses
+	// when a file gives no colour, so the entry is omitted when writing.
 	Color color.DeviceRGB
 
 	// Bold displays the item in bold.
@@ -157,10 +160,12 @@ func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, d
 	}
 
 	if cArr, _ := c.Array(dict["C"]); len(cArr) == 3 {
+		// components out of range are clamped, so that anything we read can
+		// be written back out through the strict writer
 		cr, _ := c.Number(cArr[0])
 		cg, _ := c.Number(cArr[1])
 		cb, _ := c.Number(cArr[2])
-		item.Color = color.DeviceRGB{cr, cg, cb}
+		item.Color = color.DeviceRGB{clamp01(cr), clamp01(cg), clamp01(cb)}
 	}
 
 	if f, _ := c.Integer(dict["F"]); f != 0 {
@@ -313,7 +318,8 @@ func (ww *writer) writeItem(ref pdf.Reference, dict pdf.Dict, item *Item) error 
 			return err
 		}
 		for i, c := range item.Color {
-			if c < 0 || c > 1 {
+			// negated so that NaN is rejected
+			if !(c >= 0 && c <= 1) {
 				return fmt.Errorf("outline item color component %d out of range: %g", i, c)
 			}
 		}
@@ -447,3 +453,15 @@ func (ww *writer) flush() error {
 }
 
 const chunkSize = 32
+
+// clamp01 restricts a colour component to the range the spec allows.
+// NaN, which no comparison admits, maps to 0.
+func clamp01(x float64) float64 {
+	if x > 1 {
+		return 1
+	}
+	if x > 0 {
+		return x
+	}
+	return 0
+}

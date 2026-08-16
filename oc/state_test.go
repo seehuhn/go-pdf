@@ -903,3 +903,145 @@ func TestApplyViewUsageNoAS(t *testing.T) {
 		t.Error("expected group to remain ON with no AS dicts")
 	}
 }
+
+// The zero value of GroupStates is a usable, modifiable, empty state.
+func TestGroupStatesZeroValue(t *testing.T) {
+	g1 := &Group{Name: "Group 1"}
+	g2 := &Group{Name: "Group 2"}
+
+	var s GroupStates
+	if s.Participates(g1) {
+		t.Error("expected no group to participate in the zero value")
+	}
+	if !s.IsOn(g1) {
+		t.Error("expected a non-participating group to be visible")
+	}
+
+	s.SetState(g1, false)
+	if !s.Participates(g1) || s.IsOn(g1) {
+		t.Error("SetState had no effect on the zero value")
+	}
+
+	s.SetManualState(g2, false)
+	if !s.Participates(g2) || s.IsOn(g2) || !s.IsManual(g2) {
+		t.Error("SetManualState had no effect on the zero value")
+	}
+
+	if c := s.Clone(); !c.Participates(g1) || !c.IsManual(g2) {
+		t.Error("clone of a lazily built state lost entries")
+	}
+}
+
+// A nil *GroupStates cannot be modified, so applying usage to one does
+// nothing instead of panicking.
+func TestApplyViewUsageNilState(t *testing.T) {
+	g := &Group{
+		Name:  "Layer",
+		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
+	}
+	c := &Configuration{
+		BaseState: BaseStateON,
+		AS: []*UsageApplication{{
+			Event:    EventView,
+			OCGs:     []*Group{g},
+			Category: []Category{CategoryZoom},
+		}},
+	}
+	c.ApplyViewUsage(nil, &ViewerContext{Zoom: 0.5})
+}
+
+// DefaultState drops groups whose intent does not match the configuration;
+// a usage application must not put them back.
+func TestApplyViewUsageIntentMismatch(t *testing.T) {
+	g := &Group{
+		Name:   "Design Layer",
+		Intent: []pdf.Name{"Design"},
+		Usage:  &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
+	}
+	c := &Configuration{
+		BaseState: BaseStateON,
+		Intent:    []pdf.Name{"View"},
+		AS: []*UsageApplication{{
+			Event:    EventView,
+			OCGs:     []*Group{g},
+			Category: []Category{CategoryZoom},
+		}},
+	}
+	state := c.DefaultState([]*Group{g}, EventView, nil)
+	if state.Participates(g) {
+		t.Fatal("expected the intent mismatch to exclude the group")
+	}
+
+	c.ApplyViewUsage(state, &ViewerContext{Zoom: 0.5})
+	if state.Participates(g) {
+		t.Error("expected the excluded group to stay out of the state")
+	}
+	if !state.IsOn(g) {
+		t.Error("expected the excluded group to stay visible")
+	}
+}
+
+// The same, for the collective language evaluation: an excluded group must
+// not take part in choosing the best language match either.
+func TestApplyViewUsageIntentMismatchLanguage(t *testing.T) {
+	excluded := &Group{
+		Name:   "English (design only)",
+		Intent: []pdf.Name{"Design"},
+		Usage:  &Usage{Language: &UsageLanguage{Lang: language.English}},
+	}
+	included := &Group{
+		Name:  "German",
+		Usage: &Usage{Language: &UsageLanguage{Lang: language.German}},
+	}
+	c := &Configuration{
+		BaseState: BaseStateON,
+		Intent:    []pdf.Name{"View"},
+		AS: []*UsageApplication{{
+			Event:    EventView,
+			OCGs:     []*Group{excluded, included},
+			Category: []Category{CategoryLanguage},
+		}},
+	}
+	state := c.DefaultState([]*Group{excluded, included}, EventView, nil)
+	c.ApplyViewUsage(state, &ViewerContext{Lang: language.German})
+
+	if state.Participates(excluded) {
+		t.Error("expected the excluded group to stay out of the state")
+	}
+	if !state.IsOn(included) {
+		t.Error("expected the German group ON for a German system language")
+	}
+}
+
+// A manual override fixes a group's state but does not take it out of the
+// collective language evaluation: it still counts as an exact match, so the
+// other groups are switched OFF rather than treated as the best match.
+func TestApplyViewUsageManualLanguageCandidate(t *testing.T) {
+	manual := &Group{
+		Name:  "American English",
+		Usage: &Usage{Language: &UsageLanguage{Lang: language.AmericanEnglish}},
+	}
+	other := &Group{
+		Name:  "British English",
+		Usage: &Usage{Language: &UsageLanguage{Lang: language.BritishEnglish, Preferred: true}},
+	}
+	c := &Configuration{
+		BaseState: BaseStateON,
+		AS: []*UsageApplication{{
+			Event:    EventView,
+			OCGs:     []*Group{manual, other},
+			Category: []Category{CategoryLanguage},
+		}},
+	}
+	state := c.DefaultState([]*Group{manual, other}, EventView, nil)
+	state.SetManualState(manual, false)
+
+	c.ApplyViewUsage(state, &ViewerContext{Lang: language.AmericanEnglish})
+
+	if state.IsOn(manual) {
+		t.Error("expected the manual override to be preserved")
+	}
+	if state.IsOn(other) {
+		t.Error("expected the British group OFF: en-US is an exact match")
+	}
+}

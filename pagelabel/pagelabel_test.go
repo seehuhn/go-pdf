@@ -209,8 +209,8 @@ func TestExtractCyclicPageLabels(t *testing.T) {
 	}
 	// no real entries in the cyclic tree; Extract installs the default
 	// page-0 range, so we expect exactly one range.
-	if labels.NumRanges() != 1 {
-		t.Errorf("NumRanges() = %d, want 1", labels.NumRanges())
+	if len(labels.Ranges) != 1 {
+		t.Errorf("got %d ranges, want 1", len(labels.Ranges))
 	}
 }
 
@@ -233,18 +233,13 @@ func TestExtract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if labels.NumRanges() != 3 {
-		t.Fatalf("got %d ranges, want 3", labels.NumRanges())
+	want := []Entry{
+		{FirstPage: 0, Range: Range{Style: LowerRoman, Start: 1}},
+		{FirstPage: 4, Range: Range{Style: Decimal, Start: 1}},
+		{FirstPage: 7, Range: Range{Style: Decimal, Prefix: "A-", Start: 8}},
 	}
-
-	fp, rng := labels.GetRange(0)
-	if fp != 0 || rng.Style != LowerRoman || rng.Prefix != "" || rng.Start != 1 {
-		t.Errorf("range 0: firstPage=%d, range=%+v", fp, rng)
-	}
-
-	fp, rng = labels.GetRange(2)
-	if fp != 7 || rng.Style != Decimal || rng.Prefix != "A-" || rng.Start != 8 {
-		t.Errorf("range 2: firstPage=%d, range=%+v", fp, rng)
+	if diff := cmp.Diff(want, labels.Ranges); diff != "" {
+		t.Errorf("wrong ranges (-want +got):\n%s", diff)
 	}
 
 	if got := labels.Format(0); got != "i" {
@@ -270,7 +265,7 @@ func TestExtractClampStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, rng := labels.GetRange(0)
+	rng := labels.Ranges[0]
 	if rng.Start != limits.MaxPageLabelStart {
 		t.Errorf("Start = %d, want clamped to %d", rng.Start, limits.MaxPageLabelStart)
 	}
@@ -281,13 +276,44 @@ func TestExtractClampStart(t *testing.T) {
 	}
 }
 
+// TestExtractNegativeKey checks that a key which is not a valid page index
+// is dropped, so that the ranges stay sorted and can be fed back into New.
+func TestExtractNegativeKey(t *testing.T) {
+	obj := pdf.Dict{
+		"Nums": pdf.Array{
+			pdf.Integer(-5), pdf.Dict{"S": pdf.Name("A")},
+			pdf.Integer(3), pdf.Dict{"S": pdf.Name("r")},
+		},
+	}
+
+	labels, err := Extract(mock.Getter, obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := []Entry{
+		{FirstPage: 0, Range: Range{Style: Decimal, Start: 1}},
+		{FirstPage: 3, Range: Range{Style: LowerRoman, Start: 1}},
+	}
+	if diff := cmp.Diff(want, labels.Ranges); diff != "" {
+		t.Errorf("wrong ranges (-want +got):\n%s", diff)
+	}
+
+	if got := labels.Format(0); got != "1" {
+		t.Errorf("Format(0) = %q, want %q", got, "1")
+	}
+
+	if _, err := New(labels.Ranges...); err != nil {
+		t.Errorf("the extracted ranges cannot be fed back into New: %v", err)
+	}
+}
+
 // TestRoundTripClampedStart checks that a clamped start value survives
 // Extract → Embed → Extract unchanged, so read/write parity holds.
 func TestRoundTripClampedStart(t *testing.T) {
-	entries := func(yield func(int, Range) bool) {
-		yield(0, Range{LowerAlpha, "", limits.MaxPageLabelStart})
-	}
-	labels, err := New(entries)
+	labels, err := New(
+		Entry{0, Range{LowerAlpha, "", limits.MaxPageLabelStart}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +335,7 @@ func TestRoundTripClampedStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, r2 := labels2.GetRange(0)
+	r2 := labels2.Ranges[0]
 	if r2.Start != limits.MaxPageLabelStart {
 		t.Errorf("round trip: Start = %d, want %d", r2.Start, limits.MaxPageLabelStart)
 	}
@@ -341,18 +367,8 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if labels.NumRanges() != labels2.NumRanges() {
-		t.Fatalf("round trip: %d ranges → %d ranges", labels.NumRanges(), labels2.NumRanges())
-	}
-	for i := range labels.NumRanges() {
-		fp1, r1 := labels.GetRange(i)
-		fp2, r2 := labels2.GetRange(i)
-		if diff := cmp.Diff(fp1, fp2); diff != "" {
-			t.Errorf("range %d firstPage (-want +got):\n%s", i, diff)
-		}
-		if diff := cmp.Diff(r1, r2); diff != "" {
-			t.Errorf("range %d (-want +got):\n%s", i, diff)
-		}
+	if diff := cmp.Diff(labels.Ranges, labels2.Ranges); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
 
@@ -386,18 +402,82 @@ func TestRangeAt(t *testing.T) {
 // pages 7+: decimal with prefix "A-", starting at 8 (A-8, A-9, ...)
 func newTestLabels(t *testing.T) *Labels {
 	t.Helper()
-	entries := func(yield func(int, Range) bool) {
-		if !yield(0, Range{LowerRoman, "", 1}) {
-			return
-		}
-		if !yield(4, Range{Decimal, "", 1}) {
-			return
-		}
-		yield(7, Range{Decimal, "A-", 8})
-	}
-	labels, err := New(entries)
+	labels, err := New(
+		Entry{0, Range{LowerRoman, "", 1}},
+		Entry{4, Range{Decimal, "", 1}},
+		Entry{7, Range{Decimal, "A-", 8}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return labels
+}
+
+// The Ranges of a Labels can be fed straight back into New.
+func TestRangesRoundTrip(t *testing.T) {
+	labels := newTestLabels(t)
+
+	again, err := New(labels.Ranges...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(labels, again); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// TestExtractValidates checks the promise made by validate's doc comment:
+// whatever Extract makes of a malformed number tree can be written back out.
+func TestExtractValidates(t *testing.T) {
+	tests := []struct {
+		name string
+		obj  pdf.Object
+	}{
+		{"empty", pdf.Dict{"Nums": pdf.Array{}}},
+		{"no page 0", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(7), pdf.Dict{"S": pdf.Name("D")},
+		}}},
+		{"negative key", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(-5), pdf.Dict{"S": pdf.Name("D")},
+		}}},
+		{"duplicate keys", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(0), pdf.Dict{"S": pdf.Name("D")},
+			pdf.Integer(0), pdf.Dict{"S": pdf.Name("r")},
+		}}},
+		{"unsorted keys", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(4), pdf.Dict{"S": pdf.Name("D")},
+			pdf.Integer(0), pdf.Dict{"S": pdf.Name("r")},
+		}}},
+		{"unknown style", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(0), pdf.Dict{"S": pdf.Name("nonsense")},
+		}}},
+		{"zero start", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(0), pdf.Dict{"S": pdf.Name("D"), "St": pdf.Integer(0)},
+		}}},
+		{"negative start", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(0), pdf.Dict{"S": pdf.Name("D"), "St": pdf.Integer(-3)},
+		}}},
+		{"wrong value type", pdf.Dict{"Nums": pdf.Array{
+			pdf.Integer(0), pdf.Integer(42),
+		}}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			labels, err := Extract(mock.Getter, tc.obj)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := labels.validate(); err != nil {
+				t.Errorf("Extract returned an unwritable value: %v", err)
+			}
+
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
+			if _, err := rm.Embed(labels); err != nil {
+				t.Errorf("re-embedding a value read from a file failed: %v", err)
+			}
+		})
+	}
 }

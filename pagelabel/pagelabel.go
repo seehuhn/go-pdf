@@ -25,7 +25,7 @@ package pagelabel
 import (
 	"errors"
 	"fmt"
-	"iter"
+	"math"
 	"slices"
 	"strings"
 
@@ -113,46 +113,60 @@ func (r *Range) Format(offset int) string {
 	return r.Prefix + numeric
 }
 
-// labelRange pairs a Range with the 0-based page index where it starts.
-type labelRange struct {
-	firstPage int
+// Entry is a labelling range together with the page where it starts.
+type Entry struct {
+	// FirstPage is the 0-based index of the first page the range covers.
+	FirstPage int
+
 	Range
 }
 
 // Labels holds page labelling information for a document.
 type Labels struct {
-	ranges []labelRange // sorted by firstPage
+	// Ranges lists the labelling ranges, sorted by FirstPage in strictly
+	// ascending order.  The first entry covers page 0.
+	Ranges []Entry
 }
 
-// New creates a Labels from a list of (firstPage, Range) pairs.
-// The firstPage values are 0-based page indices and must be in strictly
-// ascending order.  The first entry must have firstPage 0.
-func New(entries iter.Seq2[int, Range]) (*Labels, error) {
-	l := &Labels{}
-	prev := -1
-	for firstPage, r := range entries {
-		if firstPage < 0 {
-			return nil, fmt.Errorf("negative page index: %d", firstPage)
+// New creates a Labels from a list of labelling ranges.
+// The FirstPage values are 0-based page indices and must be in strictly
+// ascending order.  The first entry must have FirstPage 0.
+// A Start value below 1 is replaced by the default value 1.
+func New(entries ...Entry) (*Labels, error) {
+	l := &Labels{Ranges: slices.Clone(entries)}
+	for i := range l.Ranges {
+		if l.Ranges[i].Start < 1 {
+			l.Ranges[i].Start = 1
 		}
-		if firstPage <= prev && prev >= 0 {
-			return nil, fmt.Errorf("page label ranges not in ascending order: %d after %d", firstPage, prev)
-		}
-		if r.Start < 1 {
-			r.Start = 1
-		}
-		l.ranges = append(l.ranges, labelRange{
-			firstPage: firstPage,
-			Range:     r,
-		})
-		prev = firstPage
 	}
-	if len(l.ranges) == 0 {
-		return nil, errors.New("no page label ranges")
-	}
-	if l.ranges[0].firstPage != 0 {
-		return nil, fmt.Errorf("first page label range starts at page %d, not 0", l.ranges[0].firstPage)
+	if err := l.validate(); err != nil {
+		return nil, err
 	}
 	return l, nil
+}
+
+// validate checks the invariants of [Labels.Ranges].  Both [New] and
+// [Labels.Embed] use it, so no invalid Labels can reach a PDF file.
+// Everything [Extract] returns satisfies it.
+func (l *Labels) validate() error {
+	if len(l.Ranges) == 0 {
+		return errors.New("no page label ranges")
+	}
+	if l.Ranges[0].FirstPage != 0 {
+		return fmt.Errorf("first labelling range starts at page %d, not 0", l.Ranges[0].FirstPage)
+	}
+	for i, e := range l.Ranges {
+		if i > 0 && e.FirstPage <= l.Ranges[i-1].FirstPage {
+			return fmt.Errorf("labelling ranges out of order: %d after %d", e.FirstPage, l.Ranges[i-1].FirstPage)
+		}
+		if e.Start < 1 {
+			return fmt.Errorf("labelling range at page %d has start value %d", e.FirstPage, e.Start)
+		}
+		if int(e.Style) >= len(styleToPDFName) {
+			return fmt.Errorf("invalid numbering style %d at page %d", e.Style, e.FirstPage)
+		}
+	}
+	return nil
 }
 
 // Extract reads page labels from a PDF PageLabels number tree object.
@@ -170,19 +184,28 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 
 	l := &Labels{}
 	for key, val := range tree.All() {
-		lr := labelRange{
-			firstPage: int(key),
+		// A key names the page index of the first page of a range, so it
+		// cannot be negative.  Skip anything outside the range of a page
+		// index, so that the ranges stay sorted and can be fed back into
+		// [New].
+		if key < 0 || key > math.MaxInt {
+			continue
+		}
+
+		lr := Entry{
+			FirstPage: int(key),
 			Range: Range{
 				Start: 1,
 			},
 		}
 
-		dict, err := c.Dict(val)
+		// a value which is not a dictionary is treated like a missing one
+		dict, err := pdf.Optional(c.Dict(val))
 		if err != nil {
 			return nil, err
 		}
 		if dict == nil {
-			l.ranges = append(l.ranges, lr)
+			l.Ranges = append(l.Ranges, lr)
 			continue
 		}
 
@@ -203,18 +226,18 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 			lr.Start = int(min(st, limits.MaxPageLabelStart))
 		}
 
-		l.ranges = append(l.ranges, lr)
+		l.Ranges = append(l.Ranges, lr)
 	}
 
 	// ensure sorted by page index
-	slices.SortFunc(l.ranges, func(a, b labelRange) int {
-		return a.firstPage - b.firstPage
+	slices.SortFunc(l.Ranges, func(a, b Entry) int {
+		return a.FirstPage - b.FirstPage
 	})
 
 	// insert a default range at page 0 if missing
-	if len(l.ranges) == 0 || l.ranges[0].firstPage != 0 {
-		l.ranges = slices.Insert(l.ranges, 0, labelRange{
-			firstPage: 0,
+	if len(l.Ranges) == 0 || l.Ranges[0].FirstPage != 0 {
+		l.Ranges = slices.Insert(l.Ranges, 0, Entry{
+			FirstPage: 0,
 			Range:     Range{Style: Decimal, Start: 1},
 		})
 	}
@@ -224,10 +247,14 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 
 // Embed writes page labels as a number tree into a PDF file.
 func (l *Labels) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := l.validate(); err != nil {
+		return nil, err
+	}
+
 	opt := rm.Out().GetOptions()
 
 	data := func(yield func(pdf.Integer, pdf.Object) bool) {
-		for _, lr := range l.ranges {
+		for _, lr := range l.Ranges {
 			dict := pdf.Dict{}
 			if opt.HasAny(pdf.OptDictTypes) {
 				dict["Type"] = pdf.Name("PageLabel")
@@ -241,7 +268,7 @@ func (l *Labels) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			if lr.Start != 1 {
 				dict["St"] = pdf.Integer(lr.Start)
 			}
-			if !yield(pdf.Integer(lr.firstPage), dict) {
+			if !yield(pdf.Integer(lr.FirstPage), dict) {
 				return
 			}
 		}
@@ -256,39 +283,28 @@ func (l *Labels) Format(pageIndex int) string {
 	if ri < 0 {
 		return formatDecimal(pageIndex + 1)
 	}
-	return l.ranges[ri].Format(offset)
-}
-
-// NumRanges returns the number of labelling ranges.
-func (l *Labels) NumRanges() int {
-	return len(l.ranges)
-}
-
-// GetRange returns the Range and 0-based first page index for the i-th range.
-func (l *Labels) GetRange(i int) (firstPage int, r Range) {
-	lr := l.ranges[i]
-	return lr.firstPage, lr.Range
+	return l.Ranges[ri].Format(offset)
 }
 
 // RangeAt returns the range index and offset within that range for a
 // 0-based page index.  Returns -1, 0 if no range covers the page.
 func (l *Labels) RangeAt(pageIndex int) (rangeIndex, offset int) {
-	if len(l.ranges) == 0 {
+	if len(l.Ranges) == 0 {
 		return -1, 0
 	}
 
-	// binary search for the last range whose firstPage <= pageIndex
-	i, _ := slices.BinarySearchFunc(l.ranges, pageIndex, func(lr labelRange, target int) int {
-		return lr.firstPage - target
+	// binary search for the last range whose FirstPage <= pageIndex
+	i, _ := slices.BinarySearchFunc(l.Ranges, pageIndex, func(lr Entry, target int) int {
+		return lr.FirstPage - target
 	})
 	// i is the insertion point; the range we want is i-1 if the exact
 	// match was not found
-	if i < len(l.ranges) && l.ranges[i].firstPage == pageIndex {
+	if i < len(l.Ranges) && l.Ranges[i].FirstPage == pageIndex {
 		return i, 0
 	}
 	i--
 	if i < 0 {
 		return -1, 0
 	}
-	return i, pageIndex - l.ranges[i].firstPage
+	return i, pageIndex - l.Ranges[i].FirstPage
 }
