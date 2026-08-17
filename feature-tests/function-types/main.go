@@ -402,10 +402,9 @@ func (w *writer) test2DStrip(f pdf.Function) error {
 	w.page.PopGraphicsState()
 
 	s := &shading.Type1{
-		ColorSpace: cs,
-		F:          f,
-		Matrix:     []float64{area1.Dx(), 0, 0, area1.Dy(), area1.LLx, area1.LLy},
-		BBox:       &pdf.Rectangle{LLx: area1.LLx, LLy: area1.LLy, URx: area1.URx, URy: area1.URy},
+		Common: shading.Common{ColorSpace: cs, BBox: &pdf.Rectangle{LLx: area1.LLx, LLy: area1.LLy, URx: area1.URx, URy: area1.URy}},
+		F:      f,
+		Matrix: []float64{area1.Dx(), 0, 0, area1.Dy(), area1.LLx, area1.LLy},
 	}
 	w.page.DrawShading(s)
 
@@ -483,13 +482,12 @@ func (w *writer) test1DStrip(f pdf.Function) error {
 	w.page.PopGraphicsState()
 
 	s := &shading.Type2{
-		ColorSpace: cs,
-		F:          f,
-		P0:         vec.Vec2{X: area1.LLx, Y: area1.LLy + area1.Dy()/2},
-		P1:         vec.Vec2{X: area1.URx, Y: area1.LLy + area1.Dy()/2},
-		TMin:       0,
-		TMax:       1,
-		BBox:       &pdf.Rectangle{LLx: area1.LLx, LLy: area1.LLy, URx: area1.URx, URy: area1.URy},
+		Common: shading.Common{ColorSpace: cs, BBox: &pdf.Rectangle{LLx: area1.LLx, LLy: area1.LLy, URx: area1.URx, URy: area1.URy}},
+		F:      f,
+		P0:     vec.Vec2{X: area1.LLx, Y: area1.LLy + area1.Dy()/2},
+		P1:     vec.Vec2{X: area1.URx, Y: area1.LLy + area1.Dy()/2},
+		TMin:   0,
+		TMax:   1,
 	}
 	w.page.DrawShading(s)
 

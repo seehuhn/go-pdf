@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // PDF 2.0 sections: 8.7.4.3 8.7.4.5.2
@@ -33,8 +32,8 @@ import (
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type1 struct {
-	// ColorSpace defines the color space for shading color values.
-	ColorSpace color.Space
+	// Common holds the entries shared by all shading types.
+	Common
 
 	// F is either a 2->n function or an array of n 2->1 functions, where n is
 	// the number of color components of the ColorSpace.
@@ -47,19 +46,6 @@ type Type1 struct {
 	// Matrix (optional) transforms domain coordinates to target coordinate
 	// space. Default: identity matrix [1 0 0 1 0 0].
 	Matrix []float64
-
-	// Background (optional) specifies the color for areas outside the
-	// transformed domain, when used in a shading pattern. The default is to
-	// leave points outside the transformed domain unpainted.
-	Background []float64
-
-	// BBox (optional) defines the shading's bounding box as a clipping
-	// boundary.
-	BBox *pdf.Rectangle
-
-	// AntiAlias controls whether to filter the shading function to prevent
-	// aliasing. Default: false.
-	AntiAlias bool
 
 	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
@@ -82,31 +68,20 @@ func (s *Type1) Equal(other graphics.Shading) bool {
 	if !ok {
 		return false
 	}
-	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+	return commonEqual(&s.Common, &o.Common) &&
 		function.Equal(s.F, o.F) &&
 		slices.Equal(s.Domain, o.Domain) &&
-		slices.Equal(s.Matrix, o.Matrix) &&
-		slices.Equal(s.Background, o.Background) &&
-		s.BBox.Equal(o.BBox) &&
-		s.AntiAlias == o.AntiAlias
+		slices.Equal(s.Matrix, o.Matrix)
 }
 
 // extractType1 reads a Type 1 (function-based) shading from a PDF dictionary.
 func extractType1(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type1, error) {
 	s := &Type1{}
 
-	// Read required ColorSpace
-	csObj, ok := d["ColorSpace"]
-	if !ok {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing /ColorSpace entry"),
-		}
-	}
-	cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
-	if err != nil {
+	if err := extractCommon(c, d, &s.Common, false); err != nil {
 		return nil, err
 	}
-	s.ColorSpace = cs
+	cs := s.ColorSpace
 
 	// Read required Function
 	fnObj, ok := d["Function"]
@@ -171,39 +146,6 @@ func extractType1(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type1, error) {
 		// Invalid matrix values are ignored, using zero value
 	}
 
-	// Read optional Background
-	if bgObj, ok := d["Background"]; ok {
-		if bg, err := pdf.Optional(c.FloatArray(bgObj)); err != nil {
-			return nil, err
-		} else if len(bg) > 0 {
-			if len(bg) != cs.Channels() {
-				return nil, pdf.Errorf("wrong number of background values: expected %d, got %d", cs.Channels(), len(bg))
-			}
-			s.Background = bg
-		}
-		// Invalid background values are ignored, using zero value
-	}
-
-	// Read optional BBox
-	if bboxObj, ok := d["BBox"]; ok {
-		if bbox, err := pdf.Optional(c.Rectangle(bboxObj)); err != nil {
-			return nil, err
-		} else if bbox != nil {
-			s.BBox = bbox
-		}
-		// Invalid bbox values are ignored, using zero value
-	}
-
-	// Read optional AntiAlias
-	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(c.Boolean(aaObj)); err != nil {
-			return nil, err
-		} else {
-			s.AntiAlias = bool(aa)
-		}
-		// Invalid antiAlias values are ignored, using zero value (false)
-	}
-
 	s.SingleUse = isDirect
 
 	return s, nil
@@ -216,20 +158,8 @@ func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	if s.ColorSpace == nil {
-		return nil, errors.New("missing ColorSpace")
-	} else if s.ColorSpace.Family() == color.FamilyPattern {
-		return nil, errors.New("invalid ColorSpace")
-	} else if s.ColorSpace.Family() == color.FamilyIndexed {
-		return nil, errors.New("Type 1 shading cannot use Indexed color space")
-	}
-	if have := len(s.Background); have > 0 {
-		want := s.ColorSpace.Channels()
-		if have != want {
-			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
-				want, have)
-			return nil, err
-		}
+	if err := validateCommon(&s.Common, false); err != nil {
+		return nil, err
 	}
 	if m, n := s.F.Shape(); m != 2 {
 		return nil, fmt.Errorf("function must have 2 inputs, not %d", m)
@@ -269,15 +199,7 @@ func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"ColorSpace":  csE,
 		"Function":    fn,
 	}
-	if len(s.Background) > 0 {
-		dict["Background"] = toPDF(s.Background)
-	}
-	if s.BBox != nil {
-		dict["BBox"] = s.BBox
-	}
-	if s.AntiAlias {
-		dict["AntiAlias"] = pdf.Boolean(true)
-	}
+	embedCommon(dict, &s.Common)
 	if len(s.Domain) > 0 && !isValues(s.Domain, 0, 1, 0, 1) {
 		dict["Domain"] = toPDF(s.Domain)
 	}

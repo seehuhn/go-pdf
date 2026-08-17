@@ -106,7 +106,7 @@ func TestShadingBudgetRejection(t *testing.T) {
 // regardless of their packing ratio.
 func TestShadingBudgetSmallMeshAccepted(t *testing.T) {
 	s := &Type4{
-		ColorSpace:        color.SpaceDeviceGray,
+		Common:            Common{ColorSpace: color.SpaceDeviceGray},
 		BitsPerCoordinate: 8,
 		BitsPerComponent:  4,
 		BitsPerFlag:       2,

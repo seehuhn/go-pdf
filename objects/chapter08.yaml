@@ -1409,6 +1409,7 @@ types:
 - name: ShadingType1
   purpose: "function-based shading"
   goType: graphics/shading.Type1
+  embeds: [ShadingCommon]
   pdfRepr: dict
   introduced: '1.3'
   fields:
@@ -1453,59 +1454,6 @@ types:
     introduced: '1.3'
     possibleValues:
     - '1'
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - DeviceCMYK
-    - DeviceRGB
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    - DeviceRGBColorSpace
-    - DeviceCMYKColorSpace
-    - CalGrayColorSpace
-    - CalRGBColorSpace
-    - LabColorSpace
-    - ICCBasedColorSpace
-    - IndexedColorSpace
-    - SeparationColorSpace
-    - DeviceNColorSpace
-    notes: except pattern
-    goType: color.Space
-    purpose: ColorSpace defines the color space for shading color values.
-  - goName: Background
-    pdfKey: Background
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Background (optional) specifies the color for areas outside the
-
-      transformed domain, when used in a shading pattern. The default is to
-
-      leave points outside the transformed domain unpainted.'
-  - goName: BBox
-    pdfKey: BBox
-    pdfType: rectangle
-    required: false
-    introduced: '1.3'
-    goType: '*pdf.Rectangle'
-    purpose: 'BBox (optional) defines the shading''s bounding box as a clipping
-
-      boundary.'
-  - goName: AntiAlias
-    pdfKey: AntiAlias
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.3'
-    goType: bool
-    purpose: 'AntiAlias controls whether to filter the shading function to prevent
-
-      aliasing. Default: false.'
   fileDependent: false
   writeMethod: (*Type1).Embed
   readFunc: extract.Shading
@@ -1515,6 +1463,7 @@ types:
 - name: ShadingType2
   purpose: "axial shading"
   goType: graphics/shading.Type2
+  embeds: [ShadingCommon]
   pdfRepr: dict
   introduced: '1.3'
   fields:
@@ -1559,59 +1508,6 @@ types:
     introduced: '1.3'
     possibleValues:
     - '2'
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - DeviceCMYK
-    - DeviceRGB
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    - DeviceRGBColorSpace
-    - DeviceCMYKColorSpace
-    - CalGrayColorSpace
-    - CalRGBColorSpace
-    - LabColorSpace
-    - ICCBasedColorSpace
-    - IndexedColorSpace
-    - SeparationColorSpace
-    - DeviceNColorSpace
-    notes: except pattern
-    goType: color.Space
-    purpose: ColorSpace defines the color space for shading color values.
-  - goName: Background
-    pdfKey: Background
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Background (optional) specifies the color for areas outside the
-
-      shading''s bounds, when used in a shading pattern. The default is to
-
-      leave such points unpainted.'
-  - goName: BBox
-    pdfKey: BBox
-    pdfType: rectangle
-    required: false
-    introduced: '1.3'
-    goType: '*pdf.Rectangle'
-    purpose: 'BBox (optional) defines the shading''s bounding box as a clipping
-
-      boundary.'
-  - goName: AntiAlias
-    pdfKey: AntiAlias
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.3'
-    goType: bool
-    purpose: 'AntiAlias controls whether to filter the shading function to prevent
-
-      aliasing.'
   fileDependent: false
   writeMethod: (*Type2).Embed
   readFunc: extract.Shading
@@ -1621,6 +1517,7 @@ types:
 - name: ShadingType3
   purpose: "radial shading"
   goType: graphics/shading.Type3
+  embeds: [ShadingCommon]
   pdfRepr: dict
   introduced: '1.3'
   fields:
@@ -1662,53 +1559,6 @@ types:
     introduced: '1.3'
     possibleValues:
     - '3'
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - DeviceCMYK
-    - DeviceRGB
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    - DeviceRGBColorSpace
-    - DeviceCMYKColorSpace
-    - CalGrayColorSpace
-    - CalRGBColorSpace
-    - LabColorSpace
-    - ICCBasedColorSpace
-    - IndexedColorSpace
-    - SeparationColorSpace
-    - DeviceNColorSpace
-    notes: except pattern
-    goType: color.Space
-    purpose: ColorSpace defines the color space for shading color values.
-  - goName: Background
-    pdfKey: Background
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Background (optional) specifies the color for areas outside the
-
-      shading''s bounds, when used in a shading pattern.'
-  - goName: BBox
-    pdfKey: BBox
-    pdfType: rectangle
-    required: false
-    introduced: '1.3'
-    goType: '*pdf.Rectangle'
-    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
-  - goName: AntiAlias
-    pdfKey: AntiAlias
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.3'
-    goType: bool
-    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
   fileDependent: false
   writeMethod: (*Type3).Embed
   readFunc: extract.Shading
@@ -1718,6 +1568,7 @@ types:
 - name: ShadingType4
   purpose: "free-form Gouraud-shaded triangle mesh"
   goType: graphics/shading.Type4
+  embeds: [ShadingCommon]
   pdfRepr: stream
   fields:
   - goName: BitsPerCoordinate
@@ -1791,53 +1642,6 @@ types:
     introduced: '1.3'
     possibleValues:
     - '4'
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - DeviceCMYK
-    - DeviceRGB
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    - DeviceRGBColorSpace
-    - DeviceCMYKColorSpace
-    - CalGrayColorSpace
-    - CalRGBColorSpace
-    - LabColorSpace
-    - ICCBasedColorSpace
-    - IndexedColorSpace
-    - SeparationColorSpace
-    - DeviceNColorSpace
-    notes: except pattern
-    goType: color.Space
-    purpose: ColorSpace defines the color space for shading color values.
-  - goName: Background
-    pdfKey: Background
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Background (optional) specifies the color for areas outside the
-
-      shading''s bounds, when used in a shading pattern.'
-  - goName: BBox
-    pdfKey: BBox
-    pdfType: rectangle
-    required: false
-    introduced: '1.3'
-    goType: '*pdf.Rectangle'
-    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
-  - goName: AntiAlias
-    pdfKey: AntiAlias
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.3'
-    goType: bool
-    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
   - goName:
     pdfKey: Length
     pdfType: integer
@@ -1910,6 +1714,7 @@ types:
 - name: ShadingType5
   purpose: "lattice-form Gouraud-shaded triangle mesh"
   goType: graphics/shading.Type5
+  embeds: [ShadingCommon]
   pdfRepr: stream
   fields:
   - goName: BitsPerCoordinate
@@ -1983,53 +1788,6 @@ types:
     introduced: '1.3'
     possibleValues:
     - '5'
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - DeviceCMYK
-    - DeviceRGB
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    - DeviceRGBColorSpace
-    - DeviceCMYKColorSpace
-    - CalGrayColorSpace
-    - CalRGBColorSpace
-    - LabColorSpace
-    - ICCBasedColorSpace
-    - IndexedColorSpace
-    - SeparationColorSpace
-    - DeviceNColorSpace
-    notes: except pattern
-    goType: color.Space
-    purpose: ColorSpace defines the color space for shading color values.
-  - goName: Background
-    pdfKey: Background
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Background (optional) specifies the color for areas outside the
-
-      shading''s bounds, when used in a shading pattern.'
-  - goName: BBox
-    pdfKey: BBox
-    pdfType: rectangle
-    required: false
-    introduced: '1.3'
-    goType: '*pdf.Rectangle'
-    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
-  - goName: AntiAlias
-    pdfKey: AntiAlias
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.3'
-    goType: bool
-    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
   - goName:
     pdfKey: Length
     pdfType: integer
@@ -2102,6 +1860,7 @@ types:
 - name: ShadingType6
   purpose: "Coons patch mesh shading"
   goType: graphics/shading.Type6
+  embeds: [ShadingCommon]
   pdfRepr: stream
   fields:
   - goName: BitsPerCoordinate
@@ -2171,53 +1930,6 @@ types:
     introduced: '1.3'
     possibleValues:
     - '6'
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - DeviceCMYK
-    - DeviceRGB
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    - DeviceRGBColorSpace
-    - DeviceCMYKColorSpace
-    - CalGrayColorSpace
-    - CalRGBColorSpace
-    - LabColorSpace
-    - ICCBasedColorSpace
-    - IndexedColorSpace
-    - SeparationColorSpace
-    - DeviceNColorSpace
-    notes: except pattern
-    goType: color.Space
-    purpose: ColorSpace defines the color space for shading color values.
-  - goName: Background
-    pdfKey: Background
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Background (optional) specifies the color for areas outside the
-
-      shading''s bounds, when used in a shading pattern.'
-  - goName: BBox
-    pdfKey: BBox
-    pdfType: rectangle
-    required: false
-    introduced: '1.3'
-    goType: '*pdf.Rectangle'
-    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
-  - goName: AntiAlias
-    pdfKey: AntiAlias
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.3'
-    goType: bool
-    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
   - goName:
     pdfKey: Length
     pdfType: integer
@@ -2290,6 +2002,7 @@ types:
 - name: ShadingType7
   purpose: "tensor-product patch mesh shading"
   goType: graphics/shading.Type7
+  embeds: [ShadingCommon]
   pdfRepr: stream
   fields:
   - goName: BitsPerCoordinate
@@ -2359,53 +2072,6 @@ types:
     introduced: '1.3'
     possibleValues:
     - '7'
-  - goName: ColorSpace
-    pdfKey: ColorSpace
-    pdfType: array;name
-    required: true
-    introduced: '1.3'
-    possibleValues:
-    - DeviceCMYK
-    - DeviceRGB
-    - DeviceGray
-    refTypes:
-    - DeviceGrayColorSpace
-    - DeviceRGBColorSpace
-    - DeviceCMYKColorSpace
-    - CalGrayColorSpace
-    - CalRGBColorSpace
-    - LabColorSpace
-    - ICCBasedColorSpace
-    - IndexedColorSpace
-    - SeparationColorSpace
-    - DeviceNColorSpace
-    notes: except pattern
-    goType: color.Space
-    purpose: ColorSpace defines the color space for shading color values.
-  - goName: Background
-    pdfKey: Background
-    pdfType: array
-    required: false
-    introduced: '1.3'
-    goType: '[]float64'
-    purpose: 'Background (optional) specifies the color for areas outside the
-
-      shading''s bounds, when used in a shading pattern.'
-  - goName: BBox
-    pdfKey: BBox
-    pdfType: rectangle
-    required: false
-    introduced: '1.3'
-    goType: '*pdf.Rectangle'
-    purpose: BBox (optional) defines the shading's bounding box as a clipping boundary.
-  - goName: AntiAlias
-    pdfKey: AntiAlias
-    pdfType: boolean
-    required: false
-    default: false
-    introduced: '1.3'
-    goType: bool
-    purpose: AntiAlias controls whether to filter the shading function to prevent aliasing.
   - goName:
     pdfKey: Length
     pdfType: integer
@@ -2473,6 +2139,69 @@ types:
   writeMethod: (*Type7).Embed
   readFunc: extract.Shading
   goPackage: shading
+  goRepr: struct
+  specSection: 8.7.4.3
+- name: ShadingCommon
+  purpose: "entries common to all shading types"
+  goType: graphics.ShadingCommon
+  pdfType: null
+  pdfRepr: dict
+  introduced: '1.3'
+  fields:
+  - goName: ColorSpace
+    pdfKey: ColorSpace
+    pdfType: array;name
+    required: true
+    introduced: '1.3'
+    possibleValues:
+    - DeviceCMYK
+    - DeviceRGB
+    - DeviceGray
+    refTypes:
+    - DeviceGrayColorSpace
+    - DeviceRGBColorSpace
+    - DeviceCMYKColorSpace
+    - CalGrayColorSpace
+    - CalRGBColorSpace
+    - LabColorSpace
+    - ICCBasedColorSpace
+    - IndexedColorSpace
+    - SeparationColorSpace
+    - DeviceNColorSpace
+    notes: except pattern
+    goType: color.Space
+    purpose: ColorSpace defines the color space for shading color values.
+  - goName: Background
+    pdfKey: Background
+    pdfType: array
+    required: false
+    introduced: '1.3'
+    goType: '[]float64'
+    purpose: 'Background (optional) specifies the color for areas outside the
+
+      transformed domain, when used in a shading pattern. The default is to
+
+      leave points outside the transformed domain unpainted.'
+  - goName: BBox
+    pdfKey: BBox
+    pdfType: rectangle
+    required: false
+    introduced: '1.3'
+    goType: '*pdf.Rectangle'
+    purpose: 'BBox (optional) defines the shading''s bounding box as a clipping
+
+      boundary.'
+  - goName: AntiAlias
+    pdfKey: AntiAlias
+    pdfType: boolean
+    required: false
+    default: false
+    introduced: '1.3'
+    goType: bool
+    purpose: 'AntiAlias controls whether to filter the shading function to prevent
+
+      aliasing. Default: false.'
+  goPackage: graphics
   goRepr: struct
   specSection: 8.7.4.3
 - name: Solidities

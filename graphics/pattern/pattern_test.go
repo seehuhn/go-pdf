@@ -39,7 +39,7 @@ func TestPatternEqual(t *testing.T) {
 		},
 		&Type2{
 			Shading: &shading.Type1{
-				ColorSpace: color.SpaceDeviceGray,
+				Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{0},

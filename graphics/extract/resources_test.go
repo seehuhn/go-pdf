@@ -206,7 +206,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						ColorSpace: color.SpaceDeviceGray,
+						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},
@@ -225,7 +225,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						ColorSpace: color.SpaceDeviceGray,
+						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},
@@ -244,7 +244,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						ColorSpace: color.SpaceDeviceGray,
+						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},
@@ -349,7 +349,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						ColorSpace: color.SpaceDeviceGray,
+						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},

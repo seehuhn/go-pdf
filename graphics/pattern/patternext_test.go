@@ -81,7 +81,7 @@ var testCases = []testCase{
 		Name: "Type2-Shading",
 		Pattern: &pattern.Type2{
 			Shading: &shading.Type1{
-				ColorSpace: color.SpaceDeviceGray,
+				Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 				F: &function.Type4{
 					Domain:  []float64{0, 100, 0, 100},
 					Range:   []float64{0, 1},
@@ -96,7 +96,7 @@ var testCases = []testCase{
 		Name: "Type2-SingleUse-True",
 		Pattern: &pattern.Type2{
 			Shading: &shading.Type1{
-				ColorSpace: color.SpaceDeviceGray,
+				Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 				F: &function.Type4{
 					Domain:  []float64{0, 100, 0, 100},
 					Range:   []float64{0, 1},
@@ -111,7 +111,7 @@ var testCases = []testCase{
 		Name: "Type2-SingleUse-False",
 		Pattern: &pattern.Type2{
 			Shading: &shading.Type1{
-				ColorSpace: color.SpaceDeviceGray,
+				Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
 				F: &function.Type4{
 					Domain:  []float64{0, 100, 0, 100},
 					Range:   []float64{0, 1},

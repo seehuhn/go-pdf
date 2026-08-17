@@ -17,6 +17,8 @@
 package ghostscript
 
 import (
+	"errors"
+
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 
@@ -62,7 +64,11 @@ func FindTextPos(v pdf.Version, paper *pdf.Rectangle, setup func(page *document.
 	b := builder.New(content.Glyph, nil, pdf.V2_0)
 	b.Type3ColoredGlyph(0, 0) // d0: colored glyph with zero width
 	b.SetFillColor(color.DeviceRGB{1.0, 0, 0})
-	A := M.Inv()
+	A, ok := M.Inv()
+	if !ok {
+		// a zero font size or horizontal scaling leaves no marker to draw
+		return 0, 0, errors.New("singular text matrix")
+	}
 	pq := A.Apply(vec.Vec2{X: c.X - 1, Y: c.Y - 1})
 	b.MoveTo(pq.X*1000, pq.Y*1000)
 	pq = A.Apply(vec.Vec2{X: c.X + 1, Y: c.Y - 1})

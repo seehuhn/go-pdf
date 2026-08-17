@@ -36,7 +36,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type1",
 			shading: &Type1{
-				ColorSpace: color.SpaceDeviceRGB,
+				Common: Common{ColorSpace: color.SpaceDeviceRGB},
 				F: &function.Type0{
 					Domain:        []float64{0, 1, 0, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -51,7 +51,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type1 with background and bbox",
 			shading: &Type1{
-				ColorSpace: color.SpaceDeviceRGB,
+				Common: Common{ColorSpace: color.SpaceDeviceRGB, Background: []float64{0.5, 0.5, 0.5}, BBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100}, AntiAlias: true},
 				F: &function.Type0{
 					Domain:        []float64{0, 1, 0, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -61,15 +61,12 @@ var testCases = map[int][]testCase{
 					Decode:        []float64{0, 1, 0, 1, 0, 1},
 					Samples:       []byte{0, 0, 255, 255, 255, 0, 128, 128, 128, 255, 255, 0},
 				},
-				Background: []float64{0.5, 0.5, 0.5},
-				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-				AntiAlias:  true,
 			},
 		},
 		{
 			name: "Type1 with custom domain and matrix",
 			shading: &Type1{
-				ColorSpace: color.SpaceDeviceRGB,
+				Common: Common{ColorSpace: color.SpaceDeviceRGB},
 				F: &function.Type0{
 					Domain:        []float64{-1, 1, -1, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -88,9 +85,9 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type2",
 			shading: &Type2{
-				ColorSpace: color.SpaceDeviceRGB,
-				P0:         vec.Vec2{X: 0, Y: 0},
-				P1:         vec.Vec2{X: 100, Y: 100},
+				Common: Common{ColorSpace: color.SpaceDeviceRGB},
+				P0:     vec.Vec2{X: 0, Y: 0},
+				P1:     vec.Vec2{X: 100, Y: 100},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -103,9 +100,9 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type2 with extend and domain",
 			shading: &Type2{
-				ColorSpace: color.SpaceDeviceRGB,
-				P0:         vec.Vec2{X: 10, Y: 20},
-				P1:         vec.Vec2{X: 90, Y: 80},
+				Common: Common{ColorSpace: color.SpaceDeviceRGB, Background: []float64{0.2, 0.2, 0.2}, AntiAlias: true},
+				P0:     vec.Vec2{X: 10, Y: 20},
+				P1:     vec.Vec2{X: 90, Y: 80},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{0, 1, 0},
@@ -116,16 +113,14 @@ var testCases = map[int][]testCase{
 				TMax:        0.8,
 				ExtendStart: true,
 				ExtendEnd:   true,
-				Background:  []float64{0.2, 0.2, 0.2},
-				AntiAlias:   true,
 			},
 		},
 		{
 			name: "Type2 with bbox",
 			shading: &Type2{
-				ColorSpace: color.SpaceDeviceRGB,
-				P0:         vec.Vec2{X: 0, Y: 0},
-				P1:         vec.Vec2{X: 50, Y: 50},
+				Common: Common{ColorSpace: color.SpaceDeviceRGB, BBox: &pdf.Rectangle{LLx: -10, LLy: -10, URx: 60, URy: 60}},
+				P0:     vec.Vec2{X: 0, Y: 0},
+				P1:     vec.Vec2{X: 50, Y: 50},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 1, 0},
@@ -133,7 +128,6 @@ var testCases = map[int][]testCase{
 					N:  0.5,
 				},
 				TMax: 1,
-				BBox: &pdf.Rectangle{LLx: -10, LLy: -10, URx: 60, URy: 60},
 			},
 		},
 	},
@@ -141,11 +135,11 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type3",
 			shading: &Type3{
-				ColorSpace: color.SpaceDeviceRGB,
-				Center1:    vec.Vec2{X: 20, Y: 30},
-				R1:         0,
-				Center2:    vec.Vec2{X: 80, Y: 70},
-				R2:         50,
+				Common:  Common{ColorSpace: color.SpaceDeviceRGB},
+				Center1: vec.Vec2{X: 20, Y: 30},
+				R1:      0,
+				Center2: vec.Vec2{X: 80, Y: 70},
+				R2:      50,
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -158,11 +152,11 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type3 with extend and domain",
 			shading: &Type3{
-				ColorSpace: color.SpaceDeviceRGB,
-				Center1:    vec.Vec2{X: 50, Y: 50},
-				R1:         10,
-				Center2:    vec.Vec2{X: 50, Y: 50},
-				R2:         40,
+				Common:  Common{ColorSpace: color.SpaceDeviceRGB, Background: []float64{0.8, 0.8, 0.8}, BBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100}, AntiAlias: true},
+				Center1: vec.Vec2{X: 50, Y: 50},
+				R1:      10,
+				Center2: vec.Vec2{X: 50, Y: 50},
+				R2:      40,
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 1, 0},
@@ -173,9 +167,6 @@ var testCases = map[int][]testCase{
 				TMax:        0.9,
 				ExtendStart: true,
 				ExtendEnd:   false,
-				Background:  []float64{0.8, 0.8, 0.8},
-				BBox:        &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-				AntiAlias:   true,
 			},
 		},
 	},
@@ -183,7 +174,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type4",
 			shading: &Type4{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 16,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -198,7 +189,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type4 with function",
 			shading: &Type4{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB, Background: []float64{0.9, 0.9, 0.9}, BBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100}, AntiAlias: true},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -215,9 +206,6 @@ var testCases = map[int][]testCase{
 					{X: 50, Y: 90, Flag: 2, Color: []float64{0.5}},
 					{X: 10, Y: 90, Flag: 1, Color: []float64{0.1}},
 				},
-				Background: []float64{0.9, 0.9, 0.9},
-				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-				AntiAlias:  true,
 			},
 		},
 	},
@@ -225,7 +213,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type5",
 			shading: &Type5{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				VerticesPerRow:    2,
@@ -243,7 +231,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type5 with function",
 			shading: &Type5{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB, Background: []float64{0.9, 0.9, 0.9}, BBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 100}, AntiAlias: true},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				VerticesPerRow:    3,
@@ -264,9 +252,6 @@ var testCases = map[int][]testCase{
 					{X: 100, Y: 100, Color: []float64{0.7}},
 					{X: 200, Y: 100, Color: []float64{0.8}},
 				},
-				Background: []float64{0.9, 0.9, 0.9},
-				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 100},
-				AntiAlias:  true,
 			},
 		},
 	},
@@ -274,7 +259,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type6",
 			shading: &Type6{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -297,7 +282,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type6 with function",
 			shading: &Type6{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB, Background: []float64{0.9, 0.9, 0.9}, BBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200}, AntiAlias: true},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -321,15 +306,12 @@ var testCases = map[int][]testCase{
 						},
 					},
 				},
-				Background: []float64{0.9, 0.9, 0.9},
-				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
-				AntiAlias:  true,
 			},
 		},
 		{
 			name: "Type6 with connected patches",
 			shading: &Type6{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -367,7 +349,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "basic Type7",
 			shading: &Type7{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -393,7 +375,7 @@ var testCases = map[int][]testCase{
 		{
 			name: "Type7 with function",
 			shading: &Type7{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB, Background: []float64{0.9, 0.9, 0.9}, BBox: &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200}, AntiAlias: true},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -419,15 +401,12 @@ var testCases = map[int][]testCase{
 						},
 					},
 				},
-				Background: []float64{0.9, 0.9, 0.9},
-				BBox:       &pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 200},
-				AntiAlias:  true,
 			},
 		},
 		{
 			name: "Type7 with connected patches",
 			shading: &Type7{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -582,7 +561,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type1 evaluation",
 			shading: &Type1{
-				ColorSpace: color.SpaceDeviceRGB,
+				Common: Common{ColorSpace: color.SpaceDeviceRGB},
 				F: &function.Type0{
 					Domain:        []float64{0, 1, 0, 1},
 					Range:         []float64{0, 1, 0, 1, 0, 1},
@@ -597,9 +576,9 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type2 evaluation",
 			shading: &Type2{
-				ColorSpace: color.SpaceDeviceRGB,
-				P0:         vec.Vec2{X: 0, Y: 0},
-				P1:         vec.Vec2{X: 100, Y: 100},
+				Common: Common{ColorSpace: color.SpaceDeviceRGB},
+				P0:     vec.Vec2{X: 0, Y: 0},
+				P1:     vec.Vec2{X: 100, Y: 100},
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -611,11 +590,11 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type3 evaluation",
 			shading: &Type3{
-				ColorSpace: color.SpaceDeviceRGB,
-				Center1:    vec.Vec2{X: 50, Y: 50},
-				R1:         0,
-				Center2:    vec.Vec2{X: 50, Y: 50},
-				R2:         25,
+				Common:  Common{ColorSpace: color.SpaceDeviceRGB},
+				Center1: vec.Vec2{X: 50, Y: 50},
+				R1:      0,
+				Center2: vec.Vec2{X: 50, Y: 50},
+				R2:      25,
 				F: &function.Type2{
 					XMin: 0, XMax: 1,
 					C0: []float64{1, 0, 0},
@@ -627,7 +606,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type4 evaluation",
 			shading: &Type4{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -642,7 +621,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type5 evaluation",
 			shading: &Type5{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				VerticesPerRow:    2,
@@ -658,7 +637,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type6 evaluation",
 			shading: &Type6{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -681,7 +660,7 @@ func TestShadingEvaluation(t *testing.T) {
 		{
 			name: "Type7 evaluation",
 			shading: &Type7{
-				ColorSpace:        color.SpaceDeviceRGB,
+				Common:            Common{ColorSpace: color.SpaceDeviceRGB},
 				BitsPerCoordinate: 8,
 				BitsPerComponent:  8,
 				BitsPerFlag:       2,
@@ -764,6 +743,39 @@ func TestReadErrors(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "Type2 Indexed ColorSpace",
+			dict: pdf.Dict{
+				"ShadingType": pdf.Integer(2),
+				"ColorSpace": pdf.Array{
+					pdf.Name("Indexed"),
+					pdf.Name("DeviceRGB"),
+					pdf.Integer(1),
+					pdf.String("\x00\x00\x00\xff\xff\xff"),
+				},
+				"Coords": pdf.Array{
+					pdf.Integer(0), pdf.Integer(0),
+					pdf.Integer(100), pdf.Integer(100),
+				},
+				"Function": pdf.Dict{
+					"FunctionType": pdf.Integer(2),
+					"N":            pdf.Number(1),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Type1 Pattern ColorSpace",
+			dict: pdf.Dict{
+				"ShadingType": pdf.Integer(1),
+				"ColorSpace":  pdf.Name("Pattern"),
+				"Function": pdf.Dict{
+					"FunctionType": pdf.Integer(2),
+					"N":            pdf.Number(1),
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -790,9 +802,9 @@ func TestType2InvalidColorSpace(t *testing.T) {
 	}
 
 	shading := &Type2{
-		ColorSpace: indexedColorSpace,
-		P0:         vec.Vec2{X: 0, Y: 0},
-		P1:         vec.Vec2{X: 100, Y: 100},
+		Common: Common{ColorSpace: indexedColorSpace},
+		P0:     vec.Vec2{X: 0, Y: 0},
+		P1:     vec.Vec2{X: 100, Y: 100},
 		F: &function.Type2{
 			XMin: 0, XMax: 1,
 			C0: []float64{0},
@@ -807,6 +819,39 @@ func TestType2InvalidColorSpace(t *testing.T) {
 	_, err = rm.Embed(shading)
 	if err == nil {
 		t.Error("expected error for Indexed color space with Type2 shading, got nil")
+	}
+}
+
+func TestBackgroundWrongLengthIgnored(t *testing.T) {
+	dict := pdf.Dict{
+		"ShadingType": pdf.Integer(2),
+		"ColorSpace":  pdf.Name("DeviceRGB"),
+		"Background":  pdf.Array{pdf.Number(0.5)}, // DeviceRGB needs 3 values
+		"Coords": pdf.Array{
+			pdf.Integer(0), pdf.Integer(0),
+			pdf.Integer(100), pdf.Integer(100),
+		},
+		"Function": pdf.Dict{
+			"FunctionType": pdf.Integer(2),
+			"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+			"C0":           pdf.Array{pdf.Number(1), pdf.Number(0), pdf.Number(0)},
+			"C1":           pdf.Array{pdf.Number(0), pdf.Number(1), pdf.Number(0)},
+			"N":            pdf.Number(1),
+		},
+	}
+
+	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	x := pdf.NewExtractor(buf)
+	s, err := Extract(pdf.CursorAt(x, nil), dict, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, ok := s.(*Type2)
+	if !ok {
+		t.Fatalf("expected *Type2, got %T", s)
+	}
+	if s2.Background != nil {
+		t.Errorf("wrong-length Background not ignored: %v", s2.Background)
 	}
 }
 

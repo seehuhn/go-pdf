@@ -19,13 +19,11 @@ package shading
 import (
 	"errors"
 	"fmt"
-	"slices"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/color"
 )
 
 // PDF 2.0 sections: 8.7.4.3 8.7.4.5.3
@@ -34,8 +32,8 @@ import (
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type2 struct {
-	// ColorSpace defines the color space for shading color values.
-	ColorSpace color.Space
+	// Common holds the entries shared by all shading types.
+	Common
 
 	// P0, P1 specify the starting and ending coordinates of the axis,
 	// expressed in the shading's target coordinate space.
@@ -64,19 +62,6 @@ type Type2 struct {
 	// point of the axis. Default: false.
 	ExtendEnd bool
 
-	// Background (optional) specifies the color for areas outside the
-	// shading's bounds, when used in a shading pattern. The default is to
-	// leave such points unpainted.
-	Background []float64
-
-	// BBox (optional) defines the shading's bounding box as a clipping
-	// boundary.
-	BBox *pdf.Rectangle
-
-	// AntiAlias controls whether to filter the shading function to prevent
-	// aliasing.
-	AntiAlias bool
-
 	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
 	SingleUse bool
@@ -98,32 +83,21 @@ func (s *Type2) Equal(other graphics.Shading) bool {
 	if !ok {
 		return false
 	}
-	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+	return commonEqual(&s.Common, &o.Common) &&
 		s.P0 == o.P0 && s.P1 == o.P1 &&
 		function.Equal(s.F, o.F) &&
 		s.TMin == o.TMin && s.TMax == o.TMax &&
-		s.ExtendStart == o.ExtendStart && s.ExtendEnd == o.ExtendEnd &&
-		slices.Equal(s.Background, o.Background) &&
-		s.BBox.Equal(o.BBox) &&
-		s.AntiAlias == o.AntiAlias
+		s.ExtendStart == o.ExtendStart && s.ExtendEnd == o.ExtendEnd
 }
 
 // extractType2 reads a Type 2 (axial) shading from a PDF dictionary.
 func extractType2(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type2, error) {
 	s := &Type2{}
 
-	// Read required ColorSpace
-	csObj, ok := d["ColorSpace"]
-	if !ok {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing /ColorSpace entry"),
-		}
-	}
-	cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
-	if err != nil {
+	if err := extractCommon(c, d, &s.Common, false); err != nil {
 		return nil, err
 	}
-	s.ColorSpace = cs
+	cs := s.ColorSpace
 
 	// Read required Coords
 	coordsObj, ok := d["Coords"]
@@ -225,36 +199,6 @@ func extractType2(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type2, error) {
 		}
 	}
 
-	// Read optional Background
-	if bgObj, ok := d["Background"]; ok {
-		if bg, err := pdf.Optional(c.FloatArray(bgObj)); err != nil {
-			return nil, err
-		} else if len(bg) > 0 {
-			if len(bg) != cs.Channels() {
-				return nil, pdf.Errorf("wrong number of background values: expected %d, got %d", cs.Channels(), len(bg))
-			}
-			s.Background = bg
-		}
-	}
-
-	// Read optional BBox
-	if bboxObj, ok := d["BBox"]; ok {
-		if bbox, err := pdf.Optional(c.Rectangle(bboxObj)); err != nil {
-			return nil, err
-		} else {
-			s.BBox = bbox
-		}
-	}
-
-	// Read optional AntiAlias
-	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(c.Boolean(aaObj)); err != nil {
-			return nil, err
-		} else {
-			s.AntiAlias = bool(aa)
-		}
-	}
-
 	s.SingleUse = isDirect
 
 	return s, nil
@@ -267,18 +211,8 @@ func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	if s.ColorSpace == nil {
-		return nil, errors.New("missing ColorSpace")
-	} else if s.ColorSpace.Family() == color.FamilyPattern || s.ColorSpace.Family() == color.FamilyIndexed {
-		return nil, errors.New("invalid ColorSpace")
-	}
-	if have := len(s.Background); have > 0 {
-		want := s.ColorSpace.Channels()
-		if have != want {
-			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
-				want, have)
-			return nil, err
-		}
+	if err := validateCommon(&s.Common, false); err != nil {
+		return nil, err
 	}
 
 	// substitute PDF default for Go zero value
@@ -326,15 +260,7 @@ func (s *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		},
 		"Function": fn,
 	}
-	if len(s.Background) > 0 {
-		dict["Background"] = toPDF(s.Background)
-	}
-	if s.BBox != nil {
-		dict["BBox"] = s.BBox
-	}
-	if s.AntiAlias {
-		dict["AntiAlias"] = pdf.Boolean(true)
-	}
+	embedCommon(dict, &s.Common)
 	if tMin != 0 || tMax != 1 {
 		dict["Domain"] = pdf.Array{pdf.Number(tMin), pdf.Number(tMax)}
 	}

@@ -37,8 +37,8 @@ import (
 //
 // This type implements the [seehuhn.de/go/pdf/graphics.Shading] interface.
 type Type6 struct {
-	// ColorSpace defines the color space for shading color values.
-	ColorSpace color.Space
+	// Common holds the entries shared by all shading types.
+	Common
 
 	// BitsPerCoordinate specifies the number of bits used to represent each coordinate.
 	BitsPerCoordinate int
@@ -58,16 +58,6 @@ type Type6 struct {
 
 	// F (optional) is a 1->n function for mapping parametric values to colors.
 	F pdf.Function
-
-	// Background (optional) specifies the color for areas outside the
-	// shading's bounds, when used in a shading pattern.
-	Background []float64
-
-	// BBox (optional) defines the shading's bounding box as a clipping boundary.
-	BBox *pdf.Rectangle
-
-	// AntiAlias controls whether to filter the shading function to prevent aliasing.
-	AntiAlias bool
 }
 
 var _ graphics.Shading = (*Type6)(nil)
@@ -103,16 +93,13 @@ func (s *Type6) Equal(other graphics.Shading) bool {
 	if !ok {
 		return false
 	}
-	return color.SpacesEqual(s.ColorSpace, o.ColorSpace) &&
+	return commonEqual(&s.Common, &o.Common) &&
 		s.BitsPerCoordinate == o.BitsPerCoordinate &&
 		s.BitsPerComponent == o.BitsPerComponent &&
 		s.BitsPerFlag == o.BitsPerFlag &&
 		slices.Equal(s.Decode, o.Decode) &&
 		type6PatchesEqual(s.Patches, o.Patches) &&
-		function.Equal(s.F, o.F) &&
-		slices.Equal(s.Background, o.Background) &&
-		s.BBox.Equal(o.BBox) &&
-		s.AntiAlias == o.AntiAlias
+		function.Equal(s.F, o.F)
 }
 
 func type6PatchesEqual(a, b []Type6Patch) bool {
@@ -308,18 +295,9 @@ func extractType6(c pdf.Cursor, stream *pdf.Stream) (*Type6, error) {
 	d := stream.Dict
 	s := &Type6{}
 
-	// Read required ColorSpace
-	csObj, ok := d["ColorSpace"]
-	if !ok {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing /ColorSpace entry"),
-		}
-	}
-	cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
-	if err != nil {
+	if err := extractCommon(c, d, &s.Common, true); err != nil {
 		return nil, err
 	}
-	s.ColorSpace = cs
 
 	// Read required BitsPerCoordinate
 	bpcObj, ok := d["BitsPerCoordinate"]
@@ -430,36 +408,6 @@ func extractType6(c pdf.Cursor, stream *pdf.Stream) (*Type6, error) {
 		}
 	}
 
-	// Read optional Background
-	if bgObj, ok := d["Background"]; ok {
-		if bg, err := pdf.Optional(c.FloatArray(bgObj)); err != nil {
-			return nil, err
-		} else if len(bg) > 0 {
-			if len(bg) != cs.Channels() {
-				return nil, pdf.Errorf("wrong number of background values: expected %d, got %d", cs.Channels(), len(bg))
-			}
-			s.Background = bg
-		}
-	}
-
-	// Read optional BBox
-	if bboxObj, ok := d["BBox"]; ok {
-		if bbox, err := pdf.Optional(c.Rectangle(bboxObj)); err != nil {
-			return nil, err
-		} else {
-			s.BBox = bbox
-		}
-	}
-
-	// Read optional AntiAlias
-	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(c.Boolean(aaObj)); err != nil {
-			return nil, err
-		} else {
-			s.AntiAlias = bool(aa)
-		}
-	}
-
 	// Read stream data to extract patches
 	data, err := c.ReadAll(stream, limits.MaxShadingBytes)
 	if err != nil {
@@ -484,19 +432,10 @@ func (s *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	if s.ColorSpace == nil {
-		return nil, errors.New("missing ColorSpace")
-	} else if s.ColorSpace.Family() == color.FamilyPattern {
-		return nil, errors.New("invalid ColorSpace")
+	if err := validateCommon(&s.Common, true); err != nil {
+		return nil, err
 	}
 	numComponents := s.ColorSpace.Channels()
-	if have := len(s.Background); have > 0 {
-		if have != numComponents {
-			err := fmt.Errorf("wrong number of background values: expected %d, got %d",
-				numComponents, have)
-			return nil, err
-		}
-	}
 	switch s.BitsPerCoordinate {
 	case 1, 2, 4, 8, 12, 16, 24, 32:
 		// pass
@@ -555,15 +494,7 @@ func (s *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"BitsPerFlag":       pdf.Integer(s.BitsPerFlag),
 		"Decode":            toPDF(s.Decode),
 	}
-	if len(s.Background) > 0 {
-		dict["Background"] = toPDF(s.Background)
-	}
-	if s.BBox != nil {
-		dict["BBox"] = s.BBox
-	}
-	if s.AntiAlias {
-		dict["AntiAlias"] = pdf.Boolean(true)
-	}
+	embedCommon(dict, &s.Common)
 	if s.F != nil {
 		fn, err := rm.Embed(s.F)
 		if err != nil {

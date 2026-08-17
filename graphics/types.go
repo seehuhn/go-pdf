@@ -19,6 +19,7 @@ package graphics
 import (
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/property"
 )
 
@@ -100,6 +101,35 @@ func IsImageMask(xobj XObject) bool {
 	return false
 }
 
+// ShadingCommon holds the entries every shading dictionary has, whatever its
+// shading type.
+type ShadingCommon struct {
+	// ColorSpace defines the color space for shading color values.
+	ColorSpace color.Space
+
+	// Background (optional) specifies the color used for areas outside the
+	// shading's own extent.  The default is to leave such areas unpainted.
+	//
+	// This applies only where the shading is used as a shading pattern.  A
+	// shading painted directly, with the "sh" operator, leaves the areas
+	// unpainted whatever this field says.
+	Background []float64
+
+	// BBox (optional) defines the shading's bounding box, in the shading's
+	// target coordinate space.  The shading is clipped to this box, in
+	// addition to any other clipping in effect.
+	BBox *pdf.Rectangle
+
+	// AntiAlias controls whether to filter the shading function to prevent
+	// aliasing. Default: false.
+	AntiAlias bool
+}
+
+// GetShadingCommon returns the entries common to all shading types.
+func (c *ShadingCommon) GetShadingCommon() *ShadingCommon {
+	return c
+}
+
 // Shading defines a smooth color gradient that can fill an area.
 // Shadings can be drawn directly or used as the basis of a shading pattern.
 //
@@ -109,6 +139,10 @@ func IsImageMask(xobj XObject) bool {
 // [seehuhn.de/go/pdf/graphics/extract.Shading].
 type Shading interface {
 	ShadingType() int
+
+	// GetShadingCommon returns the entries common to all shading types.
+	GetShadingCommon() *ShadingCommon
+
 	Equal(other Shading) bool
 
 	pdf.Embedder
