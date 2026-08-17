@@ -72,25 +72,23 @@ func validateType16Dims(width, height, width2, height2 int) (hasSecondRect bool,
 	return hasSecondRect, nil
 }
 
-// rejectNestedType5 returns an error if obj resolves to an inline halftone
-// dict whose HalftoneType is 5. This prevents unbounded recursion when
-// extracting a Type 5 halftone whose Default or colorant entry is itself
-// Type 5: indirect-reference cycles among Type 5 dicts are caught by
-// pdf.Decode's path.Seen check, but inline nesting and deep linear
-// chains of distinct refs are not — without this check, a malicious file
-// can grow the call stack proportionally to file size.
-func rejectNestedType5(c pdf.Cursor, obj pdf.Object, role string) error {
+// isNestedType5 reports whether obj resolves to a halftone dict whose
+// HalftoneType is 5. Callers must not descend into such an entry: this
+// prevents unbounded recursion when extracting a Type 5 halftone whose
+// Default or colorant entry is itself Type 5. Indirect-reference cycles
+// among Type 5 dicts are caught by pdf.Decode's path.Seen check, but inline
+// nesting and deep linear chains of distinct refs are not — without this
+// check, a malicious file can grow the call stack proportionally to file
+// size.
+func isNestedType5(c pdf.Cursor, obj pdf.Object) bool {
 	resolved, err := c.Resolve(obj)
 	if err != nil || resolved == nil {
-		return nil // let the main extract path surface the error
+		return false // let the main extract path surface the error
 	}
 	d, ok := resolved.(pdf.Dict)
 	if !ok {
-		return nil // streams (Types 6/10/16) cannot be Type 5
+		return false // streams (Types 6/10/16) cannot be Type 5
 	}
 	t, _ := c.Integer(d["HalftoneType"])
-	if t != 5 {
-		return nil
-	}
-	return pdf.Errorf("invalid %s halftone: Type 5 cannot be nested", role)
+	return t == 5
 }

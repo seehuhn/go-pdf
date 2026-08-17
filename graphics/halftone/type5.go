@@ -59,8 +59,8 @@ var _ graphics.Halftone = (*Type5)(nil)
 func extractType5(c pdf.Cursor, dict pdf.Dict) (*Type5, error) {
 	h := &Type5{}
 
-	if err := rejectNestedType5(c, dict["Default"], "Default"); err != nil {
-		return nil, err
+	if isNestedType5(c, dict["Default"]) {
+		return nil, pdf.Error("invalid Default halftone: Type 5 cannot be nested")
 	}
 	if ht, err := pdf.Decode(c, dict["Default"], Extract); err != nil {
 		return nil, err
@@ -70,6 +70,9 @@ func extractType5(c pdf.Cursor, dict pdf.Dict) (*Type5, error) {
 		return nil, pdf.Error("missing Default halftone")
 	}
 
+	// Unreadable colorant entries are dropped rather than invalidating the
+	// whole halftone: the Default halftone applies to every colorant without
+	// an entry of its own.
 	h.Colorants = make(map[pdf.Name]graphics.Halftone)
 	for colorant, val := range dict {
 		switch colorant {
@@ -77,10 +80,10 @@ func extractType5(c pdf.Cursor, dict pdf.Dict) (*Type5, error) {
 			continue
 		}
 
-		if err := rejectNestedType5(c, val, fmt.Sprintf("colorant %q", colorant)); err != nil {
-			return nil, err
+		if isNestedType5(c, val) {
+			continue
 		}
-		if ht, err := pdf.Decode(c, val, Extract); err != nil {
+		if ht, err := pdf.DecodeOptional(c, val, Extract); err != nil {
 			return nil, err
 		} else if ht != nil {
 			h.Colorants[colorant] = ht

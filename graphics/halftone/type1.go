@@ -94,14 +94,8 @@ func extractType1(c pdf.Cursor, dict pdf.Dict) (*Type1, error) {
 					}
 				}
 			}
-		case pdf.Dict:
-			spotFunc, err := function.Extract(c, spot, false)
-			if err != nil {
-				return nil, err
-			}
-			h.SpotFunction = spotFunc
-		case *pdf.Stream:
-			spotFunc, err := function.Extract(c, spot, false)
+		case pdf.Dict, *pdf.Stream:
+			spotFunc, err := pdf.Optional(function.Extract(c, spot, false))
 			if err != nil {
 				return nil, err
 			}
@@ -111,7 +105,9 @@ func extractType1(c pdf.Cursor, dict pdf.Dict) (*Type1, error) {
 	if h.SpotFunction == nil {
 		h.SpotFunction = SimpleDot
 	} else if nIn, nOut := h.SpotFunction.Shape(); nIn != 2 || nOut != 1 {
-		return nil, fmt.Errorf("invalid spot function shape %dx%d != 2x1", nIn, nOut)
+		// a spot function maps the cell to a single value; fall back to the
+		// default rather than rejecting the whole halftone
+		h.SpotFunction = SimpleDot
 	}
 
 	if accurateScreens, ok := dict["AccurateScreens"]; ok {

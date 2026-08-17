@@ -453,3 +453,177 @@ func FuzzRoundTrip(f *testing.F) {
 		roundTripTest(t, halftone)
 	})
 }
+
+// An unreadable colorant entry of a Type 5 halftone is dropped, leaving the
+// remaining colorants and the default halftone intact. The dropped colorant
+// then uses the default halftone, as the spec prescribes for colorants
+// without an entry of their own.
+func TestType5UnreadableColorantDropped(t *testing.T) {
+	type1 := func(freq float64) pdf.Dict {
+		return pdf.Dict{
+			"HalftoneType": pdf.Integer(1),
+			"Frequency":    pdf.Real(freq),
+			"Angle":        pdf.Real(0),
+			"SpotFunction": pdf.Name("SimpleDot"),
+		}
+	}
+
+	// a chain of inline Type 5 dicts, nested via colorant entries
+	deepChain := pdf.Dict{"HalftoneType": pdf.Integer(5), "Default": type1(60)}
+	for range 1000 {
+		deepChain = pdf.Dict{
+			"HalftoneType": pdf.Integer(5),
+			"Default":      type1(60),
+			"Cyan":         deepChain,
+		}
+	}
+
+	badColorants := map[string]pdf.Object{
+		"invalid frequency":   type1(0),
+		"unsupported type":    pdf.Dict{"HalftoneType": pdf.Integer(42)},
+		"not a halftone":      pdf.Integer(7),
+		"nested Type 5":       pdf.Dict{"HalftoneType": pdf.Integer(5), "Default": type1(60)},
+		"deep colorant chain": deepChain,
+	}
+
+	for name, bad := range badColorants {
+		t.Run(name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+
+			dict := pdf.Dict{
+				"HalftoneType": pdf.Integer(5),
+				"Default":      type1(60),
+				"Cyan":         bad,
+				"Magenta":      type1(72),
+			}
+
+			ht, err := Extract(c, dict, false)
+			if err != nil {
+				t.Fatalf("extract failed: %v", err)
+			}
+
+			h5, ok := ht.(*Type5)
+			if !ok {
+				t.Fatalf("got %T, want *Type5", ht)
+			}
+			if h5.Default == nil {
+				t.Error("default halftone was lost")
+			}
+			if _, ok := h5.Colorants["Cyan"]; ok {
+				t.Error("unreadable colorant was not dropped")
+			}
+			if _, ok := h5.Colorants["Magenta"]; !ok {
+				t.Error("valid colorant was lost")
+			}
+		})
+	}
+}
+
+// A nonprimary colorant obliges the default halftone to carry a transfer
+// function. Reading supplies the missing functions, and dropping the only
+// nonprimary colorant removes the obligation again, so either result can be
+// written back out.
+func TestType5NonPrimaryColorantTransferFunction(t *testing.T) {
+	type1 := func(freq float64) pdf.Dict {
+		return pdf.Dict{
+			"HalftoneType": pdf.Integer(1),
+			"Frequency":    pdf.Real(freq),
+			"Angle":        pdf.Real(0),
+			"SpotFunction": pdf.Name("SimpleDot"),
+		}
+	}
+
+	for _, kept := range []bool{true, false} {
+		name := "colorant kept"
+		spot := type1(80)
+		if !kept {
+			name = "colorant dropped"
+			spot = type1(0) // invalid frequency
+		}
+
+		t.Run(name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+
+			ht, err := Extract(c, pdf.Dict{
+				"HalftoneType": pdf.Integer(5),
+				"Default":      type1(60),
+				"Cyan":         type1(72),
+				"PANTONE 123":  spot,
+			}, false)
+			if err != nil {
+				t.Fatalf("extract failed: %v", err)
+			}
+			h5 := ht.(*Type5)
+
+			spotHalftone, ok := h5.Colorants["PANTONE 123"]
+			if ok != kept {
+				t.Fatalf("nonprimary colorant present = %t, want %t", ok, kept)
+			}
+			if kept && spotHalftone.GetTransferFunction() == nil {
+				t.Error("nonprimary colorant has no transfer function")
+			}
+			if got := h5.Default.GetTransferFunction() != nil; got != kept {
+				t.Errorf("default transfer function present = %t, want %t", got, kept)
+			}
+
+			// whatever we read must be writable again
+			rm := pdf.NewResourceManager(w)
+			if _, err := rm.Embed(h5); err != nil {
+				t.Errorf("embed failed: %v", err)
+			}
+		})
+	}
+}
+
+// An unusable /SpotFunction must not make the whole halftone unreadable:
+// reading falls back to the default spot function and keeps the remaining
+// entries.
+func TestType1SpotFunctionUnusable(t *testing.T) {
+	spotFunctions := map[string]pdf.Object{
+		"wrong shape": pdf.Dict{ // 1 -> 1, but a spot function is 2 -> 1
+			"FunctionType": pdf.Integer(2),
+			"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1)},
+			"C0":           pdf.Array{pdf.Real(0)},
+			"C1":           pdf.Array{pdf.Real(1)},
+			"N":            pdf.Real(1),
+		},
+		"unknown function type": pdf.Dict{
+			"FunctionType": pdf.Integer(99),
+			"Domain":       pdf.Array{pdf.Real(0), pdf.Real(1), pdf.Real(0), pdf.Real(1)},
+			"Range":        pdf.Array{pdf.Real(-1), pdf.Real(1)},
+		},
+		"unknown name": pdf.Name("Quir:NoSuchSpotFunction"),
+	}
+
+	for name, spot := range spotFunctions {
+		t.Run(name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+
+			dict := pdf.Dict{
+				"HalftoneType": pdf.Integer(1),
+				"Frequency":    pdf.Real(60),
+				"Angle":        pdf.Real(45),
+				"SpotFunction": spot,
+			}
+
+			ht, err := Extract(c, dict, false)
+			if err != nil {
+				t.Fatalf("extract failed: %v", err)
+			}
+
+			h1, ok := ht.(*Type1)
+			if !ok {
+				t.Fatalf("got %T, want *Type1", ht)
+			}
+			if h1.SpotFunction != SimpleDot {
+				t.Error("spot function was not replaced by the default")
+			}
+			if h1.Frequency != 60 || h1.Angle != 45 {
+				t.Errorf("frequency/angle = %g/%g, want 60/45", h1.Frequency, h1.Angle)
+			}
+		})
+	}
+}
