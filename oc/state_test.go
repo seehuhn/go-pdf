@@ -1045,3 +1045,180 @@ func TestApplyViewUsageManualLanguageCandidate(t *testing.T) {
 		t.Error("expected the British group OFF: en-US is an exact match")
 	}
 }
+
+// TestDefaultStateRBGroups checks that a configuration's radio-button
+// collections end up with at most one visible member, whichever way the
+// configuration switches several of them on.
+func TestDefaultStateRBGroups(t *testing.T) {
+	g1 := &Group{Name: "Group 1"}
+	g2 := &Group{Name: "Group 2"}
+	g3 := &Group{Name: "Group 3"}
+	allGroups := []*Group{g1, g2, g3}
+
+	t.Run("first_visible_member_wins", func(t *testing.T) {
+		c := &Configuration{
+			BaseState: BaseStateON,
+			RBGroups:  [][]*Group{{g2, g1}},
+		}
+		state := c.DefaultState(allGroups, EventView, nil)
+		if !state.IsOn(g2) {
+			t.Error("expected g2 to stay ON")
+		}
+		if state.IsOn(g1) {
+			t.Error("expected g1 to be switched OFF")
+		}
+		if !state.IsOn(g3) {
+			t.Error("expected g3, outside the collection, to stay ON")
+		}
+	})
+
+	t.Run("on_override_decides", func(t *testing.T) {
+		c := &Configuration{
+			BaseState: BaseStateOFF,
+			ON:        []*Group{g3},
+			RBGroups:  [][]*Group{{g1, g2, g3}},
+		}
+		state := c.DefaultState(allGroups, EventView, nil)
+		if !state.IsOn(g3) {
+			t.Error("expected the only ON member to stay ON")
+		}
+	})
+
+	t.Run("no_visible_member_left_alone", func(t *testing.T) {
+		c := &Configuration{
+			BaseState: BaseStateOFF,
+			RBGroups:  [][]*Group{{g1, g2}},
+		}
+		state := c.DefaultState(allGroups, EventView, nil)
+		for _, g := range []*Group{g1, g2} {
+			if state.IsOn(g) {
+				t.Errorf("expected %s to stay OFF", g.Name)
+			}
+		}
+	})
+
+	t.Run("duplicated_member_is_not_its_own_sibling", func(t *testing.T) {
+		c := &Configuration{
+			BaseState: BaseStateON,
+			RBGroups:  [][]*Group{{g1, g1}},
+		}
+		state := c.DefaultState(allGroups, EventView, nil)
+		if !state.IsOn(g1) {
+			t.Error("expected g1 to stay ON")
+		}
+	})
+
+	t.Run("non_participating_member_takes_no_part", func(t *testing.T) {
+		// g1 is excluded from the state by its intent, so it must not be
+		// the member which switches g2 off
+		g1.Intent = []pdf.Name{"Design"}
+		defer func() { g1.Intent = nil }()
+
+		c := &Configuration{
+			BaseState: BaseStateON,
+			RBGroups:  [][]*Group{{g1, g2}},
+		}
+		state := c.DefaultState(allGroups, EventView, nil)
+		if state.Participates(g1) {
+			t.Fatal("expected g1 to be excluded by intent")
+		}
+		if !state.IsOn(g2) {
+			t.Error("expected g2 to stay ON")
+		}
+	})
+}
+
+func TestSwitch(t *testing.T) {
+	g1 := &Group{Name: "Group 1"}
+	g2 := &Group{Name: "Group 2"}
+	g3 := &Group{Name: "Group 3"}
+	allGroups := []*Group{g1, g2, g3}
+
+	t.Run("named_group_wins", func(t *testing.T) {
+		// the opposite of the reduction in DefaultState, where the first
+		// visible member wins: here the group switched on is the point
+		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
+		state := c.DefaultState(allGroups, EventView, nil)
+		state.Switch(g2, true)
+		if !state.IsOn(g2) {
+			t.Error("expected g2 to be ON")
+		}
+		if state.IsOn(g1) {
+			t.Error("expected g1 to be switched OFF")
+		}
+		if !state.IsOn(g3) {
+			t.Error("expected g3, outside the collection, to stay ON")
+		}
+	})
+
+	t.Run("switching_off_leaves_siblings_alone", func(t *testing.T) {
+		c := &Configuration{BaseState: BaseStateOFF, RBGroups: [][]*Group{{g1, g2}}}
+		state := c.DefaultState(allGroups, EventView, nil)
+		state.Switch(g1, false)
+		if state.IsOn(g2) {
+			t.Error("expected g2 to stay OFF")
+		}
+		if state.IsOn(g1) {
+			t.Error("expected g1 to be OFF")
+		}
+	})
+
+	t.Run("all_collections_of_the_group", func(t *testing.T) {
+		c := &Configuration{
+			BaseState: BaseStateON,
+			RBGroups:  [][]*Group{{g1, g2}, {g1, g3}},
+		}
+		state := c.DefaultState(allGroups, EventView, nil)
+		state.Switch(g1, true)
+		for _, g := range []*Group{g2, g3} {
+			if state.IsOn(g) {
+				t.Errorf("expected %s to be switched OFF", g.Name)
+			}
+		}
+	})
+
+	t.Run("sibling_outside_the_state_stays_outside", func(t *testing.T) {
+		g1.Intent = []pdf.Name{"Design"}
+		defer func() { g1.Intent = nil }()
+
+		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
+		state := c.DefaultState(allGroups, EventView, nil)
+		state.Switch(g2, true)
+		if state.Participates(g1) {
+			t.Error("expected g1 to stay out of the state")
+		}
+	})
+
+	t.Run("switched_groups_are_manual", func(t *testing.T) {
+		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
+		state := c.DefaultState(allGroups, EventView, nil)
+		state.Switch(g1, true)
+		for _, g := range []*Group{g1, g2} {
+			if !state.IsManual(g) {
+				t.Errorf("expected %s to be marked as set manually", g.Name)
+			}
+		}
+	})
+
+	t.Run("state_without_configuration", func(t *testing.T) {
+		state := &GroupStates{}
+		state.SetState(g1, true)
+		state.SetState(g2, true)
+		state.Switch(g2, true)
+		if !state.IsOn(g1) {
+			t.Error("expected g1 to be left alone")
+		}
+		if !state.IsManual(g2) {
+			t.Error("expected g2 to be marked as set manually")
+		}
+	})
+
+	t.Run("clone_keeps_the_relationships", func(t *testing.T) {
+		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
+		state := c.DefaultState(allGroups, EventView, nil).Clone()
+		state.Switch(g2, true)
+		if state.IsOn(g1) {
+			t.Error("expected g1 to be switched OFF in the clone")
+		}
+	})
+}

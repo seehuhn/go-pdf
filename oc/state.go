@@ -49,10 +49,13 @@ type ViewerContext struct {
 // The zero value is an empty state in which no group participates, and can be
 // used and modified directly.  A nil *GroupStates is equally valid and behaves
 // the same way, except that it cannot be modified.  Use
-// [Configuration.DefaultState] to obtain the states a configuration prescribes.
+// [Configuration.DefaultState] to obtain the states a configuration prescribes;
+// only a state obtained that way knows the radio-button relationships
+// [GroupStates.Switch] applies.
 type GroupStates struct {
 	state  map[*Group]bool // present = participates; true = ON, false = OFF
 	manual map[*Group]bool // groups set manually by the user
+	config *Configuration  // the configuration the states were derived from
 }
 
 // IsOn returns whether the group is visible. Groups not participating
@@ -101,12 +104,48 @@ func (s *GroupStates) IsManual(g *Group) bool {
 	return s.manual[g]
 }
 
+// Switch sets the visibility of a group as a manual change, made by the user
+// or by a set-OCG-state action, and applies the radio-button relationships of
+// the configuration the state came from: switching a group on switches off
+// the other members of every radio-button collection it belongs to.
+// Switching a group off leaves the other members alone.
+//
+// The group named is always switched, but a sibling is only switched off if
+// the state already covers it: a group outside the state decides the
+// visibility of nothing, and making it participate would hide content the
+// configuration wants shown.
+//
+// Every group switched here counts as manually set, so that a later usage
+// application does not undo it.  A state which did not come from
+// [Configuration.DefaultState] carries no configuration, and hence no
+// radio-button relationships to apply.
+func (s *GroupStates) Switch(g *Group, on bool) {
+	s.SetManualState(g, on)
+	if !on || s.config == nil {
+		return
+	}
+	for _, rb := range s.config.RBGroups {
+		if !slices.Contains(rb, g) {
+			continue
+		}
+		for _, other := range rb {
+			if other == g {
+				continue
+			}
+			if _, ok := s.state[other]; !ok {
+				continue
+			}
+			s.SetManualState(other, false)
+		}
+	}
+}
+
 // Clone returns a deep copy of the state.
 func (s *GroupStates) Clone() *GroupStates {
 	if s == nil {
 		return nil
 	}
-	c := &GroupStates{state: maps.Clone(s.state)}
+	c := &GroupStates{state: maps.Clone(s.state), config: s.config}
 	if s.manual != nil {
 		c.manual = maps.Clone(s.manual)
 	}
@@ -142,6 +181,8 @@ func intentOverlaps(groupIntent, configIntent []pdf.Name) bool {
 // It applies BaseState to allGroups, then ON/OFF overrides, then AS usage
 // applications for the given event. Groups whose intent does not match the
 // configuration's intent are removed so they have no effect on visibility.
+// Finally each RBGroups array is reduced to at most one visible member, the
+// first one in the array.
 // If allGroups is nil, BaseState has no effect and only groups explicitly
 // listed in ON, OFF, or AS are included.
 //
@@ -219,7 +260,27 @@ func (c *Configuration) DefaultState(allGroups []*Group, event Event, prior *Gro
 		}
 	}
 
-	return &GroupStates{state: state}
+	// step 5: reduce each radio-button collection to at most one visible
+	// member, which is all a state is allowed to have at any one time
+	// (8.11.4.3).  The first visible member in array order is the one kept:
+	// with several switched on there is nothing to prefer a later one.
+	// Groups the state does not cover take no part, since they decide the
+	// visibility of nothing, and a group listed twice is not its own sibling.
+	for _, rb := range c.RBGroups {
+		var keeper *Group
+		for _, g := range rb {
+			if on, ok := state[g]; !ok || !on {
+				continue
+			}
+			if keeper == nil {
+				keeper = g
+			} else if g != keeper {
+				state[g] = false
+			}
+		}
+	}
+
+	return &GroupStates{state: state, config: c}
 }
 
 // evaluateUsage evaluates the usage dictionary for the given categories.

@@ -23,7 +23,7 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// PDF 2.0 sections: 8.11.4.3
+// PDF 2.0 sections: 8.11.4
 
 // BaseState controls the initial group states when a configuration is applied.
 type BaseState pdf.Name
@@ -173,6 +173,19 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 		return nil, err
 	}
 
+	// A group must not appear in both arrays.  OFF is applied last, so
+	// dropping the group from ON leaves the state the file describes.
+	if len(cfg.ON) > 0 && len(cfg.OFF) > 0 {
+		off := groupSet(cfg.OFF)
+		cfg.ON = slices.DeleteFunc(cfg.ON, func(g *Group) bool {
+			_, isOff := off[g]
+			return isOff
+		})
+		if len(cfg.ON) == 0 {
+			cfg.ON = nil
+		}
+	}
+
 	// Intent (optional, default "View")
 	intentObj, err := c.Resolve(dict["Intent"])
 	if err != nil {
@@ -248,7 +261,11 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 		return nil, err
 	} else if rbArr != nil {
 		cfg.RBGroups = [][]*Group{}
+		remaining := maxRBGroupsItems
 		for _, item := range rbArr {
+			if remaining <= 0 {
+				break
+			}
 			inner, err := pdf.Optional(c.Array(item))
 			if err != nil {
 				continue
@@ -257,8 +274,12 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 			if err != nil {
 				continue
 			}
+			if len(groups) > remaining {
+				groups = groups[:remaining]
+			}
 			if len(groups) > 0 {
 				cfg.RBGroups = append(cfg.RBGroups, groups)
+				remaining -= len(groups)
 			}
 		}
 	}
@@ -304,9 +325,12 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// validate that ON and OFF do not overlap
-	for _, on := range c.ON {
-		if slices.Contains(c.OFF, on) {
-			return nil, errors.New("group in both ON and OFF arrays")
+	if len(c.ON) > 0 && len(c.OFF) > 0 {
+		off := groupSet(c.OFF)
+		for _, on := range c.ON {
+			if _, isOff := off[on]; isOff {
+				return nil, errors.New("group in both ON and OFF arrays")
+			}
 		}
 	}
 
@@ -326,6 +350,12 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, err
 		}
 		dict["OFF"] = arr
+	}
+
+	// an empty name is not a valid intent, and would read back as an absent
+	// entry
+	if slices.Contains(c.Intent, "") {
+		return nil, errors.New("empty intent name")
 	}
 
 	// Intent (omit when nil or default "View")
@@ -421,6 +451,17 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
+// groupSet collects the groups into a set.  Group arrays read from a file are
+// unbounded in length, so membership must not be tested by a linear scan: one
+// scan per element would cost time quadratic in the size of the file.
+func groupSet(groups []*Group) map[*Group]struct{} {
+	set := make(map[*Group]struct{}, len(groups))
+	for _, g := range groups {
+		set[g] = struct{}{}
+	}
+	return set
+}
+
 // extractGroupArray extracts an array of Group references from a PDF object.
 func extractGroupArray(c pdf.Cursor, obj pdf.Object) ([]*Group, error) {
 	arr, err := pdf.Optional(c.Array(obj))
@@ -468,6 +509,14 @@ func embedGroupArray(rm *pdf.EmbedHelper, groups []*Group) (pdf.Array, error) {
 // allowed in an Order array. This represents user-selectable check-boxes
 // in a layer panel, so real documents need far fewer.
 const maxOrderItems = 1000
+
+// maxRBGroupsItems is the maximum total number of groups read into RBGroups.
+// The rationale is the same as for maxOrderItems: the collections are radio
+// buttons in a layer panel.  The cap also bounds the scan every call of
+// [GroupStates.Switch] makes over the collections, so that a set-OCG-state
+// action from a malicious file cannot make switching cost quadratic in the
+// size of the file.
+const maxRBGroupsItems = 1000
 
 // extractOrderItems extracts Order items from a PDF array.
 func extractOrderItems(c pdf.Cursor, arr pdf.Array) ([]OrderItem, error) {

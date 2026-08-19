@@ -395,6 +395,130 @@ func normalizeOrderItems(items []OrderItem) {
 	}
 }
 
+// TestConfigurationONOFFOverlap checks that a group listed in both the ON and
+// OFF arrays, which Table 99 does not allow, is read back in OFF alone.  The
+// writer rejects the overlap, so the repair is what keeps such a file
+// writable again.
+func TestConfigurationONOFFOverlap(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	shared := w.Alloc()
+	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("shared")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	onlyOn := w.Alloc()
+	err = w.Put(onlyOn, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("only on")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ref := w.Alloc()
+	err = w.Put(ref, pdf.Dict{
+		"BaseState": pdf.Name("Unchanged"),
+		"ON":        pdf.Array{shared, onlyOn},
+		"OFF":       pdf.Array{shared},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	cfg, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractConfiguration)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+
+	if len(cfg.ON) != 1 || cfg.ON[0].Name != "only on" {
+		t.Errorf("ON = %v, want the group listed in ON alone", cfg.ON)
+	}
+	if len(cfg.OFF) != 1 || cfg.OFF[0].Name != "shared" {
+		t.Errorf("OFF = %v, want the shared group", cfg.OFF)
+	}
+
+	// the repaired value must be writable again
+	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w2)
+	_, err = rm.Embed(cfg)
+	if err != nil {
+		t.Errorf("re-embed failed: %v", err)
+	}
+}
+
+// a configuration whose ON array holds nothing but groups repeated in OFF
+func TestConfigurationONOFFOverlapAll(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	shared := w.Alloc()
+	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("shared")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ref := w.Alloc()
+	err = w.Put(ref, pdf.Dict{
+		"ON":  pdf.Array{shared},
+		"OFF": pdf.Array{shared},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	cfg, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractConfiguration)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+
+	// an emptied ON array reads as absent, matching an absent entry
+	if cfg.ON != nil {
+		t.Errorf("ON = %v, want nil", cfg.ON)
+	}
+	if len(cfg.OFF) != 1 {
+		t.Errorf("OFF = %v, want the shared group", cfg.OFF)
+	}
+}
+
+// TestConfigurationRBGroupsCap checks that no more than maxRBGroupsItems
+// groups are read into RBGroups, so that a malicious file cannot make later
+// scans over the collections arbitrarily expensive.
+func TestConfigurationRBGroupsCap(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+
+	inner := make(pdf.Array, maxRBGroupsItems+5)
+	for i := range inner {
+		inner[i] = pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("g")}
+	}
+
+	ref := w.Alloc()
+	err := w.Put(ref, pdf.Dict{
+		"RBGroups": pdf.Array{
+			inner,
+			pdf.Array{pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("late")}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	cfg, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractConfiguration)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+
+	total := 0
+	for _, rb := range cfg.RBGroups {
+		total += len(rb)
+	}
+	if total != maxRBGroupsItems {
+		t.Errorf("got %d groups in RBGroups, want %d", total, maxRBGroupsItems)
+	}
+	if len(cfg.RBGroups) != 1 {
+		t.Errorf("got %d collections, want the truncated first one alone", len(cfg.RBGroups))
+	}
+}
+
 func TestConfigurationValidation(t *testing.T) {
 	w14, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
 	rm14 := pdf.NewResourceManager(w14)
@@ -413,6 +537,15 @@ func TestConfigurationValidation(t *testing.T) {
 	_, err = rm.Embed(c)
 	if err == nil {
 		t.Error("expected error for invalid BaseState, but got none")
+	}
+
+	// empty intent name, alone and among valid ones
+	for _, intent := range [][]pdf.Name{{""}, {"View", ""}} {
+		c = &Configuration{Intent: intent}
+		_, err = rm.Embed(c)
+		if err == nil {
+			t.Errorf("expected error for intent %q, but got none", intent)
+		}
 	}
 }
 

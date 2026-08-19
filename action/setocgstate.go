@@ -78,6 +78,41 @@ type SetOCGState struct {
 func (a *SetOCGState) ActionType() pdf.Name  { return TypeSetOCGState }
 func (a *SetOCGState) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 
+// Apply changes the states of optional content groups as the action
+// prescribes.  The changes are applied in order, so that the last change to a
+// group wins, and each is recorded as a manual change, so that a later usage
+// application does not undo what the document asked for.
+//
+// Radio-button relationships between groups are honoured unless
+// IgnoreRBGroups is set: switching a group on switches off the other members
+// of its radio-button collections, and the group the action names is the one
+// which survives.
+//
+// An operation outside the set of operations the specification defines is
+// ignored.
+func (a *SetOCGState) Apply(state *oc.GroupStates) {
+	for _, change := range a.State {
+		for _, group := range change.Groups {
+			var on bool
+			switch change.Op {
+			case OCGOperationON:
+				on = true
+			case OCGOperationOFF:
+				on = false
+			case OCGOperationToggle:
+				on = !state.IsOn(group)
+			default:
+				continue
+			}
+			if a.IgnoreRBGroups {
+				state.SetManualState(group, on)
+			} else {
+				state.Switch(group, on)
+			}
+		}
+	}
+}
+
 func (a *SetOCGState) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "SetOCGState action", pdf.V1_5); err != nil {
 		return nil, err

@@ -3967,7 +3967,7 @@ types:
   fileDependent: false
   readFunc: oc.ExtractConfiguration
   writeMethod: (*Configuration).Embed
-  specSection: '8.11.4.3'
+  specSection: '8.11.4'
   specTable: Table 99
   fields:
   - goName: Name

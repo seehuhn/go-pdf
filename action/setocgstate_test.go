@@ -304,3 +304,95 @@ func TestSetOCGStateSharedGroup(t *testing.T) {
 		t.Error("the same reference decoded to two different groups")
 	}
 }
+
+// TestSetOCGStateApply checks that the action's operations reach the group
+// states in order, and that a group switched on displaces the other members
+// of its radio-button collection.
+func TestSetOCGStateApply(t *testing.T) {
+	g1 := &oc.Group{Name: "Group 1"}
+	g2 := &oc.Group{Name: "Group 2"}
+	g3 := &oc.Group{Name: "Group 3"}
+	allGroups := []*oc.Group{g1, g2, g3}
+
+	config := &oc.Configuration{
+		BaseState: oc.BaseStateON,
+		RBGroups:  [][]*oc.Group{{g1, g2}},
+	}
+
+	t.Run("last_change_wins", func(t *testing.T) {
+		state := config.DefaultState(allGroups, oc.EventView, nil)
+		a := &SetOCGState{State: []OCGStateChange{
+			{Op: OCGOperationOFF, Groups: []*oc.Group{g3}},
+			{Op: OCGOperationON, Groups: []*oc.Group{g3}},
+			{Op: OCGOperationOFF, Groups: []*oc.Group{g3}},
+		}}
+		a.Apply(state)
+		if state.IsOn(g3) {
+			t.Error("expected g3 to be OFF")
+		}
+	})
+
+	t.Run("toggle_reverses_the_current_state", func(t *testing.T) {
+		state := config.DefaultState(allGroups, oc.EventView, nil)
+		a := &SetOCGState{State: []OCGStateChange{
+			{Op: OCGOperationToggle, Groups: []*oc.Group{g3}},
+		}}
+		a.Apply(state)
+		if state.IsOn(g3) {
+			t.Error("expected g3 to be toggled OFF")
+		}
+		a.Apply(state)
+		if !state.IsOn(g3) {
+			t.Error("expected g3 to be toggled back ON")
+		}
+	})
+
+	t.Run("radio_button_siblings_follow", func(t *testing.T) {
+		state := config.DefaultState(allGroups, oc.EventView, nil)
+		a := &SetOCGState{State: []OCGStateChange{
+			{Op: OCGOperationON, Groups: []*oc.Group{g2}},
+		}}
+		a.Apply(state)
+		if !state.IsOn(g2) {
+			t.Error("expected g2 to be ON")
+		}
+		if state.IsOn(g1) {
+			t.Error("expected g1 to be switched OFF")
+		}
+	})
+
+	t.Run("ignore_rb_groups_leaves_siblings_alone", func(t *testing.T) {
+		state := config.DefaultState(allGroups, oc.EventView, nil)
+		state.Switch(g1, true)
+		a := &SetOCGState{
+			State:          []OCGStateChange{{Op: OCGOperationON, Groups: []*oc.Group{g2}}},
+			IgnoreRBGroups: true,
+		}
+		a.Apply(state)
+		if !state.IsOn(g1) || !state.IsOn(g2) {
+			t.Error("expected both members to be ON")
+		}
+	})
+
+	t.Run("changes_are_manual", func(t *testing.T) {
+		state := config.DefaultState(allGroups, oc.EventView, nil)
+		a := &SetOCGState{State: []OCGStateChange{
+			{Op: OCGOperationOFF, Groups: []*oc.Group{g3}},
+		}}
+		a.Apply(state)
+		if !state.IsManual(g3) {
+			t.Error("expected g3 to be marked as set manually")
+		}
+	})
+
+	t.Run("unknown_operation_ignored", func(t *testing.T) {
+		state := config.DefaultState(allGroups, oc.EventView, nil)
+		a := &SetOCGState{State: []OCGStateChange{
+			{Op: OCGOperation("Invert"), Groups: []*oc.Group{g3}},
+		}}
+		a.Apply(state)
+		if !state.IsOn(g3) {
+			t.Error("expected g3 to be left alone")
+		}
+	})
+}
