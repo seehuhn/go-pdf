@@ -83,6 +83,13 @@ func (a *SetOCGState) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 // group wins, and each is recorded as a manual change, so that a later usage
 // application does not undo what the document asked for.
 //
+// A toggle reverses the state in force when it runs: for a group this action
+// has already changed, the state just set; otherwise the state the effective
+// snapshot shows.  The snapshot should be the visibility the user sees, as
+// [oc.ViewState.Effective] derives it for the current view; passing nil makes
+// a toggle read the stored state instead, which for a group hidden by a usage
+// application inverts a state the user never saw.
+//
 // Radio-button relationships between groups are honoured unless
 // IgnoreRBGroups is set: switching a group on switches off the other members
 // of its radio-button collections, and the group the action names is the one
@@ -90,7 +97,7 @@ func (a *SetOCGState) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 //
 // An operation outside the set of operations the specification defines is
 // ignored.
-func (a *SetOCGState) Apply(state *oc.GroupStates) {
+func (a *SetOCGState) Apply(state *oc.ViewState, effective *oc.GroupStates) {
 	for _, change := range a.State {
 		for _, group := range change.Groups {
 			var on bool
@@ -100,7 +107,14 @@ func (a *SetOCGState) Apply(state *oc.GroupStates) {
 			case OCGOperationOFF:
 				on = false
 			case OCGOperationToggle:
-				on = !state.IsOn(group)
+				switch {
+				case state.IsManual(group):
+					on = !state.IsOn(group)
+				case effective != nil:
+					on = !effective.IsOn(group)
+				default:
+					on = !state.IsOn(group)
+				}
 			default:
 				continue
 			}

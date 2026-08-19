@@ -24,6 +24,8 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF 2.0 sections: 8.11.4.5
+
 // ViewerContext provides runtime information needed to evaluate
 // Zoom, Language, and User usage categories.
 type ViewerContext struct {
@@ -42,24 +44,138 @@ type ViewerContext struct {
 	UserType UserType
 }
 
-// GroupStates tracks the visibility state of optional content groups.
-// Groups present in the map participate in visibility decisions;
-// groups absent from the map have no effect on visibility (always shown).
+// ViewState holds the persistent optional-content viewing state of a
+// document: the group visibility a configuration prescribes, together with
+// the manual changes the user or a set-OCG-state action has made.  Manual
+// changes are pinned: a usage application never moves a pinned group.
 //
-// The zero value is an empty state in which no group participates, and can be
-// used and modified directly.  A nil *GroupStates is equally valid and behaves
-// the same way, except that it cannot be modified.  Use
-// [Configuration.DefaultState] to obtain the states a configuration prescribes;
-// only a state obtained that way knows the radio-button relationships
-// [GroupStates.Switch] applies.
+// A ViewState is not what a render consults.  The visibility in force at any
+// moment is derived from it with [ViewState.Effective], which layers the
+// usage recommendations of the configuration between the prescribed states
+// and the pins.
+//
+// The zero value is an empty state with no configuration; it can be used and
+// modified directly.  A nil *ViewState is equally valid and behaves the same
+// way, except that it cannot be modified.  Use [Configuration.DefaultState]
+// to obtain the state a configuration prescribes; only a state obtained that
+// way knows the configuration's radio-button relationships and usage
+// applications.
+type ViewState struct {
+	config *Configuration  // the configuration the state was derived from
+	base   map[*Group]bool // the configuration-prescribed visibility
+	pins   map[*Group]bool // manual overrides, layered over base and usage
+}
+
+// IsOn returns the stored visibility of the group: its pinned state if the
+// group was manually changed, the prescribed state otherwise.  Groups not
+// participating in this state are treated as visible.  Usage recommendations
+// are not part of the answer; derive them with [ViewState.Effective].
+func (s *ViewState) IsOn(g *Group) bool {
+	if s == nil {
+		return true
+	}
+	if on, ok := s.pins[g]; ok {
+		return on
+	}
+	on, ok := s.base[g]
+	return !ok || on
+}
+
+// Participates reports whether the group takes part in visibility decisions.
+func (s *ViewState) Participates(g *Group) bool {
+	if s == nil {
+		return false
+	}
+	if _, ok := s.pins[g]; ok {
+		return true
+	}
+	_, ok := s.base[g]
+	return ok
+}
+
+// IsManual reports whether the group's state was set manually.
+func (s *ViewState) IsManual(g *Group) bool {
+	if s == nil {
+		return false
+	}
+	_, ok := s.pins[g]
+	return ok
+}
+
+// SetManualState pins the visibility of a group as a manual change, without
+// regard to radio-button relationships.  A pinned group keeps this state
+// until the pin is replaced: later usage applications do not move it.
+func (s *ViewState) SetManualState(g *Group, on bool) {
+	if s.pins == nil {
+		s.pins = make(map[*Group]bool)
+	}
+	s.pins[g] = on
+}
+
+// Switch sets the visibility of a group as a manual change, made by the user
+// or by a set-OCG-state action, and applies the radio-button relationships of
+// the configuration the state came from: switching a group on switches off
+// the other members of every radio-button collection it belongs to.
+// Switching a group off leaves the other members alone.
+//
+// The group named is always switched, but a sibling is only switched off if
+// the state already covers it: a group outside the state decides the
+// visibility of nothing, and making it participate would hide content the
+// configuration wants shown.
+//
+// Every group switched here is pinned, the displaced siblings included, so
+// that a later usage application does not undo any part of the change.  A
+// state which did not come from [Configuration.DefaultState] carries no
+// configuration, and hence no radio-button relationships to apply.
+func (s *ViewState) Switch(g *Group, on bool) {
+	s.SetManualState(g, on)
+	if !on || s.config == nil {
+		return
+	}
+	for _, rb := range s.config.RBGroups {
+		if !slices.Contains(rb, g) {
+			continue
+		}
+		for _, other := range rb {
+			if other == g {
+				continue
+			}
+			if !s.Participates(other) {
+				continue
+			}
+			s.SetManualState(other, false)
+		}
+	}
+}
+
+// Clone returns an independent copy of the state.
+func (s *ViewState) Clone() *ViewState {
+	if s == nil {
+		return nil
+	}
+	c := &ViewState{config: s.config, base: maps.Clone(s.base)}
+	if s.pins != nil {
+		c.pins = maps.Clone(s.pins)
+	}
+	return c
+}
+
+// GroupStates is a snapshot of effective group visibility, as consulted when
+// rendering or filtering content.  Groups present in the snapshot participate
+// in visibility decisions; groups absent from it have no effect on visibility
+// (always shown).
+//
+// Snapshots are usually derived from a [ViewState] with [ViewState.Effective]
+// or [ViewState.EffectiveForPrint].  The zero value is an empty snapshot and
+// can be populated directly with [GroupStates.SetState]; a nil *GroupStates
+// is equally valid and behaves the same way, except that it cannot be
+// modified.
 type GroupStates struct {
-	state  map[*Group]bool // present = participates; true = ON, false = OFF
-	manual map[*Group]bool // groups set manually by the user
-	config *Configuration  // the configuration the states were derived from
+	state map[*Group]bool // present = participates; true = ON, false = OFF
 }
 
 // IsOn returns whether the group is visible. Groups not participating
-// in this state (absent from the map) are treated as visible.
+// in this snapshot (absent from the map) are treated as visible.
 func (s *GroupStates) IsOn(g *Group) bool {
 	if s == nil {
 		return true
@@ -77,7 +193,8 @@ func (s *GroupStates) Participates(g *Group) bool {
 	return ok
 }
 
-// SetState sets the visibility of a group, making it participate.
+// SetState sets the visibility of a group, adding it to the snapshot if it
+// was not participating before.
 func (s *GroupStates) SetState(g *Group, on bool) {
 	if s.state == nil {
 		s.state = make(map[*Group]bool)
@@ -85,71 +202,12 @@ func (s *GroupStates) SetState(g *Group, on bool) {
 	s.state[g] = on
 }
 
-// SetManualState sets the visibility of a group and marks it as manually
-// overridden by the user. Groups with manual overrides are not affected
-// by [Configuration.ApplyViewUsage].
-func (s *GroupStates) SetManualState(g *Group, on bool) {
-	s.SetState(g, on)
-	if s.manual == nil {
-		s.manual = make(map[*Group]bool)
-	}
-	s.manual[g] = true
-}
-
-// IsManual reports whether the group was set manually by the user.
-func (s *GroupStates) IsManual(g *Group) bool {
-	if s == nil {
-		return false
-	}
-	return s.manual[g]
-}
-
-// Switch sets the visibility of a group as a manual change, made by the user
-// or by a set-OCG-state action, and applies the radio-button relationships of
-// the configuration the state came from: switching a group on switches off
-// the other members of every radio-button collection it belongs to.
-// Switching a group off leaves the other members alone.
-//
-// The group named is always switched, but a sibling is only switched off if
-// the state already covers it: a group outside the state decides the
-// visibility of nothing, and making it participate would hide content the
-// configuration wants shown.
-//
-// Every group switched here counts as manually set, so that a later usage
-// application does not undo it.  A state which did not come from
-// [Configuration.DefaultState] carries no configuration, and hence no
-// radio-button relationships to apply.
-func (s *GroupStates) Switch(g *Group, on bool) {
-	s.SetManualState(g, on)
-	if !on || s.config == nil {
-		return
-	}
-	for _, rb := range s.config.RBGroups {
-		if !slices.Contains(rb, g) {
-			continue
-		}
-		for _, other := range rb {
-			if other == g {
-				continue
-			}
-			if _, ok := s.state[other]; !ok {
-				continue
-			}
-			s.SetManualState(other, false)
-		}
-	}
-}
-
-// Clone returns a deep copy of the state.
+// Clone returns an independent copy of the snapshot.
 func (s *GroupStates) Clone() *GroupStates {
 	if s == nil {
 		return nil
 	}
-	c := &GroupStates{state: maps.Clone(s.state), config: s.config}
-	if s.manual != nil {
-		c.manual = maps.Clone(s.manual)
-	}
-	return c
+	return &GroupStates{state: maps.Clone(s.state)}
 }
 
 // intentOverlaps reports whether a group's intent matches a configuration's
@@ -177,19 +235,22 @@ func intentOverlaps(groupIntent, configIntent []pdf.Name) bool {
 	return false
 }
 
-// DefaultState computes the initial group visibility from this configuration.
-// It applies BaseState to allGroups, then ON/OFF overrides, then AS usage
-// applications for the given event. Groups whose intent does not match the
-// configuration's intent are removed so they have no effect on visibility.
-// Finally each RBGroups array is reduced to at most one visible member, the
-// first one in the array.
+// DefaultState computes the group visibility this configuration prescribes:
+// BaseState applied to allGroups, then the ON and OFF overrides.  Groups
+// whose intent does not match the configuration's are removed so they have
+// no effect on visibility, and each RBGroups collection is reduced to at
+// most one visible member, the first one in the array.  Usage applications
+// are not folded in here; they belong to the derivation in
+// [ViewState.Effective], which re-evaluates them for every view.
 // If allGroups is nil, BaseState has no effect and only groups explicitly
-// listed in ON, OFF, or AS are included.
+// listed in ON or OFF are included.
 //
 // The prior parameter provides the group states from the previously active
 // configuration. It is used when BaseState is Unchanged (alternate configs
-// only). If prior is nil, Unchanged is treated as ON.
-func (c *Configuration) DefaultState(allGroups []*Group, event Event, prior *GroupStates) *GroupStates {
+// only): the prior state is read with manual changes in force, but the pins
+// themselves are not carried over. If prior is nil, Unchanged is treated
+// as ON.
+func (c *Configuration) DefaultState(allGroups []*Group, prior *ViewState) *ViewState {
 	state := make(map[*Group]bool)
 
 	// step 1: apply BaseState to all groups
@@ -222,51 +283,63 @@ func (c *Configuration) DefaultState(allGroups []*Group, event Event, prior *Gro
 		state[g] = false
 	}
 
-	// step 3: apply AS usage application dictionaries for the given event
-	//
-	// Per spec (8.11.4.4): "If a given optional content group appears in
-	// more than one OCGs array, its state shall be ON only if all
-	// categories in all the usage application dictionaries it appears in
-	// have a state of ON."
-	//
-	// Collect all AS recommendations per group, then apply with AND.
-	asRecs := map[*Group]bool{} // true = all recs so far are ON
-	for _, ua := range c.AS {
-		if ua.Event != event {
-			continue
-		}
-		for _, g := range ua.OCGs {
-			if g.Usage == nil {
-				continue
-			}
-			on, ok := evaluateUsage(g.Usage, ua.Category, nil)
-			if !ok {
-				continue
-			}
-			prev, seen := asRecs[g]
-			if !seen {
-				asRecs[g] = on
-			} else {
-				asRecs[g] = prev && on
-			}
-		}
-	}
-	maps.Copy(state, asRecs)
-
-	// step 4: remove groups whose intent does not match the configuration
+	// step 3: remove groups whose intent does not match the configuration
 	for g := range state {
 		if !intentOverlaps(g.Intent, c.Intent) {
 			delete(state, g)
 		}
 	}
 
-	// step 5: reduce each radio-button collection to at most one visible
-	// member, which is all a state is allowed to have at any one time
-	// (8.11.4.3).  The first visible member in array order is the one kept:
-	// with several switched on there is nothing to prefer a later one.
-	// Groups the state does not cover take no part, since they decide the
-	// visibility of nothing, and a group listed twice is not its own sibling.
-	for _, rb := range c.RBGroups {
+	// step 4: radio-button reduction
+	reduceRB(state, c.RBGroups, nil, nil)
+
+	return &ViewState{config: c, base: state}
+}
+
+// reduceRB reduces each radio-button collection towards at most one visible
+// member, which is all a state is allowed to have at any one time (8.11.4.3).
+//
+// Pinned values are never rewritten: several pinned members switched on at
+// once — reachable only by a set-OCG-state action that asks for radio-button
+// relationships to be ignored — are honoured as the explicit request they
+// are.  A pinned member which is on silences the members a usage application
+// recommended on, since a pin is the user's word and a recommendation is
+// not; a member on from the prescribed states alone stands even then,
+// because the only way to reach that combination is the same explicit
+// ignore-RB request.  With no pinned member on, the first visible member in
+// array order is kept: with several switched on there is nothing to prefer a
+// later one.
+//
+// Groups the state does not cover take no part, since they decide the
+// visibility of nothing, and a group listed twice is not its own sibling.
+func reduceRB(state map[*Group]bool, rbGroups [][]*Group, pinned, recommended func(*Group) bool) {
+	if pinned == nil {
+		pinned = func(*Group) bool { return false }
+	}
+	if recommended == nil {
+		recommended = func(*Group) bool { return false }
+	}
+	for _, rb := range rbGroups {
+		pinnedOn := false
+		for _, g := range rb {
+			if on, ok := state[g]; ok && on && pinned(g) {
+				pinnedOn = true
+				break
+			}
+		}
+
+		if pinnedOn {
+			for _, g := range rb {
+				if on, ok := state[g]; !ok || !on || pinned(g) {
+					continue
+				}
+				if recommended(g) {
+					state[g] = false
+				}
+			}
+			continue
+		}
+
 		var keeper *Group
 		for _, g := range rb {
 			if on, ok := state[g]; !ok || !on {
@@ -279,8 +352,168 @@ func (c *Configuration) DefaultState(allGroups []*Group, event Event, prior *Gro
 			}
 		}
 	}
+}
 
-	return &GroupStates{state: state, config: c}
+// Effective derives the group visibility in force for a view under the given
+// context: the prescribed states, then the recommendations of the
+// configuration's View-event usage applications — which pinned groups are
+// exempt from — then the pins, with each radio-button collection reduced to
+// at most one visible member.  A pinned member that is on displaces the
+// recommended members of its collections; among unpinned members the first
+// visible one in array order wins.
+//
+// The context supplies the external factors the usage categories read; a nil
+// context, or a context field left at its zero value, yields no
+// recommendation for the categories that need it.  The result is an
+// independent snapshot: later changes to the state do not affect it.
+//
+// Effective on a nil state returns a nil snapshot.
+func (s *ViewState) Effective(ctx *ViewerContext) *GroupStates {
+	if s == nil {
+		return nil
+	}
+
+	state := maps.Clone(s.base)
+	if state == nil {
+		state = make(map[*Group]bool)
+	}
+
+	// usage recommendations, sparing the pinned groups
+	var recs map[*Group]bool
+	if s.config != nil {
+		recs = s.config.eventRecommendations(EventView, ctx, s.IsManual)
+		maps.Copy(state, recs)
+	}
+
+	// pins
+	maps.Copy(state, s.pins)
+
+	if s.config != nil {
+		reduceRB(state, s.config.RBGroups, s.IsManual,
+			func(g *Group) bool { _, ok := recs[g]; return ok })
+	}
+
+	return &GroupStates{state: state}
+}
+
+// EffectiveForPrint derives the group visibility a print copy uses: the
+// visibility a view under the given context shows, with the recommendations
+// of the configuration's Print-event usage applications applied over it.  A
+// print recommendation overrides even a pinned state — it holds for the
+// duration of printing only, and the pin remains in force afterwards — and
+// counts like a pin in the radio-button reduction.
+//
+// EffectiveForPrint on a nil state returns a nil snapshot.
+func (s *ViewState) EffectiveForPrint(ctx *ViewerContext) *GroupStates {
+	snap := s.Effective(ctx)
+	if s == nil || s.config == nil {
+		return snap
+	}
+
+	recs := s.config.eventRecommendations(EventPrint, ctx, nil)
+	if len(recs) == 0 {
+		return snap
+	}
+	maps.Copy(snap.state, recs)
+
+	// A collection a print recommendation switched a member on in follows
+	// that recommendation: the first recommended-on member in array order
+	// wins and every other visible member yields, the view state's choices
+	// included.  Collections the recommendations only switched members off
+	// in stay valid on their own.
+	for _, rb := range s.config.RBGroups {
+		var keeper *Group
+		for _, g := range rb {
+			on, isRec := recs[g]
+			if isRec && on && snap.Participates(g) {
+				keeper = g
+				break
+			}
+		}
+		if keeper == nil {
+			continue
+		}
+		for _, g := range rb {
+			if g == keeper {
+				continue
+			}
+			if on, ok := snap.state[g]; ok && on {
+				snap.state[g] = false
+			}
+		}
+	}
+
+	return snap
+}
+
+// eventRecommendations collects the state recommendations of the
+// configuration's usage applications for the given event, ANDed across the
+// dictionaries a group appears in (8.11.4.4).  Groups whose intent does not
+// match the configuration's receive no recommendation: DefaultState excludes
+// them from the state, and a usage application must not bring them back.
+//
+// skip names groups to withhold recommendations from (the pinned ones, for a
+// View derivation); nil means no group is withheld.  A withheld group still
+// takes part in choosing the best language match — it merely keeps its own
+// state afterwards.  A nil context yields recommendations only for the
+// categories that need no external factors.
+func (c *Configuration) eventRecommendations(event Event, ctx *ViewerContext, skip func(*Group) bool) map[*Group]bool {
+	if len(c.AS) == 0 {
+		return nil
+	}
+
+	// groups the configuration considers at all
+	considers := func(g *Group) bool {
+		return intentOverlaps(g.Intent, c.Intent)
+	}
+
+	recs := map[*Group]bool{}
+	add := func(g *Group, on bool) {
+		prev, seen := recs[g]
+		if !seen {
+			recs[g] = on
+		} else {
+			recs[g] = prev && on
+		}
+	}
+
+	for _, ua := range c.AS {
+		if ua.Event != event {
+			continue
+		}
+
+		// per-group evaluation for non-Language categories
+		for _, g := range ua.OCGs {
+			if g.Usage == nil || !considers(g) || (skip != nil && skip(g)) {
+				continue
+			}
+			on, ok := evaluateUsage(g.Usage, ua.Category, ctx)
+			if !ok {
+				continue
+			}
+			add(g, on)
+		}
+
+		// collective language evaluation, over the considered groups only:
+		// an excluded group must not influence the best-match choice either
+		if ctx != nil && ctx.Lang != language.Und &&
+			slices.Contains(ua.Category, CategoryLanguage) {
+			candidates := make([]*Group, 0, len(ua.OCGs))
+			for _, g := range ua.OCGs {
+				if considers(g) {
+					candidates = append(candidates, g)
+				}
+			}
+			for g, on := range evaluateLanguage(candidates, ctx.Lang) {
+				if skip != nil && skip(g) {
+					continue
+				}
+				add(g, on)
+			}
+		}
+	}
+
+	return recs
 }
 
 // evaluateUsage evaluates the usage dictionary for the given categories.
@@ -408,78 +641,4 @@ func evaluateLanguage(groups []*Group, sysLang language.Tag) map[*Group]bool {
 	}
 
 	return result
-}
-
-// ApplyViewUsage re-evaluates all View-event AS dicts with runtime context
-// and updates the state accordingly. Groups with manual overrides are
-// not affected, and neither are groups whose intent does not match the
-// configuration's: [Configuration.DefaultState] excludes those from the state,
-// and a usage application must not bring them back.
-//
-// If ctx is nil, or if state is nil and thus cannot be modified, this is a
-// no-op.
-func (c *Configuration) ApplyViewUsage(state *GroupStates, ctx *ViewerContext) {
-	if ctx == nil || state == nil || len(c.AS) == 0 {
-		return
-	}
-
-	// groups the configuration considers at all
-	considers := func(g *Group) bool {
-		return intentOverlaps(g.Intent, c.Intent)
-	}
-
-	// collect recommendations per group, ANDing across AS dicts
-	recs := map[*Group]bool{}
-	for _, ua := range c.AS {
-		if ua.Event != EventView {
-			continue
-		}
-
-		// per-group evaluation for non-Language categories
-		for _, g := range ua.OCGs {
-			if g.Usage == nil || !considers(g) || state.IsManual(g) {
-				continue
-			}
-			on, ok := evaluateUsage(g.Usage, ua.Category, ctx)
-			if !ok {
-				continue
-			}
-			prev, seen := recs[g]
-			if !seen {
-				recs[g] = on
-			} else {
-				recs[g] = prev && on
-			}
-		}
-
-		// Collective language evaluation, over the considered groups only:
-		// an excluded group must not influence the best-match choice either.
-		// A manually overridden group, by contrast, still takes part in the
-		// choice — it merely keeps its own state afterwards.
-		if slices.Contains(ua.Category, CategoryLanguage) && ctx.Lang != language.Und {
-			candidates := make([]*Group, 0, len(ua.OCGs))
-			for _, g := range ua.OCGs {
-				if considers(g) {
-					candidates = append(candidates, g)
-				}
-			}
-			langRecs := evaluateLanguage(candidates, ctx.Lang)
-			for g, on := range langRecs {
-				if state.IsManual(g) {
-					continue
-				}
-				prev, seen := recs[g]
-				if !seen {
-					recs[g] = on
-				} else {
-					recs[g] = prev && on
-				}
-			}
-		}
-	}
-
-	// apply results
-	for g, on := range recs {
-		state.SetState(g, on)
-	}
 }

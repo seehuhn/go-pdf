@@ -185,7 +185,7 @@ func (c *converter) buildOCState(hidden []pdf.Reference) error {
 	}
 
 	cur := pdf.CursorAt(c.x, nil)
-	state := (&oc.Configuration{}).DefaultState(nil, oc.EventView, nil)
+	state := &oc.GroupStates{}
 	for _, item := range ocgs {
 		ref, ok := item.(pdf.Reference)
 		if !ok {

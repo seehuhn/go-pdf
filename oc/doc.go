@@ -28,8 +28,12 @@
 // A [Group] or [Membership] (both implement [Conditional]) is associated
 // with content via marked content sequences (BDC/EMC) in content streams.
 //
-// Group visibility is tracked as a [GroupStates] value. Use
-// [Configuration.DefaultState] to compute initial states from a configuration.
-// Groups whose intent does not match the configuration are excluded from the
-// state, so they have no effect on visibility.
+// Group visibility is held in a [ViewState]: the states a configuration
+// prescribes, obtained with [Configuration.DefaultState], together with the
+// manual changes the user or a set-OCG-state action has made.  Rendering
+// consults a [GroupStates] snapshot derived from the view state with
+// [ViewState.Effective], which folds in the configuration's usage
+// recommendations for the current view.  Groups whose intent does not match
+// the configuration are excluded from the state, so they have no effect on
+// visibility.
 package oc

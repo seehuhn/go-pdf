@@ -31,7 +31,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("base_state_on", func(t *testing.T) {
 		c := &Configuration{BaseState: BaseStateON}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		for _, g := range allGroups {
 			if !state.IsOn(g) {
 				t.Errorf("expected %s to be ON", g.Name)
@@ -41,7 +41,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("base_state_off", func(t *testing.T) {
 		c := &Configuration{BaseState: BaseStateOFF}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		for _, g := range allGroups {
 			if state.IsOn(g) {
 				t.Errorf("expected %s to be OFF", g.Name)
@@ -51,7 +51,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("default_base_state", func(t *testing.T) {
 		c := &Configuration{}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		for _, g := range allGroups {
 			if !state.IsOn(g) {
 				t.Errorf("expected %s to be ON (default)", g.Name)
@@ -64,7 +64,7 @@ func TestDefaultState(t *testing.T) {
 			BaseState: BaseStateOFF,
 			ON:        []*Group{g1, g3},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.IsOn(g1) {
 			t.Error("expected g1 to be ON")
 		}
@@ -81,7 +81,7 @@ func TestDefaultState(t *testing.T) {
 			BaseState: BaseStateON,
 			OFF:       []*Group{g2},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.IsOn(g1) {
 			t.Error("expected g1 to be ON")
 		}
@@ -110,7 +110,7 @@ func TestDefaultState(t *testing.T) {
 				},
 			},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
+		state := c.DefaultState([]*Group{g}, nil).Effective(nil)
 		if state.IsOn(g) {
 			t.Error("expected group to be OFF due to ViewState=false")
 		}
@@ -133,7 +133,7 @@ func TestDefaultState(t *testing.T) {
 				},
 			},
 		}
-		state := c.DefaultState([]*Group{g}, EventPrint, nil)
+		state := c.DefaultState([]*Group{g}, nil).EffectiveForPrint(nil)
 		if !state.IsOn(g) {
 			t.Error("expected group to be ON due to PrintState=true")
 		}
@@ -157,7 +157,7 @@ func TestDefaultState(t *testing.T) {
 			},
 		}
 		// ask for View event, should not match Print AS entry
-		state := c.DefaultState([]*Group{g}, EventView, nil)
+		state := c.DefaultState([]*Group{g}, nil).Effective(nil)
 		if state.IsOn(g) {
 			t.Error("expected group to remain OFF (wrong event)")
 		}
@@ -176,7 +176,7 @@ func TestDefaultState(t *testing.T) {
 				},
 			},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
+		state := c.DefaultState([]*Group{g}, nil).Effective(nil)
 		if !state.IsOn(g) {
 			t.Error("expected group to remain ON (no usage)")
 		}
@@ -200,7 +200,7 @@ func TestDefaultState(t *testing.T) {
 				},
 			},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
+		state := c.DefaultState([]*Group{g}, nil).Effective(nil)
 		if !state.IsOn(g) {
 			t.Error("expected group to be ON (both categories ON)")
 		}
@@ -224,7 +224,7 @@ func TestDefaultState(t *testing.T) {
 				},
 			},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
+		state := c.DefaultState([]*Group{g}, nil).Effective(nil)
 		if state.IsOn(g) {
 			t.Error("expected group to be OFF (one category OFF)")
 		}
@@ -318,7 +318,7 @@ func TestIntentFiltering(t *testing.T) {
 
 	t.Run("view_config_includes_view_group", func(t *testing.T) {
 		c := &Configuration{Intent: []pdf.Name{"View"}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.Participates(viewGroup) {
 			t.Error("expected View group to participate in View config")
 		}
@@ -329,7 +329,7 @@ func TestIntentFiltering(t *testing.T) {
 
 	t.Run("design_group_excluded_from_view_config", func(t *testing.T) {
 		c := &Configuration{Intent: []pdf.Name{"View"}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		// non-participating groups are always visible
 		if !state.IsOn(designGroup) {
 			t.Error("expected non-participating Design group to be visible")
@@ -338,7 +338,7 @@ func TestIntentFiltering(t *testing.T) {
 
 	t.Run("all_config_includes_all_groups", func(t *testing.T) {
 		c := &Configuration{Intent: []pdf.Name{"All"}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.Participates(viewGroup) {
 			t.Error("expected View group to participate in All config")
 		}
@@ -350,7 +350,7 @@ func TestIntentFiltering(t *testing.T) {
 	t.Run("default_config_intent", func(t *testing.T) {
 		// empty config intent defaults to ["View"]
 		c := &Configuration{}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.Participates(viewGroup) {
 			t.Error("expected View group to participate in default config")
 		}
@@ -362,7 +362,7 @@ func TestIntentFiltering(t *testing.T) {
 	t.Run("mixed_intent_groups", func(t *testing.T) {
 		mixedGroup := &Group{Name: "Mixed", Intent: []pdf.Name{"View", "Design"}}
 		c := &Configuration{Intent: []pdf.Name{"Design"}}
-		state := c.DefaultState([]*Group{viewGroup, designGroup, mixedGroup}, EventView, nil)
+		state := c.DefaultState([]*Group{viewGroup, designGroup, mixedGroup}, nil)
 		if state.Participates(viewGroup) {
 			t.Error("expected View-only group to not participate in Design config")
 		}
@@ -378,7 +378,7 @@ func TestIntentFiltering(t *testing.T) {
 		// per spec 8.11.2.3: explicit empty Intent array means no groups
 		// participate, so all content is visible
 		c := &Configuration{Intent: []pdf.Name{}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		for _, g := range allGroups {
 			if state.Participates(g) {
 				t.Errorf("expected %s to not participate with empty Intent", g.Name)
@@ -392,7 +392,7 @@ func TestIntentFiltering(t *testing.T) {
 	t.Run("nil_intent_defaults_to_view", func(t *testing.T) {
 		// nil Intent (absent from PDF) defaults to "View"
 		c := &Configuration{Intent: nil}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.Participates(viewGroup) {
 			t.Error("expected View group to participate with nil Intent")
 		}
@@ -430,7 +430,7 @@ func TestDefaultStateASAndSemantics(t *testing.T) {
 				},
 			},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
+		state := c.DefaultState([]*Group{g}, nil).Effective(nil)
 		// View says ON, Export says OFF → AND → OFF
 		if state.IsOn(g) {
 			t.Error("expected group to be OFF (AND of ON and OFF)")
@@ -460,7 +460,7 @@ func TestDefaultStateASAndSemantics(t *testing.T) {
 				},
 			},
 		}
-		state := c.DefaultState([]*Group{gBoth}, EventView, nil)
+		state := c.DefaultState([]*Group{gBoth}, nil).Effective(nil)
 		// both say ON → AND → ON
 		if !state.IsOn(gBoth) {
 			t.Error("expected group to be ON (AND of ON and ON)")
@@ -475,7 +475,7 @@ func TestVEIntentNotVisible(t *testing.T) {
 	allGroups := []*Group{designGroup}
 
 	c := &Configuration{Intent: []pdf.Name{"View"}}
-	state := c.DefaultState(allGroups, EventView, nil)
+	state := c.DefaultState(allGroups, nil).Effective(nil)
 
 	m := &Membership{
 		VE: &VisibilityExpressionNot{
@@ -498,7 +498,7 @@ func TestDefaultStateBaseStateUnchanged(t *testing.T) {
 			BaseState: BaseStateUnchanged,
 			OFF:       []*Group{g1},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		// g1 explicitly OFF
 		if state.IsOn(g1) {
 			t.Error("expected g1 to be OFF")
@@ -515,7 +515,7 @@ func TestDefaultStateBaseStateUnchanged(t *testing.T) {
 
 func TestManualOverride(t *testing.T) {
 	g := &Group{Name: "Manual"}
-	state := &GroupStates{state: map[*Group]bool{g: true}}
+	state := &ViewState{base: map[*Group]bool{g: true}}
 
 	if state.IsManual(g) {
 		t.Error("expected group to not be manual initially")
@@ -529,14 +529,17 @@ func TestManualOverride(t *testing.T) {
 		t.Error("expected group to be OFF after SetManualState(false)")
 	}
 
-	// clone preserves manual flag
+	// clone preserves the pin
 	c := state.Clone()
 	if !c.IsManual(g) {
-		t.Error("expected clone to preserve manual flag")
+		t.Error("expected clone to preserve the pin")
+	}
+	if c.IsOn(g) {
+		t.Error("expected clone to preserve the pinned state")
 	}
 }
 
-func TestApplyViewUsageZoom(t *testing.T) {
+func TestEffectiveZoom(t *testing.T) {
 	t.Run("on_when_in_range", func(t *testing.T) {
 		g := &Group{
 			Name:  "ZoomLayer",
@@ -550,9 +553,9 @@ func TestApplyViewUsageZoom(t *testing.T) {
 				Category: []Category{CategoryZoom},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Zoom: 2.0})
-		if !state.IsOn(g) {
+		state := c.DefaultState([]*Group{g}, nil)
+		derived := state.Effective(&ViewerContext{Zoom: 2.0})
+		if !derived.IsOn(g) {
 			t.Error("expected group ON at zoom 2.0 (range [1.0, 4.0))")
 		}
 	})
@@ -570,9 +573,9 @@ func TestApplyViewUsageZoom(t *testing.T) {
 				Category: []Category{CategoryZoom},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Zoom: 1.5})
-		if state.IsOn(g) {
+		state := c.DefaultState([]*Group{g}, nil)
+		derived := state.Effective(&ViewerContext{Zoom: 1.5})
+		if derived.IsOn(g) {
 			t.Error("expected group OFF at zoom 1.5 (range [2.0, 4.0))")
 		}
 	})
@@ -590,9 +593,9 @@ func TestApplyViewUsageZoom(t *testing.T) {
 				Category: []Category{CategoryZoom},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Zoom: 2.0})
-		if state.IsOn(g) {
+		state := c.DefaultState([]*Group{g}, nil)
+		derived := state.Effective(&ViewerContext{Zoom: 2.0})
+		if derived.IsOn(g) {
 			t.Error("expected group OFF at zoom exactly 2.0 (strict < max)")
 		}
 	})
@@ -610,15 +613,15 @@ func TestApplyViewUsageZoom(t *testing.T) {
 				Category: []Category{CategoryZoom},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Zoom: 0})
-		if state.IsOn(g) {
+		state := c.DefaultState([]*Group{g}, nil)
+		derived := state.Effective(&ViewerContext{Zoom: 0})
+		if derived.IsOn(g) {
 			t.Error("expected group to remain OFF when zoom=0 (skip)")
 		}
 	})
 }
 
-func TestApplyViewUsageLanguage(t *testing.T) {
+func TestEffectiveLanguage(t *testing.T) {
 	t.Run("exact_match", func(t *testing.T) {
 		en := &Group{
 			Name:  "English",
@@ -636,12 +639,12 @@ func TestApplyViewUsageLanguage(t *testing.T) {
 				Category: []Category{CategoryLanguage},
 			}},
 		}
-		state := c.DefaultState([]*Group{en, de}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Lang: language.English})
-		if !state.IsOn(en) {
+		state := c.DefaultState([]*Group{en, de}, nil)
+		derived := state.Effective(&ViewerContext{Lang: language.English})
+		if !derived.IsOn(en) {
 			t.Error("expected English group ON with English locale")
 		}
-		if state.IsOn(de) {
+		if derived.IsOn(de) {
 			t.Error("expected German group OFF with English locale")
 		}
 	})
@@ -669,12 +672,12 @@ func TestApplyViewUsageLanguage(t *testing.T) {
 			}},
 		}
 		// system locale is en-AU — no exact match, partial match on both
-		state := c.DefaultState([]*Group{enGB, enUS}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Lang: language.MustParse("en-AU")})
-		if !state.IsOn(enGB) {
+		state := c.DefaultState([]*Group{enGB, enUS}, nil)
+		derived := state.Effective(&ViewerContext{Lang: language.MustParse("en-AU")})
+		if !derived.IsOn(enGB) {
 			t.Error("expected en-GB ON (partial match + Preferred)")
 		}
-		if state.IsOn(enUS) {
+		if derived.IsOn(enUS) {
 			t.Error("expected en-US OFF (partial match, not Preferred)")
 		}
 	})
@@ -695,9 +698,9 @@ func TestApplyViewUsageLanguage(t *testing.T) {
 				Category: []Category{CategoryLanguage},
 			}},
 		}
-		state := c.DefaultState([]*Group{en}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Lang: language.Japanese})
-		if state.IsOn(en) {
+		state := c.DefaultState([]*Group{en}, nil)
+		derived := state.Effective(&ViewerContext{Lang: language.Japanese})
+		if derived.IsOn(en) {
 			t.Error("expected English group OFF with Japanese locale")
 		}
 	})
@@ -715,15 +718,15 @@ func TestApplyViewUsageLanguage(t *testing.T) {
 				Category: []Category{CategoryLanguage},
 			}},
 		}
-		state := c.DefaultState([]*Group{en}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{Lang: language.Und})
-		if !state.IsOn(en) {
+		state := c.DefaultState([]*Group{en}, nil)
+		derived := state.Effective(&ViewerContext{Lang: language.Und})
+		if !derived.IsOn(en) {
 			t.Error("expected group to remain ON when lang=Und (skip)")
 		}
 	})
 }
 
-func TestApplyViewUsageUser(t *testing.T) {
+func TestEffectiveUser(t *testing.T) {
 	t.Run("name_match", func(t *testing.T) {
 		g := &Group{
 			Name: "ForAlice",
@@ -740,9 +743,9 @@ func TestApplyViewUsageUser(t *testing.T) {
 				Category: []Category{CategoryUser},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{UserName: "Alice"})
-		if !state.IsOn(g) {
+		state := c.DefaultState([]*Group{g}, nil)
+		derived := state.Effective(&ViewerContext{UserName: "Alice"})
+		if !derived.IsOn(g) {
 			t.Error("expected group ON for user Alice")
 		}
 	})
@@ -763,9 +766,9 @@ func TestApplyViewUsageUser(t *testing.T) {
 				Category: []Category{CategoryUser},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{UserName: "Charlie"})
-		if state.IsOn(g) {
+		state := c.DefaultState([]*Group{g}, nil)
+		derived := state.Effective(&ViewerContext{UserName: "Charlie"})
+		if derived.IsOn(g) {
 			t.Error("expected group OFF for user Charlie")
 		}
 	})
@@ -786,13 +789,13 @@ func TestApplyViewUsageUser(t *testing.T) {
 				Category: []Category{CategoryUser},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
+		state := c.DefaultState([]*Group{g}, nil)
 		// user type is Individual, doesn't match Organisation
-		c.ApplyViewUsage(state, &ViewerContext{
+		derived := state.Effective(&ViewerContext{
 			UserName: "Acme",
 			UserType: UserTypeIndividual,
 		})
-		if state.IsOn(g) {
+		if derived.IsOn(g) {
 			t.Error("expected group OFF when user type doesn't match")
 		}
 	})
@@ -813,15 +816,15 @@ func TestApplyViewUsageUser(t *testing.T) {
 				Category: []Category{CategoryUser},
 			}},
 		}
-		state := c.DefaultState([]*Group{g}, EventView, nil)
-		c.ApplyViewUsage(state, &ViewerContext{UserName: ""})
-		if !state.IsOn(g) {
+		state := c.DefaultState([]*Group{g}, nil)
+		derived := state.Effective(&ViewerContext{UserName: ""})
+		if !derived.IsOn(g) {
 			t.Error("expected group to remain ON when userName empty (skip)")
 		}
 	})
 }
 
-func TestApplyViewUsageANDSemantics(t *testing.T) {
+func TestEffectiveANDSemantics(t *testing.T) {
 	// zoom ON + language OFF = OFF
 	g := &Group{
 		Name: "Combo",
@@ -838,17 +841,17 @@ func TestApplyViewUsageANDSemantics(t *testing.T) {
 			Category: []Category{CategoryZoom, CategoryLanguage},
 		}},
 	}
-	state := c.DefaultState([]*Group{g}, EventView, nil)
-	c.ApplyViewUsage(state, &ViewerContext{
+	state := c.DefaultState([]*Group{g}, nil)
+	derived := state.Effective(&ViewerContext{
 		Zoom: 2.0,              // in range → ON
 		Lang: language.English, // no match → OFF
 	})
-	if state.IsOn(g) {
+	if derived.IsOn(g) {
 		t.Error("expected group OFF (zoom ON AND language OFF)")
 	}
 }
 
-func TestApplyViewUsageManualOverride(t *testing.T) {
+func TestEffectiveManualOverride(t *testing.T) {
 	g := &Group{
 		Name:  "ManualLayer",
 		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
@@ -861,17 +864,17 @@ func TestApplyViewUsageManualOverride(t *testing.T) {
 			Category: []Category{CategoryZoom},
 		}},
 	}
-	state := c.DefaultState([]*Group{g}, EventView, nil)
+	state := c.DefaultState([]*Group{g}, nil)
 	state.SetManualState(g, true) // user manually set to ON
 
 	// zoom says OFF, but manual override should prevent change
-	c.ApplyViewUsage(state, &ViewerContext{Zoom: 0.5})
-	if !state.IsOn(g) {
+	derived := state.Effective(&ViewerContext{Zoom: 0.5})
+	if !derived.IsOn(g) {
 		t.Error("expected manually overridden group to remain ON")
 	}
 }
 
-func TestApplyViewUsageNilContext(t *testing.T) {
+func TestEffectiveNilContext(t *testing.T) {
 	g := &Group{
 		Name:  "Layer",
 		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
@@ -884,30 +887,30 @@ func TestApplyViewUsageNilContext(t *testing.T) {
 			Category: []Category{CategoryZoom},
 		}},
 	}
-	state := c.DefaultState([]*Group{g}, EventView, nil)
-	c.ApplyViewUsage(state, nil)
-	if state.IsOn(g) {
+	state := c.DefaultState([]*Group{g}, nil)
+	// a nil context leaves the zoom category without a magnification to read
+	derived := state.Effective(nil)
+	if derived.IsOn(g) {
 		t.Error("expected group to remain OFF with nil context")
 	}
 }
 
-func TestApplyViewUsageNoAS(t *testing.T) {
+func TestEffectiveNoAS(t *testing.T) {
 	g := &Group{
 		Name:  "Layer",
 		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
 	}
 	c := &Configuration{BaseState: BaseStateON}
-	state := c.DefaultState([]*Group{g}, EventView, nil)
-	c.ApplyViewUsage(state, &ViewerContext{Zoom: 0.5})
-	if !state.IsOn(g) {
+	state := c.DefaultState([]*Group{g}, nil)
+	derived := state.Effective(&ViewerContext{Zoom: 0.5})
+	if !derived.IsOn(g) {
 		t.Error("expected group to remain ON with no AS dicts")
 	}
 }
 
-// The zero value of GroupStates is a usable, modifiable, empty state.
+// The zero value of GroupStates is a usable, modifiable, empty snapshot.
 func TestGroupStatesZeroValue(t *testing.T) {
 	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
 
 	var s GroupStates
 	if s.Participates(g1) {
@@ -922,37 +925,65 @@ func TestGroupStatesZeroValue(t *testing.T) {
 		t.Error("SetState had no effect on the zero value")
 	}
 
+	if c := s.Clone(); !c.Participates(g1) || c.IsOn(g1) {
+		t.Error("clone of a lazily built snapshot lost entries")
+	}
+}
+
+// The zero value of ViewState is a usable, modifiable, empty state without a
+// configuration.
+func TestViewStateZeroValue(t *testing.T) {
+	g1 := &Group{Name: "Group 1"}
+	g2 := &Group{Name: "Group 2"}
+
+	var s ViewState
+	if s.Participates(g1) {
+		t.Error("expected no group to participate in the zero value")
+	}
+	if !s.IsOn(g1) {
+		t.Error("expected a non-participating group to be visible")
+	}
+
 	s.SetManualState(g2, false)
 	if !s.Participates(g2) || s.IsOn(g2) || !s.IsManual(g2) {
 		t.Error("SetManualState had no effect on the zero value")
 	}
 
-	if c := s.Clone(); !c.Participates(g1) || !c.IsManual(g2) {
-		t.Error("clone of a lazily built state lost entries")
+	if c := s.Clone(); !c.IsManual(g2) || c.IsOn(g2) {
+		t.Error("clone of a lazily built state lost the pin")
+	}
+
+	derived := s.Effective(nil)
+	if !derived.Participates(g2) || derived.IsOn(g2) {
+		t.Error("derivation from the zero value lost the pin")
 	}
 }
 
-// A nil *GroupStates cannot be modified, so applying usage to one does
-// nothing instead of panicking.
-func TestApplyViewUsageNilState(t *testing.T) {
-	g := &Group{
-		Name:  "Layer",
-		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
+// A nil *ViewState derives a nil snapshot instead of panicking, and a nil
+// snapshot answers like an empty one.
+func TestEffectiveNilState(t *testing.T) {
+	g := &Group{Name: "Layer"}
+
+	var s *ViewState
+	if snap := s.Effective(&ViewerContext{Zoom: 0.5}); snap != nil {
+		t.Error("expected a nil snapshot from a nil state")
 	}
-	c := &Configuration{
-		BaseState: BaseStateON,
-		AS: []*UsageApplication{{
-			Event:    EventView,
-			OCGs:     []*Group{g},
-			Category: []Category{CategoryZoom},
-		}},
+	if snap := s.EffectiveForPrint(nil); snap != nil {
+		t.Error("expected a nil print snapshot from a nil state")
 	}
-	c.ApplyViewUsage(nil, &ViewerContext{Zoom: 0.5})
+	if s.Participates(g) || s.IsManual(g) || !s.IsOn(g) || s.Clone() != nil {
+		t.Error("nil state answered unlike an empty one")
+	}
+
+	var snap *GroupStates
+	if snap.Participates(g) || !snap.IsOn(g) || snap.Clone() != nil {
+		t.Error("nil snapshot answered unlike an empty one")
+	}
 }
 
 // DefaultState drops groups whose intent does not match the configuration;
 // a usage application must not put them back.
-func TestApplyViewUsageIntentMismatch(t *testing.T) {
+func TestEffectiveIntentMismatch(t *testing.T) {
 	g := &Group{
 		Name:   "Design Layer",
 		Intent: []pdf.Name{"Design"},
@@ -967,23 +998,23 @@ func TestApplyViewUsageIntentMismatch(t *testing.T) {
 			Category: []Category{CategoryZoom},
 		}},
 	}
-	state := c.DefaultState([]*Group{g}, EventView, nil)
+	state := c.DefaultState([]*Group{g}, nil)
 	if state.Participates(g) {
 		t.Fatal("expected the intent mismatch to exclude the group")
 	}
 
-	c.ApplyViewUsage(state, &ViewerContext{Zoom: 0.5})
-	if state.Participates(g) {
+	derived := state.Effective(&ViewerContext{Zoom: 0.5})
+	if derived.Participates(g) {
 		t.Error("expected the excluded group to stay out of the state")
 	}
-	if !state.IsOn(g) {
+	if !derived.IsOn(g) {
 		t.Error("expected the excluded group to stay visible")
 	}
 }
 
 // The same, for the collective language evaluation: an excluded group must
 // not take part in choosing the best language match either.
-func TestApplyViewUsageIntentMismatchLanguage(t *testing.T) {
+func TestEffectiveIntentMismatchLanguage(t *testing.T) {
 	excluded := &Group{
 		Name:   "English (design only)",
 		Intent: []pdf.Name{"Design"},
@@ -1002,13 +1033,13 @@ func TestApplyViewUsageIntentMismatchLanguage(t *testing.T) {
 			Category: []Category{CategoryLanguage},
 		}},
 	}
-	state := c.DefaultState([]*Group{excluded, included}, EventView, nil)
-	c.ApplyViewUsage(state, &ViewerContext{Lang: language.German})
+	state := c.DefaultState([]*Group{excluded, included}, nil)
+	derived := state.Effective(&ViewerContext{Lang: language.German})
 
-	if state.Participates(excluded) {
+	if derived.Participates(excluded) {
 		t.Error("expected the excluded group to stay out of the state")
 	}
-	if !state.IsOn(included) {
+	if !derived.IsOn(included) {
 		t.Error("expected the German group ON for a German system language")
 	}
 }
@@ -1016,7 +1047,7 @@ func TestApplyViewUsageIntentMismatchLanguage(t *testing.T) {
 // A manual override fixes a group's state but does not take it out of the
 // collective language evaluation: it still counts as an exact match, so the
 // other groups are switched OFF rather than treated as the best match.
-func TestApplyViewUsageManualLanguageCandidate(t *testing.T) {
+func TestEffectiveManualLanguageCandidate(t *testing.T) {
 	manual := &Group{
 		Name:  "American English",
 		Usage: &Usage{Language: &UsageLanguage{Lang: language.AmericanEnglish}},
@@ -1033,15 +1064,15 @@ func TestApplyViewUsageManualLanguageCandidate(t *testing.T) {
 			Category: []Category{CategoryLanguage},
 		}},
 	}
-	state := c.DefaultState([]*Group{manual, other}, EventView, nil)
+	state := c.DefaultState([]*Group{manual, other}, nil)
 	state.SetManualState(manual, false)
 
-	c.ApplyViewUsage(state, &ViewerContext{Lang: language.AmericanEnglish})
+	derived := state.Effective(&ViewerContext{Lang: language.AmericanEnglish})
 
-	if state.IsOn(manual) {
+	if derived.IsOn(manual) {
 		t.Error("expected the manual override to be preserved")
 	}
-	if state.IsOn(other) {
+	if derived.IsOn(other) {
 		t.Error("expected the British group OFF: en-US is an exact match")
 	}
 }
@@ -1060,7 +1091,7 @@ func TestDefaultStateRBGroups(t *testing.T) {
 			BaseState: BaseStateON,
 			RBGroups:  [][]*Group{{g2, g1}},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.IsOn(g2) {
 			t.Error("expected g2 to stay ON")
 		}
@@ -1078,7 +1109,7 @@ func TestDefaultStateRBGroups(t *testing.T) {
 			ON:        []*Group{g3},
 			RBGroups:  [][]*Group{{g1, g2, g3}},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.IsOn(g3) {
 			t.Error("expected the only ON member to stay ON")
 		}
@@ -1089,7 +1120,7 @@ func TestDefaultStateRBGroups(t *testing.T) {
 			BaseState: BaseStateOFF,
 			RBGroups:  [][]*Group{{g1, g2}},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		for _, g := range []*Group{g1, g2} {
 			if state.IsOn(g) {
 				t.Errorf("expected %s to stay OFF", g.Name)
@@ -1102,7 +1133,7 @@ func TestDefaultStateRBGroups(t *testing.T) {
 			BaseState: BaseStateON,
 			RBGroups:  [][]*Group{{g1, g1}},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if !state.IsOn(g1) {
 			t.Error("expected g1 to stay ON")
 		}
@@ -1118,7 +1149,7 @@ func TestDefaultStateRBGroups(t *testing.T) {
 			BaseState: BaseStateON,
 			RBGroups:  [][]*Group{{g1, g2}},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		if state.Participates(g1) {
 			t.Fatal("expected g1 to be excluded by intent")
 		}
@@ -1138,7 +1169,7 @@ func TestSwitch(t *testing.T) {
 		// the opposite of the reduction in DefaultState, where the first
 		// visible member wins: here the group switched on is the point
 		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		state.Switch(g2, true)
 		if !state.IsOn(g2) {
 			t.Error("expected g2 to be ON")
@@ -1153,7 +1184,7 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("switching_off_leaves_siblings_alone", func(t *testing.T) {
 		c := &Configuration{BaseState: BaseStateOFF, RBGroups: [][]*Group{{g1, g2}}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		state.Switch(g1, false)
 		if state.IsOn(g2) {
 			t.Error("expected g2 to stay OFF")
@@ -1168,7 +1199,7 @@ func TestSwitch(t *testing.T) {
 			BaseState: BaseStateON,
 			RBGroups:  [][]*Group{{g1, g2}, {g1, g3}},
 		}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		state.Switch(g1, true)
 		for _, g := range []*Group{g2, g3} {
 			if state.IsOn(g) {
@@ -1182,7 +1213,7 @@ func TestSwitch(t *testing.T) {
 		defer func() { g1.Intent = nil }()
 
 		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		state.Switch(g2, true)
 		if state.Participates(g1) {
 			t.Error("expected g1 to stay out of the state")
@@ -1191,7 +1222,7 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("switched_groups_are_manual", func(t *testing.T) {
 		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
-		state := c.DefaultState(allGroups, EventView, nil)
+		state := c.DefaultState(allGroups, nil)
 		state.Switch(g1, true)
 		for _, g := range []*Group{g1, g2} {
 			if !state.IsManual(g) {
@@ -1201,9 +1232,7 @@ func TestSwitch(t *testing.T) {
 	})
 
 	t.Run("state_without_configuration", func(t *testing.T) {
-		state := &GroupStates{}
-		state.SetState(g1, true)
-		state.SetState(g2, true)
+		state := &ViewState{base: map[*Group]bool{g1: true, g2: true}}
 		state.Switch(g2, true)
 		if !state.IsOn(g1) {
 			t.Error("expected g1 to be left alone")
@@ -1215,10 +1244,219 @@ func TestSwitch(t *testing.T) {
 
 	t.Run("clone_keeps_the_relationships", func(t *testing.T) {
 		c := &Configuration{BaseState: BaseStateON, RBGroups: [][]*Group{{g1, g2}}}
-		state := c.DefaultState(allGroups, EventView, nil).Clone()
+		state := c.DefaultState(allGroups, nil).Clone()
 		state.Switch(g2, true)
 		if state.IsOn(g1) {
 			t.Error("expected g1 to be switched OFF in the clone")
+		}
+	})
+}
+
+// Usage recommendations must not break the radio-button invariant: with
+// several members of one collection recommended on, the derivation keeps at
+// most one visible (8.11.4.3).
+func TestEffectiveRBGroups(t *testing.T) {
+	g1 := &Group{
+		Name:  "Overview",
+		Usage: &Usage{Zoom: &UsageZoom{Min: 0, Max: 4}},
+	}
+	g2 := &Group{
+		Name:  "Detail",
+		Usage: &Usage{Zoom: &UsageZoom{Min: 2, Max: 100}},
+	}
+	c := &Configuration{
+		OFF:      []*Group{g1, g2},
+		RBGroups: [][]*Group{{g1, g2}},
+		AS: []*UsageApplication{{
+			Event:    EventView,
+			OCGs:     []*Group{g1, g2},
+			Category: []Category{CategoryZoom},
+		}},
+	}
+	state := c.DefaultState([]*Group{g1, g2}, nil)
+
+	// zoom 3 recommends both on; the first member in array order survives
+	derived := state.Effective(&ViewerContext{Zoom: 3})
+	if !derived.IsOn(g1) || derived.IsOn(g2) {
+		t.Errorf("got g1=%v g2=%v at zoom 3, want the first member alone",
+			derived.IsOn(g1), derived.IsOn(g2))
+	}
+
+	// outside the overlap the recommendations agree with the invariant
+	derived = state.Effective(&ViewerContext{Zoom: 10})
+	if derived.IsOn(g1) || !derived.IsOn(g2) {
+		t.Errorf("got g1=%v g2=%v at zoom 10, want the second member alone",
+			derived.IsOn(g1), derived.IsOn(g2))
+	}
+}
+
+// A pinned member that is on wins its radio-button collections, whatever the
+// array order says.
+func TestEffectiveRBGroupsPinnedWins(t *testing.T) {
+	g1 := &Group{
+		Name:  "Overview",
+		Usage: &Usage{Zoom: &UsageZoom{Min: 0, Max: 4}},
+	}
+	g2 := &Group{Name: "Detail"}
+	c := &Configuration{
+		RBGroups: [][]*Group{{g1, g2}},
+		AS: []*UsageApplication{{
+			Event:    EventView,
+			OCGs:     []*Group{g1},
+			Category: []Category{CategoryZoom},
+		}},
+	}
+	state := c.DefaultState([]*Group{g1, g2}, nil)
+	// pin without radio-button handling, so the reduction alone must
+	// resolve the collection
+	state.SetManualState(g2, true)
+
+	// zoom 1 recommends g1 on, but the pinned g2 wins the collection
+	derived := state.Effective(&ViewerContext{Zoom: 1})
+	if derived.IsOn(g1) || !derived.IsOn(g2) {
+		t.Errorf("got g1=%v g2=%v, want the pinned member alone",
+			derived.IsOn(g1), derived.IsOn(g2))
+	}
+}
+
+// A member on from the prescribed states alone stands beside a pinned
+// member: the only way to reach that combination is a set-OCG-state action
+// that asked for radio-button relationships to be ignored, and the reduction
+// must not take back what the action asked for.
+func TestEffectiveRBGroupsIgnoreRBPair(t *testing.T) {
+	g1 := &Group{Name: "Group 1"}
+	g2 := &Group{Name: "Group 2"}
+	c := &Configuration{
+		OFF:      []*Group{g2},
+		RBGroups: [][]*Group{{g1, g2}},
+	}
+	state := c.DefaultState([]*Group{g1, g2}, nil)
+	state.SetManualState(g2, true) // ignore-RB action: g1 stays on from base
+
+	derived := state.Effective(nil)
+	if !derived.IsOn(g1) || !derived.IsOn(g2) {
+		t.Errorf("got g1=%v g2=%v, want both on",
+			derived.IsOn(g1), derived.IsOn(g2))
+	}
+}
+
+// Several pinned members switched on at once — a set-OCG-state action that
+// asks for radio-button relationships to be ignored — survive the reduction:
+// the reduction never rewrites a pin.
+func TestEffectiveRBGroupsPinnedPair(t *testing.T) {
+	g1 := &Group{Name: "Group 1"}
+	g2 := &Group{Name: "Group 2"}
+	g3 := &Group{Name: "Group 3"}
+	c := &Configuration{
+		OFF:      []*Group{g2, g3},
+		RBGroups: [][]*Group{{g1, g2, g3}},
+	}
+	state := c.DefaultState([]*Group{g1, g2, g3}, nil)
+	state.SetManualState(g1, true)
+	state.SetManualState(g2, true)
+
+	derived := state.Effective(nil)
+	if !derived.IsOn(g1) || !derived.IsOn(g2) {
+		t.Errorf("got g1=%v g2=%v, want both pins kept",
+			derived.IsOn(g1), derived.IsOn(g2))
+	}
+	if derived.IsOn(g3) {
+		t.Error("expected the unpinned member to be off")
+	}
+}
+
+// A derived snapshot is independent of the state it came from.
+func TestEffectiveIsASnapshot(t *testing.T) {
+	g := &Group{Name: "Layer"}
+	c := &Configuration{}
+	state := c.DefaultState([]*Group{g}, nil)
+
+	derived := state.Effective(nil)
+	state.Switch(g, false)
+	if !derived.IsOn(g) {
+		t.Error("expected the snapshot to keep the state at derivation time")
+	}
+}
+
+func TestEffectiveForPrint(t *testing.T) {
+	t.Run("print_state_applied", func(t *testing.T) {
+		g := &Group{
+			Name:  "Watermark",
+			Usage: &Usage{Print: &UsagePrint{PrintState: StateON}},
+		}
+		c := &Configuration{
+			OFF: []*Group{g},
+			AS: []*UsageApplication{{
+				Event:    EventPrint,
+				OCGs:     []*Group{g},
+				Category: []Category{CategoryPrint},
+			}},
+		}
+		state := c.DefaultState([]*Group{g}, nil)
+
+		if state.Effective(nil).IsOn(g) {
+			t.Error("expected the group to be off on screen")
+		}
+		if !state.EffectiveForPrint(nil).IsOn(g) {
+			t.Error("expected the group to be on in print")
+		}
+	})
+
+	t.Run("print_overrides_pins", func(t *testing.T) {
+		g := &Group{
+			Name:  "Watermark",
+			Usage: &Usage{Print: &UsagePrint{PrintState: StateON}},
+		}
+		c := &Configuration{
+			AS: []*UsageApplication{{
+				Event:    EventPrint,
+				OCGs:     []*Group{g},
+				Category: []Category{CategoryPrint},
+			}},
+		}
+		state := c.DefaultState([]*Group{g}, nil)
+		state.Switch(g, false)
+
+		if !state.EffectiveForPrint(nil).IsOn(g) {
+			t.Error("expected the print recommendation to override the pin")
+		}
+		if state.Effective(nil).IsOn(g) {
+			t.Error("expected the pin to remain in force for the view")
+		}
+	})
+
+	t.Run("print_recommendation_wins_collections", func(t *testing.T) {
+		g1 := &Group{Name: "Screen variant"}
+		g2 := &Group{
+			Name:  "Print variant",
+			Usage: &Usage{Print: &UsagePrint{PrintState: StateON}},
+		}
+		c := &Configuration{
+			OFF:      []*Group{g2},
+			RBGroups: [][]*Group{{g1, g2}},
+			AS: []*UsageApplication{{
+				Event:    EventPrint,
+				OCGs:     []*Group{g2},
+				Category: []Category{CategoryPrint},
+			}},
+		}
+		state := c.DefaultState([]*Group{g1, g2}, nil)
+
+		derived := state.EffectiveForPrint(nil)
+		if derived.IsOn(g1) || !derived.IsOn(g2) {
+			t.Errorf("got g1=%v g2=%v, want the print recommendation alone",
+				derived.IsOn(g1), derived.IsOn(g2))
+		}
+	})
+
+	t.Run("no_print_dicts", func(t *testing.T) {
+		g := &Group{Name: "Layer"}
+		c := &Configuration{}
+		state := c.DefaultState([]*Group{g}, nil)
+		state.Switch(g, false)
+
+		if state.EffectiveForPrint(nil).IsOn(g) {
+			t.Error("expected the view state to carry through unchanged")
 		}
 	})
 }

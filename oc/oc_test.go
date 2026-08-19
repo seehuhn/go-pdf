@@ -130,7 +130,7 @@ func TestExtractConditionalInferTypeIdentity(t *testing.T) {
 		t.Fatal("conditional group pointer differs from directly extracted group")
 	}
 
-	state := (&Configuration{}).DefaultState([]*Group{group}, EventView, nil)
+	state := &GroupStates{}
 	state.SetState(group, false)
 	if cond.IsVisible(state) {
 		t.Error("conditional is visible although its group is off")

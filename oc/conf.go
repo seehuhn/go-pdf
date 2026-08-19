@@ -513,9 +513,9 @@ const maxOrderItems = 1000
 // maxRBGroupsItems is the maximum total number of groups read into RBGroups.
 // The rationale is the same as for maxOrderItems: the collections are radio
 // buttons in a layer panel.  The cap also bounds the scan every call of
-// [GroupStates.Switch] makes over the collections, so that a set-OCG-state
-// action from a malicious file cannot make switching cost quadratic in the
-// size of the file.
+// [ViewState.Switch] and every derivation with [ViewState.Effective] makes
+// over the collections, so that a set-OCG-state action from a malicious file
+// cannot make switching cost quadratic in the size of the file.
 const maxRBGroupsItems = 1000
 
 // extractOrderItems extracts Order items from a PDF array.

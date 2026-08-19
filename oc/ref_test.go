@@ -220,7 +220,7 @@ func TestConditionalPointerIdentity(t *testing.T) {
 
 	// the state built from the document's group list must control the
 	// annotation-style conditional too
-	state := (&Configuration{}).DefaultState([]*Group{group}, EventView, nil)
+	state := &GroupStates{}
 	state.SetState(group, false)
 	if cond.IsVisible(state) {
 		t.Error("conditional is visible although its group is off")

@@ -320,39 +320,39 @@ func TestSetOCGStateApply(t *testing.T) {
 	}
 
 	t.Run("last_change_wins", func(t *testing.T) {
-		state := config.DefaultState(allGroups, oc.EventView, nil)
+		state := config.DefaultState(allGroups, nil)
 		a := &SetOCGState{State: []OCGStateChange{
 			{Op: OCGOperationOFF, Groups: []*oc.Group{g3}},
 			{Op: OCGOperationON, Groups: []*oc.Group{g3}},
 			{Op: OCGOperationOFF, Groups: []*oc.Group{g3}},
 		}}
-		a.Apply(state)
+		a.Apply(state, nil)
 		if state.IsOn(g3) {
 			t.Error("expected g3 to be OFF")
 		}
 	})
 
 	t.Run("toggle_reverses_the_current_state", func(t *testing.T) {
-		state := config.DefaultState(allGroups, oc.EventView, nil)
+		state := config.DefaultState(allGroups, nil)
 		a := &SetOCGState{State: []OCGStateChange{
 			{Op: OCGOperationToggle, Groups: []*oc.Group{g3}},
 		}}
-		a.Apply(state)
+		a.Apply(state, nil)
 		if state.IsOn(g3) {
 			t.Error("expected g3 to be toggled OFF")
 		}
-		a.Apply(state)
+		a.Apply(state, nil)
 		if !state.IsOn(g3) {
 			t.Error("expected g3 to be toggled back ON")
 		}
 	})
 
 	t.Run("radio_button_siblings_follow", func(t *testing.T) {
-		state := config.DefaultState(allGroups, oc.EventView, nil)
+		state := config.DefaultState(allGroups, nil)
 		a := &SetOCGState{State: []OCGStateChange{
 			{Op: OCGOperationON, Groups: []*oc.Group{g2}},
 		}}
-		a.Apply(state)
+		a.Apply(state, nil)
 		if !state.IsOn(g2) {
 			t.Error("expected g2 to be ON")
 		}
@@ -362,37 +362,91 @@ func TestSetOCGStateApply(t *testing.T) {
 	})
 
 	t.Run("ignore_rb_groups_leaves_siblings_alone", func(t *testing.T) {
-		state := config.DefaultState(allGroups, oc.EventView, nil)
+		state := config.DefaultState(allGroups, nil)
 		state.Switch(g1, true)
 		a := &SetOCGState{
 			State:          []OCGStateChange{{Op: OCGOperationON, Groups: []*oc.Group{g2}}},
 			IgnoreRBGroups: true,
 		}
-		a.Apply(state)
+		a.Apply(state, nil)
 		if !state.IsOn(g1) || !state.IsOn(g2) {
 			t.Error("expected both members to be ON")
 		}
 	})
 
 	t.Run("changes_are_manual", func(t *testing.T) {
-		state := config.DefaultState(allGroups, oc.EventView, nil)
+		state := config.DefaultState(allGroups, nil)
 		a := &SetOCGState{State: []OCGStateChange{
 			{Op: OCGOperationOFF, Groups: []*oc.Group{g3}},
 		}}
-		a.Apply(state)
+		a.Apply(state, nil)
 		if !state.IsManual(g3) {
 			t.Error("expected g3 to be marked as set manually")
 		}
 	})
 
 	t.Run("unknown_operation_ignored", func(t *testing.T) {
-		state := config.DefaultState(allGroups, oc.EventView, nil)
+		state := config.DefaultState(allGroups, nil)
 		a := &SetOCGState{State: []OCGStateChange{
 			{Op: OCGOperation("Invert"), Groups: []*oc.Group{g3}},
 		}}
-		a.Apply(state)
+		a.Apply(state, nil)
 		if !state.IsOn(g3) {
 			t.Error("expected g3 to be left alone")
+		}
+	})
+}
+
+// TestSetOCGStateApplyEffective checks the toggles against an effective
+// snapshot: a group a usage application hides toggles visibly on in one
+// step, and a group this action has already changed toggles against the
+// state just set rather than the snapshot.
+func TestSetOCGStateApplyEffective(t *testing.T) {
+	g := &oc.Group{
+		Name:  "Zoomed detail",
+		Usage: &oc.Usage{Zoom: &oc.UsageZoom{Min: 4, Max: 100}},
+	}
+	config := &oc.Configuration{
+		BaseState: oc.BaseStateON,
+		AS: []*oc.UsageApplication{{
+			Event:    oc.EventView,
+			OCGs:     []*oc.Group{g},
+			Category: []oc.Category{oc.CategoryZoom},
+		}},
+	}
+
+	t.Run("toggle_flips_what_the_user_sees", func(t *testing.T) {
+		state := config.DefaultState([]*oc.Group{g}, nil)
+		effective := state.Effective(&oc.ViewerContext{Zoom: 1})
+		if effective.IsOn(g) {
+			t.Fatal("expected the group to be hidden by zoom usage")
+		}
+
+		a := &SetOCGState{State: []OCGStateChange{
+			{Op: OCGOperationToggle, Groups: []*oc.Group{g}},
+		}}
+		a.Apply(state, effective)
+		if !state.Effective(&oc.ViewerContext{Zoom: 1}).IsOn(g) {
+			t.Error("expected the toggle to make the hidden group visible")
+		}
+	})
+
+	t.Run("later_ops_see_earlier_ones", func(t *testing.T) {
+		// spec example 2 (12.6.4.13): [/OFF g /Toggle g] ends ON, even
+		// when a snapshot taken before the action shows the group ON
+		state := config.DefaultState([]*oc.Group{g}, nil)
+		effective := state.Effective(&oc.ViewerContext{Zoom: 8})
+		if !effective.IsOn(g) {
+			t.Fatal("expected the group to be visible at zoom 8")
+		}
+
+		a := &SetOCGState{State: []OCGStateChange{
+			{Op: OCGOperationOFF, Groups: []*oc.Group{g}},
+			{Op: OCGOperationToggle, Groups: []*oc.Group{g}},
+		}}
+		a.Apply(state, effective)
+		if !state.IsOn(g) {
+			t.Error("expected the group to end ON")
 		}
 	})
 }
