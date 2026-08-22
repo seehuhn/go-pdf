@@ -14,36 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Command external writes test.pdf, a single-page A4 document containing
-// one Movie annotation playing an H.264/MP4 timestamp-counter movie
-// referenced as an external file (no data embedded in the PDF).
+// Command external writes test.pdf, a single A5 landscape page with one
+// Movie annotation (§13.4.5, removed in PDF 2.0) over the playback area.
+// The clip is not embedded: the file specification names movie.mp4
+// relative to the PDF file.
 //
-// The PDF names the file movie.mp4 relative to the PDF's location; the
-// committed symlink movie.mp4 in this directory points at the shared
-// copy in viewer-tests/internal/testmovie.  Open test.pdf from within
-// this directory: viewers which resolve external media will play the
-// movie, others will show nothing or an error.  The sibling `embedded`
-// test covers the same Movie annotation with the movie embedded in the
-// PDF file, for comparison.
+// Open test.pdf from within this directory, where the committed symlink
+// movie.mp4 points at the shared clip.  The page layout is shared with
+// the three sibling tests; see viewer-tests/internal/moviepage.
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/file"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/movie"
+	"seehuhn.de/go/pdf/viewer-tests/internal/moviepage"
 )
 
 const (
-	movieW = 320.0
-	movieH = 240.0
+	title = "Movie annotation, external clip"
+	what  = "Click the outlined area: the movie should play in place, with the default activation parameters."
+	how   = "The clip is not embedded; the viewer has to resolve movie.mp4 next to test.pdf."
+	note  = "The Movie annotation has no operations of its own; the media tests drive playback with rendition actions."
 )
 
 func main() {
@@ -54,56 +48,33 @@ func main() {
 }
 
 func createDocument(filename string) error {
-	paper := document.A4
-	opt := &pdf.WriterOptions{HumanReadable: true}
-	page, err := document.CreateSinglePage(filename, paper, pdf.V1_7, opt)
+	page, err := moviepage.New(filename, title, what, how)
 	if err != nil {
 		return err
 	}
-
-	captionFont := font.Must(standard.Helvetica.New())
-	captionX := pdf.Round((paper.URx-movieW)/2, 2) // left-align with movie rect
-	captionY := pdf.Round(paper.URy-80, 2)
-
-	page.TextBegin()
-	page.TextSetFont(captionFont, 12)
-	page.TextSetMatrix(matrix.Translate(captionX, captionY))
-	page.TextShow("Click the rectangle to play the test movie; it is not embedded.")
-	page.TextEnd()
-
-	rect := pdf.Rectangle{
-		LLx: captionX,
-		URx: captionX + movieW,
-		LLy: captionY - 16 - movieH,
-		URy: captionY - 16,
-	}
+	page.Note(note)
 
 	annot := &annotation.Movie{
 		Common: annotation.Common{
-			Rect:     rect,
-			Contents: "Timestamp counter (751 frames @ 25 fps), external file movie.mp4.",
+			Rect:     moviepage.Screen,
+			Contents: moviepage.Description + ", external file movie.mp4.",
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},
-		Title:      "Test movie",
-		Movie:      newTestMovie(),
+		Title:      "Tick movie",
+		Movie:      newMovie(),
 		Activation: movie.DefaultActivation,
 	}
-	page.Page.Annots = append(page.Page.Annots, annot)
+	page.Add(annot)
 
 	return page.Close()
 }
 
-// newTestMovie builds a *movie.Movie whose file specification names the
-// external file movie.mp4 without embedding data.
-func newTestMovie() *movie.Movie {
-	spec := &file.Specification{
-		FileName:        "movie.mp4",
-		FileNameUnicode: "movie.mp4",
-		Description:     "Timestamp counter movie (751 frames at 25 fps, 320x240, H.264/MP4)",
-	}
+// newMovie builds the movie whose file specification names the external
+// file movie.mp4, without embedding data.
+func newMovie() *movie.Movie {
 	return &movie.Movie{
-		File:   spec,
-		Aspect: movie.Aspect{Width: int(movieW), Height: int(movieH)},
+		File:   moviepage.ExternalSpec(),
+		Aspect: movie.Aspect{Width: 320, Height: 240},
 	}
 }

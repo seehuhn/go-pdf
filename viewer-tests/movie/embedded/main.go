@@ -14,35 +14,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Command embedded writes test.pdf, a single-page A4 document containing
-// one Movie annotation playing an H.264/MP4 timestamp-counter movie
-// embedded into the PDF file.  Clicking the annotation should play the
-// movie in place with the PDF specification's default activation
-// parameters.
+// Command embedded writes test.pdf, a single A5 landscape page with one
+// Movie annotation (§13.4.5, removed in PDF 2.0) over the playback area.
+// The clip is embedded in the PDF file.
 //
-// The movie data is shared with the other media tests and comes from
-// the viewer-tests/internal/testmovie package.
+// Clicking the area should play the movie in place, with the
+// specification's default activation parameters.  The page layout is
+// shared with the three sibling tests; see viewer-tests/internal/moviepage.
 package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 
-	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/file"
-	"seehuhn.de/go/pdf/font"
-	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/movie"
-	"seehuhn.de/go/pdf/viewer-tests/internal/testmovie"
+	"seehuhn.de/go/pdf/viewer-tests/internal/moviepage"
 )
 
 const (
-	movieW = 320.0
-	movieH = 240.0
+	title = "Movie annotation, embedded clip"
+	what  = "Click the outlined area: the movie should play in place, with the default activation parameters."
+	how   = "The clip is embedded in the PDF file, so a viewer which supports the annotation has the data."
+	note  = "The Movie annotation has no operations of its own; the media tests drive playback with rendition actions."
 )
 
 func main() {
@@ -53,65 +47,33 @@ func main() {
 }
 
 func createDocument(filename string) error {
-	paper := document.A4
-	opt := &pdf.WriterOptions{HumanReadable: true}
-	page, err := document.CreateSinglePage(filename, paper, pdf.V1_7, opt)
+	page, err := moviepage.New(filename, title, what, how)
 	if err != nil {
 		return err
 	}
-
-	captionFont := font.Must(standard.Helvetica.New())
-	captionX := pdf.Round((paper.URx-movieW)/2, 2) // left-align with movie rect
-	captionY := pdf.Round(paper.URy-80, 2)
-
-	page.TextBegin()
-	page.TextSetFont(captionFont, 12)
-	page.TextSetMatrix(matrix.Translate(captionX, captionY))
-	page.TextShow("Click the rectangle to play the embedded test movie.")
-	page.TextEnd()
-
-	rect := pdf.Rectangle{
-		LLx: captionX,
-		URx: captionX + movieW,
-		LLy: captionY - 16 - movieH,
-		URy: captionY - 16,
-	}
+	page.Note(note)
 
 	annot := &annotation.Movie{
 		Common: annotation.Common{
-			Rect:     rect,
-			Contents: "Timestamp counter (751 frames @ 25 fps), embedded in the PDF file.",
+			Rect:     moviepage.Screen,
+			Contents: moviepage.Description + ", embedded in the PDF file.",
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},
-		Title:      "Test movie",
-		Movie:      newTestMovie(),
+		Title:      "Tick movie",
+		Movie:      newMovie(),
 		Activation: movie.DefaultActivation,
 	}
-	page.Page.Annots = append(page.Page.Annots, annot)
+	page.Add(annot)
 
 	return page.Close()
 }
 
-// newTestMovie builds a *movie.Movie whose file specification embeds
-// the shared test movie data.
-func newTestMovie() *movie.Movie {
-	stream := &file.Stream{
-		MimeType: "video/mp4",
-		Size:     int64(len(testmovie.Data())),
-		WriteData: func(w io.Writer) error {
-			_, err := w.Write(testmovie.Data())
-			return err
-		},
-	}
-	spec := &file.Specification{
-		FileName:        "movie.mp4",
-		FileNameUnicode: "movie.mp4",
-		Description:     "Timestamp counter movie (751 frames at 25 fps, 320x240, H.264/MP4)",
-		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
-	}
+// newMovie builds the movie whose file specification carries the clip in
+// an embedded file stream.
+func newMovie() *movie.Movie {
 	return &movie.Movie{
-		File:   spec,
-		Aspect: movie.Aspect{Width: int(movieW), Height: int(movieH)},
+		File:   moviepage.EmbeddedSpec(),
+		Aspect: movie.Aspect{Width: 320, Height: 240},
 	}
 }

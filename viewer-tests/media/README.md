@@ -2,7 +2,11 @@
 
 Two `go run .` programs write a `test.pdf` driving a 30-second 320x240
 timestamp-counter clip (with a per-second audio tick) through a Screen
-annotation (§13.4.5) and Rendition actions (§12.6.4.10).  Clicking the
+annotation (§13.4.5) and Rendition actions (§12.6.4.10).  Both pages, and
+the two in `../movie/`, share one A5 landscape layout from
+`../internal/moviepage`, so that what a viewer does with any of the four
+can be compared against the others without allowing for a change of page
+geometry.  Clicking the
 screen plays the movie in place with the player's controller UI; a row of
 buttons below exercises the operation codes — Play (0), Pause (2), Resume
 (3), Stop (1), Play/Resume (4) — all targeting the screen annotation via

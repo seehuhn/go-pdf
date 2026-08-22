@@ -4,7 +4,10 @@ Two `go run .` programs write a `test.pdf` playing a 30-second 320x240
 timestamp-counter clip (with a per-second audio tick) through the deprecated
 Movie annotation (§13.4.5, removed in PDF 2.0), using the default
 activation parameters: clicking the annotation rectangle plays the movie in
-place.
+place.  Both pages, and the two in `../media/`, share one A5 landscape
+layout from `../internal/moviepage`, so that what a viewer does with any of
+the four can be compared against the others without allowing for a change
+of page geometry.
 
 ## The variants
 
