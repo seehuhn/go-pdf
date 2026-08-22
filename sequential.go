@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strconv"
 )
 
@@ -461,9 +462,7 @@ func (fi *FileInfo) makeXRef() map[uint32]*xRefEntry {
 }
 
 func (fi *FileInfo) getTrailer() (Dict, error) {
-	for j := len(fi.Sections) - 1; j >= 0; j-- {
-		sect := fi.Sections[j]
-
+	for _, sect := range slices.Backward(fi.Sections) {
 		// method 1: Try to find a cross-reference stream.  If there are several,
 		// use the last one.
 		var xrefStream *FileObject

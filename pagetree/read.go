@@ -19,6 +19,7 @@ package pagetree
 import (
 	"iter"
 	"maps"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 )
@@ -65,8 +66,7 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 			if kids == nil {
 				continue
 			}
-			for i := len(kids) - 1; i >= 0; i-- {
-				kid := kids[i]
+			for _, kid := range slices.Backward(kids) {
 				if kidRef, ok := kid.(pdf.Reference); ok && !seen[kidRef] {
 					todo = append(todo, kidRef)
 					seen[kidRef] = true
@@ -195,8 +195,7 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 					}
 				}
 
-				for i := len(kids) - 1; i >= 0; i-- {
-					kid := kids[i]
+				for _, kid := range slices.Backward(kids) {
 					if kidRef, ok := kid.(pdf.Reference); ok && !seen[kidRef] {
 						todo = append(todo, kidRef)
 						seen[kidRef] = true

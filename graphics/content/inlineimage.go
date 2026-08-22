@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 
 	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf"
@@ -179,8 +180,8 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 	}
 
 	result, err := io.ReadAll(io.LimitReader(r, sizeLimit+1))
-	for i := len(closers) - 1; i >= 0; i-- {
-		if cerr := closers[i].Close(); err == nil {
+	for _, closer := range slices.Backward(closers) {
+		if cerr := closer.Close(); err == nil {
 			err = cerr
 		}
 	}
