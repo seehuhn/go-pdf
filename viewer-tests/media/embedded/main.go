@@ -14,24 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:generate go run gen_movie.go
-
-// Command media writes test.pdf, a single landscape (16:9 presentation)
-// page driving an embedded H.264/AAC movie through a Screen annotation and
-// a Rendition action.  The movie carries a video timestamp counter and an
+// Command embedded writes test.pdf, a single landscape page driving a
+// movie embedded into the PDF file through a Screen annotation and a
+// Rendition action.  The movie carries a video timestamp counter and an
 // audio track that ticks once per second.
 //
-// The large screen rectangle plays the movie in place (rendition OP 0).  A
-// row of buttons below it exercises the rendition operation codes the viewer
-// supports, all targeting the screen annotation via the action's AN entry:
-// Play (0), Pause (2), Resume (3), Stop (1), and Play/Resume (4).
+// The large screen rectangle plays the movie in place (rendition OP 0).
+// A row of buttons below it exercises the rendition operation codes the
+// viewer supports, all targeting the screen annotation via the action's
+// AN entry: Play (0), Pause (2), Resume (3), Stop (1), and Play/Resume (4).
 //
-// The movie itself is generated separately by gen_movie.go (invoked via
-// `go generate`) and embedded here via go:embed.
+// The movie data is shared with the other media tests and comes from
+// the viewer-tests/internal/testmovie package.
 package main
 
 import (
-	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -47,10 +44,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/media"
 	"seehuhn.de/go/pdf/optional"
+	"seehuhn.de/go/pdf/viewer-tests/internal/testmovie"
 )
-
-//go:embed movie.mp4
-var movieData []byte
 
 func main() {
 	if err := createDocument("test.pdf"); err != nil {
@@ -74,16 +69,16 @@ func createDocument(filename string) error {
 	page.TextBegin()
 	page.TextSetFont(titleFont, 20)
 	page.TextSetMatrix(matrix.Translate(80, paper.URy-50))
-	page.TextShow("Rendition action test")
+	page.TextShow("Rendition action test (embedded movie)")
 	page.TextSetFont(bodyFont, 12)
 	page.TextSetMatrix(matrix.Translate(80, paper.URy-72))
 	page.TextShow("Click the screen to play. The movie ticks once per second; use the buttons to control playback.")
 	page.TextEnd()
 
-	// the screen annotation that hosts playback (16:9, below the caption and
-	// above the button row); reserve its reference up front so the rendition
-	// actions can target it via AN
-	screenRect := pdf.Rectangle{LLx: 180, LLy: 107.5, URx: 780, URy: 445}
+	// the screen annotation that hosts playback (4:3, below the caption
+	// and above the button row); reserve its reference up front so the
+	// rendition actions can target it via AN
+	screenRect := pdf.Rectangle{LLx: 255, LLy: 107.5, URx: 705, URy: 445}
 
 	// one shared rendition: embedded once, referenced by every play action
 	rend := newRendition()
@@ -91,7 +86,7 @@ func createDocument(filename string) error {
 	screen := &annotation.Screen{
 		Common: annotation.Common{
 			Rect:     screenRect,
-			Contents: "Tick movie (1280x720, H.264/AAC, 30 s).",
+			Contents: "Tick movie (320x240, H.264/AAC, 30 s), embedded in the PDF file.",
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},
@@ -162,21 +157,21 @@ func renditionAction(r media.Rendition, an pdf.Reference, op uint) *action.Rendi
 	}
 }
 
-// newRendition builds the media rendition that plays the embedded movie with
-// the player's controller UI shown.
+// newRendition builds the media rendition that plays the movie embedded
+// in the PDF file, with the player's controller UI shown.
 func newRendition() *media.MediaRendition {
 	stream := &file.Stream{
 		MimeType: "video/mp4",
-		Size:     int64(len(movieData)),
+		Size:     int64(len(testmovie.Data())),
 		WriteData: func(w io.Writer) error {
-			_, err := w.Write(movieData)
+			_, err := w.Write(testmovie.Data())
 			return err
 		},
 	}
 	spec := &file.Specification{
 		FileName:        "movie.mp4",
 		FileNameUnicode: "movie.mp4",
-		Description:     "Tick movie (1280x720, H.264/AAC, ticks once per second)",
+		Description:     "Tick movie (320x240, H.264/AAC, ticks once per second)",
 		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
 	}
 	return &media.MediaRendition{

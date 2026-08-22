@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:generate go run gen_movie.go
-
-// Command movie writes test.pdf, a single-page A4 document containing
-// one Movie annotation referencing an embedded H.264/MP4 timestamp-
-// counter movie.  Clicking the annotation should play the movie in
-// place with the PDF specification's default activation parameters.
+// Command external writes test.pdf, a single-page A4 document containing
+// one Movie annotation playing an H.264/MP4 timestamp-counter movie
+// referenced as an external file (no data embedded in the PDF).
 //
-// The movie itself is generated separately by gen_movie.go (invoked
-// via `go generate`) and embedded here via go:embed.
+// The PDF names the file movie.mp4 relative to the PDF's location; the
+// committed symlink movie.mp4 in this directory points at the shared
+// copy in viewer-tests/internal/testmovie.  Open test.pdf from within
+// this directory: viewers which resolve external media will play the
+// movie, others will show nothing or an error.  The sibling `embedded`
+// test covers the same Movie annotation with the movie embedded in the
+// PDF file, for comparison.
 package main
 
 import (
-	_ "embed"
 	"fmt"
-	"io"
 	"os"
 
 	"seehuhn.de/go/geom/matrix"
@@ -40,9 +40,6 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/movie"
 )
-
-//go:embed movie.mp4
-var movieData []byte
 
 const (
 	movieW = 320.0
@@ -65,13 +62,13 @@ func createDocument(filename string) error {
 	}
 
 	captionFont := font.Must(standard.Helvetica.New())
-	captionX := (paper.URx - movieW) / 2 // left-align with movie rect
-	captionY := paper.URy - 80
+	captionX := pdf.Round((paper.URx-movieW)/2, 2) // left-align with movie rect
+	captionY := pdf.Round(paper.URy-80, 2)
 
 	page.TextBegin()
 	page.TextSetFont(captionFont, 12)
 	page.TextSetMatrix(matrix.Translate(captionX, captionY))
-	page.TextShow("Click the rectangle to play the test movie.")
+	page.TextShow("Click the rectangle to play the test movie; it is not embedded.")
 	page.TextEnd()
 
 	rect := pdf.Rectangle{
@@ -84,7 +81,7 @@ func createDocument(filename string) error {
 	annot := &annotation.Movie{
 		Common: annotation.Common{
 			Rect:     rect,
-			Contents: "Timestamp counter (751 frames @ 25 fps).",
+			Contents: "Timestamp counter (751 frames @ 25 fps), external file movie.mp4.",
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},
@@ -97,22 +94,13 @@ func createDocument(filename string) error {
 	return page.Close()
 }
 
-// newTestMovie builds a *movie.Movie whose file specification embeds
-// the bytes baked into this binary by go:embed.
+// newTestMovie builds a *movie.Movie whose file specification names the
+// external file movie.mp4 without embedding data.
 func newTestMovie() *movie.Movie {
-	stream := &file.Stream{
-		MimeType: "video/mp4",
-		Size:     int64(len(movieData)),
-		WriteData: func(w io.Writer) error {
-			_, err := w.Write(movieData)
-			return err
-		},
-	}
 	spec := &file.Specification{
 		FileName:        "movie.mp4",
 		FileNameUnicode: "movie.mp4",
 		Description:     "Timestamp counter movie (751 frames at 25 fps, 320x240, H.264/MP4)",
-		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
 	}
 	return &movie.Movie{
 		File:   spec,
