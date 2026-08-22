@@ -18,6 +18,7 @@ package measure
 
 import (
 	"errors"
+	"slices"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
@@ -154,9 +155,9 @@ type ViewPortArray struct {
 // Implements the algorithm from PDF spec: examine in reverse order,
 // return first viewport whose BBox contains the point.
 func (va *ViewPortArray) Select(point vec.Vec2) *Viewport {
-	for i := len(va.Viewports) - 1; i >= 0; i-- {
-		if va.Viewports[i].BBox.Contains(point) {
-			return va.Viewports[i]
+	for _, v := range slices.Backward(va.Viewports) {
+		if v.BBox.Contains(point) {
+			return v
 		}
 	}
 	return nil

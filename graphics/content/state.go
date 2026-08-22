@@ -284,9 +284,9 @@ func (s *State) MarkedContentStack() []*graphics.MarkedContent {
 // Consumers can call this before [State.ApplyStateChanges] processes an
 // EMC operator to capture the MC that is about to be popped.
 func (s *State) MarkedContentTop() *graphics.MarkedContent {
-	for i := len(s.nesting) - 1; i >= 0; i-- {
-		if s.nesting[i].Kind == pairBMC {
-			return s.nesting[i].MC
+	for _, v := range slices.Backward(s.nesting) {
+		if v.Kind == pairBMC {
+			return v.MC
 		}
 	}
 	return nil
@@ -567,9 +567,9 @@ func (s *State) applyTransition(name OpName) {
 // operator pairs, and whether the writer needs to ensure proper nesting
 // for PDF 2.0 conformance.
 func (s *State) popNesting(expected pairType, opName string) (*graphics.MarkedContent, error) {
-	for i := len(s.nesting) - 1; i >= 0; i-- {
-		if s.nesting[i].Kind == expected {
-			mc := s.nesting[i].MC
+	for i, v := range slices.Backward(s.nesting) {
+		if v.Kind == expected {
+			mc := v.MC
 			s.nesting = append(s.nesting[:i], s.nesting[i+1:]...)
 			return mc, nil
 		}
@@ -599,8 +599,8 @@ func (s *State) ClosingOperators() []OpName {
 	}
 
 	// close paired operators in reverse order
-	for i := len(s.nesting) - 1; i >= 0; i-- {
-		switch s.nesting[i].Kind {
+	for _, v := range slices.Backward(s.nesting) {
+		switch v.Kind {
 		case pairQ:
 			ops = append(ops, OpPopGraphicsState)
 		case pairBT:

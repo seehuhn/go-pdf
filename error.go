@@ -19,6 +19,7 @@ package pdf
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -84,8 +85,8 @@ func Errorf(format string, args ...any) error {
 func (err *MalformedFileError) Error() string {
 	parts := make([]string, 0, len(err.Loc)+2)
 	parts = append(parts, "invalid PDF: ")
-	for i := len(err.Loc) - 1; i >= 0; i-- {
-		parts = append(parts, err.Loc[i]+": ")
+	for _, v := range slices.Backward(err.Loc) {
+		parts = append(parts, v+": ")
 	}
 	parts = append(parts, err.Err.Error())
 	return strings.Join(parts, "")

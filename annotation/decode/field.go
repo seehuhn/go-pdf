@@ -19,6 +19,7 @@
 package decode
 
 import (
+	"slices"
 	"strings"
 
 	"seehuhn.de/go/pdf"
@@ -589,8 +590,8 @@ func inheritedFromChain(c pdf.Cursor, dict pdf.Dict) inherited {
 	da, q := acroFormDefaults(c)
 	ctx := inherited{da: da, q: q}
 	// apply ancestors from the root down, so a nearer ancestor wins
-	for i := len(chain) - 1; i >= 0; i-- {
-		ctx = applyOwnContext(ctx, c, chain[i])
+	for _, c0 := range slices.Backward(chain) {
+		ctx = applyOwnContext(ctx, c, c0)
 	}
 	return ctx
 }
