@@ -31,7 +31,7 @@ import (
 func dump(t *testing.T, form *acroform.InteractiveForm) string {
 	t.Helper()
 
-	w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	if err := memfile.AddBlankPage(w); err != nil {
 		t.Fatalf("add blank page: %v", err)
 	}

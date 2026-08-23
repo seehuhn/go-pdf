@@ -38,7 +38,7 @@ import (
 // resulting simple CFF font dictionary.
 func embedSimpleCFF(t *testing.T, F font.Layouter, text string) *dict.Type1 {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	ref, err := rm.Embed(F)
@@ -71,7 +71,7 @@ func embedSimpleCFF(t *testing.T, F font.Layouter, text string) *dict.Type1 {
 // resulting CIDFontType0 font dictionary.
 func embedCompositeCFF(t *testing.T, F font.Layouter, text string) *dict.CIDFontType0 {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	ref, err := rm.Embed(F)

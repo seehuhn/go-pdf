@@ -35,7 +35,7 @@ import (
 func TestSimpleGlyfDescriptor(t *testing.T) {
 	fontData := makefont.TrueType()
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	F, err := opentype.NewSimple(fontData, nil)
 	if err != nil {

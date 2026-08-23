@@ -200,7 +200,7 @@ var testCases = []struct {
 func roundTripTest(t *testing.T, version pdf.Version, data *extgstate.ExtGState) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 
 	// Embed the ExtGState
 	rm := pdf.NewResourceManager(w)
@@ -250,7 +250,7 @@ func FuzzRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

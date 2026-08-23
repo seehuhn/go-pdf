@@ -130,7 +130,7 @@ var streamTestCases = []struct {
 func streamRoundTripTest(t *testing.T, version pdf.Version, stream *Stream) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 
 	// Embed the stream
 	rm := pdf.NewResourceManager(w)
@@ -217,7 +217,7 @@ func TestStreamRoundTrip(t *testing.T) {
 }
 
 func TestStreamValidation(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// Test missing WriteData
@@ -251,7 +251,7 @@ func TestStreamValidation(t *testing.T) {
 
 func TestStreamVersionRequirement(t *testing.T) {
 	// Test that PDF 1.2 fails
-	w, _ := memfile.NewPDFWriter(pdf.V1_2, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_2, nil)
 	rm := pdf.NewResourceManager(w)
 
 	stream := &Stream{
@@ -276,7 +276,7 @@ func FuzzStreamRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range streamTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

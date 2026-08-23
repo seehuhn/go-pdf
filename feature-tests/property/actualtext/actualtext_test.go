@@ -28,7 +28,7 @@ import (
 )
 
 func TestActualText(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	err := writeTestPage(w)
 	if err != nil {

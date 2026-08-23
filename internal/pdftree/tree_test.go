@@ -97,7 +97,7 @@ func testRoundTrip[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 			}
 			want := tk.data(n)
 
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			ref, err := Write[K, C](w, (&InMemory[K, C]{Data: want}).All())
 			if err != nil {
 				t.Fatal(err)
@@ -223,7 +223,7 @@ func TestEmptyTree(t *testing.T) {
 // testEmptyTree pins the contract for writing an empty tree: it produces the
 // null reference rather than a root object.
 func testEmptyTree[K cmp.Ordered, C codec[K]](t *testing.T, _ treeKind[K, C]) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref, err := Write[K, C](w, (&InMemory[K, C]{Data: map[K]pdf.Object{}}).All())
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestWriteRejectsBadInput(t *testing.T) {
 }
 
 func testWriteRejectsBadInput[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	unsorted := func(yield func(K, pdf.Object) bool) {
 		if !yield(tk.keyAt(2), tk.valAt(2)) {
@@ -273,13 +273,13 @@ func testEmbed[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 	want := tk.data(5)
 
 	t.Run("InMemory", func(t *testing.T) {
-		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		ref := embed(t, w, &InMemory[K, C]{Data: want})
 		checkContents[K, C](t, w, ref, want)
 	})
 
 	t.Run("FromFile", func(t *testing.T) {
-		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		srcRef, err := Write[K, C](w, (&InMemory[K, C]{Data: want}).All())
 		if err != nil {
 			t.Fatal(err)
@@ -326,7 +326,7 @@ func TestEarlyTermination(t *testing.T) {
 // walk, including across the intermediate nodes of a multi-leaf tree.
 func testEarlyTermination[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 	want := tk.data(maxChildren + 5) // forces a multi-leaf tree with /Kids
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref, err := Write[K, C](w, (&InMemory[K, C]{Data: want}).All())
 	if err != nil {
 		t.Fatal(err)

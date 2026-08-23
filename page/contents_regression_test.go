@@ -43,7 +43,7 @@ import (
 func TestRoundTrip_CrossSegmentText(t *testing.T) {
 	timesRoman := font.Must(standard.TimesRoman.New())
 
-	w1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w1, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w1.Alloc()
 
 	// Write two content-stream objects: BT in stream 1, ET in stream 2.
@@ -140,7 +140,7 @@ func TestRoundTrip_CrossSegmentText(t *testing.T) {
 // single inter-segment whitespace separator into one byte stream that
 // a single scanner consumes (PDF 32000-1 §7.8.2).
 func TestRoundTrip_CrossSegmentArgsAndTokens(t *testing.T) {
-	w1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w1, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w1.Alloc()
 
 	segRefs := make(pdf.Array, 2)
@@ -232,7 +232,7 @@ func TestRoundTrip_CrossSegmentArgsAndTokens(t *testing.T) {
 func TestEncode_MixedContents_AllowsCrossStreamPairs(t *testing.T) {
 	// Round-trip a page through file to obtain a *Source.
 	timesRoman := font.Must(standard.TimesRoman.New())
-	w1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w1, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w1.Alloc()
 	donor := &Page{
 		Parent:   parentRef,
@@ -269,7 +269,7 @@ func TestEncode_MixedContents_AllowsCrossStreamPairs(t *testing.T) {
 	// with the Source part (which has its own q/Q balance).  Each
 	// segment validates independently; nothing in the in-memory part
 	// depends on state from the Source.
-	w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef2 := w2.Alloc()
 	mixed := &Page{
 		Parent:   parentRef2,

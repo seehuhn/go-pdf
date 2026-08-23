@@ -52,7 +52,7 @@ func deepExtract(c pdf.Cursor, obj pdf.Object, _ bool) (int, error) {
 func TestDecodeDepthBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// build /Next chain: refs[i] -> refs[i+1], last one has no /Next
 	refs := make([]pdf.Reference, depth)

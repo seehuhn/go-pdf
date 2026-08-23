@@ -26,7 +26,7 @@ import (
 func textField(name string) *TextField { return NewTextField(name) }
 
 func TestEncodeInvalidAlign(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	f := NewTextField("f")
@@ -40,7 +40,7 @@ func TestEncodeInvalidAlign(t *testing.T) {
 
 func TestEncodeVersionGating(t *testing.T) {
 	// the XFA array form requires PDF 1.6; encoding it to a PDF 1.4 file must fail.
-	w, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
@@ -57,7 +57,7 @@ func TestEncodeVersionGating(t *testing.T) {
 func TestEncodeXFAStreamForm(t *testing.T) {
 	// the XFA stream form is valid from PDF 1.5, whereas the array form
 	// requires PDF 1.6, so a non-array XFA value must encode at PDF 1.5.
-	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
@@ -101,7 +101,7 @@ func TestEncodeVersionGatingEntries(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(tc.version, nil)
+			w, _ := memfile.NewPDFWriter(t, tc.version, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := tc.build(rm).Encode(rm); !pdf.IsWrongVersion(err) {
 				t.Errorf("expected version error, got %v", err)

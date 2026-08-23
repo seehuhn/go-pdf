@@ -225,7 +225,7 @@ end
 func TestExtractCMAP(t *testing.T) {
 	// Write a CMap "by hand".
 
-	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, testROS)
@@ -512,7 +512,7 @@ func TestExtractPredefined(t *testing.T) {
 		"Identity-V",
 	}
 	for _, name := range names {
-		data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		t.Run(string(name), func(t *testing.T) {
 			info, err := Extract(pdf.NewCursor(data), name, false)
 			if err != nil {
@@ -538,7 +538,7 @@ func TestExtractLoop(t *testing.T) {
 	// Try different loop lengths:
 	for n := 1; n <= 3; n++ {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
-			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
 			ros := &cid.SystemInfo{
 				Registry:   "Test",
@@ -618,7 +618,7 @@ func TestExtractLoop(t *testing.T) {
 }
 
 func TestEmbedCMap(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 	ref, err := rm.Embed(testToUniInfoChild)
 	if err != nil {
@@ -667,7 +667,7 @@ func TestCMapTemplate(t *testing.T) {
 // limits.MaxCMapBytes is rejected, blocking a decompression-bomb
 // attack on CMap loading.
 func TestExtractCMapOversize(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	ref := w.Alloc()
 	stm, err := w.OpenStream(ref, pdf.Dict{

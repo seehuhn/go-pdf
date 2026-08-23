@@ -140,7 +140,7 @@ func FuzzType2Dict(f *testing.F) {
 func checkRoundTripT2(t *testing.T, d1 *dict.CIDFontType2, v pdf.Version) {
 	d1 = clone(d1)
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// == Write ==

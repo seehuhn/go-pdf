@@ -111,7 +111,7 @@ func TestBorderSurvivesRoundTrip(t *testing.T) {
 	for bn, border := range borderArrays {
 		for sn, style := range borderStyles {
 			t.Run("Border="+bn+",BS="+sn, func(t *testing.T) {
-				src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+				src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 				first, err := Annotation(pdf.NewCursor(src), squareWithBorder(border, style), true)
 				if err != nil {
 					t.Fatal(err)
@@ -123,7 +123,7 @@ func TestBorderSurvivesRoundTrip(t *testing.T) {
 
 				// PDF 1.7, where a square annotation need not carry an
 				// appearance stream: the border entries are the subject here
-				buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+				buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 				rm := pdf.NewResourceManager(buf)
 				obj, err := first.Encode(rm)
 				if err != nil {
@@ -193,7 +193,7 @@ func TestEffectiveBorderWidthFromFile(t *testing.T) {
 		}, 0},
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	c := pdf.NewCursor(w)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

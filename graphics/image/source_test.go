@@ -39,7 +39,7 @@ func TestFlateSourceNoPredictor(t *testing.T) {
 
 	var streams [2][]byte
 	for i, predictor := range []pdf.FlatePredictor{0, pdf.FlatePredictorNone} {
-		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(w)
 		dict := &Dict{
 			Width:            4,

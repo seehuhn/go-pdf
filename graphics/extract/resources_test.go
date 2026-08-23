@@ -142,7 +142,7 @@ func TestRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// create in-memory PDF writer
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
 			// embed the resource
@@ -375,7 +375,7 @@ func TestVersionValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(tt.version, nil)
+			w, _ := memfile.NewPDFWriter(t, tt.version, nil)
 			rm := pdf.NewResourceManager(w)
 
 			_, err := rm.Embed(tt.resource)
@@ -490,7 +490,7 @@ func TestProcSetConversion(t *testing.T) {
 				SingleUse: true,
 			}
 
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
 			obj, err := rm.Embed(resource)
@@ -548,7 +548,7 @@ func TestProcSetConversion(t *testing.T) {
 
 func TestProcSetUnknownNames(t *testing.T) {
 	// test that unknown names in PDF array are ignored (permissive)
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// create a resource dict with ProcSet containing known and unknown names
 	dict := pdf.Dict{
@@ -637,7 +637,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, nil)
+		w, buf := memfile.NewPDFWriter(f, tc.version, nil)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -685,7 +685,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		// embed back - strict
-		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(w)
 
 		embedded, err := rm.Embed(resource1)

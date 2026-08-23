@@ -150,7 +150,7 @@ func TestVisibilityExpressionRoundTrip(t *testing.T) {
 func testVisibilityExpressionRoundTrip(t *testing.T, version pdf.Version, original VisibilityExpression) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(original)
@@ -182,7 +182,7 @@ func testVisibilityExpressionRoundTrip(t *testing.T, version pdf.Version, origin
 
 func TestVisibilityExpressionVersionCheck(t *testing.T) {
 	// visibility expressions require PDF 1.6+
-	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm := pdf.NewResourceManager(w)
 
 	ve := &VisibilityExpressionAnd{
@@ -201,7 +201,7 @@ func TestVisibilityExpressionVersionCheck(t *testing.T) {
 }
 
 func TestVisibilityExpressionValidation(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	tests := []struct {
@@ -295,7 +295,7 @@ func TestVisibilityExpressionCycle(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			veRef := tc.build(t, w)
 			x := pdf.NewExtractor(w)
 
@@ -507,7 +507,7 @@ func FuzzVisibilityExpression(f *testing.F) {
 	}
 
 	for _, tc := range visibilityExpressionTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

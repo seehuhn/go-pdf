@@ -272,7 +272,7 @@ func BenchmarkMakeName(b *testing.B) {
 func TestExtractToUnicode(t *testing.T) {
 	// Write a ToUnicode CMap "by hand".
 
-	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, toUnicodeROS)
@@ -461,7 +461,7 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 	// Try different loop lengths:
 	for n := 1; n <= 3; n++ {
 		t.Run(fmt.Sprintf("%d", n), func(t *testing.T) {
-			data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(data)
 			rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, toUnicodeROS)
 			if err != nil {
@@ -534,7 +534,7 @@ func TestExtractToUnicodeLoop(t *testing.T) {
 }
 
 func TestEmbedToUnicode(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
 	ref, err := rm.Embed(testToUniInfoChild)

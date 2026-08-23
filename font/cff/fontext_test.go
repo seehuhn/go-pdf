@@ -29,7 +29,7 @@ import (
 
 func TestEmbedSimple(t *testing.T) {
 	// step 1: embed a font instance into a simple PDF file
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	fontData := makefont.OpenType()

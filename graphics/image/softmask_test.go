@@ -203,7 +203,7 @@ func TestExtractSoftMaskMatteOversize(t *testing.T) {
 				matte[i] = pdf.Number(0.5)
 			}
 
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			ref := w.Alloc()
 			body, err := w.OpenStream(ref, pdf.Dict{
 				"Type":             pdf.Name("XObject"),
@@ -251,7 +251,7 @@ func TestSoftMaskRoundTrip(t *testing.T) {
 		for _, tt := range softMaskTests {
 			testName := tt.name + "_" + version.String()
 			t.Run(testName, func(t *testing.T) {
-				w, _ := memfile.NewPDFWriter(version, nil)
+				w, _ := memfile.NewPDFWriter(t, version, nil)
 				defer w.Close()
 
 				rm := pdf.NewResourceManager(w)
@@ -312,7 +312,7 @@ func FuzzSoftMaskRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tt := range softMaskTests {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 		rm := pdf.NewResourceManager(w)
 
 		err := memfile.AddBlankPage(w)

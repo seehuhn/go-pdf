@@ -192,7 +192,7 @@ func TestExtractNil(t *testing.T) {
 // path documented in the security report: a self-referencing /Kids
 // dict planted at Catalog/PageLabels.
 func TestExtractCyclicPageLabels(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	rootRef := w.Alloc()
 	root := pdf.Dict{
@@ -318,7 +318,7 @@ func TestRoundTripClampedStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(labels)
 	if err != nil {
@@ -344,7 +344,7 @@ func TestRoundTripClampedStart(t *testing.T) {
 func TestRoundTrip(t *testing.T) {
 	labels := newTestLabels(t)
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(labels)
@@ -473,7 +473,7 @@ func TestExtractValidates(t *testing.T) {
 				t.Errorf("Extract returned an unwritable value: %v", err)
 			}
 
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(labels); err != nil {
 				t.Errorf("re-embedding a value read from a file failed: %v", err)

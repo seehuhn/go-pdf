@@ -45,7 +45,7 @@ func writeStream(t *testing.T, w *pdf.Writer, body []byte, filters ...pdf.Filter
 }
 
 func TestCursorStreamReader(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	body := []byte("hello, cursor stream")
 	ref := writeStream(t, w, body, pdf.FilterCompress{})
 
@@ -77,7 +77,7 @@ func TestCursorStreamReader(t *testing.T) {
 }
 
 func TestCursorReadAll(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	body := []byte("0123456789")
 	ref := writeStream(t, w, body)
 
@@ -103,7 +103,7 @@ func TestCursorReadAll(t *testing.T) {
 }
 
 func TestCursorFilters(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	c := pdf.NewCursor(w)
 
 	// a dictionary without /Filter has an empty filter chain
@@ -123,7 +123,7 @@ func TestCursorFilters(t *testing.T) {
 }
 
 func TestCursorVersion(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if v := pdf.NewCursor(w).Version(); v != pdf.V1_7 {
 		t.Errorf("Version: got %v, want %v", v, pdf.V1_7)
 	}

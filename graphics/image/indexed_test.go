@@ -46,7 +46,7 @@ func mustIndexed(colors ...color.Color) color.Space {
 func embedIndexed(t *testing.T, v pdf.Version, im *Indexed) (*Dict, error) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	ref, err := rm.Embed(im)

@@ -198,7 +198,7 @@ func TestPropertiesRoundTrip(t *testing.T) {
 func testPropertiesRoundTrip(t *testing.T, version pdf.Version, data *Properties) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(data)
@@ -263,7 +263,7 @@ func normalizeProperties(p *Properties) {
 
 func TestPropertiesValidation(t *testing.T) {
 	// missing OCGs
-	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm := pdf.NewResourceManager(w)
 	p := &Properties{D: &Configuration{BaseState: BaseStateON}}
 	_, err := rm.Embed(p)
@@ -272,7 +272,7 @@ func TestPropertiesValidation(t *testing.T) {
 	}
 
 	// missing D
-	w2, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm2 := pdf.NewResourceManager(w2)
 	p2 := &Properties{OCGs: []*Group{propGroup1}}
 	_, err = rm2.Embed(p2)
@@ -281,7 +281,7 @@ func TestPropertiesValidation(t *testing.T) {
 	}
 
 	// version check
-	w14, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	w14, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm14 := pdf.NewResourceManager(w14)
 	p3 := &Properties{
 		OCGs: []*Group{propGroup1},
@@ -297,7 +297,7 @@ func FuzzPropertiesRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range propTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -349,7 +349,7 @@ func FuzzPropertiesRoundTrip(f *testing.F) {
 // configuration only when the entry is absent.  An empty array says
 // "present nothing" and must be kept.
 func TestPropertiesOrderInheritance(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 
 	groupRef := w.Alloc()
 	err := w.Put(groupRef, pdf.Dict{
@@ -407,7 +407,7 @@ func TestPropertiesOrderInheritance(t *testing.T) {
 // A default configuration with an explicitly empty Intent is invalid:
 // if present, its value has to be View.
 func TestPropertiesDefaultIntentEmpty(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm := pdf.NewResourceManager(w)
 	p := &Properties{
 		OCGs: []*Group{propGroup1},

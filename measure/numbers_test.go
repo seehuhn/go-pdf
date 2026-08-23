@@ -90,7 +90,7 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a test PDF writer
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			// Embed the NumberFormat
 			rm := pdf.NewResourceManager(w)
@@ -122,7 +122,7 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 
 func TestNumberFormatExtractDefaults(t *testing.T) {
 	// Test extraction with minimal PDF dictionary (only required fields)
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	dict := pdf.Dict{
 		"U": pdf.String("mi"),
@@ -230,7 +230,7 @@ func TestNumberFormatExtractFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			x := pdf.NewExtractor(w)
 			nf, err := pdf.Decode(pdf.CursorAt(x, nil), tt.dict, ExtractNumberFormat)
 			if err != nil {

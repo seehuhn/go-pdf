@@ -33,7 +33,7 @@ import (
 // reader and the reference of the optional-content group.
 func makeLayeredSource(t *testing.T) (*pdf.Reader, pdf.Reference) {
 	t.Helper()
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ocgRef := w.Alloc()
 	if err := w.Put(ocgRef, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.String("Layer 1")}); err != nil {
@@ -174,7 +174,7 @@ func formContent(t *testing.T, data []byte, name pdf.Name) string {
 }
 
 func TestFormRecursion(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	formRef := w.Alloc()
 	fstm, err := w.OpenStream(formRef, pdf.Dict{

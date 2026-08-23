@@ -36,7 +36,7 @@ var (
 
 // TestPNGRefactored verifies that the PNG function creates proper Dict objects.
 func TestPNGRefactored(t *testing.T) {
-	writer, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	writer, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm := pdf.NewResourceManager(writer)
 
 	// Create a test image with transparency
@@ -149,7 +149,7 @@ func TestPNGRefactored(t *testing.T) {
 // TestMaskWithPtData verifies that PtData is properly handled during
 // image mask read/write cycles.
 func TestMaskWithPtData(t *testing.T) {
-	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer1, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
 	// create test PtData with some geospatial point data
@@ -210,7 +210,7 @@ func TestMaskWithPtData(t *testing.T) {
 	}
 
 	// test round-trip
-	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
 	ref2, err := rm2.Embed(mask1)
 	if err != nil {

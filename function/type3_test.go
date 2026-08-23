@@ -189,7 +189,7 @@ func TestType3BoundaryHandling(t *testing.T) {
 // turn this into a malformed-file error rather than a crash.
 func TestExtractType3DeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	refs := make([]pdf.Reference, depth)
 	for i := range refs {

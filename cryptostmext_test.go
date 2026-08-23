@@ -76,7 +76,7 @@ func TestIndirectFilterWriteInlines(t *testing.T) {
 
 	// Build an encrypted PDF using a memfile-backed writer so that
 	// Writer.Get can resolve the indirect /Filter at write time.
-	w, mf := memfile.NewPDFWriter(pdf.V1_6, &pdf.WriterOptions{
+	w, mf := memfile.NewPDFWriter(t, pdf.V1_6, &pdf.WriterOptions{
 		UserPassword:  "u",
 		OwnerPassword: "o",
 	})
@@ -155,7 +155,7 @@ func TestIndirectFilterReadResolves(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w, mf := memfile.NewPDFWriter(pdf.V1_6, &pdf.WriterOptions{
+	w, mf := memfile.NewPDFWriter(t, pdf.V1_6, &pdf.WriterOptions{
 		UserPassword:  "u",
 		OwnerPassword: "o",
 	})
@@ -247,7 +247,7 @@ func TestCopyInlinesIndirectFilter(t *testing.T) {
 	}
 
 	// Source: encrypted PDF with /Filter as an indirect reference.
-	srcW, srcMF := memfile.NewPDFWriter(pdf.V1_6, &pdf.WriterOptions{
+	srcW, srcMF := memfile.NewPDFWriter(t, pdf.V1_6, &pdf.WriterOptions{
 		UserPassword:  "src",
 		OwnerPassword: "src",
 	})

@@ -141,7 +141,7 @@ func TestMembershipRoundTrip(t *testing.T) {
 func testMembershipRoundTrip(t *testing.T, version pdf.Version, original *Membership) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// embed the membership dictionary
@@ -220,7 +220,7 @@ func normalizeVisibilityExpression(ve VisibilityExpression) {
 }
 
 func TestMembershipValidation(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// test empty membership (valid per spec Table 97: content always visible)
@@ -247,7 +247,7 @@ func TestMembershipValidation(t *testing.T) {
 
 func TestMembershipExtractPermissive(t *testing.T) {
 	// test that extraction handles malformed data gracefully
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// create a minimal OCG
@@ -303,7 +303,7 @@ func TestMembershipPolicyConstants(t *testing.T) {
 }
 
 func TestMembershipSingleOCG(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// create membership with single OCG
@@ -339,7 +339,7 @@ func TestMembershipSingleOCG(t *testing.T) {
 
 func TestMembershipWithNullOCGs(t *testing.T) {
 	// test that null values in OCGs array are ignored per PDF spec
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// create a valid group first
@@ -395,7 +395,7 @@ func FuzzMembershipRoundTrip(f *testing.F) {
 		for _, singleUse := range []bool{false, true} {
 			tc.membership.SingleUse = singleUse
 
-			w, buf := memfile.NewPDFWriter(tc.version, opt)
+			w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 			err := memfile.AddBlankPage(w)
 			if err != nil {

@@ -341,7 +341,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 				return err
 			}
 		}
-		dict["CA"] = pdf.Number(1 - c.StrokingTransparency)
+		dict["CA"] = pdf.Number(pdf.Round(1-c.StrokingTransparency, 10))
 	}
 
 	// NonStrokingOpacity (ca entry)
@@ -349,7 +349,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 		if err := pdf.CheckVersion(w, "annotation ca entry", pdf.V2_0); err != nil {
 			return err
 		}
-		dict["ca"] = pdf.Number(1 - c.NonStrokingTransparency)
+		dict["ca"] = pdf.Number(pdf.Round(1-c.NonStrokingTransparency, 10))
 	}
 
 	if c.BlendMode != "" {

@@ -33,7 +33,7 @@ func TestNewEmbedVerbatim(t *testing.T) {
 	}
 	o := Direct(original)
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	native, err := rm.Embed(o)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestNewEmbedVerbatim(t *testing.T) {
 func TestExtractRoundTripCrossFile(t *testing.T) {
 	// Build the source: an outer dict whose /Inner entry references an
 	// indirect dict in the same file.
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(src); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestExtractRoundTripCrossFile(t *testing.T) {
 	o := Extract(srcX, outerRef)
 
 	// Embed into a different file.
-	dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(dst)
 	native, err := rm.Embed(o)
 	if err != nil {
@@ -153,7 +153,7 @@ func TestExtractRoundTripCrossFile(t *testing.T) {
 // which produces a Reference for indirect source values.
 func TestEmbedDedup(t *testing.T) {
 	// Source PDF with one indirect dict.
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(src); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestEmbedDedup(t *testing.T) {
 	o := Extract(srcX, srcRef)
 
 	// Two Embed calls against the same ResourceManager.
-	dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(dst)
 
 	a, err := rm.Embed(o)
@@ -214,7 +214,7 @@ func TestEmbedDedup(t *testing.T) {
 // returns an error when called on an Object built via New.
 func TestObjectAs(t *testing.T) {
 	// Build source PDF with a dict containing a known integer.
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(src); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestEqualNil(t *testing.T) {
 // blow the Go call stack.  Equal returns false because deepResolve
 // reports a MalformedFileError.
 func TestEqualCycle(t *testing.T) {
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	aRef := src.Alloc()
 	bRef := src.Alloc()
 	if err := src.Put(aRef, pdf.Dict{"K": bRef}); err != nil {
@@ -305,7 +305,7 @@ func TestEqualCycle(t *testing.T) {
 // indirect references does not exhaust the Go stack.  The chain has
 // no cycle, so only the depth cap protects against stack overflow.
 func TestEqualDeepChain(t *testing.T) {
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	const n = maxDeepResolveDepth + 10
 	refs := make([]pdf.Reference, n)
 	for i := range refs {

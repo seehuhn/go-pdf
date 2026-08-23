@@ -27,7 +27,7 @@ import (
 // (also a Getter) and the form dictionary.
 func encodeForm(t *testing.T, form *InteractiveForm) (*pdf.Writer, pdf.Dict) {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	native, err := form.Encode(rm)
 	if err != nil {
@@ -183,7 +183,7 @@ func TestFactorFlagsOverride(t *testing.T) {
 }
 
 func TestEncodeEmptyGroup(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	form := &InteractiveForm{Fields: []Node{&Group{Name: "g"}}}
 	if _, err := form.Encode(rm); err == nil {
@@ -192,7 +192,7 @@ func TestEncodeEmptyGroup(t *testing.T) {
 }
 
 func TestEncodeDuplicateNode(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	f := NewTextField("f")
 	form := &InteractiveForm{Fields: []Node{f, f}}
@@ -202,7 +202,7 @@ func TestEncodeDuplicateNode(t *testing.T) {
 }
 
 func TestEncodeCalculationOrderNotInTree(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	form := &InteractiveForm{
 		Fields:           []Node{NewTextField("a")},

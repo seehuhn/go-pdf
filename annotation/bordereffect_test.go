@@ -68,7 +68,7 @@ var borderEffectTestCases = []struct {
 func borderEffectRoundTrip(t *testing.T, version pdf.Version, data *BorderEffect) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	embedded, err := rm.Embed(data)
@@ -118,7 +118,7 @@ func FuzzBorderEffectRoundTrip(f *testing.F) {
 	versions := []pdf.Version{pdf.V1_7, pdf.V2_0}
 	for _, v := range versions {
 		for _, tc := range borderEffectTestCases {
-			w, buf := memfile.NewPDFWriter(v, opt)
+			w, buf := memfile.NewPDFWriter(f, v, opt)
 
 			err := memfile.AddBlankPage(w)
 			if err != nil {

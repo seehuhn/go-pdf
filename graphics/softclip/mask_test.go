@@ -51,7 +51,7 @@ func TestMaskRoundTrip(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			writer, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+			writer, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 			rm := pdf.NewResourceManager(writer)
 
 			embedded, err := rm.Embed(tc.mask)

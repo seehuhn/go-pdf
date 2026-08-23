@@ -213,7 +213,7 @@ func TestGetGlyphQuadPointsTextMatrixTransform(t *testing.T) {
 }
 
 func TestGlyphWidths(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	F := font.Must(standard.TimesRoman.New())
 

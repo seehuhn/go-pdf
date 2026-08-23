@@ -218,7 +218,7 @@ func TestPrinterMarkFlagRepair(t *testing.T) {
 // TestTrapNetAppearanceRepair checks that a normal appearance without the trap
 // network entries is repaired, so that the annotation can be written back.
 func TestTrapNetAppearanceRepair(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	formRef := writeFormStream(t, w, nil)
 
 	dict := pdf.Dict{
@@ -248,7 +248,7 @@ func TestTrapNetAppearanceRepair(t *testing.T) {
 	}
 
 	// the repaired annotation must be writable
-	out, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	out, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(out)
 	if _, err := tn.Encode(rm); err != nil {
 		t.Fatalf("cannot write the annotation back: %v", err)
@@ -276,7 +276,7 @@ func TestTrapNetRepairKeepsAppearanceShared(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	out, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(out)
 	obj, err := tn.Encode(rm)
 	if err != nil {
@@ -310,7 +310,7 @@ func TestTrapNetRepairKeepsAppearanceShared(t *testing.T) {
 // A down appearance which repeated the normal appearance keeps repeating it,
 // pointing at the repaired form rather than the one the file holds.
 func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	formRef := writeFormStream(t, w, nil)
 
 	// /N and /D name the very same form object
@@ -361,7 +361,7 @@ func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
 // shared with a printer's mark annotation, and dropping them here would
 // discard data the file legitimately carries.
 func TestTrapNetAppearanceKeepsPrinterMark(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	formRef := writeFormStream(t, w, pdf.Dict{"MarkStyle": pdf.TextString("Colour bar")})
 
 	dict := pdf.Dict{
@@ -392,7 +392,7 @@ func TestTrapNetAppearanceKeepsPrinterMark(t *testing.T) {
 	}
 
 	// the repaired annotation must be writable
-	out, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	out, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(out)
 	if _, err := tn.Encode(rm); err != nil {
 		t.Fatalf("cannot write the annotation back: %v", err)

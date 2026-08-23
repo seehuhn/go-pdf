@@ -31,7 +31,7 @@ import (
 // a Getter) together with the container reference.
 func writeSOS(t *testing.T, s pdf.StringOrStream) (*pdf.Writer, pdf.Reference) {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	ref := w.Alloc()
 	obj, err := rm.Embed(s)
@@ -148,7 +148,7 @@ func TestStringOrStreamEmbedStreamPDFDocEncoded(t *testing.T) {
 // produced elsewhere (UTF-16BE with a byte order marker) decodes to its logical
 // text rather than to its raw bytes.
 func TestStringOrStreamReadForeignTextStream(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	strmRef := w.Alloc()
 	body, err := w.OpenStream(strmRef, nil)
 	if err != nil {
@@ -198,7 +198,7 @@ func TestStringOrStreamFormsInterchangeable(t *testing.T) {
 // TestStringOrStreamEmbedInlineStaysDirect checks that the inline form is
 // embedded as a direct string object, not promoted to an indirect reference.
 func TestStringOrStreamEmbedInlineStaysDirect(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	obj, err := rm.Embed(pdf.StringOrStream{Value: "inline"})
 	if err != nil {
@@ -222,7 +222,7 @@ func TestStringOrStreamEmbedInlineStaysDirect(t *testing.T) {
 // stream introduced in PDF 1.5, is rejected when writing an earlier version
 // while the inline form remains allowed.
 func TestStringOrStreamEmbedStreamRequiresV15(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm := pdf.NewResourceManager(w)
 
 	if _, err := rm.Embed(pdf.StringOrStream{Value: "x", IsStream: true}); err == nil {
@@ -237,7 +237,7 @@ func TestStringOrStreamEmbedStreamRequiresV15(t *testing.T) {
 // stream-form values share a single stream object, while distinct values do
 // not.
 func TestStringOrStreamEmbedDeduplicatesStreams(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	s := pdf.StringOrStream{Value: "shared script", IsStream: true}
@@ -277,7 +277,7 @@ func TestStringOrStreamEmbedDeduplicatesStreams(t *testing.T) {
 // TestStringOrStreamReadBareString checks that a value stored as a plain string
 // (not produced by Embed) reads back as the inline form.
 func TestStringOrStreamReadBareString(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	if err := w.Put(ref, pdf.Dict{"V": pdf.String("plain text")}); err != nil {
 		t.Fatal(err)
@@ -294,7 +294,7 @@ func TestStringOrStreamReadBareString(t *testing.T) {
 
 // TestStringOrStreamReadReference checks that a reference to a string resolves.
 func TestStringOrStreamReadReference(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	strRef := w.Alloc()
 	if err := w.Put(strRef, pdf.TextString("via reference")); err != nil {
 		t.Fatal(err)
@@ -338,7 +338,7 @@ func TestStringOrStreamReadWrongType(t *testing.T) {
 
 func memfileGetter(t *testing.T) pdf.Getter {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}

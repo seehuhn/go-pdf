@@ -167,7 +167,7 @@ func roundTripRoots(t *testing.T, version pdf.Version, roots ...acroform.Node) [
 func roundTripForm(t *testing.T, version pdf.Version, want *acroform.InteractiveForm) *acroform.InteractiveForm {
 	t.Helper()
 
-	w, buf := memfile.NewPDFWriter(version, nil)
+	w, buf := memfile.NewPDFWriter(t, version, nil)
 	if err := memfile.AddBlankPage(w); err != nil {
 		t.Fatalf("add blank page: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestFormRoundTrip(t *testing.T) {
 }
 
 func TestDecodeValues(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
@@ -332,7 +332,7 @@ func TestDecodeValues(t *testing.T) {
 }
 
 func TestDecodeNil(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	form, err := Form(pdf.CursorAt(x, nil), nil, false)
@@ -350,13 +350,13 @@ func FuzzFormRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 	for _, version := range testVersions {
 		for _, tc := range formTestCases {
-			if data, ok := encodeFormBytes(version, opt, tc.form); ok {
+			if data, ok := encodeFormBytes(f, version, opt, tc.form); ok {
 				f.Add(data)
 			}
 		}
 		for _, tc := range fieldTestCases() {
 			form := &acroform.InteractiveForm{Fields: []acroform.Node{tc.root}}
-			if data, ok := encodeFormBytes(version, opt, form); ok {
+			if data, ok := encodeFormBytes(f, version, opt, form); ok {
 				f.Add(data)
 			}
 		}
@@ -384,8 +384,8 @@ func FuzzFormRoundTrip(f *testing.F) {
 
 // encodeFormBytes writes a form (and its widgets) to a self-contained PDF,
 // returning false if it cannot be encoded at the given version.
-func encodeFormBytes(version pdf.Version, opt *pdf.WriterOptions, form *acroform.InteractiveForm) ([]byte, bool) {
-	w, buf := memfile.NewPDFWriter(version, opt)
+func encodeFormBytes(tb testing.TB, version pdf.Version, opt *pdf.WriterOptions, form *acroform.InteractiveForm) ([]byte, bool) {
+	w, buf := memfile.NewPDFWriter(tb, version, opt)
 	if err := memfile.AddBlankPage(w); err != nil {
 		return nil, false
 	}

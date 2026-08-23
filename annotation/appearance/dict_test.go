@@ -179,7 +179,7 @@ var normalStates = map[pdf.Name]*form.Form{
 // leave the entries out again, and what tells a rollover the file asks for
 // from one substituted here.
 func TestExtractDefaults(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	normalRef, err := rm.Embed(appA)
 	if err != nil {
@@ -271,7 +271,7 @@ func TestExtractDefaults(t *testing.T) {
 // TestExtractDropsEmptyStateName checks that a state with an empty name is
 // left out of the map, while the other states of the same entry are kept.
 func TestExtractDropsEmptyStateName(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	onRef, err := rm.Embed(appA)
 	if err != nil {
@@ -370,7 +370,7 @@ func TestEmbedOmitsRepeats(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 			obj, err := rm.Embed(tc.data)
 			if err != nil {
@@ -414,7 +414,7 @@ func TestEmbedRejectsMissingNormal(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(tc.data); err == nil {
 				t.Error("embed accepted a dictionary without a normal appearance")
@@ -426,7 +426,7 @@ func TestEmbedRejectsMissingNormal(t *testing.T) {
 func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(data)
 	if err != nil {
@@ -468,7 +468,7 @@ func FuzzRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -587,7 +587,7 @@ func TestEmbedRejectsEmptyStateName(t *testing.T) {
 
 	for name, d := range cases {
 		t.Run(name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(d); err == nil {
 				t.Error("expected an error for the empty state name")
@@ -644,7 +644,7 @@ func TestCloneKeepsRepeats(t *testing.T) {
 		SingleUse:   true,
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	obj, err := rm.Embed(orig.Clone())
 	if err != nil {

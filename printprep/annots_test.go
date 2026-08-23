@@ -54,7 +54,7 @@ func apForm(t *testing.T, w *pdf.Writer, body string) pdf.Reference {
 // is routed through the same content normalization as page content: its
 // marked-content operators are stripped rather than embedded verbatim.
 func TestFlattenNormalizesSourceAppearance(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// appearance content wraps its drawing in a marked-content region
 	ap := apForm(t, w, "/Artifact BMC\n1 0 0 rg 0 0 40 40 re f\nEMC\n")
@@ -105,7 +105,7 @@ func TestFlattenNormalizesSourceAppearance(t *testing.T) {
 }
 
 func TestFlattenAnnots(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	printAP := apForm(t, w, "1 0 0 rg 0 0 40 40 re f\n")
 	hiddenAP := apForm(t, w, "0 1 0 rg 0 0 40 40 re f\n")
@@ -204,7 +204,7 @@ func TestFlattenAnnots(t *testing.T) {
 // resource: reopening the output confirms that resource was rebuilt in the new
 // document rather than left pointing at the source.
 func TestFlattenSynthesizesFallback(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// a printable FreeText with no /AP: the fallback must synthesize one
 	freeText := w.Alloc()
@@ -297,7 +297,7 @@ func TestFlattenSynthesizesFallback(t *testing.T) {
 // draws; a printable annotation is flattened on top.  The annotation must get a
 // different name, and the page's own /PPAnnot0 must survive unchanged.
 func TestFlattenAvoidsResourceNameCollision(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	pageXObj := apForm(t, w, "0 0 1 rg 0 0 20 20 re f\n") // page's own form, 20x20
 	annotAP := apForm(t, w, "1 0 0 rg 0 0 40 40 re f\n")  // annotation form, 40x40
@@ -387,7 +387,7 @@ func TestFlattenAvoidsResourceNameCollision(t *testing.T) {
 // matches the annotation rectangle, so the appearance-to-rect matrix is unit
 // scale.  If the page's CTM leaked, the annotation would be drawn at 2x.
 func TestFlattenIsolatesGraphicsState(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ap := apForm(t, w, "1 0 0 rg 0 0 40 40 re f\n") // 40x40 bbox
 
@@ -501,7 +501,7 @@ func asFloat(o pdf.Object) float64 {
 // fallback generator with no field attached draws only empty chrome, silently
 // dropping the field value from the printed page.
 func TestFlattenMergedFieldValue(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// one object that is both a text field and its widget, with a value but no
 	// appearance stream
@@ -581,7 +581,7 @@ func TestFlattenMergedFieldValue(t *testing.T) {
 // is drawn nowhere on screen and must not appear on paper either.  The "Group"
 // relationship is not a reply and is flattened as usual.
 func TestFlattenDropsReplies(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ap := apForm(t, w, "1 0 0 rg 0 0 40 40 re f\n")
 	rect := pdf.Array{pdf.Integer(10), pdf.Integer(10), pdf.Integer(50), pdf.Integer(50)}
@@ -646,7 +646,7 @@ func TestFlattenDropsReplies(t *testing.T) {
 // through the widget's form field, which reading the page's annotations links
 // up; a widget decoded on its own would print an empty box.
 func TestFlattenSplitFieldValue(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	fieldRef := w.Alloc()
 	widgetRef := w.Alloc()
@@ -720,7 +720,7 @@ func TestFlattenSplitFieldValue(t *testing.T) {
 // with the screen instead of dropping the mark over a reference that leads
 // nowhere.
 func TestFlattenDanglingReply(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ap := apForm(t, w, "1 0 0 rg 0 0 40 40 re f\n")
 	a := w.Alloc()
@@ -766,11 +766,16 @@ func TestFlattenDanglingReply(t *testing.T) {
 // page, where the matrix is normally the identity, but not on a rotated one,
 // where a pre-rotated layout puts a quarter turn in every appearance.
 func TestFlattenAppearanceMatrix(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// a 40x20 appearance turned a quarter turn: the transformed box is 20x40,
-	// the shape of the annotation rectangle below
+	// the shape of the annotation rectangle below.  The matrix components are
+	// rounded before they are written, as required for computed coordinates:
+	// RotateDeg(90) yields 6.1e-17 where the exact value is 0.
 	formMatrix := matrix.RotateDeg(90)
+	for i := range formMatrix {
+		formMatrix[i] = pdf.Round(formMatrix[i], 10)
+	}
 	apRef := w.Alloc()
 	stm, err := w.OpenStream(apRef, pdf.Dict{
 		"Type":    pdf.Name("XObject"),
@@ -856,7 +861,7 @@ func TestFlattenNoRotateOnRotatedPage(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			// a 40x20 appearance filling a 40x20 rectangle
 			apRef := w.Alloc()

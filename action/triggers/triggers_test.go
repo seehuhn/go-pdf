@@ -82,7 +82,7 @@ var annotationTestCases = []struct {
 func testAnnotationRoundTrip(t *testing.T, v pdf.Version, aa *Annotation) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := aa.Encode(rm)
@@ -123,7 +123,7 @@ func FuzzAnnotationRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range annotationTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
 		if err := memfile.AddBlankPage(w); err != nil {
@@ -191,7 +191,7 @@ var pageTestCases = []struct {
 func testPageRoundTrip(t *testing.T, v pdf.Version, aa *Page) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := aa.Encode(rm)
@@ -232,7 +232,7 @@ func FuzzPageRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range pageTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
 		if err := memfile.AddBlankPage(w); err != nil {
@@ -304,7 +304,7 @@ var formTestCases = []struct {
 func testFormRoundTrip(t *testing.T, v pdf.Version, aa *Form) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := aa.Encode(rm)
@@ -345,7 +345,7 @@ func FuzzFormRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range formTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
 		if err := memfile.AddBlankPage(w); err != nil {
@@ -427,7 +427,7 @@ var catalogTestCases = []struct {
 func testCatalogRoundTrip(t *testing.T, v pdf.Version, aa *Catalog) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := aa.Encode(rm)
@@ -468,7 +468,7 @@ func FuzzCatalogRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range catalogTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
 		if err := memfile.AddBlankPage(w); err != nil {

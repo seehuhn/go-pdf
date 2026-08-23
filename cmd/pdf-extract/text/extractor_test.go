@@ -35,7 +35,7 @@ import (
 
 func TestTextExtractorBasic(t *testing.T) {
 	// create test PDF with simple text
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	F := font.Must(standard.Helvetica.New())
@@ -100,7 +100,7 @@ func TestTextExtractorBasic(t *testing.T) {
 
 func TestTextExtractorActualTextIndirect(t *testing.T) {
 	// create test PDF with ActualText via resource reference (not inline)
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	F := font.Must(standard.Helvetica.New())
@@ -183,7 +183,7 @@ func TestTextExtractorActualTextIndirect(t *testing.T) {
 
 func TestTextExtractorActualText(t *testing.T) {
 	// create test PDF with ActualText
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	F := font.Must(standard.Helvetica.New())
@@ -291,7 +291,7 @@ func TestTextExtractorActualText(t *testing.T) {
 // BT/ET or Td/Tm operator, so that the text matrix was never explicitly
 // set, extracts without panicking.
 func TestTextExtractorNoExplicitTextMatrix(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	F := font.Must(standard.Helvetica.New())

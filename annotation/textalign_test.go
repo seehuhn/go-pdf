@@ -24,7 +24,7 @@ import (
 )
 
 func TestFreeTextRejectsInvalidAlign(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	a := &FreeText{
@@ -41,7 +41,7 @@ func TestFreeTextRejectsInvalidAlign(t *testing.T) {
 }
 
 func TestRedactRejectsInvalidAlign(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	a := &Redact{

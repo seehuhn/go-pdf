@@ -261,7 +261,7 @@ var testCases = []struct {
 func TestSpecificationRoundTrip(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(tc.version, nil)
+			w, _ := memfile.NewPDFWriter(t, tc.version, nil)
 			rm := pdf.NewResourceManager(w)
 
 			// Embed the specification
@@ -307,7 +307,7 @@ func TestSpecificationValidation(t *testing.T) {
 			Description: "No filenames",
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		_, err := rm.Embed(spec)
@@ -322,7 +322,7 @@ func TestSpecificationValidation(t *testing.T) {
 			FileNameUnicode: "test_unicode.txt",
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_6, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_6, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		_, err := rm.Embed(spec)
@@ -344,7 +344,7 @@ func TestSpecificationValidation(t *testing.T) {
 			},
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_2, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_2, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		_, err := rm.Embed(spec)
@@ -368,7 +368,7 @@ func TestSpecificationValidation(t *testing.T) {
 			},
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		_, err := rm.Embed(spec)
@@ -392,7 +392,7 @@ func TestSpecificationIndirectReference(t *testing.T) {
 			},
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		obj, err := rm.Embed(spec)
@@ -420,7 +420,7 @@ func TestSpecificationIndirectReference(t *testing.T) {
 			SingleUse: true, // Try to get a direct dictionary
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		// Should return an error because RF requires indirect reference
@@ -436,7 +436,7 @@ func TestSpecificationIndirectReference(t *testing.T) {
 			SingleUse: true, // Request a direct dictionary
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		obj, err := rm.Embed(spec)
@@ -458,7 +458,7 @@ func TestSpecificationAFRelationship(t *testing.T) {
 			AFRelationship: RelationshipUnspecified,
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		obj, err := rm.Embed(spec)
@@ -483,7 +483,7 @@ func TestSpecificationAFRelationship(t *testing.T) {
 			AFRelationship: RelationshipSource,
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		obj, err := rm.Embed(spec)
@@ -504,7 +504,7 @@ func TestSpecificationAFRelationship(t *testing.T) {
 
 func TestSpecificationMalformedInput(t *testing.T) {
 	t.Run("malformed RF dictionary", func(t *testing.T) {
-		buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 		x := pdf.NewExtractor(buf)
 
 		// Create malformed dictionary with invalid RF structure
@@ -524,7 +524,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 	})
 
 	t.Run("malformed ID array", func(t *testing.T) {
-		buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 		x := pdf.NewExtractor(buf)
 
 		// Create dictionary with malformed ID (only one element)
@@ -546,7 +546,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 }
 
 func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
-	buf, _ := memfile.NewPDFWriter(v, nil)
+	buf, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// encode the specification
@@ -583,7 +583,7 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
 		err := memfile.AddBlankPage(w)

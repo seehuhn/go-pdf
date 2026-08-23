@@ -104,7 +104,7 @@ var testCases = []testCase{
 func testRoundTrip(t *testing.T, dict pdf.Dict, isIndirect bool) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// create property list
@@ -157,7 +157,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -207,7 +207,7 @@ func FuzzRoundTrip(f *testing.F) {
 		_ = propList.AsDirectDict()
 
 		// round-trip test
-		w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(w)
 
 		embedded, err := rm.Embed(propList)

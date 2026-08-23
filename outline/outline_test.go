@@ -201,7 +201,7 @@ var testCases = []testCase{
 func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 	t.Helper()
 
-	w, buf := memfile.NewPDFWriter(v, nil)
+	w, buf := memfile.NewPDFWriter(t, v, nil)
 
 	err := memfile.AddBlankPage(w)
 	if err != nil {
@@ -257,7 +257,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -303,7 +303,7 @@ func FuzzRoundTrip(f *testing.F) {
 }
 
 func TestStructEntry(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	err := memfile.AddBlankPage(w)
 	if err != nil {
@@ -363,7 +363,7 @@ func TestStructEntry(t *testing.T) {
 
 func TestReadLoop(t *testing.T) {
 	for _, good := range []bool{true, false} {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+		w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -513,7 +513,7 @@ func TestDeepFirstChainBounded(t *testing.T) {
 func buildOutline(t *testing.T, n int, item func(i int, refs []pdf.Reference) pdf.Dict) *pdf.Reader {
 	t.Helper()
 
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(w); err != nil {
 		t.Fatal(err)
 	}
@@ -549,7 +549,7 @@ func buildOutline(t *testing.T, n int, item func(i int, refs []pdf.Reference) pd
 // spec allows are clamped on read, so that anything the reader accepts can
 // be written back out through the strict writer.
 func TestColorOutOfRange(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	rootRef := w.Alloc()
 	itemRef := w.Alloc()
@@ -583,7 +583,7 @@ func TestColorOutOfRange(t *testing.T) {
 	}
 
 	// the clamped value must survive the strict writer
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w2)
 	if _, err := o.Encode(rm); err != nil {
 		t.Errorf("re-encoding a value read from a file failed: %v", err)
@@ -601,7 +601,7 @@ func TestColorNaN(t *testing.T) {
 		}},
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	if _, err := o.Encode(rm); err == nil {
 		t.Error("expected an error for a NaN colour component")

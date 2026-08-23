@@ -302,7 +302,7 @@ func TestConfigurationRoundTrip(t *testing.T) {
 func testConfigurationRoundTrip(t *testing.T, version pdf.Version, data *Configuration) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(data)
@@ -400,7 +400,7 @@ func normalizeOrderItems(items []OrderItem) {
 // writer rejects the overlap, so the repair is what keeps such a file
 // writable again.
 func TestConfigurationONOFFOverlap(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	shared := w.Alloc()
 	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("shared")})
@@ -437,7 +437,7 @@ func TestConfigurationONOFFOverlap(t *testing.T) {
 	}
 
 	// the repaired value must be writable again
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w2)
 	_, err = rm.Embed(cfg)
 	if err != nil {
@@ -447,7 +447,7 @@ func TestConfigurationONOFFOverlap(t *testing.T) {
 
 // a configuration whose ON array holds nothing but groups repeated in OFF
 func TestConfigurationONOFFOverlapAll(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	shared := w.Alloc()
 	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("shared")})
@@ -483,7 +483,7 @@ func TestConfigurationONOFFOverlapAll(t *testing.T) {
 // groups are read into RBGroups, so that a malicious file cannot make later
 // scans over the collections arbitrarily expensive.
 func TestConfigurationRBGroupsCap(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	inner := make(pdf.Array, maxRBGroupsItems+5)
 	for i := range inner {
@@ -520,7 +520,7 @@ func TestConfigurationRBGroupsCap(t *testing.T) {
 }
 
 func TestConfigurationValidation(t *testing.T) {
-	w14, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	w14, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm14 := pdf.NewResourceManager(w14)
 
 	// version check (PDF 1.4 should fail)
@@ -531,7 +531,7 @@ func TestConfigurationValidation(t *testing.T) {
 	}
 
 	// invalid BaseState
-	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm := pdf.NewResourceManager(w)
 	c = &Configuration{BaseState: BaseState("Invalid")}
 	_, err = rm.Embed(c)
@@ -553,7 +553,7 @@ func FuzzConfigurationRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range confTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

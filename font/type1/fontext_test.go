@@ -44,7 +44,7 @@ import (
 
 func TestEmbed(t *testing.T) {
 	// step 1: embed a font instance into a simple PDF file
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	fontData := makefont.Type1()
@@ -463,7 +463,7 @@ func encodeAll(t *testing.T, F *type1.Instance, text string) pdf.String {
 func embedAlone(t *testing.T, F *type1.Instance) *dict.Type1 {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(F)
 	if err != nil {

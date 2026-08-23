@@ -110,7 +110,7 @@ func decodeBothWays(t *testing.T, r pdf.Getter, ref pdf.Reference, outerFirst bo
 // an object reached through a delegating decoder is the same Go value as one
 // decoded with the delegate directly, so callers can compare by pointer.
 func TestCursorAtRefOneValuePerReference(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	ref := w.Alloc()
 	if err := w.Put(ref, pdf.Dict{"Name": pdf.Name("leaf")}); err != nil {
 		t.Fatal(err)
@@ -145,7 +145,7 @@ func TestCursorAtRefOneValuePerReference(t *testing.T) {
 // reference to step back to: a direct object, whose enclosing reference on the
 // path is not its own, and a cursor built by hand with no path at all.
 func TestCursorAtRefPassThrough(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	containerRef := w.Alloc()
 	if err := w.Put(containerRef, pdf.Dict{"Name": pdf.Name("container")}); err != nil {
 		t.Fatal(err)
@@ -211,7 +211,7 @@ func decodeAtRefLinkLeaf(c pdf.Cursor, obj pdf.Object, _ bool) (*atRefLeaf, erro
 // again leaves cycle detection working, so that a cycle running through a
 // delegating decoder terminates with an error rather than recursing forever.
 func TestCursorAtRefCycle(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	refA, refB := w.Alloc(), w.Alloc()
 	if err := w.Put(refA, pdf.Dict{"Next": refB}); err != nil {
 		t.Fatal(err)

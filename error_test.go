@@ -72,19 +72,19 @@ func TestVersionErrorMessage(t *testing.T) {
 }
 
 func TestCheckVersionAtMost(t *testing.T) {
-	w20, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w20, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	if err := pdf.CheckVersionAtMost(w20, "op", pdf.V1_7); err == nil {
 		t.Fatal("expected VersionError for V2.0 writer + max V1.7")
 	} else if !pdf.IsWrongVersion(err) {
 		t.Errorf("got %T, want *VersionError", err)
 	}
 
-	w17, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w17, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := pdf.CheckVersionAtMost(w17, "op", pdf.V1_7); err != nil {
 		t.Errorf("V1.7 writer + max V1.7 should pass, got %v", err)
 	}
 
-	w14, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	w14, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	if err := pdf.CheckVersionAtMost(w14, "op", pdf.V1_7); err != nil {
 		t.Errorf("V1.4 writer + max V1.7 should pass, got %v", err)
 	}

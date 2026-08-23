@@ -210,7 +210,7 @@ func TestWriteFromEncrypted(t *testing.T) {
 // A nil value omits the entry.
 func rotatedSource(t *testing.T, pageRotate, parentRotate pdf.Object) *pdf.Reader {
 	t.Helper()
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	contentRef := w.Alloc()
 	stm, err := w.OpenStream(contentRef, pdf.Dict{})

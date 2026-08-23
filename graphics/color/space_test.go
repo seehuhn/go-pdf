@@ -146,7 +146,7 @@ func indexedDeviceNCMYK() Space {
 func TestDecodeSpace(t *testing.T) {
 	for i, space := range testColorSpaces {
 		t.Run(fmt.Sprintf("%02d-%s", i, space.Family()), func(t *testing.T) {
-			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(r)
 
 			obj, err := rm.Embed(space)
@@ -237,7 +237,7 @@ func TestExtractSpaceMalformedSeparationDeviceN(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			x := pdf.NewExtractor(r)
 			_, err := ExtractSpace(pdf.CursorAt(x, nil), tc.obj, false)
 			if err == nil {
@@ -276,7 +276,7 @@ func TestExtractDeviceNTooManyColorants(t *testing.T) {
 		},
 	}
 
-	r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	x := pdf.NewExtractor(r)
 	_, err := ExtractSpace(pdf.CursorAt(x, nil), obj, false)
 	if err == nil {
@@ -382,7 +382,7 @@ func TestExtractIndexedRejectsSpecialBase(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			x := pdf.NewExtractor(r)
 			_, err := ExtractSpace(pdf.CursorAt(x, nil), tc.obj, false)
 			if err == nil {
@@ -422,7 +422,7 @@ func TestExtractPatternUncoloredRejectsPatternBase(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			x := pdf.NewExtractor(r)
 			_, err := ExtractSpace(pdf.CursorAt(x, nil), tc.obj, false)
 			if err == nil {
@@ -480,7 +480,7 @@ func TestPatternUncoloredPanicsOnPatternBase(t *testing.T) {
 func spaceRoundTrip(t *testing.T, version pdf.Version, space Space) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(space)
@@ -741,7 +741,7 @@ func FuzzSpaceRoundTrip(f *testing.F) {
 	}
 	for _, version := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for _, space := range testColorSpaces {
-			w, buf := memfile.NewPDFWriter(version, opt)
+			w, buf := memfile.NewPDFWriter(f, version, opt)
 
 			err := memfile.AddBlankPage(w)
 			if err != nil {
@@ -796,7 +796,7 @@ func FuzzSpaceRoundTrip(f *testing.F) {
 // this into a malformed-file error rather than a crash.
 func TestExtractSpaceDeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	tint := pdf.Dict{
 		"FunctionType": pdf.Integer(2),
@@ -864,7 +864,7 @@ func TestExtractSpaceRepairsGamma(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			x := pdf.NewExtractor(r)
 			space, err := ExtractSpace(pdf.CursorAt(x, nil), tc.obj, false)
 			if err != nil {
@@ -1170,7 +1170,7 @@ func TestExtractSpaceRepairsCIEParameters(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			x := pdf.NewExtractor(r)
 			space, err := ExtractSpace(pdf.CursorAt(x, nil), tc.obj, false)
 			if err != nil {
@@ -1290,7 +1290,7 @@ func TestFactoryOutputSurvivesRoundTrip(t *testing.T) {
 				return
 			}
 
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 			obj, err := rm.Embed(space)
 			if err != nil {
@@ -1430,7 +1430,7 @@ func TestExtractDeviceNRepairsAttributes(t *testing.T) {
 				tc.attr,
 			}
 
-			r, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			r, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			x := pdf.NewExtractor(r)
 			space, err := ExtractSpace(pdf.CursorAt(x, nil), obj, false)
 			if err != nil {

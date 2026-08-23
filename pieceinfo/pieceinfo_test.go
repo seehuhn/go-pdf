@@ -158,7 +158,7 @@ func TestExtractMissingPrivate(t *testing.T) {
 		t.Fatalf("Extract: %v", err)
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	embedded, err := rm.Embed(info)
 	if err != nil {
@@ -183,7 +183,7 @@ func TestExtractMissingPrivate(t *testing.T) {
 }
 
 func TestPieceInfoEmbed(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// test with nil PieceInfo
@@ -262,7 +262,7 @@ func TestSingleUse(t *testing.T) {
 
 	// test indirect reference (SingleUse = false)
 	// create a writer with the piece dict stored as an indirect object
-	w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w2.Alloc()
 	err = w2.Put(ref, pieceDict)
 	if err != nil {
@@ -279,7 +279,7 @@ func TestSingleUse(t *testing.T) {
 	}
 
 	// test Embed with SingleUse = true (returns direct dict)
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	info.SingleUse = true

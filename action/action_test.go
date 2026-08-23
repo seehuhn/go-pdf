@@ -28,7 +28,7 @@ import (
 )
 
 func TestActionListEncode_Empty(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	defer w.Close()
 	rm := pdf.NewResourceManager(w)
 
@@ -43,7 +43,7 @@ func TestActionListEncode_Empty(t *testing.T) {
 }
 
 func TestActionListMultipleActions(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	defer w.Close()
 	rm := pdf.NewResourceManager(w)
 
@@ -86,7 +86,7 @@ func TestActionListMultipleActions(t *testing.T) {
 }
 
 func TestNewWindowMode(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	defer w.Close()
 	rm := pdf.NewResourceManager(w)
 	x := pdf.NewExtractor(w)
@@ -209,7 +209,7 @@ func TestNewWindowMode(t *testing.T) {
 // entry pointing back at itself is rejected with pdf.ErrCycle instead of
 // recursing until the goroutine stack is exhausted.
 func TestDecodeActionListNextCycleSelf(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{
@@ -234,7 +234,7 @@ func TestDecodeActionListNextCycleSelf(t *testing.T) {
 // TestDecodeActionListNextCycleMutual checks that two URI actions with
 // /Next entries pointing at each other are rejected with pdf.ErrCycle.
 func TestDecodeActionListNextCycleMutual(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	refA := w.Alloc()
 	refB := w.Alloc()
@@ -267,7 +267,7 @@ func TestDecodeActionListNextCycleMutual(t *testing.T) {
 // /Next dictionary whose own /Next references the parent action is
 // cycle-protected.
 func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{
@@ -299,7 +299,7 @@ func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
 // handles: a cycle check that only catches refs already on the entry
 // path would recurse forever between B and C.
 func TestDecodeActionListNextCycleDeep(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	refA := w.Alloc()
 	refB := w.Alloc()
@@ -339,7 +339,7 @@ func TestDecodeActionListNextCycleDeep(t *testing.T) {
 // TestDecodeActionListNextCycleArray checks that a /Next entry containing
 // an array of action references is also cycle-protected.
 func TestDecodeActionListNextCycleArray(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{
@@ -368,7 +368,7 @@ func TestDecodeActionListNextCycleArray(t *testing.T) {
 // rather than a crash.
 func TestDecodeActionListNextDeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	refs := make([]pdf.Reference, depth)
 	for i := range refs {

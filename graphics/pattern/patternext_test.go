@@ -130,7 +130,7 @@ func testRoundTrip(t *testing.T, pat color.Pattern) {
 	t.Helper()
 
 	// first round: embed and extract
-	w1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w1, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm1 := pdf.NewResourceManager(w1)
 
 	ref1, err := rm1.Embed(pat)
@@ -155,7 +155,7 @@ func testRoundTrip(t *testing.T, pat color.Pattern) {
 	}
 
 	// second round: embed and extract
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(w2)
 
 	ref2, err := rm2.Embed(pat1)
@@ -215,7 +215,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

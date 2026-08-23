@@ -51,7 +51,7 @@ func TestKidsSelfCycle(t *testing.T) {
 // does not cause unbounded recursion in any reader.
 func testKidsSelfCycle[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 	var kc C
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	root := w.Alloc()
 	put(t, w, root, pdf.Dict{
 		"Kids":   pdf.Array{root},
@@ -90,7 +90,7 @@ func TestKidsMutualCycle(t *testing.T) {
 // terminate, while a leaf reachable before the cycle is still surfaced.
 func testKidsMutualCycle[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 	var kc C
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	aRef := w.Alloc()
 	bRef := w.Alloc()
 	leafRef := w.Alloc()
@@ -151,7 +151,7 @@ func TestKidsDeepChainBounded(t *testing.T) {
 // a stack overflow.
 func testKidsChain[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C], depth int, overCap bool) {
 	var kc C
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	k, v := tk.keyAt(0), tk.valAt(0)
 
 	cur := w.Alloc()

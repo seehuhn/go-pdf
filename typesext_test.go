@@ -35,7 +35,7 @@ func TestArrayRoundTrip(t *testing.T) {
 	}
 	for i, a := range cases {
 		t.Run(fmt.Sprintf("case%d", i), func(t *testing.T) {
-			w, m := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, m := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			ref := w.Alloc()
 			w.Put(ref, a)
 			b, err := pdf.NewCursor(w).Array(ref)

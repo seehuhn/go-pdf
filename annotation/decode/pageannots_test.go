@@ -35,7 +35,7 @@ var pageAnnotRect = pdf.Array{
 // while one whose target is not (table 172 requires both on the same page)
 // has the entry cleared and reads as an ordinary annotation.
 func TestPageAnnotationsIRTRepair(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	parent := w.Alloc()
 	w.Put(parent, pdf.Dict{
@@ -80,7 +80,7 @@ func TestPageAnnotationsIRTRepair(t *testing.T) {
 // references, and entries which do not decode to an annotation, are skipped,
 // and that the returned slices stay aligned.
 func TestPageAnnotationsSkip(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	a := w.Alloc()
 	w.Put(a, pdf.Dict{
@@ -126,7 +126,7 @@ func TestPageAnnotationsSkip(t *testing.T) {
 // widget are separate objects.  The value of such a field is stored in the
 // field dictionary, so a consumer holding only the widget would not see it.
 func TestPageAnnotationsLinksWidgets(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	fieldRef := w.Alloc()
 	widgetRef := w.Alloc()

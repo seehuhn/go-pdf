@@ -177,7 +177,7 @@ func collectOps(t *testing.T, it content.Iter) *content.Operators {
 func roundTripTest(t *testing.T, v pdf.Version, p1 *Page) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 
 	// Allocate a parent reference
 	parentRef := w.Alloc()
@@ -304,7 +304,7 @@ func TestOperators_Embed(t *testing.T) {
 
 func TestSource_Deduplication(t *testing.T) {
 	// encode a page with content to get a Source via round-trip
-	w1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w1, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w1.Alloc()
 	p := &Page{
 		Parent:   parentRef,
@@ -340,7 +340,7 @@ func TestSource_Deduplication(t *testing.T) {
 	seg := decoded.Contents[0]
 
 	// embedding the same segment twice should produce the same reference
-	w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(w2)
 
 	ref1, err := rm2.Embed(seg)
@@ -417,7 +417,7 @@ func TestPage_VersionChecks(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(tc.version, nil)
+			w, _ := memfile.NewPDFWriter(t, tc.version, nil)
 			parentRef := w.Alloc()
 			tc.page.Parent = parentRef
 
@@ -435,7 +435,7 @@ func TestPage_VersionChecks(t *testing.T) {
 }
 
 func TestPage_Encode_InvalidBoxCoords(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w.Alloc()
 
 	page := &Page{
@@ -453,7 +453,7 @@ func TestPage_Encode_InvalidBoxCoords(t *testing.T) {
 }
 
 func TestPage_Encode_BoxOutsideMediaBox(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w.Alloc()
 
 	page := &Page{
@@ -473,7 +473,7 @@ func TestPage_Encode_BoxOutsideMediaBox(t *testing.T) {
 
 func TestPage_Decode_ClipsBoxes(t *testing.T) {
 	// write a page dict directly with boxes extending beyond MediaBox
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w.Alloc()
 
 	mediaBox := &pdf.Rectangle{LLx: 0, LLy: 0, URx: 612, URy: 792}
@@ -512,7 +512,7 @@ func TestPage_Decode_ClipsBoxes(t *testing.T) {
 
 func TestPage_Decode_ClipsToNil(t *testing.T) {
 	// write a page dict with a TrimBox completely outside MediaBox
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w.Alloc()
 
 	dict := pdf.Dict{
@@ -544,7 +544,7 @@ func TestPage_Decode_ClipsToNil(t *testing.T) {
 func TestAnnotInfoRoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(v, nil)
+			w, _ := memfile.NewPDFWriter(t, v, nil)
 			rm := pdf.NewResourceManager(w)
 
 			parentRef := w.Alloc()
@@ -601,7 +601,7 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 }
 
 func TestAnnotInfoIRTFiltering(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	parentRef := w.Alloc()
 
 	// two annotations on the page
@@ -719,7 +719,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 
 // an annotation added without a reserved reference is auto-allocated by Store
 func TestAnnotEncodeWithoutReservedRef(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	parentRef := w.Alloc()
 
@@ -768,7 +768,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
 		// allocate page tree references

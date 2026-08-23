@@ -37,7 +37,7 @@ func TestType3RoundTrip(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for i, d := range type3Dicts {
 			t.Run(fmt.Sprintf("D%dv%s-%s", i, v, d.Name), func(t *testing.T) {
-				w, _ := memfile.NewPDFWriter(v, nil)
+				w, _ := memfile.NewPDFWriter(t, v, nil)
 				rm := pdf.NewResourceManager(w)
 
 				// == Write ==
@@ -165,7 +165,7 @@ func FuzzType3Dict(f *testing.F) {
 
 		// Write the Type3Dict back to a new PDF file.
 		// Make sure we can write arbitrary Type3Dicts.
-		w, _ := memfile.NewPDFWriter(pdf.GetVersion(r), nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.GetVersion(r), nil)
 		rm := pdf.NewResourceManager(w)
 
 		fontDictRef, err := rm.Embed(d1)

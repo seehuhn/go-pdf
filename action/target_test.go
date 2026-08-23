@@ -76,7 +76,7 @@ func targetTypeName(t Target) string {
 func testTargetRoundTrip(t *testing.T, version pdf.Version, target Target) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	encoded, err := target.Encode(rm)
@@ -123,7 +123,7 @@ func FuzzTargetRoundTrip(f *testing.F) {
 	}
 
 	for _, target := range targetTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -172,7 +172,7 @@ func FuzzTargetRoundTrip(f *testing.F) {
 }
 
 func TestTargetNamedChildEmptyName(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	target := &TargetNamedChild{
@@ -186,7 +186,7 @@ func TestTargetNamedChildEmptyName(t *testing.T) {
 }
 
 func TestTargetAnnotationChildMissingFields(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	tests := []struct {
@@ -208,7 +208,7 @@ func TestTargetAnnotationChildMissingFields(t *testing.T) {
 }
 
 func TestTargetCycle(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// Create a cycle: t1 -> t2 -> t1
@@ -226,7 +226,7 @@ func TestTargetCycle(t *testing.T) {
 // TestDecodeTargetCycleSelf checks that DecodeTarget rejects a target
 // dictionary that references itself via /T.
 func TestDecodeTargetCycleSelf(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{
@@ -250,7 +250,7 @@ func TestDecodeTargetCycleSelf(t *testing.T) {
 // TestDecodeTargetCycleMutual checks that DecodeTarget rejects two target
 // dictionaries that reference each other via /T.
 func TestDecodeTargetCycleMutual(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	refA := w.Alloc()
 	refB := w.Alloc()
@@ -278,7 +278,7 @@ func TestDecodeTargetCycleMutual(t *testing.T) {
 // than a crash.
 func TestDecodeTargetDeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	refs := make([]pdf.Reference, depth)
 	for i := range refs {

@@ -29,7 +29,7 @@ import (
 // under the correct descriptor key for each font dictionary type, applies the
 // documented key precedence, and returns nil for an external font.
 func TestExtractFontFile(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	// newStream embeds a font file stream with the given Subtype (omitted when
 	// empty) and returns a reference to it.
@@ -99,7 +99,7 @@ func TestExtractFontFile(t *testing.T) {
 // than limits.MaxFontProgramBytes is rejected during WriteTo,
 // blocking a decompression-bomb attack on font embedding.
 func TestExtractStreamOversize(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	ref := w.Alloc()
 	stm, err := w.OpenStream(ref, pdf.Dict{})
 	if err != nil {

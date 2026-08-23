@@ -44,7 +44,7 @@ func putJBIG2Stream(t *testing.T, w *pdf.Writer, ref pdf.Reference, globals pdf.
 // pointing at its own stream is detected as a cycle rather than recursing
 // until the goroutine stack is exhausted.
 func TestGetFiltersJBIG2GlobalsCycleSelf(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	refA := w.Alloc()
 	putJBIG2Stream(t, w, refA, refA)
 	if err := w.Close(); err != nil {
@@ -64,7 +64,7 @@ func TestGetFiltersJBIG2GlobalsCycleSelf(t *testing.T) {
 // TestGetFiltersJBIG2GlobalsCycleMutual checks that two JBIG2Decode streams
 // whose /JBIG2Globals entries point at each other are detected as a cycle.
 func TestGetFiltersJBIG2GlobalsCycleMutual(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	refA := w.Alloc()
 	refB := w.Alloc()
 	putJBIG2Stream(t, w, refA, refB)
@@ -88,7 +88,7 @@ func TestGetFiltersJBIG2GlobalsCycleMutual(t *testing.T) {
 // indirection, and GetFilters returns a populated FilterJBIG2 without
 // flagging a cycle.
 func TestGetFiltersJBIG2GlobalsValid(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	refA := w.Alloc()
 	refGlobals := w.Alloc()
 
@@ -125,7 +125,7 @@ func TestGetFiltersJBIG2GlobalsValid(t *testing.T) {
 // array longer than the per-stream cap, preventing attackers from
 // stacking many decoder wrappers on a single read.
 func TestGetFiltersChainTooLong(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	ref := w.Alloc()
 
 	chain := make(pdf.Array, 17)

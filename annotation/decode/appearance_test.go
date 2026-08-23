@@ -31,7 +31,7 @@ import (
 func annotWithoutAppearance(t *testing.T, v pdf.Version, a0 annotation.Annotation, rect pdf.Rectangle) annotation.Annotation {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	a := shallowCopy(a0)
@@ -80,7 +80,7 @@ func TestMissingAppearanceIsWritable(t *testing.T) {
 			t.Run(string(subtype)+"-"+v.String(), func(t *testing.T) {
 				a := annotWithoutAppearance(t, v, cases[0].annotation, rect)
 
-				out, _ := memfile.NewPDFWriter(v, nil)
+				out, _ := memfile.NewPDFWriter(t, v, nil)
 				rm := pdf.NewResourceManager(out)
 				if _, err := a.Encode(rm); err != nil && !pdf.IsWrongVersion(err) {
 					t.Errorf("cannot write back: %v", err)
@@ -124,7 +124,7 @@ func TestMissingAppearanceRepairIsExact(t *testing.T) {
 // keeping it would leave behind a map demanding an /AS entry which cannot name
 // it.
 func TestEmptyStateNameIsWritable(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	apRef, err := rm.Embed(defaultAppearance)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestEmptyStateNameIsWritable(t *testing.T) {
 		t.Fatalf("cannot read: %v", err)
 	}
 
-	out, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	out, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	if _, err := a.Encode(pdf.NewResourceManager(out)); err != nil {
 		t.Errorf("cannot write back: %v", err)
 	}

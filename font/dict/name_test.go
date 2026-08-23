@@ -69,7 +69,7 @@ func TestValidateFontName(t *testing.T) {
 // Every font dictionary describes the font it names, so a dictionary with no
 // descriptor is reported rather than dereferenced.
 func TestValidateNoDescriptor(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	for _, tc := range []struct {
 		label    string

@@ -32,7 +32,7 @@ func TestCustomAnnotation(t *testing.T) {
 		"CustomField": pdf.TextString("custom value"),
 	}
 
-	buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// Add the dictionary directly to the PDF
 	ref := buf.Alloc()
@@ -68,7 +68,7 @@ func TestCustomAnnotation(t *testing.T) {
 	// For unknown annotations, we don't expect perfect round-trip
 	// because the embedding process may add common annotation fields
 	// Just verify it doesn't crash and basic fields are preserved
-	buf2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	buf2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(buf2)
 
 	_, err = custom.Encode(rm2)

@@ -106,7 +106,7 @@ func TestRoundTrip(t *testing.T) {
 func roundTripTest(t *testing.T, version pdf.Version, original *Attributes) {
 	t.Helper()
 
-	buf, _ := memfile.NewPDFWriter(version, nil)
+	buf, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	embedded, err := rm.Embed(&carrier{attrs: original})
@@ -215,7 +215,7 @@ func TestExtractSkipsInvalidColorantNames(t *testing.T) {
 }
 
 func TestFillDictRejectsInvalidPCM(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	_, err := rm.Embed(&carrier{attrs: &Attributes{PCM: "DeviceWibble"}})
@@ -228,7 +228,7 @@ func TestFillDictRejectsInvalidPCM(t *testing.T) {
 // Such an entry has no PDF representation, and silently skipping it would
 // drop data the caller asked to write.
 func TestFillDictRejectsNilTrapRegion(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	attrs := &Attributes{
@@ -241,7 +241,7 @@ func TestFillDictRejectsNilTrapRegion(t *testing.T) {
 }
 
 func TestFillDictVersion(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_2, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_2, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	_, err := rm.Embed(&carrier{attrs: &Attributes{PCM: "DeviceCMYK"}})
@@ -255,7 +255,7 @@ func FuzzRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 		if err := memfile.AddBlankPage(w); err != nil {
 			continue

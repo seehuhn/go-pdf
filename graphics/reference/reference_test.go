@@ -74,7 +74,7 @@ func TestRoundTrip(t *testing.T) {
 func roundTripTest(t *testing.T, version pdf.Version, d1 *Dict) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(d1)
@@ -105,7 +105,7 @@ func FuzzRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		if err := memfile.AddBlankPage(w); err != nil {
 			continue
 		}

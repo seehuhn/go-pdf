@@ -56,7 +56,7 @@ func TestType1RoundTrip(t *testing.T) {
 // TestMMType1Extract checks that a hand-built font dictionary with Subtype
 // /MMType1 is extracted as a *dict.Type1 with MultipleMaster set.
 func TestMMType1Extract(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ref := w.Alloc()
 	fontDict := pdf.Dict{
@@ -210,7 +210,7 @@ func TestMMType1RoundTripSubtype(t *testing.T) {
 		Width: makeTestWidth(65, 600.0),
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	fontDictRef, err := rm.Embed(d1)
@@ -251,7 +251,7 @@ func TestMMType1RoundTripSubtype(t *testing.T) {
 func checkRoundTripT1(t *testing.T, d1 *dict.Type1, v pdf.Version) {
 	d1 = clone(d1)
 
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// == Write ==

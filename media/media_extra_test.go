@@ -28,7 +28,7 @@ import (
 // resulting native value or error.
 func embed(t *testing.T, version pdf.Version, obj pdf.Embedder) (pdf.Native, error) {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 	return rm.Embed(obj)
 }
@@ -224,6 +224,6 @@ func TestMarkers(t *testing.T) {
 
 func memfileGetter(t *testing.T) pdf.Getter {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	return w
 }

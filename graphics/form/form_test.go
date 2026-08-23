@@ -67,7 +67,7 @@ func makeTestForm() *form.Form {
 // TestRead verifies that a form XObject read from one PDF file can be written
 // to another PDF file.
 func TestRead(t *testing.T) {
-	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer1, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
 	form0 := makeTestForm()
@@ -90,7 +90,7 @@ func TestRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
 	ref2, err := rm2.Embed(form1)
 	if err != nil {
@@ -120,7 +120,7 @@ func TestRead(t *testing.T) {
 // TestReadWithPieceInfo verifies that PieceInfo is properly handled during
 // form XObject read/write cycles.
 func TestReadWithPieceInfo(t *testing.T) {
-	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer1, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
 	// create test PieceInfo with some data
@@ -159,7 +159,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 	}
 
 	// test round-trip
-	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
 	ref2, err := rm2.Embed(form1)
 	if err != nil {
@@ -189,7 +189,7 @@ func TestReadWithPieceInfo(t *testing.T) {
 // TestPieceInfoRequiresLastModified verifies that LastModified is required
 // when PieceInfo is present.
 func TestPieceInfoRequiresLastModified(t *testing.T) {
-	writer, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(writer)
 
 	testPieceInfo := &pieceinfo.PieceInfo{
@@ -211,7 +211,7 @@ func TestPieceInfoRequiresLastModified(t *testing.T) {
 // TestFormWithPtData verifies that PtData is properly handled during
 // form XObject read/write cycles.
 func TestFormWithPtData(t *testing.T) {
-	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer1, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
 	// create test PtData with some geospatial point data
@@ -265,7 +265,7 @@ func TestFormWithPtData(t *testing.T) {
 	}
 
 	// test round-trip
-	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
 	ref2, err := rm2.Embed(form1)
 	if err != nil {
@@ -300,7 +300,7 @@ func TestFormWithPtData(t *testing.T) {
 
 // TestFormWithStructParent verifies that StructParent fields are properly handled.
 func TestFormWithStructParent(t *testing.T) {
-	writer1, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	writer1, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
 	form0 := makeTestForm()
@@ -330,7 +330,7 @@ func TestFormWithStructParent(t *testing.T) {
 	}
 
 	// Test with StructParent value 0 (edge case)
-	writer2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	writer2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(writer2)
 
 	form0Zero := makeTestForm()
@@ -363,7 +363,7 @@ func TestFormWithStructParent(t *testing.T) {
 // roundTripForm embeds f, extracts it back, and returns the extracted form.
 func roundTripForm(t *testing.T, version pdf.Version, f *form.Form) *form.Form {
 	t.Helper()
-	writer, _ := memfile.NewPDFWriter(version, nil)
+	writer, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(writer)
 	ref, err := rm.Embed(f)
 	if err != nil {
@@ -428,7 +428,7 @@ func TestFormWithOPI(t *testing.T) {
 // tests can construct dicts without a /Resources entry.
 func writeRawForm(t *testing.T, version pdf.Version, withResources bool) (*pdf.Writer, pdf.Reference) {
 	t.Helper()
-	writer, _ := memfile.NewPDFWriter(version, nil)
+	writer, _ := memfile.NewPDFWriter(t, version, nil)
 	ref := writer.Alloc()
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Form"),
@@ -501,7 +501,7 @@ func TestExtractFormEmptyResources(t *testing.T) {
 // TestEmbedNilResRejected20 verifies that writing a form with Res == nil at
 // PDF 2.0 fails, because the spec requires a /Resources entry.
 func TestEmbedNilResRejected20(t *testing.T) {
-	writer, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(writer)
 	f := &form.Form{
 		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
@@ -519,7 +519,7 @@ func TestEmbedNilResRejected20(t *testing.T) {
 // at PDF 1.7 is accepted, and the resulting stream dict has no /Resources
 // entry.  Round-trip extraction yields Res == nil again.
 func TestEmbedNilResOmitsResources17(t *testing.T) {
-	writer, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	writer, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(writer)
 	f := &form.Form{
 		BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
@@ -558,7 +558,7 @@ func TestEmbedNilResOmitsResources17(t *testing.T) {
 // TestFormWithAssociatedFiles verifies that AssociatedFiles (AF) are properly
 // handled during form XObject read/write cycles.
 func TestFormWithAssociatedFiles(t *testing.T) {
-	writer1, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer1, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm1 := pdf.NewResourceManager(writer1)
 
 	// create test associated files
@@ -621,7 +621,7 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 	}
 
 	// test round-trip
-	writer2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	writer2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(writer2)
 	ref2, err := rm2.Embed(form1)
 	if err != nil {
@@ -664,7 +664,7 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 // refuse to produce.
 func writeFormDict(t *testing.T, version pdf.Version, extra pdf.Dict) (*pdf.Writer, pdf.Reference) {
 	t.Helper()
-	writer, _ := memfile.NewPDFWriter(version, nil)
+	writer, _ := memfile.NewPDFWriter(t, version, nil)
 	ref := writer.Alloc()
 	dict := pdf.Dict{
 		"Subtype":   pdf.Name("Form"),
@@ -881,7 +881,7 @@ func TestExtractStripsFutureEntries(t *testing.T) {
 func mustEmbed(t *testing.T, version pdf.Version, f *form.Form) {
 	t.Helper()
 
-	out, _ := memfile.NewPDFWriter(version, nil)
+	out, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(out)
 	obj, err := rm.Embed(f)
 	if err != nil {

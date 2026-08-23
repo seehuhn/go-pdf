@@ -73,7 +73,7 @@ func TestEncryptedPayloadRoundTrip(t *testing.T) {
 					original.SingleUse = singleUse
 
 					// Round trip test
-					buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+					buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 					rm := pdf.NewResourceManager(buf)
 
 					// Embed the encrypted payload
@@ -118,7 +118,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 			Version: "1.0",
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		_, err := rm.Embed(ep)
@@ -132,7 +132,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 			FilterName: "TestCrypto",
 		}
 
-		buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		_, err := rm.Embed(ep)
@@ -142,7 +142,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 	})
 
 	t.Run("malformed dict", func(t *testing.T) {
-		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		x := pdf.NewExtractor(buf)
 
 		// Create malformed dictionary (missing required Subtype)
@@ -166,7 +166,7 @@ func TestEncryptedPayloadOptionalType(t *testing.T) {
 	}
 
 	t.Run("type field handling", func(t *testing.T) {
-		buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+		buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		rm := pdf.NewResourceManager(buf)
 
 		obj, err := rm.Embed(ep)

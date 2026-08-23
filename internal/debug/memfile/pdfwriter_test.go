@@ -26,7 +26,7 @@ import (
 // TestWriterReadAfterClose verifies that a memfile Writer can be used for
 // reading after it is closed, specifically testing stream operations.
 func TestWriterReadAfterClose(t *testing.T) {
-	writer, _ := NewPDFWriter(pdf.V2_0, nil)
+	writer, _ := NewPDFWriter(t, pdf.V2_0, nil)
 
 	// Create a stream containing "hello world"
 	content := "hello world"

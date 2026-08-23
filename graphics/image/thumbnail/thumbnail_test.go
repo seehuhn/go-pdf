@@ -278,7 +278,7 @@ func roundTripThumbnail(t *testing.T, version pdf.Version, thumb *thumbnail.Thum
 		t.Fatalf("failed to get original data: %v", err)
 	}
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// embed the thumbnail
@@ -348,7 +348,7 @@ func TestExtractThumbnailRejectsHugeDecodedBuffer(t *testing.T) {
 	// -- the most a thumbnail colour space can have -- the decoded-buffer
 	// cap (limits.MaxImageDecodedBytes) never trips before the
 	// pixel-count cap does; extraction must still reject the thumbnail.
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	dict := pdf.Dict{
 		"Type":             pdf.Name("XObject"),
@@ -376,7 +376,7 @@ func TestExtractThumbnailRejectsHugeDecodedBuffer(t *testing.T) {
 }
 
 func TestInvalidThumbnails(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	tests := []struct {
@@ -470,7 +470,7 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range thumbnailTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

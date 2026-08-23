@@ -36,7 +36,7 @@ func TestMarkedContentInline(t *testing.T) {
 		err  error
 	}
 
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(data)
 
 	// create property lists for test cases

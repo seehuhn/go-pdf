@@ -211,7 +211,7 @@ var viewportTestCases = []struct {
 func viewportRoundTripTest(t *testing.T, version pdf.Version, vp *Viewport) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// Write the viewport
@@ -311,7 +311,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 
 	// Add test cases as seed corpus
 	for _, tc := range viewportTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -366,7 +366,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 func viewportArrayRoundTripTest(t *testing.T, version pdf.Version, data *ViewPortArray) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	embedded, err := rm.Embed(data)
@@ -406,7 +406,7 @@ func FuzzViewPortArrayRoundTrip(f *testing.F) {
 
 	// build seed corpus from test cases
 	for _, tc := range viewportArrayTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -499,7 +499,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	}
 
 	// Test with PDF 1.5 (should fail - viewports require 1.6+)
-	w15, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w15, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm15 := pdf.NewResourceManager(w15)
 	_, err := rm15.Embed(vp)
 	if err == nil {
@@ -507,7 +507,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	}
 
 	// Test with PDF 1.6 (should succeed)
-	w16, _ := memfile.NewPDFWriter(pdf.V1_6, nil)
+	w16, _ := memfile.NewPDFWriter(t, pdf.V1_6, nil)
 	rm16 := pdf.NewResourceManager(w16)
 	_, err = rm16.Embed(vp)
 	if err != nil {
@@ -527,7 +527,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	}
 
 	// Should fail with PDF 1.7
-	w17, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w17, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm17 := pdf.NewResourceManager(w17)
 	_, err = rm17.Embed(vpWithPtData)
 	if err == nil {
@@ -535,7 +535,7 @@ func TestViewportVersionRequirements(t *testing.T) {
 	}
 
 	// Should succeed with PDF 2.0
-	w20, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w20, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm20 := pdf.NewResourceManager(w20)
 	_, err = rm20.Embed(vpWithPtData)
 	if err != nil {
@@ -550,7 +550,7 @@ func TestViewportSingleUse(t *testing.T) {
 		SingleUse: true,
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// Embed with SingleUse = true
@@ -582,7 +582,7 @@ func TestViewportSingleUse(t *testing.T) {
 
 // TestExtractViewportMalformed tests extraction with malformed data
 func TestExtractViewportMalformed(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	tests := []struct {
 		name      string

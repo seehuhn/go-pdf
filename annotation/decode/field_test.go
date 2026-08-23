@@ -195,7 +195,7 @@ func decodeRootField(x *pdf.Extractor, ref pdf.Reference) (acroform.Node, error)
 }
 
 func TestDecodeFieldNil(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	d := newFieldTreeDecoder()
@@ -209,7 +209,7 @@ func TestDecodeFieldNil(t *testing.T) {
 }
 
 func TestDecodeFieldKidsSelfCycle(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
@@ -234,7 +234,7 @@ func TestDecodeFieldKidsSelfCycle(t *testing.T) {
 }
 
 func TestDecodeFieldKidsMutualCycle(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	refA := w.Alloc()
@@ -268,7 +268,7 @@ func TestDecodeFieldKidsMutualCycle(t *testing.T) {
 // fully-qualified-name separator. The reader strips any so the field stays
 // writable.
 func TestDecodeFieldNameStripsPeriod(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
@@ -308,7 +308,7 @@ func TestIsWidgetKid(t *testing.T) {
 // the field type is inheritable: a sub-field without its own /FT is flattened to
 // the inherited concrete type, so its type-specific entries are preserved.
 func TestDecodeFieldInheritedType(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	parentRef := w.Alloc()
@@ -340,7 +340,7 @@ func TestDecodeFieldInheritedType(t *testing.T) {
 // MaxLen is inheritable: a comb field whose MaxLen sits on an ancestor adopts
 // the inherited value on decode, keeping the Comb flag valid.
 func TestDecodeCombInheritedMaxLen(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	parentRef := w.Alloc()
@@ -386,7 +386,7 @@ func TestDecodeCombSnap(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			x := pdf.NewExtractor(w)
 			ref := w.Alloc()
 			dict := pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("x"), "Ff": pdf.Integer(tc.ff)}
@@ -414,7 +414,7 @@ func TestDecodeCombSnap(t *testing.T) {
 
 // a terminal field whose effective type is unknown is dropped from the tree.
 func TestDecodeUnknownTypeDropped(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
@@ -434,7 +434,7 @@ func TestDecodeUnknownTypeDropped(t *testing.T) {
 // TU/TM and other own entries on a non-terminal field are dropped; only the
 // name and the inheritable context survive.
 func TestDecodeGroupDropsOwnEntries(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	parentRef := w.Alloc()
@@ -471,7 +471,7 @@ func TestDecodeGroupDropsOwnEntries(t *testing.T) {
 // terminates within bounds and never crashes.
 func TestDecodeFieldKidsDeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	refs := make([]pdf.Reference, depth)
 	for i := range refs {
@@ -512,7 +512,7 @@ func TestDecodeFieldKidsDeepChainBounded(t *testing.T) {
 // sibling breadth: a single field with many kids is read in full.
 func TestDecodeFieldKidsWide(t *testing.T) {
 	n := 2*limits.MaxExtractDepth + 50
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	kids := make(pdf.Array, n)
 	for i := range kids {
@@ -544,7 +544,7 @@ func TestDecodeFieldKidsWide(t *testing.T) {
 // a choice field's /Opt may mix string entries with [export, display] pairs;
 // entries that are neither are skipped rather than decoded as empty options.
 func TestDecodeChoiceOptSkipsNonStrings(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
@@ -596,7 +596,7 @@ func TestDecodeChoiceValueNormalises(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			x := pdf.NewExtractor(w)
 
 			ref := w.Alloc()

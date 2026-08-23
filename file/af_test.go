@@ -37,7 +37,7 @@ func TestAFAsDirectDict(t *testing.T) {
 }
 
 func TestAFEmptyError(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	af := &AF{
@@ -51,7 +51,7 @@ func TestAFEmptyError(t *testing.T) {
 }
 
 func TestAFRoundTripSingleUse(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	original := &AF{
@@ -87,7 +87,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 	}
 
 	// re-embed and extract to verify round-trip equality
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(w2)
 	embedded2, err := rm2.Embed(decoded)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestAFRoundTripSingleUse(t *testing.T) {
 }
 
 func TestAFRoundTripIndirect(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	original := &AF{
@@ -144,7 +144,7 @@ func TestAFRoundTripIndirect(t *testing.T) {
 	}
 
 	// re-embed and extract to verify round-trip equality
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(w2)
 	embedded2, err := rm2.Embed(decoded)
 	if err != nil {
@@ -161,7 +161,7 @@ func TestAFRoundTripIndirect(t *testing.T) {
 }
 
 func TestAFWithoutMCID(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	original := &AF{
@@ -188,7 +188,7 @@ func TestAFWithoutMCID(t *testing.T) {
 	}
 
 	// re-embed and extract to verify round-trip equality
-	w2, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm2 := pdf.NewResourceManager(w2)
 	embedded2, err := rm2.Embed(decoded)
 	if err != nil {

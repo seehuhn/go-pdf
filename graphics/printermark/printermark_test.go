@@ -103,7 +103,7 @@ func TestRoundTrip(t *testing.T) {
 func roundTripTest(t *testing.T, version pdf.Version, original *Attributes) {
 	t.Helper()
 
-	buf, _ := memfile.NewPDFWriter(version, nil)
+	buf, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	embedded, err := rm.Embed(&carrier{attrs: original})
@@ -152,7 +152,7 @@ func TestExtractAbsent(t *testing.T) {
 // TestExtractDropsUnusableColorants checks that colorant entries which cannot
 // be written back unchanged are dropped on read.
 func TestExtractDropsUnusableColorants(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// a Separation space filed under a key which does not match its colorant
@@ -206,7 +206,7 @@ func TestExtractDropsUnusableColorants(t *testing.T) {
 }
 
 func TestFillDictRejectsMismatchedColorant(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	attrs := &Attributes{
@@ -223,7 +223,7 @@ func TestFillDictRejectsMismatchedColorant(t *testing.T) {
 // is refused.  Such an entry has no PDF representation, and silently skipping
 // it could turn a form into one which carries no printer's mark entries at all.
 func TestFillDictRejectsNilColorant(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	attrs := &Attributes{
@@ -235,7 +235,7 @@ func TestFillDictRejectsNilColorant(t *testing.T) {
 }
 
 func TestFillDictVersion(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	_, err := rm.Embed(&carrier{attrs: &Attributes{MarkStyle: "x"}})
@@ -249,7 +249,7 @@ func FuzzRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 		if err := memfile.AddBlankPage(w); err != nil {
 			continue

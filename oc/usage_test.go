@@ -178,7 +178,7 @@ func TestUsageRoundTrip(t *testing.T) {
 func testUsageRoundTrip(t *testing.T, version pdf.Version, original *Usage) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// embed the usage dictionary
@@ -254,7 +254,7 @@ func normalizeUsage(u *Usage) {
 }
 
 func TestUsageValidation(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// Test invalid Zoom constraint: Min > Max
@@ -281,7 +281,7 @@ func FuzzUsageRoundTrip(f *testing.F) {
 		for _, singleUse := range []bool{false, true} {
 			tc.usage.SingleUse = singleUse
 
-			w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+			w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
 			err := memfile.AddBlankPage(w)
 			if err != nil {

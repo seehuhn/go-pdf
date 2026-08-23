@@ -100,7 +100,7 @@ var movieRoundTripCases = []struct {
 func roundTripMovie(t *testing.T, version pdf.Version, m *Movie) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 	obj, err := rm.Embed(m)
 	if err != nil {
@@ -165,7 +165,7 @@ func TestMovieEmbedValidation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(tc.movie); err == nil {
 				t.Errorf("expected error, got nil")
@@ -177,7 +177,7 @@ func TestMovieEmbedValidation(t *testing.T) {
 }
 
 func TestMovieEmbedVersionRequirement(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_1, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_1, nil)
 	rm := pdf.NewResourceManager(w)
 	defer w.Close()
 	defer rm.Close()
@@ -195,7 +195,7 @@ func TestMovieEmbedVersionRequirement(t *testing.T) {
 // TestPosterFromMovieFileEmbedRejects verifies that the sentinel cannot
 // be silently passed to rm.Embed: its Embed method must return an error.
 func TestPosterFromMovieFileEmbedRejects(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	defer w.Close()
 	defer rm.Close()
@@ -208,7 +208,7 @@ func FuzzMovieRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range movieRoundTripCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 		if err := memfile.AddBlankPage(w); err != nil {
 			continue
 		}
@@ -244,7 +244,7 @@ func FuzzMovieRoundTrip(f *testing.F) {
 			t.Skip("malformed movie dictionary")
 		}
 
-		w, _ := memfile.NewPDFWriter(pdf.GetVersion(r), nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.GetVersion(r), nil)
 		rm := pdf.NewResourceManager(w)
 		obj, err := rm.Embed(first)
 		if err != nil {

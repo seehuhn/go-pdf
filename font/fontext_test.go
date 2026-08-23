@@ -120,7 +120,7 @@ func TestToUnicodeSimple1(t *testing.T) {
 				t.Fatalf("expected 3 glyphs, got %d", len(seq.Seq))
 			}
 
-			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
 			b := builder.New(content.Page, nil, pdf.V2_0)
@@ -177,7 +177,7 @@ func TestToUnicodeSimple2(t *testing.T) {
 			}
 			seq.Seq[1].Text = "D" // one glyph with non-standard text
 
-			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
 			b := builder.New(content.Page, nil, pdf.V2_0)
@@ -249,7 +249,7 @@ func getToUnicode(d dict.Dict) *cmap.ToUnicodeFile {
 func TestSubsetTagReachesFontProgram(t *testing.T) {
 	for _, sample := range fonttypes.All {
 		t.Run(sample.Label, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 
 			F := sample.MakeFont()
@@ -372,7 +372,7 @@ func TestFontNameSurvivesRoundTrip(t *testing.T) {
 func embedAndExtract(t *testing.T, F font.Layouter) dict.Dict {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(F)
 	if err != nil {
@@ -415,7 +415,7 @@ func TestEmbedLeavesSourceGlyphNamesAlone(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(F); err != nil {
 				t.Fatal(err)
@@ -566,7 +566,7 @@ func TestFontNameStableAcrossWriteReadWrite(t *testing.T) {
 			tag1, psName1, stream1 := subsetInfo(first)
 
 			// write the dictionary we read back out, and read it again
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 			ref, err := rm.Embed(first)
 			if err != nil {

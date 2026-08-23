@@ -39,7 +39,7 @@ func TestEmbedSimple(t *testing.T) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		t.Run(v.String(), func(t *testing.T) {
 			// step 1: embed a font instance into a simple PDF file
-			w, _ := memfile.NewPDFWriter(v, nil)
+			w, _ := memfile.NewPDFWriter(t, v, nil)
 			rm := pdf.NewResourceManager(w)
 
 			fontData := makefont.OpenType()
@@ -114,7 +114,7 @@ func TestSimpleCFFDescriptor(t *testing.T) {
 // and returns the round-tripped font dictionary.
 func embedSimpleForDescriptor(t *testing.T, fontData *sfnt.Font) *dict.Type1 {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	F, err := opentype.NewSimple(fontData, nil)
@@ -194,7 +194,7 @@ func TestEmbeddedCFFTakesTheDictionaryName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(F)
 	if err != nil {

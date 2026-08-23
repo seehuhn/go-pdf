@@ -68,7 +68,7 @@ func TestEncryptionMetaInfo(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			opt := &pdf.WriterOptions{UserPassword: "u"}
-			w, mf := memfile.NewPDFWriter(c.version, opt)
+			w, mf := memfile.NewPDFWriter(t, c.version, opt)
 
 			// writer-side observation
 			if got := w.GetMeta().Encryption; got == nil || *got != c.want {
@@ -99,7 +99,7 @@ func TestEncryptionMetaInfo(t *testing.T) {
 // summary is nil for unencrypted documents on both writer and reader
 // sides, so callers can rely on a nil check to mean "no encryption".
 func TestEncryptionMetaInfoUnencrypted(t *testing.T) {
-	w, mf := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, mf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	if got := w.GetMeta().Encryption; got != nil {
 		t.Errorf("writer Encryption: got %+v, want nil", got)

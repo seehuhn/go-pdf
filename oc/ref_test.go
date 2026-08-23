@@ -28,7 +28,7 @@ import (
 // OCProperties and via a content stream's Properties resource returns
 // the same *Group pointer, thanks to the extractor cache.
 func TestOCGPointerIdentity(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// create an OCG dictionary as an indirect object
 	ocgDict := pdf.Dict{
@@ -70,7 +70,7 @@ func TestOCGPointerIdentity(t *testing.T) {
 // visibility expression have the same pointer identity as groups
 // extracted directly.  This is essential for OCG state evaluation.
 func TestVEGroupPointerIdentity(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// create an OCG
 	ocgDict := pdf.Dict{
@@ -127,7 +127,7 @@ func TestVEGroupPointerIdentity(t *testing.T) {
 // same reference.  Pointer identity matters because [GroupStates] uses
 // the *Group as a map key.
 func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ocgDict := pdf.Dict{
 		"Type": pdf.Name("OCG"),
@@ -170,7 +170,7 @@ func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
 // that, the annotation's group would be a second value which no
 // [GroupStates] can reach, leaving the annotation visible whatever the state.
 func TestConditionalPointerIdentity(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ocgRef := w.Alloc()
 	err := w.Put(ocgRef, pdf.Dict{

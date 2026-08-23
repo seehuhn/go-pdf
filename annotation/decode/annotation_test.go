@@ -137,7 +137,7 @@ func roundTripValue(t *testing.T, v pdf.Version, a1 annotation.Annotation) {
 // roundTripFile performs a round-trip test for any annotation type, writing
 // a1 exactly as given and comparing the result of reading it back.
 func roundTripFile(t *testing.T, v pdf.Version, a1 annotation.Annotation) {
-	buf, _ := memfile.NewPDFWriter(v, nil)
+	buf, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// embed the annotation
@@ -272,7 +272,7 @@ func TestOpacity(t *testing.T) {
 				},
 			}
 
-			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
 			embedded, err := annot.Encode(rm)
@@ -310,7 +310,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 	for _, cases := range testCases {
 		for _, tc := range cases {
-			w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+			w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 			rm := pdf.NewResourceManager(w)
 
 			err := memfile.AddBlankPage(w)
@@ -342,7 +342,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 	}
 	for _, dict := range testDicts {
-		w, out := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, out := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

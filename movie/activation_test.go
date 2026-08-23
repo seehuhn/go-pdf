@@ -219,7 +219,7 @@ var activationRoundTripCases = []struct {
 func roundTripActivation(t *testing.T, version pdf.Version, a *Activation) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 	obj, err := rm.Embed(a)
 	if err != nil {
@@ -311,7 +311,7 @@ func TestActivationEmbedValidation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(tc.act); err == nil {
 				t.Errorf("expected error, got nil")
@@ -323,7 +323,7 @@ func TestActivationEmbedValidation(t *testing.T) {
 }
 
 func TestActivationEmbedVersionRequirement(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_1, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_1, nil)
 	rm := pdf.NewResourceManager(w)
 	defer w.Close()
 	defer rm.Close()
@@ -377,7 +377,7 @@ func TestTimestampWireForms(t *testing.T) {
 // decodes as the default 1.0 (zero is treated as a shorthand for the
 // PDF default).
 func TestActivationRateZeroShorthand(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	if err := w.Put(ref, pdf.Dict{"Rate": pdf.Number(0)}); err != nil {
 		t.Fatalf("Put: %v", err)
@@ -400,7 +400,7 @@ func TestActivationRateZeroShorthand(t *testing.T) {
 // TestActivationDecodePermissive verifies that an out-of-range Volume
 // on the wire is silently coerced to the default 1.0.
 func TestActivationDecodePermissive(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	dict := pdf.Dict{
 		"Volume": pdf.Number(2.5), // out of range
@@ -427,7 +427,7 @@ func FuzzActivationRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range activationRoundTripCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 		if err := memfile.AddBlankPage(w); err != nil {
 			continue
 		}
@@ -462,7 +462,7 @@ func FuzzActivationRoundTrip(f *testing.F) {
 			t.Skip("malformed activation dictionary")
 		}
 
-		w, _ := memfile.NewPDFWriter(pdf.GetVersion(r), nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.GetVersion(r), nil)
 		rm := pdf.NewResourceManager(w)
 		obj, err := rm.Embed(first)
 		if err != nil {

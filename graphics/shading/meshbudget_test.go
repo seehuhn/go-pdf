@@ -32,7 +32,7 @@ import (
 // the raw vertex/patch data that the parsers consume.
 func meshStreamData(t *testing.T, sh graphics.Shading) []byte {
 	t.Helper()
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 	embedded, err := rm.Embed(sh)
 	if err != nil {

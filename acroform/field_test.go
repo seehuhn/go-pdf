@@ -72,7 +72,7 @@ func TestAllFields(t *testing.T) {
 }
 
 func TestEncodeFieldNameWithPeriod(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	field := NewTextField("a.b")
@@ -127,7 +127,7 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(tc.version, nil)
+			w, _ := memfile.NewPDFWriter(t, tc.version, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := terminalEntries(rm, tc.field); !pdf.IsWrongVersion(err) {
 				t.Errorf("expected version error, got %v", err)
@@ -151,7 +151,7 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 	}
 	for _, tc := range atVersion {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(tc.version, nil)
+			w, _ := memfile.NewPDFWriter(t, tc.version, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := terminalEntries(rm, tc.field); err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -180,7 +180,7 @@ func TestEncodeCombValidation(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			_, err := terminalEntries(rm, tc.field)
 			if tc.wantErr && err == nil {

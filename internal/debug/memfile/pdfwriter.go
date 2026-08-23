@@ -16,7 +16,11 @@
 
 package memfile
 
-import "seehuhn.de/go/pdf"
+import (
+	"testing"
+
+	"seehuhn.de/go/pdf"
+)
 
 // NewPDFWriter creates a new PDF writer which writes to a MemFile.
 // The returned writer can still be used as a reader after it has been closed.
@@ -24,15 +28,24 @@ import "seehuhn.de/go/pdf"
 // A minimal page tree is added automatically so the resulting document
 // has a valid catalog without further setup.  Tests that need a different
 // page tree can overwrite [Catalog.Pages] themselves.
-func NewPDFWriter(v pdf.Version, opt *pdf.WriterOptions) (*pdf.Writer, *MemFile) {
+//
+// After the test finishes, the generated file is checked for real numbers
+// with an implausibly long fractional part (see [CheckNumbers]), and the
+// test fails if any are found.
+func NewPDFWriter(t testing.TB, v pdf.Version, opt *pdf.WriterOptions) (*pdf.Writer, *MemFile) {
 	tmpFile := New()
 	w, err := pdf.NewWriter(tmpFile, v, opt)
 	if err != nil {
-		panic(err)
+		t.Fatalf("cannot create PDF writer: %v", err)
 	}
 	if err := AddBlankPage(w); err != nil {
-		panic(err)
+		t.Fatalf("cannot add blank page: %v", err)
 	}
+	t.Cleanup(func() {
+		for _, s := range CheckNumbers(tmpFile.Data) {
+			t.Errorf("unrounded number in generated PDF: %s", s)
+		}
+	})
 	return w, tmpFile
 }
 

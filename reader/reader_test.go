@@ -37,7 +37,7 @@ import (
 // TestParameters verifies that the graphics state is correctly updated by the
 // reader.
 func TestParameters(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	testFont := font.Must(standard.Helvetica.New())
 	m := matrix.Matrix{1, 2, 3, 4, 5, 6}
@@ -154,7 +154,7 @@ func TestParameters(t *testing.T) {
 // TestProcessSplitContentStream verifies that the reader correctly handles
 // a page whose /Contents is an array of streams.
 func TestProcessSplitContentStream(t *testing.T) {
-	pdfData, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	pdfData, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	stream1Ref := pdfData.Alloc()
 	stream1, err := pdfData.OpenStream(stream1Ref, nil)

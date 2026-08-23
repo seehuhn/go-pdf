@@ -63,7 +63,7 @@ func TestLab8RoundTrip(t *testing.T) {
 		im.PixData[i] = uint8(i * 11)
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	ref, err := rm.Embed(im)

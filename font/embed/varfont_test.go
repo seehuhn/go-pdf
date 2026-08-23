@@ -40,7 +40,7 @@ import (
 // resulting simple TrueType font dictionary.
 func embedSimple(t *testing.T, F font.Layouter) *dict.TrueType {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	ref, err := rm.Embed(F)
@@ -190,7 +190,7 @@ func TestVarFontUnknownAxis(t *testing.T) {
 // resulting CIDFontType2 dictionary.
 func embedComposite(t *testing.T, F font.Layouter) *dict.CIDFontType2 {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	ref, err := rm.Embed(F)

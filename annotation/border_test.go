@@ -37,7 +37,7 @@ func TestBorderDefaults(t *testing.T) {
 		},
 	}
 
-	buf, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	embedded, err := annotation.Encode(rm)

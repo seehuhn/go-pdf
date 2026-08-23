@@ -35,7 +35,7 @@ type actualTextEvent struct {
 
 func collectActualText(t *testing.T, src string) ([]actualTextEvent, *Reader) {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
 
 	var events []actualTextEvent
@@ -148,7 +148,7 @@ func TestActualTextUnclosedAutoEnd(t *testing.T) {
 }
 
 func TestInActualText(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
 
 	if r.InActualText() {
@@ -187,7 +187,7 @@ func TestActualTextResetClears(t *testing.T) {
 	// callback that fails on the Begin event aborts ProcessIter before the
 	// region's auto-close runs, leaving it open; Reset then returns the reader
 	// to a clean state.
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
 	r.ActualText = func(ActualTextEvent, string) error {
 		return errAbortActualText
@@ -213,7 +213,7 @@ func TestActualTextProcessIterResets(t *testing.T) {
 	// without the reset at the start of ProcessIter the second run's region
 	// would be treated as nested and suppressed instead of firing its own
 	// Begin/End events.
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	r := New(pdf.NewExtractor(w))
 
 	var events []actualTextEvent

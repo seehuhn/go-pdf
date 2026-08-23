@@ -65,7 +65,7 @@ func testMalformedLeaf[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			ref := w.Alloc()
 			put(t, w, ref, pdf.Dict{kc.leafKey(): tc.entries})
 
@@ -115,7 +115,7 @@ func TestMalformedIntermediate(t *testing.T) {
 // both paths.
 func testMalformedIntermediate[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 	var kc C
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	enc := func(i int) pdf.Object { return kc.encode(tk.keyAt(i)) }
 
 	// k0 is reachable via good Limits; k1..k3 only via enumeration
@@ -177,7 +177,7 @@ func TestMalformedRoot(t *testing.T) {
 // testMalformedRoot checks that a root object which is not a dictionary yields
 // an empty tree from every reader rather than a panic.
 func testMalformedRoot[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	if err := w.Put(ref, pdf.Integer(7)); err != nil {
 		t.Fatal(err)
@@ -218,7 +218,7 @@ func testMalformedContainers[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKin
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			ref := w.Alloc()
 			put(t, w, ref, tc.dict)
 

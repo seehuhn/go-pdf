@@ -65,7 +65,7 @@ var testCases = []struct {
 func roundTripTest(t *testing.T, version pdf.Version, id *Identifier) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(id)
@@ -102,7 +102,7 @@ func TestIdentifierRoundTrip(t *testing.T) {
 }
 
 func TestExtractIdentifierNil(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	id, err := ExtractIdentifier(pdf.CursorAt(x, nil), nil, false)
@@ -115,7 +115,7 @@ func TestExtractIdentifierNil(t *testing.T) {
 }
 
 func TestExtractIdentifierWrongLength(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	// too short
@@ -138,7 +138,7 @@ func TestExtractIdentifierWrongLength(t *testing.T) {
 }
 
 func TestEmbedIdentifierVersionCheck(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_2, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_2, nil)
 	rm := pdf.NewResourceManager(w)
 
 	id := &Identifier{ID: make([]byte, 16)}
@@ -149,7 +149,7 @@ func TestEmbedIdentifierVersionCheck(t *testing.T) {
 }
 
 func TestEmbedIdentifierInvalidLength(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	id := &Identifier{ID: []byte{1, 2, 3}} // too short
@@ -165,7 +165,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

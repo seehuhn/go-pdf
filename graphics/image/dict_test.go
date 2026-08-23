@@ -768,7 +768,7 @@ func checkDictData(d *Dict) error {
 func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// Embed the original data
@@ -877,7 +877,7 @@ func FuzzDictRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
 		err := memfile.AddBlankPage(w)
@@ -909,7 +909,7 @@ func FuzzDictRoundTrip(f *testing.F) {
 	// is no JPXSource for API-side construction; instead, write the
 	// dict directly.
 	{
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		_ = memfile.AddBlankPage(w)
 		ref := w.Alloc()
 		body, err := w.OpenStream(ref, pdf.Dict{
@@ -963,7 +963,7 @@ func FuzzDictRoundTrip(f *testing.F) {
 // no later than the decoded-buffer cap; this dict sits one pixel row past
 // that shared boundary.
 func TestExtractDictDecodedOversize(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	body, err := w.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
@@ -999,7 +999,7 @@ func TestExtractDictDecodedOversize(t *testing.T) {
 func TestExtractDictTooManyAlternates(t *testing.T) {
 	for _, kind := range []string{"under cap", "over cap"} {
 		t.Run(kind, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			// build a single small alternate-target image XObject
 			altRef := w.Alloc()
@@ -1075,7 +1075,7 @@ func TestExtractDictTooManyAlternates(t *testing.T) {
 func TestExtractMaskTooManyAlternates(t *testing.T) {
 	for _, kind := range []string{"under cap", "over cap"} {
 		t.Run(kind, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			altRef := w.Alloc()
 			altBody, err := w.OpenStream(altRef, pdf.Dict{
@@ -1153,7 +1153,7 @@ func TestExtractMaskTooManyAlternates(t *testing.T) {
 func TestExtractDictTooManyAssociatedFiles(t *testing.T) {
 	for _, kind := range []string{"under cap", "over cap"} {
 		t.Run(kind, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 			// build a single tiny file-spec object referenced many times
 			specRef := w.Alloc()
@@ -1218,7 +1218,7 @@ func TestExtractDictTooManyAssociatedFiles(t *testing.T) {
 func TestExtractMaskTooManyAssociatedFiles(t *testing.T) {
 	for _, kind := range []string{"under cap", "over cap"} {
 		t.Run(kind, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 			specRef := w.Alloc()
 			if err := w.Put(specRef, pdf.Dict{
@@ -1283,7 +1283,7 @@ func TestExtractMaskTooManyAssociatedFiles(t *testing.T) {
 // rules without needing valid JP2 codestream bytes.
 func writeJPXImage(t *testing.T, version pdf.Version, extras pdf.Dict) (*Dict, error) {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	ref := w.Alloc()
 	dict := pdf.Dict{
 		"Type":    pdf.Name("XObject"),
@@ -1415,7 +1415,7 @@ func TestExtractDictJPXBPCIgnored(t *testing.T) {
 		}
 
 		// re-embed must succeed, demonstrating round-trip parity
-		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(w)
 		if _, err := rm.Embed(img); err != nil {
 			t.Errorf("BPC=%d in source: re-embed failed: %v", bpc, err)
@@ -1465,7 +1465,7 @@ func TestExtractDictDecodeLength(t *testing.T) {
 // given /Decode array, then re-extracts it.
 func extractRGBImageWithDecode(t *testing.T, decode pdf.Array) *Dict {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	dict := pdf.Dict{
 		"Type":             pdf.Name("XObject"),
@@ -1507,7 +1507,7 @@ func TestDictJPXRoundTrip(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w2)
 	ref, err := rm.Embed(orig)
 	if err != nil {
@@ -1575,7 +1575,7 @@ func TestDictRejectInvalidWriteCombinations(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(tc.d); err == nil {
 				t.Error("expected Embed to fail, got nil error")
@@ -1591,7 +1591,7 @@ func TestDictRejectInvalidWriteCombinations(t *testing.T) {
 // depth live in the JP2 codestream), so the pixel-count cap is the
 // only defence at the dictionary level.
 func TestExtractDictJPXOversizePixels(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	body, err := w.OpenStream(ref, pdf.Dict{
 		"Type":    pdf.Name("XObject"),
@@ -1637,7 +1637,7 @@ func TestExtractDictDCTDimensionMismatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	body, err := w.OpenStream(ref, pdf.Dict{
 		"Type":             pdf.Name("XObject"),
@@ -1696,7 +1696,7 @@ func TestDictNameRejectedAt2_0(t *testing.T) {
 		}),
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	if _, err := rm.Embed(d); err == nil {
 		t.Error("no error for a /Name at PDF 2.0")

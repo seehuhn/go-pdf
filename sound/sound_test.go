@@ -57,7 +57,7 @@ func readSampleBytes(t *testing.T, src Source) []byte {
 }
 
 func TestEmbedMinimal(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(w)
 
 	s := &Sound{
@@ -84,7 +84,7 @@ func TestEmbedMinimal(t *testing.T) {
 }
 
 func TestExtractMinimal(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(w)
 
 	original := &Sound{
@@ -255,7 +255,7 @@ func roundTripTest(t *testing.T, tc roundTripCase) {
 		}
 	}
 
-	w, _ := memfile.NewPDFWriter(tc.version, nil)
+	w, _ := memfile.NewPDFWriter(t, tc.version, nil)
 	rm := pdf.NewResourceManager(w)
 	obj, err := rm.Embed(&original)
 	if err != nil {
@@ -322,7 +322,7 @@ func TestRoundTrip(t *testing.T) {
 // dangling pointers, and the round-tripped Sound compares equal.
 func TestCompressionParamsCrossFile(t *testing.T) {
 	// Build source: an inner dict referenced from the /CP dict of a Sound.
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(src); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -367,7 +367,7 @@ func TestCompressionParamsCrossFile(t *testing.T) {
 	}
 
 	// Re-embed into a different file.
-	dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	dstRM := pdf.NewResourceManager(dst)
 	dstSoundRef, err := dstRM.Embed(srcSnd)
 	if err != nil {
@@ -533,7 +533,7 @@ func TestEmbedValidation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			if _, err := rm.Embed(tc.sound); err == nil {
 				t.Errorf("expected error, got nil")
@@ -551,7 +551,7 @@ func TestEmbedValidation(t *testing.T) {
 func TestStreamSourcePreservesFilter(t *testing.T) {
 	sample := bytes.Repeat([]byte{0x80, 0x81, 0x82, 0x83}, 64)
 
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(src)
 	original := &Sound{
 		SampleRate:    22050,
@@ -583,7 +583,7 @@ func TestStreamSourcePreservesFilter(t *testing.T) {
 		t.Fatalf("extract: %v", err)
 	}
 
-	dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm2 := pdf.NewResourceManager(dst)
 	obj2, err := rm2.Embed(got)
 	if err != nil {
@@ -611,7 +611,7 @@ func TestStreamSourcePreservesFilter(t *testing.T) {
 // stream dictionary is silently substituted with the default EncodingRaw,
 // preserving the read-write-read round-trip property.
 func TestExtractUnknownEncoding(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ref := w.Alloc()
 	dict := pdf.Dict{
@@ -644,7 +644,7 @@ func TestExtractUnknownEncoding(t *testing.T) {
 }
 
 func TestEmbedVersionRequirement(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_1, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_1, nil)
 	rm := pdf.NewResourceManager(w)
 	defer w.Close()
 	defer rm.Close()
@@ -668,7 +668,7 @@ func FuzzRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range roundTripCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 		if err := memfile.AddBlankPage(w); err != nil {
 			continue
 		}
@@ -731,7 +731,7 @@ func FuzzRoundTrip(f *testing.F) {
 			first.Data = inlineSourceWith(firstSamples)
 		}
 
-		w, _ := memfile.NewPDFWriter(pdf.GetVersion(r), nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.GetVersion(r), nil)
 		rm := pdf.NewResourceManager(w)
 		obj, err := rm.Embed(first)
 		if err != nil {

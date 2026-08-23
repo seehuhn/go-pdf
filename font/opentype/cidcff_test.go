@@ -89,7 +89,7 @@ func TestCompositeCFFDescriptor(t *testing.T) {
 
 func embedCompositeCFF(t *testing.T, v pdf.Version, fontData *sfnt.Font) *dict.CIDFontType0 {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	F, err := opentype.NewComposite(fontData, nil)

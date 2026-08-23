@@ -463,7 +463,7 @@ func TestRoundTrip(t *testing.T) {
 
 // roundTripTest performs a round-trip test for any shading type
 func roundTripTest(t *testing.T, originalShading graphics.Shading) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// Embed the shading
@@ -687,7 +687,7 @@ func TestShadingEvaluation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test that the shading can be embedded without error
-			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
 
 			_, err := rm.Embed(tt.shading)
@@ -780,7 +780,7 @@ func TestReadErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 			x := pdf.NewExtractor(buf)
 			_, err := Extract(pdf.CursorAt(x, nil), tt.dict, false)
@@ -813,7 +813,7 @@ func TestType2InvalidColorSpace(t *testing.T) {
 		},
 	}
 
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	_, err = rm.Embed(shading)
@@ -840,7 +840,7 @@ func TestBackgroundWrongLengthIgnored(t *testing.T) {
 		},
 	}
 
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	x := pdf.NewExtractor(buf)
 	s, err := Extract(pdf.CursorAt(x, nil), dict, false)
 	if err != nil {
@@ -863,7 +863,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 	for _, cases := range testCases {
 		for _, tc := range cases {
-			w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+			w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 			err := memfile.AddBlankPage(w)
 			if err != nil {

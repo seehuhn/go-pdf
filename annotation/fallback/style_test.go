@@ -270,7 +270,7 @@ func TestAddAppearanceKeepsStateForRollover(t *testing.T) {
 					t.Error("no normal appearance was generated")
 				}
 
-				buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+				buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 				rm := pdf.NewResourceManager(buf)
 				if _, err := w.Encode(rm); err != nil {
 					t.Errorf("encoding the annotation: %v", err)

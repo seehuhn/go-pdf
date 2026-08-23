@@ -36,7 +36,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 	keys := []pdf.Integer{-5, 0, 7}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	seq := func(yield func(pdf.Integer, pdf.Object) bool) {
 		for _, k := range keys {
 			if !yield(k, data[k]) {
@@ -79,7 +79,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestEmpty(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	seq := func(yield func(pdf.Integer, pdf.Object) bool) {}
 	ref, err := Write(w, seq)
 	if err != nil {

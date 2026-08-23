@@ -28,7 +28,7 @@ import (
 // TestStreamReader verifies that Reader returns the decoded body of
 // the wrapped stream.
 func TestStreamReader(t *testing.T) {
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(src); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestStreamReader(t *testing.T) {
 // references in the stream dict and copies the body verbatim, and that
 // caller-supplied extras overlay the translated dict.
 func TestStreamWriteAtCrossFile(t *testing.T) {
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(src); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 	}
 	s := ExtractStream(srcX, srcStream)
 
-	dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(dst)
 	dstRef := dst.Alloc()
 	embedExtras := pdf.Dict{
@@ -184,7 +184,7 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 	body := []byte("plaintext stream payload")
 
 	// build an encrypted source PDF.
-	src, srcFile := memfile.NewPDFWriter(pdf.V1_6, &pdf.WriterOptions{
+	src, srcFile := memfile.NewPDFWriter(t, pdf.V1_6, &pdf.WriterOptions{
 		UserPassword:  "u",
 		OwnerPassword: "o",
 	})
@@ -222,7 +222,7 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 	s := ExtractStream(srcX, srcStream)
 
 	// embed into an unencrypted destination.
-	dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(dst)
 	dstRef := dst.Alloc()
 	if _, err := rm.Embed(&streamCarrier{s: s, ref: dstRef, extras: pdf.Dict{}}); err != nil {
@@ -261,7 +261,7 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 // error if the caller passes any of the stream-mechanics keys that the
 // copier and writer manage themselves.
 func TestStreamWriteAtRejectsForbiddenKeys(t *testing.T) {
-	src, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	if err := memfile.AddBlankPage(src); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestStreamWriteAtRejectsForbiddenKeys(t *testing.T) {
 
 	forbidden := []pdf.Name{"Length", "Filter", "DecodeParms", "F", "FFilter", "FDecodeParms"}
 	for _, key := range forbidden {
-		dst, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(dst)
 		dstRef := dst.Alloc()
 		_, err := rm.Embed(&streamCarrier{

@@ -41,7 +41,7 @@ func TestMetadataRoundTrip(t *testing.T) {
 
 	original := &pdf.MetadataStream{Data: packet}
 
-	pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	pdfData, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(pdfData)
 	ref, err := rm.Embed(original)
 	if err != nil {
@@ -82,7 +82,7 @@ func TestMetadataRoundTripPadded(t *testing.T) {
 	packet.PadToLength = padTo
 	original := &pdf.MetadataStream{Data: packet, Plaintext: true}
 
-	pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	pdfData, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(pdfData)
 	ref, err := rm.Embed(original)
 	if err != nil {
@@ -129,7 +129,7 @@ func TestMetadataUnpaddedTrailer(t *testing.T) {
 		t.Fatalf("set: %v", err)
 	}
 
-	pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	pdfData, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(pdfData)
 	ref, err := rm.Embed(&pdf.MetadataStream{Data: packet})
 	if err != nil {
@@ -178,7 +178,7 @@ func TestMetadataCatalogPlaintext(t *testing.T) {
 			Plaintext: true,
 		},
 	}
-	w, mf := memfile.NewPDFWriter(pdf.V2_0, opt)
+	w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
 	if err := memfile.AddBlankPage(w); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestMetadataPaddedCatalogRequiresPlaintext(t *testing.T) {
 	opt := &pdf.WriterOptions{
 		UserPassword: "u",
 	}
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, opt)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, opt)
 	if err := memfile.AddBlankPage(w); err != nil {
 		t.Fatalf("AddBlankPage: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestMetadataNonCatalogStreamEncrypted(t *testing.T) {
 	opt := &pdf.WriterOptions{
 		UserPassword: "u",
 	}
-	w, mf := memfile.NewPDFWriter(pdf.V2_0, opt)
+	w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
 	rm := pdf.NewResourceManager(w)
 	embedded, err := rm.Embed(&pdf.MetadataStream{Data: packet})
 	if err != nil {
@@ -359,7 +359,7 @@ func TestMetadataNonCatalogPlaintext(t *testing.T) {
 	opt := &pdf.WriterOptions{
 		UserPassword: "u",
 	}
-	w, mf := memfile.NewPDFWriter(pdf.V2_0, opt)
+	w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
 	rm := pdf.NewResourceManager(w)
 	embedded, err := rm.Embed(&pdf.MetadataStream{
 		Data:      packet,
@@ -426,7 +426,7 @@ func TestMetadataPlaintextRoundTrip(t *testing.T) {
 				Plaintext: true,
 			},
 		}
-		w, mf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
 		if err := memfile.AddBlankPage(w); err != nil {
 			t.Fatalf("AddBlankPage: %v", err)
 		}
@@ -455,7 +455,7 @@ func TestMetadataPlaintextRoundTrip(t *testing.T) {
 		}
 
 		opt := &pdf.WriterOptions{UserPassword: "u"}
-		w, mf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
 		rm := pdf.NewResourceManager(w)
 		embedded, err := rm.Embed(&pdf.MetadataStream{
 			Data:      packet,
@@ -500,7 +500,7 @@ func TestMetadataPlaintextRoundTrip(t *testing.T) {
 			UserPassword:     "u",
 			DocumentMetadata: &pdf.MetadataStream{Data: packet},
 		}
-		w, mf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
 		if err := memfile.AddBlankPage(w); err != nil {
 			t.Fatalf("AddBlankPage: %v", err)
 		}
@@ -534,7 +534,7 @@ func TestMetadataPadToLengthRequiresPlaintext(t *testing.T) {
 	}
 	packet.PadToLength = 1024
 
-	pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	pdfData, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(pdfData)
 	_, err := rm.Embed(&pdf.MetadataStream{Data: packet})
 	if err == nil {
@@ -556,7 +556,7 @@ func TestMetadataPlaintextUnencryptedRoundTrip(t *testing.T) {
 				t.Fatalf("set: %v", err)
 			}
 
-			pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			pdfData, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(pdfData)
 			ref, err := rm.Embed(&pdf.MetadataStream{
 				Data:      packet,
@@ -595,7 +595,7 @@ func TestMetadataPlaintextRequiresVersion(t *testing.T) {
 		}
 
 		opt := &pdf.WriterOptions{UserPassword: "u"}
-		w, _ := memfile.NewPDFWriter(pdf.V1_4, opt)
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_4, opt)
 		rm := pdf.NewResourceManager(w)
 		_, err := rm.Embed(&pdf.MetadataStream{
 			Data:      packet,

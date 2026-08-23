@@ -100,7 +100,7 @@ func TestGroupRoundTrip(t *testing.T) {
 func testGroupRoundTrip(t *testing.T, version pdf.Version, original *Group) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// embed the group
@@ -164,7 +164,7 @@ func normalizeGroup(g *Group) {
 }
 
 func TestGroupValidation(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// Test empty name should fail
@@ -230,7 +230,7 @@ func FuzzGroupRoundTrip(f *testing.F) {
 
 	// build seed corpus from test cases
 	for _, tc := range groupTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

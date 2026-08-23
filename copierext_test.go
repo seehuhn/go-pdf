@@ -26,7 +26,7 @@ import (
 
 func TestCopyReference(t *testing.T) {
 	// build a chain of references: c -> b -> a -> 42
-	orig, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	orig, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	a := orig.Alloc()
 	err := orig.Put(a, pdf.Integer(42))
 	if err != nil {
@@ -44,7 +44,7 @@ func TestCopyReference(t *testing.T) {
 	}
 
 	// copy the chain
-	dest, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	dest, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	copier := pdf.NewCopier(dest, orig)
 	copiedC, err := copier.CopyReference(c)
 	if err != nil {
@@ -79,7 +79,7 @@ func (g malformedGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, err
 // whose stream dict carries a stray indirect reference to an unparsable
 // object.
 func TestCopyReferenceMalformedBecomesNull(t *testing.T) {
-	dest, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	dest, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	src := malformedGetter{meta: dest.GetMeta()}
 	copier := pdf.NewCopier(dest, src)
 

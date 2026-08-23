@@ -35,7 +35,7 @@ import (
 // caller decoding the AcroForm itself. It also checks that the merged field and
 // its page widget are one shared object.
 func TestPageDecodeLinksWidgets(t *testing.T) {
-	w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	mergedRef := w.Alloc() // one object that is both a field and a widget
 	multiRef := w.Alloc()  // a multi-widget field

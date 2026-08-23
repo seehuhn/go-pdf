@@ -64,7 +64,7 @@ var characteristicsCases = []*Characteristics{
 func roundTripCharacteristics(t *testing.T, version pdf.Version, data *Characteristics) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(data)
 	if err != nil {
@@ -113,7 +113,7 @@ func FuzzCharacteristicsRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 	for _, version := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for _, data := range characteristicsCases {
-			w, buf := memfile.NewPDFWriter(version, opt)
+			w, buf := memfile.NewPDFWriter(f, version, opt)
 			if memfile.AddBlankPage(w) != nil {
 				continue
 			}

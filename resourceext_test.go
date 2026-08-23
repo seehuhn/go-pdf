@@ -114,7 +114,7 @@ func TestResourceManager(t *testing.T) {
 // TestExtractorResolveCycle tests that Extractor.Resolve detects reference cycles.
 func TestExtractorResolveCycle(t *testing.T) {
 	// create a PDF with a cycle: A -> B -> A
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	refA := w.Alloc()
 	refB := w.Alloc()
@@ -148,7 +148,7 @@ func TestExtractorResolveCycle(t *testing.T) {
 // TestCursorArrayCycle tests that Cursor.Array detects cycles.
 func TestCursorArrayCycle(t *testing.T) {
 	// create a PDF with a cycle in an array
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	refA := w.Alloc()
 	err := w.Put(refA, pdf.Array{pdf.Integer(1), refA})

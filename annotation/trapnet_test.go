@@ -69,7 +69,7 @@ func TestTrapNetEncodeValidCombinations(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			_, err := tc.data.Encode(rm)
 			if err != nil {
@@ -133,7 +133,7 @@ func TestTrapNetEncodeInvalidCombinations(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			_, err := tc.data.Encode(rm)
 			if err == nil {
@@ -150,7 +150,7 @@ func TestTrapNetEncodeLastModifiedV13(t *testing.T) {
 		Common:       Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
 		LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 	}
-	w, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(w)
 	_, err := tn.Encode(rm)
 	if err == nil {

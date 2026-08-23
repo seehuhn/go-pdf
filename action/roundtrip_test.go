@@ -303,7 +303,7 @@ var actionTestCases = []pdf.Action{
 func testActionRoundTrip(t *testing.T, version pdf.Version, action pdf.Action) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	encoded, err := action.Encode(rm)
@@ -356,7 +356,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, action := range actionTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

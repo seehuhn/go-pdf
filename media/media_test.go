@@ -290,7 +290,7 @@ var rtCases = []rtCase{
 func roundTrip(t *testing.T, version pdf.Version, obj pdf.Embedder, decode decodeFunc) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 	stored, err := rm.Embed(obj)
 	if err != nil {
@@ -348,7 +348,7 @@ func FuzzRoundTrip(f *testing.F) {
 			if !ok {
 				continue
 			}
-			w, buf := memfile.NewPDFWriter(version, opt)
+			w, buf := memfile.NewPDFWriter(f, version, opt)
 			if err := memfile.AddBlankPage(w); err != nil {
 				continue
 			}

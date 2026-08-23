@@ -89,7 +89,7 @@ func TestSimpleLayout(t *testing.T) {
 
 func embedTrueTypeSimple(t *testing.T, v pdf.Version, fontData *sfnt.Font) *dict.TrueType {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(v, nil)
+	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
 	F, err := truetype.NewSimple(fontData, nil)

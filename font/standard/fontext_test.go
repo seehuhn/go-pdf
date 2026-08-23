@@ -34,7 +34,7 @@ func TestEmbedStandard(t *testing.T) {
 	for _, standardFont := range standard.All {
 		for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 			t.Run(fmt.Sprintf("%s@%s", standardFont, v), func(t *testing.T) {
-				data, _ := memfile.NewPDFWriter(v, nil)
+				data, _ := memfile.NewPDFWriter(t, v, nil)
 				rm := pdf.NewResourceManager(data)
 
 				// Embed the font into a PDF file:

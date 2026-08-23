@@ -211,7 +211,7 @@ func TestRoundTrip(t *testing.T) {
 
 // roundTripTest performs a round-trip test for any halftone type
 func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// Embed the halftone
@@ -256,7 +256,7 @@ func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 // extractType16/extractType10/extractType5 before the fix.
 func TestMaliciousInputRejected(t *testing.T) {
 	t.Run("Type16HugeDims", func(t *testing.T) {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		if err := memfile.AddBlankPage(w); err != nil {
 			t.Fatal(err)
 		}
@@ -282,7 +282,7 @@ func TestMaliciousInputRejected(t *testing.T) {
 	})
 
 	t.Run("Type10HugeDims", func(t *testing.T) {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		if err := memfile.AddBlankPage(w); err != nil {
 			t.Fatal(err)
 		}
@@ -308,7 +308,7 @@ func TestMaliciousInputRejected(t *testing.T) {
 	})
 
 	t.Run("Type5InlineNesting", func(t *testing.T) {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		if err := memfile.AddBlankPage(w); err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func TestMaliciousInputRejected(t *testing.T) {
 
 	t.Run("Type5DeepLinearChain", func(t *testing.T) {
 		const chainLen = 1000
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, nil)
+		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		if err := memfile.AddBlankPage(w); err != nil {
 			t.Fatal(err)
 		}
@@ -403,7 +403,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 	for _, cases := range testCases {
 		for _, tc := range cases {
-			w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+			w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 			// AddBlankPage creates a minimal valid PDF structure.
 			// Without this, the seeds will likely be rejected by pdf.NewReader.
@@ -488,7 +488,7 @@ func TestType5UnreadableColorantDropped(t *testing.T) {
 
 	for name, bad := range badColorants {
 		t.Run(name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
 
 			dict := pdf.Dict{
@@ -543,7 +543,7 @@ func TestType5NonPrimaryColorantTransferFunction(t *testing.T) {
 		}
 
 		t.Run(name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
 
 			ht, err := Extract(c, pdf.Dict{
@@ -599,7 +599,7 @@ func TestType1SpotFunctionUnusable(t *testing.T) {
 
 	for name, spot := range spotFunctions {
 		t.Run(name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
 
 			dict := pdf.Dict{

@@ -95,7 +95,7 @@ func TestRoundTrip(t *testing.T) {
 func roundTripTest(t *testing.T, original *TransparencyAttributes) {
 	t.Helper()
 
-	buf, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	embedded, err := rm.Embed(original)
@@ -124,7 +124,7 @@ func FuzzRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

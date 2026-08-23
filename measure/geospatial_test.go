@@ -115,7 +115,7 @@ var geospatialTestCases = []struct {
 func geospatialRoundTripTest(t *testing.T, data *GeospatialMeasure) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	rm := pdf.NewResourceManager(w)
 	embedded, err := rm.Embed(data)
@@ -162,7 +162,7 @@ func FuzzGeospatialRoundTrip(f *testing.F) {
 		HumanReadable: true,
 	}
 	for _, tc := range geospatialTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V2_0, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -262,7 +262,7 @@ func TestGeospatialEmbedValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(w)
 
 			_, err := rm.Embed(tt.gm)

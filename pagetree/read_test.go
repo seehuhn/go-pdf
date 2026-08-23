@@ -28,7 +28,7 @@ import (
 )
 
 func TestFindPages(t *testing.T) {
-	doc, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	doc, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	numPages := 234
 	pageRefsIn := make([]pdf.Reference, numPages)
@@ -66,7 +66,7 @@ func TestFindPages(t *testing.T) {
 func TestFindPagesInvalidKid(t *testing.T) {
 	// Test that invalid kids get 0 placeholder at the correct position.
 	// A malformed PDF might have non-reference entries in Kids array.
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// Create three page objects
 	page0Ref := data.Alloc()
@@ -107,7 +107,7 @@ func TestFindPagesInvalidKid(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	data, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	n := 10
 	refs := make([]pdf.Reference, n)

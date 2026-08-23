@@ -86,7 +86,7 @@ func TestRoundTrip(t *testing.T) {
 func roundTripTest(t *testing.T, version pdf.Version, nodes1 []*Node) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	encoded, err := Encode(rm, nodes1)
@@ -145,7 +145,7 @@ func FuzzRoundTrip(f *testing.F) {
 			continue
 		}
 
-		w, buf := memfile.NewPDFWriter(pdf.V1_5, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_5, opt)
 		err := memfile.AddBlankPage(w)
 		if err != nil {
 			continue

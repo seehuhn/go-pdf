@@ -74,7 +74,7 @@ func TestFreeTextDecodeRepair(t *testing.T) {
 	}
 
 	// the repaired annotation must encode without error
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	if _, err := ft.Encode(rm); err != nil {
 		t.Errorf("encoding repaired free text annotation: %v", err)
@@ -86,7 +86,7 @@ func TestFreeTextDecodeRepair(t *testing.T) {
 // one, so that it can be written back.  With nothing else to go on the state
 // chosen is the smallest name, taken from the normal appearance.
 func TestMissingAppearanceStateRepair(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rect := pdf.Rectangle{URx: 100, URy: 50}
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Square"),
@@ -117,7 +117,7 @@ func TestMissingAppearanceStateRepair(t *testing.T) {
 // rather than from the appearance dictionary alone.  Picking the smallest name
 // instead would show a check box which is on as unchecked.
 func TestMissingAppearanceStateFromFieldValue(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rect := pdf.Rectangle{URx: 20, URy: 20}
 	apRef := w.Alloc()
 	err := w.Put(apRef, pdf.Dict{"N": pdf.Dict{
@@ -233,7 +233,7 @@ func TestStampEncodeDefaultIntent(t *testing.T) {
 		t.Errorf("expected default intent, got %q", stamp.Intent)
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_3, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(w)
 	out, err := stamp.Encode(rm)
 	if err != nil {

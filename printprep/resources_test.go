@@ -115,7 +115,7 @@ func TestFormEntriesNormalized(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			apDict := pdf.Dict{
 				"Type":    pdf.Name("XObject"),
@@ -245,7 +245,7 @@ func TestFormEntriesNormalizedInResources(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			formDict := pdf.Dict{
 				"Type":    pdf.Name("XObject"),
@@ -362,7 +362,7 @@ func TestPatternEntriesNormalized(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, buf := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			patDict := pdf.Dict{
 				"Type":        pdf.Name("Pattern"),

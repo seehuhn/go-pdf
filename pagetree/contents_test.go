@@ -25,7 +25,7 @@ import (
 )
 
 func TestContentStream(t *testing.T) {
-	pdfData, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	pdfData, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	A := addStream(t, pdfData, "A")
 	B := addStream(t, pdfData, "B", pdf.FilterCompress{})

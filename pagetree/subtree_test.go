@@ -270,7 +270,7 @@ func FuzzInherit(f *testing.F) {
 			expectedRotate[i] = rotations[int((c>>4)&7)%len(rotations)]
 		}
 
-		doc, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		doc, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(doc)
 		pp := NewWriter(doc, rm)
 

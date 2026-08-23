@@ -28,7 +28,7 @@ import (
 // returns the resulting error.
 func embedErr(t *testing.T, version pdf.Version, obj pdf.Embedder) error {
 	t.Helper()
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 	_, err := rm.Embed(obj)
 	return err
@@ -80,7 +80,7 @@ func TestSigSeedValueVersionGating(t *testing.T) {
 
 func TestSigSeedValueLockEntryRequiresIndirect(t *testing.T) {
 	// the Lock and SV entries shall be indirect references; Embed must allocate
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(&SigFieldLock{Action: SigFieldLockAll})
 	if err != nil {

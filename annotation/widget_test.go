@@ -27,7 +27,7 @@ import (
 // a widget whose Field back-reference disagrees with the field's Widgets slice
 // is rejected by Encode.
 func TestWidgetFieldConsistency(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	f := acroform.NewTextField("f0")
@@ -50,7 +50,7 @@ func TestWidgetReservation(t *testing.T) {
 	build := func() (*pdf.ResourceManager, *acroform.InteractiveForm) {
 		// V1_7: a widget without an appearance stream is valid (PDF 2.0 would
 		// require /AP, which is irrelevant to what this test exercises)
-		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(w)
 		f := acroform.NewTextField("f0")
 		wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})

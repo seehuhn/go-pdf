@@ -167,7 +167,7 @@ var (
 )
 
 func TestUsageAppValidation(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_5, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// test invalid Event
@@ -201,7 +201,7 @@ func TestUsageAppValidation(t *testing.T) {
 	}
 
 	// test version check (PDF 1.4 should fail)
-	w14, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	w14, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm14 := pdf.NewResourceManager(w14)
 	ua = &UsageApplication{
 		Event:    EventView,
@@ -224,7 +224,7 @@ func TestUsageAppRoundTrip(t *testing.T) {
 func testUsageAppRoundTrip(t *testing.T, version pdf.Version, data *UsageApplication) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(data)
@@ -272,7 +272,7 @@ func FuzzUsageAppRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range usageAppTestCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {

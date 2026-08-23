@@ -54,7 +54,7 @@ func TestSetOCGStateEncodeInvalid(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
 			_, err := (&SetOCGState{State: tc.state}).Encode(rm)
@@ -69,7 +69,7 @@ func TestSetOCGStateEncodeInvalid(t *testing.T) {
 // written with an empty State array, so that it can be read back.  Decoding a
 // file with a missing State entry yields such an action.
 func TestSetOCGStateEncodeEmpty(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := (&SetOCGState{}).Encode(rm)
@@ -173,7 +173,7 @@ func TestSetOCGStateDecodeRepair(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
 			g1 := &oc.Group{Name: "layer 1", Intent: []pdf.Name{"View"}}
@@ -210,7 +210,7 @@ func TestSetOCGStateDecodeRepair(t *testing.T) {
 			}
 
 			// what survives must be writable again
-			w2, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm2 := pdf.NewResourceManager(w2)
 			if _, err := decoded.Encode(rm2); err != nil {
 				t.Errorf("re-encode failed: %v", err)
@@ -223,7 +223,7 @@ func TestSetOCGStateDecodeRepair(t *testing.T) {
 // as an indirect object is read.  Any PDF object may be indirect, so a State
 // array may spell its names that way.
 func TestSetOCGStateDecodeIndirectOperation(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	group := &oc.Group{Name: "layer", Intent: []pdf.Name{"View"}}
@@ -262,7 +262,7 @@ func TestSetOCGStateDecodeIndirectOperation(t *testing.T) {
 // State field relies on this: pdf.Decode caches by reference, so both uses
 // yield the same *oc.Group, which rm.Embed then writes only once.
 func TestSetOCGStateSharedGroup(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	group := &oc.Group{Name: "layer", Intent: []pdf.Name{"View"}}

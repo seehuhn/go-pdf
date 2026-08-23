@@ -80,7 +80,7 @@ func TestExtractConditionalInferType(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			ref := w.Alloc()
 			if err := w.Put(ref, tc.dict); err != nil {
 				t.Fatal(err)
@@ -110,7 +110,7 @@ func TestExtractConditionalInferType(t *testing.T) {
 // keeps the pointer identity guarantee: a group whose /Type is missing still
 // resolves to the value a [GroupStates] was built from.
 func TestExtractConditionalInferTypeIdentity(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{"Name": pdf.TextString("Layer")})
 	if err != nil {
@@ -141,7 +141,7 @@ func TestExtractConditionalInferTypeIdentity(t *testing.T) {
 // other than an optional content object is still rejected.  The inference
 // applies to a missing entry, not to a contradictory one.
 func TestExtractConditionalBadType(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{
 		"Type": pdf.Name("Annot"),
@@ -161,7 +161,7 @@ func TestExtractConditionalBadType(t *testing.T) {
 // read without its /Type entry is written back with one, so the read-write-read
 // cycle is stable.
 func TestExtractConditionalInferTypeRoundTrip(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	ocgRef := w.Alloc()
 	err := w.Put(ocgRef, pdf.Dict{

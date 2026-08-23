@@ -61,7 +61,7 @@ func collectPathSteps(p path.Path) []pathStep {
 // confirms that path works rather than rejecting CID-keyed single-FD
 // outlines.
 func TestCFF2SimpleVariable(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	coords := map[string]float64{"wght": 900}
@@ -138,7 +138,7 @@ func TestCFF2SimpleVariable(t *testing.T) {
 // fixture forces a genuine CIDFontType0C, rather than the automatic
 // simple-font collapse that makeDict applies for single-FD subsets.
 func TestCFF2CompositeVariable(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	coords := map[string]float64{"wght": 900}
@@ -201,7 +201,7 @@ func TestCFF2CompositeVariable(t *testing.T) {
 // pin; the resulting glyph paths match the CFF2 default instance exactly
 // (no blends to evaluate).
 func TestCFF2SimpleStatic(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
 
 	src := varfont.StaticCFF2()

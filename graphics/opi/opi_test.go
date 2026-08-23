@@ -114,7 +114,7 @@ func TestRoundTrip(t *testing.T) {
 func roundTripTest(t *testing.T, version pdf.Version, d1 Dict) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	obj, err := rm.Embed(d1)
@@ -145,7 +145,7 @@ func roundTripTest(t *testing.T, version pdf.Version, d1 Dict) {
 // colourant pairs reads back as nil, so a read-write-read cycle is stable
 // (Embed writes nothing for an empty Inks20, which must read back as nil).
 func TestReadInksDegenerate(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 	for _, obj := range []pdf.Object{pdf.Array{}, pdf.Array{pdf.Name("monochrome")}} {
 		inks, err := readInks(pdf.CursorAt(x, nil), obj)
@@ -162,7 +162,7 @@ func TestReadInksDegenerate(t *testing.T) {
 // nor a non-empty array reads back as nil, matching what Embed writes for an
 // empty tag value.
 func TestReadTagTextDegenerate(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 	for _, obj := range []pdf.Object{pdf.Integer(42), pdf.Array{}} {
 		text, err := readTagText(pdf.CursorAt(x, nil), obj)
@@ -185,7 +185,7 @@ func TestV20WriteValidation(t *testing.T) {
 		{F: spec("p.tif"), IncludedImageQuality: 5},
 	}
 	for i, v := range bad {
-		w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(w)
 		if _, err := rm.Embed(v); err == nil {
 			t.Errorf("case %d: expected error, got nil", i)
@@ -197,7 +197,7 @@ func TestV20WriteValidation(t *testing.T) {
 // or an out-of-range IncludedImageQuality snaps to a writable state, so the
 // read-write-read cycle stays stable.
 func TestV20ReadFix(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	fObj, err := rm.Embed(spec("proxy.tif"))
 	if err != nil {
@@ -234,7 +234,7 @@ func FuzzRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		if err := memfile.AddBlankPage(w); err != nil {
 			continue
 		}

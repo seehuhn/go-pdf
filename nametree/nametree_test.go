@@ -35,7 +35,7 @@ func TestRoundTrip(t *testing.T) {
 		"gamma": pdf.Integer(3),
 	}
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref, err := WriteMap(w, data)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestRoundTrip(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	seq := func(yield func(pdf.Name, pdf.Object) bool) {
 		yield("only", pdf.Integer(42))
 	}
@@ -89,7 +89,7 @@ func TestWrite(t *testing.T) {
 }
 
 func TestEmpty(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref, err := WriteMap(w, map[pdf.Name]pdf.Object{})
 	if err != nil {
 		t.Fatal(err)

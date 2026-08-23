@@ -157,7 +157,7 @@ var testVersions = []pdf.Version{pdf.V1_7, pdf.V2_0}
 func roundTripTest(t *testing.T, version pdf.Version, data *Info) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	embedded, err := rm.Embed(data)
@@ -207,7 +207,7 @@ func FuzzInfoRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(tc.version, opt)
+		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -260,7 +260,7 @@ func FuzzInfoRoundTrip(f *testing.F) {
 }
 
 func TestStyleValidation(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	buf, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm := pdf.NewResourceManager(buf)
 
 	// negative line width should fail

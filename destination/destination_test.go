@@ -66,7 +66,7 @@ var testCases = []testCase{
 func testRoundTrip(t *testing.T, version pdf.Version, d Destination) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 	rm := pdf.NewResourceManager(w)
 
 	// encode
@@ -99,7 +99,7 @@ func testRoundTrip(t *testing.T, version pdf.Version, d Destination) {
 }
 
 func TestXYZ(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -146,7 +146,7 @@ func TestXYZ(t *testing.T) {
 }
 
 func TestXYZWithUnset(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -178,7 +178,7 @@ func TestXYZWithUnset(t *testing.T) {
 }
 
 func TestXYZInvalidValues(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -211,7 +211,7 @@ func TestXYZInvalidValues(t *testing.T) {
 }
 
 func TestFit(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -243,7 +243,7 @@ func TestFit(t *testing.T) {
 }
 
 func TestFitH(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -272,7 +272,7 @@ func TestFitH(t *testing.T) {
 }
 
 func TestFitV(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -301,7 +301,7 @@ func TestFitV(t *testing.T) {
 }
 
 func TestFitR(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -329,7 +329,7 @@ func TestFitR(t *testing.T) {
 }
 
 func TestFitRInvalidRectangle(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -362,7 +362,7 @@ func TestFitRInvalidRectangle(t *testing.T) {
 }
 
 func TestFitB(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -380,7 +380,7 @@ func TestFitB(t *testing.T) {
 }
 
 func TestFitBVersionCheck(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_0, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -393,7 +393,7 @@ func TestFitBVersionCheck(t *testing.T) {
 }
 
 func TestFitBH(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -411,7 +411,7 @@ func TestFitBH(t *testing.T) {
 }
 
 func TestFitBV(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	pageRef := w.Alloc()
 
@@ -429,7 +429,7 @@ func TestFitBV(t *testing.T) {
 }
 
 func TestNamed(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	dest := &Named{Name: pdf.String("Chapter6")}
@@ -450,7 +450,7 @@ func TestNamed(t *testing.T) {
 }
 
 func TestNamedEmptyName(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
 	dest := &Named{Name: pdf.String("")}
@@ -472,7 +472,7 @@ func TestRoundTrip(t *testing.T) {
 func TestDecodeRoundTrip(t *testing.T) {
 	for _, tc := range decodeTestCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 			// decode
 			x := pdf.NewExtractor(w)
@@ -488,7 +488,7 @@ func TestDecodeRoundTrip(t *testing.T) {
 }
 
 func TestDecodeNamedFromName(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	// Old-style PDF 1.1 named destination using pdf.Name
@@ -510,7 +510,7 @@ func TestDecodeNamedFromName(t *testing.T) {
 }
 
 func TestDecodeDictionaryWrapper(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	pageRef := w.Alloc()
 
 	// Dictionary wrapper with D entry
@@ -541,7 +541,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
 		// AddBlankPage creates a minimal valid PDF structure.
 		// Without this, the seeds will be rejected by pdf.NewReader.
@@ -572,7 +572,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range decodeTestCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_7, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
 		// AddBlankPage creates a minimal valid PDF structure.
 		// Without this, the seeds will be rejected by pdf.NewReader.

@@ -119,7 +119,7 @@ func TestEmbedRepairsUnwritableFontName(t *testing.T) {
 func embedType1(t *testing.T, F *type1.Instance) *dict.Type1 {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(pdf.V1_7, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Embed(F)
 	if err != nil {

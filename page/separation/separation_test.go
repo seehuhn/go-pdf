@@ -84,7 +84,7 @@ func TestRoundTrip(t *testing.T) {
 func roundTripTest(t *testing.T, version pdf.Version, d1 *Dict) {
 	t.Helper()
 
-	w, _ := memfile.NewPDFWriter(version, nil)
+	w, _ := memfile.NewPDFWriter(t, version, nil)
 
 	// allocate dummy page references if not already set
 	if len(d1.Pages) == 0 {
@@ -139,7 +139,7 @@ func FuzzRoundTrip(f *testing.F) {
 	}
 
 	for _, tc := range testCases {
-		w, buf := memfile.NewPDFWriter(pdf.V1_4, opt)
+		w, buf := memfile.NewPDFWriter(f, pdf.V1_4, opt)
 
 		err := memfile.AddBlankPage(w)
 		if err != nil {
@@ -202,7 +202,7 @@ func FuzzRoundTrip(f *testing.F) {
 }
 
 func TestColorSpaceValidation(t *testing.T) {
-	w, _ := memfile.NewPDFWriter(pdf.V1_4, nil)
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 
 	pageRef := w.Alloc()
 
