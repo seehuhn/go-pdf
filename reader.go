@@ -23,6 +23,8 @@ import (
 	"io"
 	"math"
 	"os"
+
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // ReaderOptions provides additional information for opening a PDF file.
@@ -79,6 +81,12 @@ type Reader struct {
 
 	enc         *encryptInfo       // read-only after construction
 	unencrypted map[Reference]bool // read-only after construction
+
+	// objstms caches decoded object streams, so that resolving the many
+	// objects inside one ObjStm does not re-run its filter chain for every
+	// lookup.  Methods of the cache are safe for concurrent use, matching
+	// the concurrency guarantees of Get.
+	objstms *objstmCache
 
 	// Errors is a list of errors encountered while opening the file.
 	// This is only used if the ErrorHandling option is set to
@@ -148,6 +156,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		return nil, Wrap(err, "xref")
 	}
 	r.xref = xref // Now we can install the real xref table.
+	r.objstms = newObjstmCache()
 
 	shouldExit := func(err error) bool {
 		if err == nil {
@@ -283,6 +292,9 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 //
 // This call only has an effect if the Reader was created by [Open].
 func (r *Reader) Close() error {
+	if r.objstms != nil {
+		r.objstms.clear()
+	}
 	if r.ownsReader {
 		err := r.r.(io.Closer).Close()
 		if err != nil {
@@ -333,7 +345,7 @@ func (r *Reader) get(ref Reference, canObjStm, scalarOnly bool) (_ Native, err e
 			}
 		}
 		getInt := safeGetInteger(lengthGetter{r}, true)
-		return getFromObjStm(r, ref.Number(), entry.InStream, getInt, r.enc)
+		return getFromObjStm(r, ref.Number(), entry.InStream, getInt, r.objstms)
 	}
 
 	s, err := r.scannerFrom(entry.Pos+r.headerOffset, canObjStm)
@@ -364,7 +376,7 @@ func (g lengthGetter) Get(ref Reference, canObjStm bool) (Native, error) {
 	return g.Reader.get(ref, canObjStm, true)
 }
 
-func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc *encryptInfo) (obj Native, err error) {
+func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, cache *objstmCache) (obj Native, err error) {
 	// We need to be careful to avoid infinite loops, in case reading from an
 	// object stream requires opening other object streams first.  This could
 	// be either caused by the stream object being contained in another object
@@ -382,48 +394,98 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, enc
 		}
 	}
 
-	contents, err := getObjStm(r, objectStream, getInt, enc)
+	data, idx, err := cache.load(r, sRef, objectStream, getInt)
 	if err != nil {
 		return nil, Wrap(err, "object stream "+sRef.String())
 	}
-	defer func() {
-		e2 := contents.Close()
-		if err == nil {
-			err = e2
-		}
-	}()
 
-	m := -1
-	for i, info := range contents.idx {
-		if info.number == number {
-			m = i
-			break
-		}
-	}
-	if m < 0 {
+	offs, ok := lookupObjStm(idx, number)
+	if !ok {
 		return nil, &MalformedFileError{
 			Err: fmt.Errorf("object %d not found", number),
 			Loc: []string{"object stream " + sRef.String()},
 		}
 	}
-
-	info := contents.idx[m]
-
-	delta := int64(info.offs) - contents.s.CurrentPos()
-	if delta < 0 {
-		return nil, nil
+	if offs < 0 || offs > len(data) {
+		return nil, &MalformedFileError{
+			Err: fmt.Errorf("invalid object offset %d", offs),
+			Loc: []string{"object stream " + sRef.String()},
+		}
 	}
-	err = contents.s.Discard(delta)
+
+	// The cached data is immutable, so a fresh scanner over the object's
+	// section gives every lookup an independent view.  Strings inside object
+	// streams are never encrypted (PDF 32000-2, 7.5.7), so no encryptInfo is
+	// needed.
+	s := newScanner(bytes.NewReader(data[offs:]), getInt, nil)
+	return s.ReadObject()
+}
+
+// lookupObjStm returns the byte offset of the given object in a decoded
+// object stream.
+func lookupObjStm(idx []stmObj, number uint32) (int, bool) {
+	for _, info := range idx {
+		if info.number == number {
+			return info.offs, true
+		}
+	}
+	return 0, false
+}
+
+// load decodes an object stream and parses its index.  Decoded streams are
+// cached, because documents commonly keep most of their objects in one
+// ObjStm, and re-running the filter chain for every single lookup makes
+// resolving N objects cost N full decodes.
+func (c *objstmCache) load(r Getter, sRef Reference, stream *Stream, getInt getIntFn) ([]byte, []stmObj, error) {
+	if d := c.get(sRef); d != nil {
+		return d.data, d.idx, nil
+	}
+
+	N, ok := stream.Dict["N"].(Integer)
+	if !ok || N < 0 || N > 10000 {
+		return nil, nil, &MalformedFileError{Err: errors.New("no valid /N")}
+	}
+	n := int(N)
+
+	data, err := ReadAll(r, nil, stream, int64(limits.MaxObjStmBytes))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	s := newScanner(bytes.NewReader(data), getInt, nil)
+
+	idx := make([]stmObj, n)
+	for i := range n {
+		no, err := s.ReadInteger()
+		if err != nil {
+			return nil, nil, err
+		}
+		offs, err := s.ReadInteger()
+		if err != nil {
+			return nil, nil, err
+		}
+		if no < 0 || no > math.MaxUint32 || offs < 0 || offs > math.MaxInt {
+			return nil, nil, &MalformedFileError{Err: errors.New("invalid object number or offset")}
+		}
+		idx[i].number = uint32(no)
+		idx[i].offs = int(offs)
 	}
 
-	obj, err = contents.s.ReadObject()
-	if err != nil {
-		return nil, err
+	pos := s.CurrentPos()
+	first, ok := stream.Dict["First"].(Integer)
+	firstInt := int(first)
+	if !ok || first < Integer(pos) || first != Integer(firstInt) {
+		return nil, nil, &MalformedFileError{Err: errors.New("no valid /First")}
+	}
+	for i := range idx {
+		x := idx[i].offs + firstInt
+		if x < idx[i].offs { // check for integer overflow
+			return nil, nil, &MalformedFileError{Err: errors.New("invalid object offset")}
+		}
+		idx[i].offs = x
 	}
 
-	return obj, nil
+	c.put(sRef, data, idx)
+	return data, idx, nil
 }
 
 func (r *Reader) getID(obj Object) ([][]byte, error) {
@@ -471,80 +533,9 @@ func getIDDirect(obj Object) [][]byte {
 	return id
 }
 
-type objStm struct {
-	s   *scanner
-	idx []stmObj
-}
-
 type stmObj struct {
 	number uint32
 	offs   int
-}
-
-func getObjStm(r Getter, stream *Stream, getInt getIntFn, enc *encryptInfo) (_ *objStm, err error) {
-	defer func() {
-		if err != nil {
-			err = Wrap(err, "decoding ObjStm")
-		}
-	}()
-
-	N, ok := stream.Dict["N"].(Integer)
-	if !ok || N < 0 || N > 10000 {
-		return nil, &MalformedFileError{Err: errors.New("no valid /N")}
-	}
-	n := int(N)
-
-	if stream.crypt != nil {
-		// Objects in encrypted streams are not encrypted again.
-		enc = nil
-	}
-
-	decoded, err := DecodeStream(r, nil, stream)
-	if err != nil {
-		return nil, err
-	}
-	s := newScanner(decoded, getInt, enc)
-
-	idx := make([]stmObj, n)
-	for i := range n {
-		no, err := s.ReadInteger()
-		if err != nil {
-			return nil, err
-		}
-		offs, err := s.ReadInteger()
-		if err != nil {
-			return nil, err
-		}
-		if no < 0 || no > math.MaxUint32 || offs < 0 || offs > math.MaxInt {
-			return nil, &MalformedFileError{Err: errors.New("invalid object number or offset")}
-		}
-		idx[i].number = uint32(no)
-		idx[i].offs = int(offs)
-	}
-
-	pos := s.CurrentPos()
-	first, ok := stream.Dict["First"].(Integer)
-	firstInt := int(first)
-	if !ok || first < Integer(pos) || first != Integer(firstInt) {
-		return nil, &MalformedFileError{Err: errors.New("no valid /First")}
-	}
-	for i := range idx {
-		x := idx[i].offs + firstInt
-		if x < idx[i].offs { // check for integer overflow
-			return nil, &MalformedFileError{Err: errors.New("invalid object offset")}
-		}
-		idx[i].offs = x
-	}
-
-	return &objStm{s: s, idx: idx}, nil
-}
-
-func (s *objStm) Close() error {
-	rc, ok := s.s.src.(io.Closer)
-	if ok {
-		return rc.Close()
-	}
-	return nil
 }
 
 // safeGetInteger returns a function that reads an integer from a getter.

@@ -265,6 +265,14 @@ const (
 	// generous slack for unusually verbose mappings.
 	MaxCMapBytes = 4 << 20
 
+	// MaxObjStmBytes caps the decoded byte count of an object stream.
+	// Objects are resolved from a cached in-memory copy of the decoded
+	// stream, so the cap bounds the retained memory per object stream;
+	// streams decoding to more than this are rejected as malformed.
+	// Realistic object streams are well under 1 MiB; 64 MiB leaves
+	// generous slack for pathological-but-genuine files.
+	MaxObjStmBytes = 64 << 20
+
 	// MaxCMapMappings caps the number of code-to-CID or code-to-Unicode
 	// mappings enumerated from a single CMap or ToUnicode CMap.  A wide
 	// multi-byte cidrange/bfrange can claim up to 2^32 mappings from a

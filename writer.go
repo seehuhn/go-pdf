@@ -60,6 +60,10 @@ type Writer struct {
 	xref    map[uint32]*xRefEntry
 	nextRef uint32
 
+	// objstms caches decoded object streams, mirroring the Reader field of
+	// the same name; see objstm.go.
+	objstms *objstmCache
+
 	inStream    bool
 	afterStream []allocatedObject
 
@@ -270,6 +274,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 		nextRef: 1,
 		xref:    xref,
+		objstms: newObjstmCache(),
 
 		outputOptions: outOpt,
 
@@ -441,7 +446,7 @@ func (w *Writer) get(ref Reference, canObjStm, scalarOnly bool) (obj Native, err
 			}
 		}
 		getInt := safeGetInteger(writerLengthGetter{w}, true)
-		return getFromObjStm(w, ref.Number(), entry.InStream, getInt, w.w.enc)
+		return getFromObjStm(w, ref.Number(), entry.InStream, getInt, w.objstms)
 	}
 
 	err = w.w.w.Flush()
