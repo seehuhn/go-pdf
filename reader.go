@@ -140,10 +140,21 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	}
 	version, err := s.ReadHeaderVersion()
 	if err != nil {
-		// TODO(voss): A PDF processor shall attempt to read any PDF file, even
-		// if the PDF file’s version is more recent than that for which the PDF
-		// processor was created.
-		return nil, err
+		var e *MalformedFileError
+		if errors.As(err, &e) && e.Err == errNoPDF {
+			return nil, err // no PDF header at all
+		}
+		// A PDF processor shall attempt to read any PDF file, even if the
+		// header announces a version more recent than the one for which
+		// the processor was written: continue with the newest known
+		// version.
+		version = V2_0
+		if opt.ErrorHandling == ErrorHandlingReport {
+			r.Errors = append(r.Errors, &MalformedFileError{
+				Err: fmt.Errorf("unsupported PDF header version: %w", err),
+				Loc: []string{"PDF header"},
+			})
+		}
 	}
 	r.meta.Version = version
 
