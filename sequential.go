@@ -107,7 +107,10 @@ func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn, scalarOnly bool
 	}
 
 	if ref != objInfo.Reference {
-		panic("unreachable") // TODO(voss): remove
+		return nil, 0, &MalformedFileError{
+			Err: fmt.Errorf("object header mismatch: %s vs %s", ref, objInfo.Reference),
+			Loc: []string{objInfo.Reference.String()},
+		}
 	}
 
 	return x, s.CurrentPos(), nil
@@ -301,6 +304,8 @@ scanLoop:
 			section.EOFPos = pos
 			finish()
 		default:
+			// The regexp alternation above guarantees m[1] is one of the
+			// five handled keywords, so this branch cannot execute.
 			panic("unreachable")
 		}
 	}
