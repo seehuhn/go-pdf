@@ -32,8 +32,7 @@ import (
 // GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
 // Identifier (CID) values.
 type GIDToCID interface {
-	// TODO(voss): change the second argument to string
-	CID(glyph.ID, []rune) cid.CID
+	CID(glyph.ID, string) cid.CID
 
 	GID(cid.CID) glyph.ID
 
@@ -63,7 +62,7 @@ type gidToCIDSequential struct {
 }
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) CID(gid glyph.ID, _ []rune) cid.CID {
+func (g *gidToCIDSequential) CID(gid glyph.ID, _ string) cid.CID {
 	cidVal, ok := g.g2c[gid]
 	if !ok {
 		cidVal = cid.CID(len(g.g2c))
@@ -114,7 +113,7 @@ func NewGIDToCIDIdentity() GIDToCID {
 type gidToCIDIdentity struct{}
 
 // GID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) CID(gid glyph.ID, _ []rune) cid.CID {
+func (g *gidToCIDIdentity) CID(gid glyph.ID, _ string) cid.CID {
 	return cid.CID(gid)
 }
 
@@ -180,7 +179,7 @@ func NewGIDToCIDFromROS(ros *cid.SystemInfo, cmap interface{ Lookup(rune) glyph.
 	}
 }
 
-func (g *gid2CIDFromROS) CID(gid glyph.ID, _ []rune) cid.CID {
+func (g *gid2CIDFromROS) CID(gid glyph.ID, _ string) cid.CID {
 	return g.g2c[gid]
 }
 
