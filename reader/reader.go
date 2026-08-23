@@ -47,9 +47,11 @@ type Reader struct {
 	// mapping), the textual representation, and the glyph widths.
 	//
 	// The text matrix is at the start position of the character when this
-	// callback fires; the matrix advance happens after.  Use
-	// [content.State.GetTextPositionDevice] (via r.State.GState) for the
-	// start position.
+	// callback fires; the matrix advance happens after.  For the start
+	// position use the permissive [content.State.TextRenderingMatrix]
+	// (via r.State.GState): GetTextPositionDevice panics unless every
+	// text-state parameter has been explicitly set, which a hostile or
+	// minimal content stream cannot be assumed to have done.
 	Character func(c font.Code) error
 
 	TextEvent func(event TextEvent, arg float64)

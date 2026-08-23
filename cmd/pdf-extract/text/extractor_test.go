@@ -286,3 +286,58 @@ func TestTextExtractorActualText(t *testing.T) {
 		t.Errorf("got %q, want %q", extracted, want)
 	}
 }
+
+// TestTextExtractorNoExplicitTextMatrix checks that text shown without any
+// BT/ET or Td/Tm operator, so that the text matrix was never explicitly
+// set, extracts without panicking.
+func TestTextExtractorNoExplicitTextMatrix(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	F := font.Must(standard.Helvetica.New())
+
+	pageTree := pagetree.NewWriter(w, rm)
+
+	// Build the operators by hand: a /Tf followed by a bare /Tj at page
+	// level (no BT/ET, no Td/Tm) leaves the text-matrix "set" flag clear,
+	// while the reader still fires the character callback because the
+	// font is known.
+	b := builder.New(content.Page, nil, pdf.V2_0)
+	if err := b.RegisterFont("F1", F); err != nil {
+		t.Fatal(err)
+	}
+	ops := &content.Operators{Ops: []content.Operator{
+		{Name: content.OpTextSetFont, Args: []pdf.Object{pdf.Name("F1"), pdf.Integer(12)}},
+		{Name: content.OpTextShow, Args: []pdf.Object{pdf.String("hello")}},
+	}}
+
+	p := &page.Page{
+		MediaBox:  &pdf.Rectangle{LLx: 0, LLy: 0, URx: 595, URy: 842},
+		Resources: b.Resources,
+		Contents:  []page.Segment{ops},
+	}
+	if err := pageTree.AppendPage(p); err != nil {
+		t.Fatal(err)
+	}
+	treeRef, err := pageTree.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Pages = treeRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	extractor := New(w, &buf)
+	_, pageDict, err := pagetree.GetPage(w, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := extractor.ExtractPage(pageDict); err != nil {
+		t.Fatal(err)
+	}
+}
