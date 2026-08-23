@@ -273,10 +273,9 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 			//
 			// Adobe Reader seems to require for there to be a non-empty
 			// /Differences array.  If we don't have any differences (because
-			// we are using the standard encoding), we just list one of the
-			// codes as a difference.
-			//
-			// TODO(voss): find out what other libraries are doing.
+			// we are using the standard encoding), we just list code 32 with
+			// its standard name -- a harmless entry, whose only purpose is
+			// to make /Differences non-empty.
 			cand.differences = pdf.Array{
 				pdf.Integer(32),
 				pdf.Name(cand.enc[32]),
