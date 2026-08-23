@@ -122,8 +122,6 @@ func (fi *FileInfo) doRead(objInfo *FileObject, getInt getIntFn, scalarOnly bool
 
 // MakeReader creates a new reader for the PDF file described by fi.
 func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
-	// TODO(voss): unify as much code as possible with NewReader
-
 	if opt == nil {
 		opt = &ReaderOptions{}
 	}
@@ -141,93 +139,14 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	r.meta.Version = version
 
 	r.xref = fi.makeXRef()
+	r.objstms = newObjstmCache()
 
 	trailer, err := fi.getTrailer()
 	if err != nil {
 		return nil, err
 	}
 
-	ID, ok := trailer["ID"].(Array)
-	if ok && len(ID) >= 2 {
-		for i := range 2 {
-			s, ok := ID[i].(String)
-			if !ok {
-				break
-			}
-			r.meta.ID = append(r.meta.ID, []byte(s))
-		}
-		if len(r.meta.ID) != 2 {
-			r.meta.ID = nil
-		}
-	}
-
-	if encObj, ok := trailer["Encrypt"]; ok {
-		if ref, ok := encObj.(Reference); ok {
-			r.unencrypted[ref] = true
-		}
-		var perm Perm
-		r.enc, perm, err = r.parseEncryptDict(encObj, opt.Password)
-		if err != nil {
-			var authErr *AuthenticationError
-			if errors.As(err, &authErr) {
-				return nil, err
-			}
-			return nil, Wrap(err, "encryption dictionary")
-		}
-		r.meta.Permissions = perm
-		r.meta.Encryption = r.enc.publicInfo()
-	} else {
-		r.meta.Permissions = PermAll
-	}
-
-	shouldExit := func(err error) bool {
-		if err == nil {
-			return false
-		}
-		if opt.ErrorHandling == ErrorHandlingReport {
-			var e *MalformedFileError
-			if errors.As(err, &e) {
-				r.Errors = append(r.Errors, e)
-				return false
-			}
-		}
-		return opt.ErrorHandling != ErrorHandlingRecover
-	}
-
-	catalogDict, err := NewCursor(r).Dict(trailer["Root"])
-	if err != nil {
-		return nil, err
-	}
-
-	// mark the catalog metadata stream as exempt from document-level
-	// encryption when /EncryptMetadata is false; must happen before
-	// DecodeCatalog reads the stream
-	if metaRef, ok := catalogDict["Metadata"].(Reference); ok && metaRef != 0 {
-		if r.enc != nil && r.enc.sec.unencryptedMetadata {
-			r.unencrypted[metaRef] = true
-		}
-	}
-
-	x := NewExtractor(r)
-	r.meta.Catalog, err = Decode(CursorAt(x, nil), catalogDict, DecodeCatalog)
-	if shouldExit(err) {
-		return nil, err
-	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
-		return nil, err
-	}
-	if r.meta.Catalog.Version > r.meta.Version {
-		// if unset, r.meta.Catalog.Version is zero and thus smaller than r.Version
-		r.meta.Version = r.meta.Catalog.Version
-	}
-
-	// /EncryptMetadata=false exempts only the catalog metadata stream;
-	// record that on the typed value so a rewrite preserves the policy
-	if r.enc != nil && r.enc.sec.unencryptedMetadata && r.meta.Catalog.Metadata != nil {
-		r.meta.Catalog.Metadata.Plaintext = true
-	}
-
-	r.meta.Info, err = Decode(CursorAt(x, nil), trailer["Info"], ExtractInfo)
-	if shouldExit(err) {
+	if err := r.decodeTrailerCore(trailer, opt); err != nil {
 		return nil, err
 	}
 

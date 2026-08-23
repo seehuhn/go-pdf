@@ -169,6 +169,27 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	r.xref = xref // Now we can install the real xref table.
 	r.objstms = newObjstmCache()
 
+	if err := r.decodeTrailerCore(trailer, opt); err != nil {
+		return nil, err
+	}
+
+	// remove xref-related information from trailer dictionary
+	delete(trailer, "Type")
+	delete(trailer, "Size")
+	delete(trailer, "Index")
+	delete(trailer, "Prev")
+	delete(trailer, "W")
+	r.meta.Trailer = trailer
+
+	return r, nil
+}
+
+// decodeTrailerCore initialises the encryption context, document ID,
+// document catalog and document info dictionary of r from a trailer
+// dictionary.  It contains the parts of the file-opening sequence shared by
+// NewReader and (*FileInfo).MakeReader; the two differ in how they obtain
+// the trailer and how they clean it up afterwards.
+func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 	shouldExit := func(err error) bool {
 		if err == nil {
 			return false
@@ -188,12 +209,13 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	if encObj, ok := trailer["Encrypt"]; ok {
 		// If the file is encrypted, ID is guaranteed to be a direct object.
 		if r.meta.ID == nil {
-			return nil, errors.New("file is encrypted, but no ID found")
+			return errors.New("file is encrypted, but no ID found")
 		}
 		if ref, ok := encObj.(Reference); ok {
 			r.unencrypted[ref] = true
 		}
 		var perm Perm
+		var err error
 		r.enc, perm, err = r.parseEncryptDict(encObj, opt.Password)
 		if err != nil {
 			// An /Encrypt entry we cannot parse means we cannot decrypt
@@ -204,9 +226,9 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 			// detect it cleanly via errors.As.
 			var authErr *AuthenticationError
 			if errors.As(err, &authErr) {
-				return nil, err
+				return err
 			}
-			return nil, Wrap(err, "encryption dictionary")
+			return Wrap(err, "encryption dictionary")
 		}
 		r.meta.Permissions = perm
 		r.meta.Encryption = r.enc.publicInfo()
@@ -215,17 +237,18 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	}
 	if r.meta.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.
+		var err error
 		r.meta.ID, err = r.getID(IDObj)
 		if shouldExit(err) {
-			return nil, err
+			return err
 		}
 	}
-	if version >= V2_0 {
+	if r.meta.Version >= V2_0 {
 		for _, id := range r.meta.ID {
 			if len(id) < 16 {
 				err := &MalformedFileError{Err: errInvalidID}
 				if shouldExit(err) {
-					return nil, err
+					return err
 				}
 				r.meta.ID = nil
 				break
@@ -237,15 +260,14 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	if err != nil {
 		err = Wrap(err, "document catalog")
 		if shouldExit(err) {
-			return nil, err
+			return err
 		}
 	}
 
 	// mark the catalog metadata stream as exempt from document-level
 	// encryption when /EncryptMetadata is false — the spec exempts it
 	// from default StmF encryption in that case.  Must happen before
-	// DecodeCatalog reads the stream below.  Mutating r.unencrypted
-	// is safe because we are still inside NewReader.
+	// DecodeCatalog reads the stream below.
 	if metaRef, ok := catalogDict["Metadata"].(Reference); ok && metaRef != 0 {
 		if r.enc != nil && r.enc.sec.unencryptedMetadata {
 			r.unencrypted[metaRef] = true
@@ -255,7 +277,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	x := NewExtractor(r)
 	r.meta.Catalog, err = Decode(CursorAt(x, nil), catalogDict, DecodeCatalog)
 	if shouldExit(err) {
-		return nil, err
+		return err
 	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
 		err := &MalformedFileError{
 			Err: errors.New("no pages in PDF document catalog"),
@@ -266,7 +288,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 				r.meta.Catalog = &Catalog{}
 			}
 		} else {
-			return nil, err
+			return err
 		}
 	}
 	if r.meta.Catalog.Version > r.meta.Version {
@@ -285,18 +307,9 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 
 	r.meta.Info, err = Decode(CursorAt(x, nil), trailer["Info"], ExtractInfo)
 	if shouldExit(err) {
-		return nil, err
+		return err
 	}
-
-	// remove xref-related information from trailer dictionary
-	delete(trailer, "Type")
-	delete(trailer, "Size")
-	delete(trailer, "Index")
-	delete(trailer, "Prev")
-	delete(trailer, "W")
-	r.meta.Trailer = trailer
-
-	return r, nil
+	return nil
 }
 
 // Close closes the Reader.
