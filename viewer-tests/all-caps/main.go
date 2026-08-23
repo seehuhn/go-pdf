@@ -23,6 +23,13 @@ import (
 	"os"
 
 	"golang.org/x/image/font/gofont/goregular"
+
+	"seehuhn.de/go/postscript/cid"
+
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/parser"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -34,10 +41,6 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/text"
-	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/sfnt"
-	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/parser"
 )
 
 const description = `
@@ -106,7 +109,7 @@ func makeTestFont() (font.Instance, error) {
 
 	numCID := 34 + 26
 	cidToGID := make([]glyph.ID, numCID)
-	width := map[cmap.CID]float64{}
+	width := map[cid.CID]float64{}
 
 	// Create a TrueType font with the required subset of glyphs.
 	origFont, err := sfnt.Read(bytes.NewReader(goregular.TTF), parser.NewBudget(int64(len(goregular.TTF))))
@@ -129,7 +132,7 @@ func makeTestFont() (font.Instance, error) {
 	subsetGlyphs = append(subsetGlyphs, origGID)
 	for r := 'A'; r <= 'Z'; r++ {
 		// CID 34 = A, ...
-		cid := cmap.CID(r - 'A' + 34)
+		cid := cid.CID(r - 'A' + 34)
 		origGID = cmapTable.Lookup(r)
 		cidToGID[cid] = glyph.ID(len(subsetGlyphs))
 		width[cid] = math.Round(origFont.GlyphWidthPDF(origGID))

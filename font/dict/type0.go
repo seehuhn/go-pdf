@@ -58,7 +58,7 @@ type CIDFontType0 struct {
 	// Width (optional) is a map from CID values to glyph widths (in PDF glyph
 	// space units).  Only widths which are different from DefaultWidth need to
 	// be specified.
-	Width map[cmap.CID]float64
+	Width map[cid.CID]float64
 
 	// DefaultWidth is the glyph width for CID values not in the Width map
 	// (in PDF glyph space units).
@@ -66,7 +66,7 @@ type CIDFontType0 struct {
 
 	// VMetrics (optional) maps CIDs to their vertical metrics.
 	// These are used when the CMap specifies vertical writing mode.
-	VMetrics map[cmap.CID]VMetrics
+	VMetrics map[cid.CID]VMetrics
 
 	// DefaultVMetrics contains the default vertical metrics.
 	// These are used when the CMap specifies vertical writing mode,
@@ -255,7 +255,7 @@ func (d *CIDFontType0) GlyphWidth(text string) (float64, bool) {
 
 // cidForText returns the CID of a glyph whose text is text.  The ToUnicode
 // mapping takes precedence over the registry/ordering default mapping.
-func cidForText(ros *cid.SystemInfo, cmapFile *cmap.File, toUnicode *cmap.ToUnicodeFile, text string) (cmap.CID, bool) {
+func cidForText(ros *cid.SystemInfo, cmapFile *cmap.File, toUnicode *cmap.ToUnicodeFile, text string) (cid.CID, bool) {
 	if toUnicode != nil {
 		if code, ok := toUnicode.CodeForText(text); ok {
 			return cmapFile.LookupCID(code), true
@@ -270,7 +270,7 @@ func cidForText(ros *cid.SystemInfo, cmapFile *cmap.File, toUnicode *cmap.ToUnic
 }
 
 // cidWidth returns the width of CID c in text space units.
-func cidWidth(widths map[cmap.CID]float64, defaultWidth float64, c cmap.CID) float64 {
+func cidWidth(widths map[cid.CID]float64, defaultWidth float64, c cid.CID) float64 {
 	w, ok := widths[c]
 	if !ok {
 		w = defaultWidth
@@ -296,7 +296,7 @@ func (d *CIDFontType0) FontInfo() any {
 // any ToUnicode override.  Looking up per code keeps text extraction
 // proportional to the codes that actually appear, rather than materializing a
 // mapping for every code the CMap can encode.
-func (d *CIDFontType0) lookupText(defaultText map[cmap.CID]string, c cmap.CID, code []byte) string {
+func (d *CIDFontType0) lookupText(defaultText map[cid.CID]string, c cid.CID, code []byte) string {
 	text := defaultText[c]
 	if d.ToUnicode != nil {
 		if t, ok := d.ToUnicode.Lookup(code); ok && t != "" {
@@ -327,7 +327,7 @@ var (
 type t0Font struct {
 	*CIDFontType0
 	codec       *charcode.Codec
-	defaultText map[cmap.CID]string
+	defaultText map[cid.CID]string
 	mu          sync.Mutex
 	cache       map[charcode.Code]font.Code
 }

@@ -42,12 +42,6 @@ import (
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5014.CIDFont_Spec.pdf
 // - https://adobe-type-tools.github.io/font-tech-notes/pdfs/5099.CMapResources.pdf
 
-// CID represents a character identifier.  This identifies a character within
-// a character collection.
-//
-// TODO(voss): remove in favour of [cid.CID]
-type CID = cid.CID
-
 // File represents the information for a CMap used with a PDF composite
 // font.  This describes a mapping from character codes (one or more bytes) to
 // character identifiers (CIDs).
@@ -71,7 +65,7 @@ type File struct {
 // Single specifies that character code `Code` represents the CID `Value`.
 type Single struct {
 	Code  []byte
-	Value CID
+	Value cid.CID
 }
 
 // Range describes a range of character codes with consecutive CIDs.
@@ -80,7 +74,7 @@ type Single struct {
 type Range struct {
 	First []byte
 	Last  []byte
-	Value CID
+	Value cid.CID
 }
 
 func (r Range) String() string {
@@ -222,54 +216,54 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 		if len(entry.Src) == 0 {
 			continue
 		}
-		cid, ok := entry.Dst.(postscript.Integer)
-		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
+		cidVal, ok := entry.Dst.(postscript.Integer)
+		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
 			continue
 		}
 		res.CIDSingles = append(res.CIDSingles, Single{
 			Code:  entry.Src,
-			Value: CID(cid),
+			Value: cid.CID(cidVal),
 		})
 	}
 	for _, entry := range codeMap.CidRanges {
 		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
 			continue
 		}
-		cid, ok := entry.Dst.(postscript.Integer)
-		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
+		cidVal, ok := entry.Dst.(postscript.Integer)
+		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
 			continue
 		}
 		res.CIDRanges = append(res.CIDRanges, Range{
 			First: entry.Low,
 			Last:  entry.High,
-			Value: CID(cid),
+			Value: cid.CID(cidVal),
 		})
 	}
 	for _, entry := range codeMap.NotdefChars {
 		if len(entry.Src) == 0 {
 			continue
 		}
-		cid, ok := entry.Dst.(postscript.Integer)
-		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
+		cidVal, ok := entry.Dst.(postscript.Integer)
+		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
 			continue
 		}
 		res.NotdefSingles = append(res.NotdefSingles, Single{
 			Code:  entry.Src,
-			Value: CID(cid),
+			Value: cid.CID(cidVal),
 		})
 	}
 	for _, entry := range codeMap.NotdefRanges {
 		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
 			continue
 		}
-		cid, ok := entry.Dst.(postscript.Integer)
-		if !ok || cid < 0 || cid > 0xFFFF_FFFF {
+		cidVal, ok := entry.Dst.(postscript.Integer)
+		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
 			continue
 		}
 		res.NotdefRanges = append(res.NotdefRanges, Range{
 			First: entry.Low,
 			Last:  entry.High,
-			Value: CID(cid),
+			Value: cid.CID(cidVal),
 		})
 	}
 
@@ -388,7 +382,7 @@ func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
 					if !valid || k != len(codeBytes) {
 						continue
 					}
-					if !yield(code, r.Value+CID(i)) {
+					if !yield(code, r.Value+cid.CID(i)) {
 						return
 					}
 				}
@@ -415,7 +409,7 @@ func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
 // ok is false if code lies outside the range, the lengths disagree, or the
 // position exceeds math.MaxInt32; in all of these cases the caller should
 // treat the code as unmapped.  The MaxInt32 cap keeps the result within both
-// CID (a uint32) and a 32-bit int, so the behaviour is identical on 32- and
+// cid.CID (a uint32) and a 32-bit int, so the behaviour is identical on 32- and
 // 64-bit hosts and the callers can narrow without truncating or going
 // negative.  No real CMap range needs a larger index: that would require more
 // than 2^31 consecutive codes mapping to consecutive values.  The running
@@ -438,7 +432,7 @@ func rangeIndex(first, last, code []byte) (index int, ok bool) {
 	return int(acc), true
 }
 
-func (f *File) LookupCID(code []byte) CID {
+func (f *File) LookupCID(code []byte) cid.CID {
 	for _, s := range f.CIDSingles {
 		if bytes.Equal(s.Code, code) {
 			return s.Value
@@ -450,7 +444,7 @@ func (f *File) LookupCID(code []byte) CID {
 		if !ok {
 			continue
 		}
-		return r.Value + CID(index)
+		return r.Value + cid.CID(index)
 	}
 
 	if f.Parent != nil {
@@ -460,7 +454,7 @@ func (f *File) LookupCID(code []byte) CID {
 	return f.LookupNotdefCID(code)
 }
 
-func (f *File) LookupNotdefCID(code []byte) CID {
+func (f *File) LookupNotdefCID(code []byte) cid.CID {
 	for _, s := range f.NotdefSingles {
 		if bytes.Equal(s.Code, code) {
 			return s.Value

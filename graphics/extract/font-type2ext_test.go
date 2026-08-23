@@ -24,6 +24,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -222,7 +224,7 @@ var t2Dicts = []*dict.CIDFontType2{
 		},
 		ROS:  ros,
 		CMap: func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
-		Width: map[cmap.CID]float64{
+		Width: map[cid.CID]float64{
 			0: 1000,
 			1: 500,
 		},
@@ -246,7 +248,7 @@ var t2Dicts = []*dict.CIDFontType2{
 		},
 		ROS:  ros,
 		CMap: func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
-		Width: map[cmap.CID]float64{
+		Width: map[cid.CID]float64{
 			0: 1000,
 			1: 500,
 		},
@@ -291,7 +293,7 @@ var t2Dicts = []*dict.CIDFontType2{
 				},
 			},
 		},
-		Width: map[cmap.CID]float64{
+		Width: map[cid.CID]float64{
 			0:  1000,
 			1:  100,
 			2:  200,

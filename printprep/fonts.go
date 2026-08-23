@@ -23,6 +23,7 @@ import (
 	"slices"
 
 	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -247,9 +248,9 @@ func (c *converter) finalizeGlyf(cf *convFont) (pdf.Reference, error) {
 		return 0, err
 	}
 
-	ww := make(map[cmap.CID]float64, len(cf.used))
+	ww := make(map[cid.CID]float64, len(cf.used))
 	for id, w := range cf.used {
-		ww[cmap.CID(id)] = w
+		ww[cid.CID(id)] = w
 	}
 
 	cmapFile, err := cmap.Predefined("Identity-H")

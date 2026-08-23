@@ -26,11 +26,11 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
+	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/os2"
@@ -369,7 +369,7 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
 
 	// gather widths for used CIDs (plus CID 0)
-	ww := make(map[cmap.CID]float64)
+	ww := make(map[cid.CID]float64)
 	for _, info := range f.CIDEncoder.MappedCodes() {
 		if _, used := f.usedCIDs[info.CID]; used || info.CID == 0 {
 			ww[info.CID] = info.Width

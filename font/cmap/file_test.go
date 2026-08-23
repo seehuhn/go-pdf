@@ -563,7 +563,7 @@ func TestExtractLoop(t *testing.T) {
 						{Low: []byte{0x00}, High: []byte{0xFF}},
 					},
 					CIDSingles: []Single{
-						{Code: []byte{0x02 + byte(i)}, Value: CID(1 + i)},
+						{Code: []byte{0x02 + byte(i)}, Value: cid.CID(1 + i)},
 					},
 				}
 			}

@@ -284,7 +284,7 @@ func makeTestFonts() (*testFonts, error) {
 		StemV:      80,
 	}
 
-	ww := make(map[cmap.CID]float64)
+	ww := make(map[cid.CID]float64)
 	for gid, cid := range testCFF.GIDToCID {
 		w := testCFF.GlyphWidthPDF(glyph.ID(gid))
 		ww[cid] = w

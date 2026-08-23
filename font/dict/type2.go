@@ -61,7 +61,7 @@ type CIDFontType2 struct {
 	// Width (optional) is a map from CID values to glyph widths (in PDF glyph
 	// space units).  Only widths which are different from DefaultWidth need to
 	// be specified.
-	Width map[cmap.CID]float64
+	Width map[cid.CID]float64
 
 	// DefaultWidth is the glyph width for CID values not in the Width map
 	// (in PDF glyph space units).
@@ -69,7 +69,7 @@ type CIDFontType2 struct {
 
 	// VMetrics (optional) maps CIDs to their vertical metrics.
 	// These are used when the CMap specifies vertical writing mode.
-	VMetrics map[cmap.CID]VMetrics
+	VMetrics map[cid.CID]VMetrics
 
 	// DefaultVMetrics contains the default vertical metrics.
 	// These are used when the CMap specifies vertical writing mode,
@@ -335,7 +335,7 @@ func (d *CIDFontType2) FontInfo() any {
 // any ToUnicode override.  Looking up per code keeps text extraction
 // proportional to the codes that actually appear, rather than materializing a
 // mapping for every code the CMap can encode.
-func (d *CIDFontType2) lookupText(defaultText map[cmap.CID]string, c cmap.CID, code []byte) string {
+func (d *CIDFontType2) lookupText(defaultText map[cid.CID]string, c cid.CID, code []byte) string {
 	text := defaultText[c]
 	if d.ToUnicode != nil {
 		if t, ok := d.ToUnicode.Lookup(code); ok && t != "" {
@@ -362,7 +362,7 @@ func (d *CIDFontType2) MakeFont() font.Instance {
 type t2Font struct {
 	*CIDFontType2
 	codec       *charcode.Codec
-	defaultText map[cmap.CID]string
+	defaultText map[cid.CID]string
 	mu          sync.Mutex
 	cache       map[charcode.Code]font.Code
 }

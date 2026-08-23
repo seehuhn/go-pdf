@@ -23,10 +23,11 @@ import (
 	"os"
 	"testing"
 
-	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/postscript/cid"
-
 	"github.com/google/go-cmp/cmp"
+
+	"seehuhn.de/go/geom/rect"
+
+	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -229,12 +230,12 @@ var t0Dicts = []*dict.CIDFontType0{
 				},
 			},
 		},
-		Width: map[cmap.CID]float64{
+		Width: map[cid.CID]float64{
 			0: 1000,
 			1: 500,
 		},
 		DefaultWidth: 750,
-		VMetrics: map[cmap.CID]dict.VMetrics{
+		VMetrics: map[cid.CID]dict.VMetrics{
 			0: {OffsY: 800, DeltaY: -1000},
 			1: {OffsY: 880, DeltaY: -900},
 			2: {OffsY: 880, DeltaY: -900},
@@ -259,7 +260,7 @@ var t0Dicts = []*dict.CIDFontType0{
 		},
 		ROS:  ros,
 		CMap: func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
-		Width: map[cmap.CID]float64{
+		Width: map[cid.CID]float64{
 			0: 1000,
 			1: 500,
 		},
@@ -304,7 +305,7 @@ var t0Dicts = []*dict.CIDFontType0{
 				},
 			},
 		},
-		Width: map[cmap.CID]float64{
+		Width: map[cid.CID]float64{
 			0:  1000,
 			1:  100,
 			2:  200,

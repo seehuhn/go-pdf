@@ -20,10 +20,11 @@ import (
 	"maps"
 	"slices"
 
+	"seehuhn.de/go/postscript/cid"
+
 	"seehuhn.de/go/pdf"
 	_ "seehuhn.de/go/pdf/font" // for the doc strings
 	"seehuhn.de/go/pdf/font/encoding"
-	"seehuhn.de/go/postscript/cid"
 )
 
 // DefaultWidthDefault is the value of DefaultWidth which is used if no

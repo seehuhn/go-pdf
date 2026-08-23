@@ -112,7 +112,7 @@ func makeTestFont() (font.Instance, error) {
 
 	numCID := 34 + 9
 	cidToGID := make([]glyph.ID, numCID)
-	width := map[cmap.CID]float64{}
+	width := map[cid.CID]float64{}
 
 	// Create a TrueType font with the required subset of glyphs.
 	origFont, err := sfnt.Read(bytes.NewReader(gomono.TTF), parser.NewBudget(int64(len(gomono.TTF))))
@@ -130,7 +130,7 @@ func makeTestFont() (font.Instance, error) {
 	width[0] = math.Round(origFont.GlyphWidthPDF(0))
 	for r := 'A'; r < 'A'+9; r++ {
 		// CID 34 = A, ...
-		cid := cmap.CID(r - 'A' + 34)
+		cid := cid.CID(r - 'A' + 34)
 		origGID := cmapTable.Lookup(r)
 		cidToGID[cid] = glyph.ID(len(subsetGlyphs))
 		width[cid] = math.Round(origFont.GlyphWidthPDF(origGID))
