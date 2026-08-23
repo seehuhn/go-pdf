@@ -49,11 +49,23 @@ func TestCheckNumbersClean(t *testing.T) {
 }
 
 func TestCheckNumbersThreshold(t *testing.T) {
-	if hits := CheckNumbers([]byte("/A 137.63799999")); len(hits) != 1 {
-		t.Errorf("eight significant fractional digits: got %d hits, want 1", len(hits))
+	for _, data := range [][]byte{
+		[]byte("/A 137.63799999"),       // eight significant fractional digits
+		[]byte("/Tz 7.000000000000001"), // dust behind leading zeros (0.07*100)
+		[]byte("/M 28.999999999999996"), // dust behind trailing nines (0.29*100)
+	} {
+		if hits := CheckNumbers(data); len(hits) != 1 {
+			t.Errorf("%q: got %d hits, want 1", data, len(hits))
+		}
 	}
-	if hits := CheckNumbers([]byte("/A 137.6379999")); len(hits) != 0 {
-		t.Errorf("seven significant fractional digits: got %d hits, want 0", len(hits))
+	for _, data := range [][]byte{
+		[]byte("/A 137.6379999"),   // seven significant fractional digits
+		[]byte("/CYX 0.000189394"), // leading zeros are not precision
+		[]byte("/S 1.0000001"),     // short zero runs are ordinary decimals
+	} {
+		if hits := CheckNumbers(data); len(hits) != 0 {
+			t.Errorf("%q: got %d hits, want 0: %q", data, len(hits), hits)
+		}
 	}
 }
 

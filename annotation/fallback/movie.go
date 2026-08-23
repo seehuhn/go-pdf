@@ -67,8 +67,8 @@ func mediaAlpha(b *builder.Builder, strokeTransparency, fillTransparency float64
 	}
 	b.SetExtGState(&extgstate.ExtGState{
 		Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-		StrokeAlpha: 1 - strokeTransparency,
-		FillAlpha:   1 - fillTransparency,
+		StrokeAlpha: pdf.Round(1-strokeTransparency, 10),
+		FillAlpha:   pdf.Round(1-fillTransparency, 10),
 		SingleUse:   true,
 	})
 }

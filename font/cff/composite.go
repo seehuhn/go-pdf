@@ -150,8 +150,8 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		Ascent:             ascent / 1000,
 		Descent:            descent / 1000,
 		Leading:            leading / 1000,
-		UnderlinePosition:  float64(info.UnderlinePosition) * qv / 1000,
-		UnderlineThickness: float64(info.UnderlineThickness) * qv / 1000,
+		UnderlinePosition:  pdf.Round(float64(info.UnderlinePosition)*qv/1000, 6),
+		UnderlineThickness: pdf.Round(float64(info.UnderlineThickness)*qv/1000, 6),
 
 		GlyphExtents: glyphExtents,
 		Widths:       info.WidthsPDF(),

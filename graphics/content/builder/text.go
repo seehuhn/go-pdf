@@ -75,8 +75,9 @@ func (b *Builder) TextSetHorizontalScaling(scaling float64) {
 		nearlyEqual(scaling, b.State.GState.TextHorizontalScaling) {
 		return
 	}
-	// PDF operator expects percentage (100 = normal)
-	b.emit(content.OpTextSetHorizontalScaling, pdf.Number(scaling*100))
+	// PDF operator expects percentage (100 = normal); round to remove
+	// float64 artefacts from the multiplication
+	b.emit(content.OpTextSetHorizontalScaling, pdf.Number(pdf.Round(scaling*100, 10)))
 }
 
 // TextSetLeading sets the text leading.

@@ -22,14 +22,21 @@ import (
 	"regexp"
 )
 
-// longDecimalRe matches real numbers with an implausibly long fractional
-// part, such as "137.63799999999998".  Such numbers indicate computed
-// coordinates or dimensions which have been written without rounding.  The
-// eight-digit threshold counts significant digits only, so it admits
-// legitimate constants like the Lab white point (0.9504559) or calibration
-// ratios (0.000189394), while accidental float64 artefacts always carry
-// considerably longer tails.
-var longDecimalRe = regexp.MustCompile(`[0-9]\.0*[1-9][0-9]{7,}`)
+// longDecimalRe matches real numbers whose fractional part carries
+// implausible float64 artefacts, such as "137.63799999999998".  Such
+// numbers indicate computed coordinates or dimensions which have been
+// written without rounding.  Two signatures are used: eight or more
+// significant fractional digits (admitting legitimate constants like the
+// Lab white point, 0.9504559, or calibration ratios like 0.000189394,
+// where leading zeros do not count as precision), and a long run of
+// zeros followed by another digit -- dust on small magnitudes, such as
+// 7.000000000000001 from 0.07*100, which has almost all of its
+// significant content before the first nonzero digit.  Shortest-form
+// float64 output never ends in zeros, so a genuine zero run is always
+// an artefact.
+var longDecimalRe = regexp.MustCompile(
+	`[0-9]\.0*[1-9][0-9]{7,}` + // too much precision
+		`|[0-9]\.[0-9]*0{8,}[0-9]`) // dust hidden behind leading zeros
 
 // maxReports limits how many hits CheckNumbers returns.
 const maxReports = 5

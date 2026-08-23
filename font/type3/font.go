@@ -339,8 +339,8 @@ func (f *Font) New() (font.Layouter, error) {
 		Ascent:             f.Ascent * qv,
 		Descent:            f.Descent * qv,
 		Leading:            f.Leading * qv,
-		UnderlinePosition:  f.UnderlinePosition * qv,
-		UnderlineThickness: f.UnderlineThickness * qv,
+		UnderlinePosition:  pdf.Round(f.UnderlinePosition*qv, 6),
+		UnderlineThickness: pdf.Round(f.UnderlineThickness*qv, 6),
 		GlyphExtents:       ee,
 		Widths:             ww,
 	}

@@ -112,8 +112,8 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
 		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
 		Leading:            float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
+		UnderlinePosition:  pdf.Round(float64(info.UnderlinePosition)/float64(info.UnitsPerEm), 6),
+		UnderlineThickness: pdf.Round(float64(info.UnderlineThickness)/float64(info.UnitsPerEm), 6),
 	}
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
