@@ -1122,6 +1122,12 @@ func (x *Placeholder) AsPDF(opt OutputOptions) Native {
 	return x
 }
 
+// IsDirect always reports false: a placeholder stands for a value which is
+// not yet known, so it can never be treated as a direct object.
+func (x *Placeholder) IsDirect() bool {
+	return false
+}
+
 // Set fills in the value of the placeholder object.  This should be called
 // as soon as possible after the value becomes known.
 func (x *Placeholder) Set(val Native) error {

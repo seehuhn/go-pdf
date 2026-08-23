@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"io"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -399,5 +400,21 @@ func TestNearlyEqual(t *testing.T) {
 	// different types still differ
 	if NearlyEqual(Integer(1), Name("1"), eps) {
 		t.Error("NearlyEqual: Integer(1) should not equal Name(\"1\")")
+	}
+}
+
+func TestIsDirectPlaceholder(t *testing.T) {
+	w, err := NewWriter(io.Discard, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	placeholder := NewPlaceholder(w, 16)
+
+	// must not panic
+	if IsDirect(placeholder) {
+		t.Error("placeholder reported as direct object")
+	}
+	if IsDirect(Dict{"P": placeholder}) {
+		t.Error("dict containing a placeholder reported as direct")
 	}
 }
