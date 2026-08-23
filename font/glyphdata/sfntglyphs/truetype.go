@@ -70,11 +70,11 @@ func NewTrueTypeSelector(font *sfnt.Font, symbolic bool, enc encoding.Simple) fu
 			name = enc(code)
 		}
 
-		// TODO(voss): reconsider fallback behaviour.  Currently, if a
-		// method's cmap table is present but returns GID 0, we fall
-		// through to the next method.  It may be more correct to commit
-		// to a method once its table is found, even if the result is
-		// GID 0 (.notdef).
+		// A lookup which finds no entry reports GID 0, indistinguishable
+		// from an explicit .notdef mapping: committing to the first table
+		// carrying a code would therefore leave genuinely unmapped codes
+		// stuck at .notdef even when a later method knows them, so the
+		// fall-through to later methods stays.
 		for _, lookup := range ll {
 			gid, ok := lookup(code, name)
 			if ok {
