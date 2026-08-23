@@ -76,5 +76,25 @@ func TestEmbedSimple(t *testing.T) {
 		t.Errorf("FontName: got %q, want %q", dict.Descriptor.FontName, want)
 	}
 
-	// TODO(voss): more tests
+	// every glyph laid out above must have made it into the encoding and
+	// the /Widths array
+	if len(dict.Width) == 0 {
+		t.Error("no widths recorded for the embedded glyphs")
+	}
+	var positive int
+	for code, w := range dict.Width {
+		if w < 0 {
+			t.Errorf("width for code %d is %v, want non-negative", code, w)
+		}
+		if w > 0 {
+			positive++
+		}
+	}
+	if positive == 0 {
+		t.Error("all recorded widths are zero")
+	}
+	if dict.Descriptor.Ascent == 0 || dict.Descriptor.Descent == 0 {
+		t.Errorf("descriptor vertical metrics missing: ascent=%v descent=%v",
+			dict.Descriptor.Ascent, dict.Descriptor.Descent)
+	}
 }
