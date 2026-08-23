@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -444,8 +445,104 @@ func (fi *FileInfo) makeSafeGetInt() getIntFn {
 	return getInt
 }
 
+// sequentialGetter adapts a FileInfo to the Getter interface, so the object
+// stream decoder can resolve indirect references (e.g. an indirect stream
+// /Length) during a sequential scan.
+type sequentialGetter struct {
+	fi   *FileInfo
+	ver  Version
+	seen map[Reference]bool
+}
+
+func (g *sequentialGetter) GetMeta() *MetaInfo {
+	return &MetaInfo{Version: g.ver}
+}
+
+func (g *sequentialGetter) Get(ref Reference, _ bool) (Native, error) {
+	if g.seen[ref] {
+		return nil, &MalformedFileError{Err: errors.New("circular reference")}
+	}
+	objInfo := g.fi.findObject(ref)
+	if objInfo == nil {
+		return nil, &MalformedFileError{
+			Err: fmt.Errorf("object %s not found", ref),
+			Loc: []string{"object stream lookup"},
+		}
+	}
+	g.seen[ref] = true
+	defer delete(g.seen, ref)
+	x, _, err := g.fi.doRead(objInfo, g.fi.makeSafeGetInt(), false)
+	if err != nil {
+		return nil, err
+	}
+	native, ok := x.(Native)
+	if !ok {
+		return nil, &MalformedFileError{Err: fmt.Errorf("object %s is not a PDF value", ref)}
+	}
+	return native, nil
+}
+
+// decodeObjStmIndex decodes an object stream found during the sequential
+// scan and returns its index: one entry per contained object, holding the
+// object number and its absolute byte offset within the decoded body.
+func (fi *FileInfo) decodeObjStmIndex(objInfo *FileObject) ([]stmObj, error) {
+	x, err := fi.Read(objInfo)
+	if err != nil {
+		return nil, err
+	}
+	stm, ok := x.(*Stream)
+	if !ok {
+		return nil, &MalformedFileError{Err: errors.New("not a stream")}
+	}
+	N, ok := stm.Dict["N"].(Integer)
+	if !ok || N < 0 || N > 10000 {
+		return nil, &MalformedFileError{Err: errors.New("no valid /N")}
+	}
+	first, ok := stm.Dict["First"].(Integer)
+	if !ok || first < 0 {
+		return nil, &MalformedFileError{Err: errors.New("no valid /First")}
+	}
+
+	ver, err := ParseVersion(fi.HeaderVersion)
+	if err != nil {
+		return nil, err
+	}
+	getter := &sequentialGetter{fi: fi, ver: ver, seen: make(map[Reference]bool)}
+
+	in, err := DecodeStream(getter, nil, stm)
+	if err != nil {
+		return nil, err
+	}
+	defer in.Close()
+
+	s := newScanner(in, nil, nil)
+	idx := make([]stmObj, N)
+	for i := range int(N) {
+		no, err := s.ReadInteger()
+		if err != nil {
+			return nil, err
+		}
+		offs, err := s.ReadInteger()
+		if err != nil {
+			return nil, err
+		}
+		if no < 0 || no > math.MaxUint32 || offs < 0 || offs > math.MaxInt {
+			return nil, &MalformedFileError{Err: errors.New("invalid object number or offset")}
+		}
+		idx[i].number = uint32(no)
+		idx[i].offs = int(offs)
+	}
+	for i := range idx {
+		x := idx[i].offs + int(first)
+		if x < idx[i].offs { // check for integer overflow
+			return nil, &MalformedFileError{Err: errors.New("invalid object offset")}
+		}
+		idx[i].offs = x
+	}
+	return idx, nil
+}
+
 func (fi *FileInfo) makeXRef() map[uint32]*xRefEntry {
-	// TODO(voss): locate objects in object streams.
 	xref := make(map[uint32]*xRefEntry)
 	for _, section := range fi.Sections {
 		for _, obj := range section.Objects {
@@ -460,6 +557,29 @@ func (fi *FileInfo) makeXRef() map[uint32]*xRefEntry {
 			xref[obj.Reference.Number()] = &xRefEntry{
 				Pos:        obj.ObjStart,
 				Generation: obj.Reference.Generation(),
+			}
+		}
+
+		// Objects compressed inside object streams: record each contained
+		// object which is not already present in the cross-reference table.
+		for _, osi := range section.ObjectStreams {
+			if osi.Broken {
+				continue
+			}
+			idx, err := fi.decodeObjStmIndex(osi)
+			if err != nil {
+				continue // best effort: the file is damaged anyway
+			}
+			for pairIdx, so := range idx {
+				if so.number == 0 || int64(so.number) >= maxXRefSize {
+					continue
+				}
+				if _, exists := xref[so.number]; !exists {
+					xref[so.number] = &xRefEntry{
+						InStream: NewReference(osi.Reference.Number(), osi.Reference.Generation()),
+						Pos:      int64(pairIdx),
+					}
+				}
 			}
 		}
 	}

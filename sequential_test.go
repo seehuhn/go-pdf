@@ -21,6 +21,7 @@ import (
 	"cmp"
 	"io"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -239,5 +240,62 @@ func TestSequentialBrokenLength(t *testing.T) {
 		t.Error("truncated stream not located")
 	} else if !stmObj.Broken {
 		t.Error("truncated stream not marked broken")
+	}
+}
+
+// TestSequentialObjStm checks that objects compressed inside object streams
+// are located by the sequential scan and resolve through MakeReader.
+func TestSequentialObjStm(t *testing.T) {
+	path := t.TempDir() + "/objstm.pdf"
+	const n = 10
+	w, err := Create(path, V2_0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs := make([]Reference, n)
+	objs := make([]Object, n)
+	for i := range refs {
+		refs[i] = w.Alloc()
+		objs[i] = Dict{"i": Integer(i)}
+	}
+	if err := w.WriteCompressed(refs, objs...); err != nil {
+		t.Fatal(err)
+	}
+	pagesRef := w.Alloc()
+	if err := w.Put(pagesRef, Dict{"Type": Name("Pages"), "Count": Integer(0)}); err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Pages = pagesRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fi, err := SequentialScan(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := fi.MakeReader(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	for i := 0; i < n; i++ {
+		obj, err := r.Get(refs[i], true)
+		if err != nil {
+			t.Fatalf("object %d: %v", refs[i].Number(), err)
+		}
+		dict, ok := obj.(Dict)
+		if !ok {
+			t.Fatalf("object %d: got %T, want Dict", refs[i].Number(), obj)
+		}
+		if dict["i"] != Integer(i) {
+			t.Errorf("object %d: got payload %v", refs[i].Number(), dict["i"])
+		}
 	}
 }
