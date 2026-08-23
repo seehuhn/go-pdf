@@ -27,6 +27,10 @@ weight = 100
 
 ## General
 
+- Add equality methods for `measure.Measure` implementations and
+  `measure.PtData`, then include those fields in
+  `graphics/form.Form.Equal` (they are currently ignored there).
+
 - consider removing the `github.com/xdg-go/stringprep` dependency.
   It is the only third-party (non-Go-team) external module in the tree
   and has a single call site in `crypto.go` (`utf8Passwd`, SASLprep for

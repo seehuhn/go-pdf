@@ -353,11 +353,12 @@ func (f *Form) validate() error {
 	return nil
 }
 
-// Equal compares two forms for value equality.
-//
-// TODO(voss): at the moment, Metadata, PieceInfo, OptionalContent, Measure,
-// PtData, and AssociatedFiles are ignored in the comparison.  Implement and
-// use proper equality checks for these types.
+// Equal compares two forms for value equality.  Metadata and PieceInfo are
+// compared by pointer identity (they wrap stream data, whose comparison
+// would require I/O); OptionalContent uses the property-list equality of
+// its implementations; AssociatedFiles entries are compared by pointer.
+// Measure and PtData are still ignored (tracked in the developer TODO
+// list), because their types lack equality methods.
 func (f *Form) Equal(other *Form) bool {
 	if f == nil || other == nil || f == other {
 		return f == other
@@ -403,6 +404,31 @@ func (f *Form) Equal(other *Form) bool {
 
 	if !f.StructParents.Equal(other.StructParents) {
 		return false
+	}
+
+	// Metadata and PieceInfo wrap stream data: fall back to identity,
+	// mirroring pdf.Equal's treatment of streams.
+	if f.Metadata != other.Metadata {
+		return false
+	}
+	if f.PieceInfo != other.PieceInfo {
+		return false
+	}
+
+	if (f.OptionalContent == nil) != (other.OptionalContent == nil) {
+		return false
+	}
+	if f.OptionalContent != nil && !f.OptionalContent.Equal(other.OptionalContent) {
+		return false
+	}
+
+	if len(f.AssociatedFiles) != len(other.AssociatedFiles) {
+		return false
+	}
+	for i := range f.AssociatedFiles {
+		if f.AssociatedFiles[i] != other.AssociatedFiles[i] {
+			return false
+		}
 	}
 	return true
 }
