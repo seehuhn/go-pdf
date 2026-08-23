@@ -43,9 +43,12 @@ type FileInfo struct {
 
 // FileSection contains information about the part of the PDF file
 // described by a single xref table.
-//
-// TODO(voss): add start and end offsets
 type FileSection struct {
+	// StartPos and EndPos bound the byte range covered by the section:
+	// StartPos is the offset of its first recognised marker, EndPos the
+	// offset just past its last one.
+	StartPos      int64
+	EndPos        int64
 	XRefPos       int64
 	TrailerPos    int64
 	StartXRefPos  int64
@@ -248,13 +251,26 @@ func (fi *FileInfo) locateObjects() error {
 
 	used := false
 	inTrailer := false
+	var sectionStart, lastEnd int64
+	mark := func(pos int64, width int64) {
+		if !used {
+			sectionStart = pos
+		}
+		if pos+width > lastEnd {
+			lastEnd = pos + width
+		}
+		used = true
+	}
 	finish := func() {
 		if used {
+			section.StartPos = sectionStart
+			section.EndPos = lastEnd
 			fi.Sections = append(fi.Sections, section)
 		}
 		inTrailer = false
 		used = false
 		section = &FileSection{}
+		lastEnd = 0
 	}
 
 scanLoop:
@@ -288,21 +304,22 @@ scanLoop:
 				Reference: NewReference(uint32(n), uint16(g)),
 			}
 			section.Objects = append(section.Objects, obj)
-			used = true
+			mark(pos, int64(len(m[0]))-countLeadingSpaces(m[0]))
 		case m[1] == "xref":
 			section.XRefPos = pos
 			inTrailer = true
-			used = true
+			mark(pos, int64(len(m[0]))-countLeadingSpaces(m[0]))
 		case m[1] == "trailer":
 			section.TrailerPos = pos
 			inTrailer = true
-			used = true
+			mark(pos, int64(len(m[0]))-countLeadingSpaces(m[0]))
 		case m[1] == "startxref":
 			section.StartXRefPos = pos
 			inTrailer = true
-			used = true
+			mark(pos, int64(len(m[0]))-countLeadingSpaces(m[0]))
 		case m[1] == "%%EOF":
 			section.EOFPos = pos
+			mark(pos, int64(len(m[0]))-countLeadingSpaces(m[0]))
 			finish()
 		default:
 			// The regexp alternation above guarantees m[1] is one of the
