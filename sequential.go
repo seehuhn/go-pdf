@@ -557,13 +557,13 @@ func (fi *FileInfo) getTrailer() (Dict, error) {
 	// found anywhere in the file.  As a last resort, synthesise one from
 	// the objects the scan identified: the newest plausible document
 	// catalog becomes /Root, and /Size covers the highest object number.
-	for j := len(fi.Sections) - 1; j >= 0; j-- {
-		catalog := fi.Sections[j].Catalog
+	for _, sect := range slices.Backward(fi.Sections) {
+		catalog := sect.Catalog
 		if catalog == nil {
 			continue
 		}
 		var maxNum uint32
-		for _, obj := range fi.Sections[j].Objects {
+		for _, obj := range sect.Objects {
 			if !obj.Broken && obj.Number() > maxNum {
 				maxNum = obj.Number()
 			}

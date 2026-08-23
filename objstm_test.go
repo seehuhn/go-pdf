@@ -69,8 +69,8 @@ func TestGetFromObjStmCached(t *testing.T) {
 	}
 	defer r.Close()
 
-	for pass := 0; pass < 2; pass++ {
-		for i := 0; i < n; i++ {
+	for pass := range 2 {
+		for i := range n {
 			// object numbers start at 1; the page tree occupies the last one
 			num := uint32(i + 1)
 			obj, err := r.Get(NewReference(num, 0), true)
@@ -106,18 +106,16 @@ func TestGetFromObjStmConcurrent(t *testing.T) {
 	defer r.Close()
 
 	var wg sync.WaitGroup
-	for worker := 0; worker < 8; worker++ {
-		wg.Add(1)
-		go func(worker int) {
-			defer wg.Done()
-			for i := 0; i < n; i++ {
+	for worker := range 8 {
+		wg.Go(func() {
+			for i := range n {
 				ref := NewReference(uint32(i+1), 0)
 				if _, err := r.Get(ref, true); err != nil {
 					t.Errorf("worker %d: object %d: %v", worker, i+1, err)
 					return
 				}
 			}
-		}(worker)
+		})
 	}
 	wg.Wait()
 }

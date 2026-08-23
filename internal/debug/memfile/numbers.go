@@ -53,14 +53,8 @@ func CheckNumbers(data []byte) []string {
 	var res []string
 	add := func(region []byte) {
 		for _, loc := range longDecimalRe.FindAllIndex(region, -1) {
-			lo := loc[0] - 40
-			if lo < 0 {
-				lo = 0
-			}
-			hi := loc[1] + 12
-			if hi > len(region) {
-				hi = len(region)
-			}
+			lo := max(loc[0]-40, 0)
+			hi := min(loc[1]+12, len(region))
 			res = append(res, fmt.Sprintf("%.60q", region[lo:hi]))
 			if len(res) == maxReports {
 				return

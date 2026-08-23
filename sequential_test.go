@@ -285,7 +285,7 @@ func TestSequentialObjStm(t *testing.T) {
 	}
 	defer r.Close()
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		obj, err := r.Get(refs[i], true)
 		if err != nil {
 			t.Fatalf("object %d: %v", refs[i].Number(), err)
