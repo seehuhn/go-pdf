@@ -454,9 +454,19 @@ func resolveJBIG2Globals(r Getter, path *CycleCheck, f *FilterJBIG2) error {
 
 // IsTagged returns true, if the PDF file is "tagged".
 func IsTagged(pdf *Writer) bool {
-	// TODO(voss): what can we do if catalog.MarkInfo is an indirect object?
 	catalog := pdf.GetMeta().Catalog
-	markInfo, _ := catalog.MarkInfo.(Dict)
+	var markInfo Dict
+	switch mi := catalog.MarkInfo.(type) {
+	case Dict:
+		markInfo = mi
+	case Reference:
+		// the user may have stored the dictionary as an indirect object
+		obj, err := pdf.Get(mi, true)
+		if err != nil {
+			return false
+		}
+		markInfo, _ = obj.(Dict)
+	}
 	if markInfo == nil {
 		return false
 	}
