@@ -611,9 +611,30 @@ func (fi *FileInfo) getTrailer() (Dict, error) {
 		if err == nil {
 			return trailer, nil
 		}
+	}
 
-		// TODO(voss): method 3: Try to collect all the pieces to build
-		// our own trailer dictionary.
+	// method 3: No intact trailer or cross-reference stream dictionary was
+	// found anywhere in the file.  As a last resort, synthesise one from
+	// the objects the scan identified: the newest plausible document
+	// catalog becomes /Root, and /Size covers the highest object number.
+	for j := len(fi.Sections) - 1; j >= 0; j-- {
+		catalog := fi.Sections[j].Catalog
+		if catalog == nil {
+			continue
+		}
+		var maxNum uint32
+		for _, obj := range fi.Sections[j].Objects {
+			if !obj.Broken && obj.Number() > maxNum {
+				maxNum = obj.Number()
+			}
+		}
+		if int64(maxNum)+1 > maxXRefSize {
+			continue
+		}
+		return Dict{
+			"Root": catalog.Reference,
+			"Size": Integer(maxNum + 1),
+		}, nil
 	}
 	return nil, errors.New("no trailer found")
 }
