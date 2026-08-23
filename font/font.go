@@ -126,7 +126,12 @@ const (
 // Two fonts are equal if they have the same PostScript name, writing mode,
 // and code space range.
 //
-// TODO(voss): implement a more specific comparison.
+// The comparison is deliberately structural rather than exhaustive:
+// instances with the same PostScript name share the embedded font
+// program, so per-glyph differences (e.g. from variation axes applied
+// unequally) cannot occur between equally named instances produced by
+// this library.  Callers needing byte-level identity of encoded output
+// should compare the embedded programs instead.
 func InstancesEqual(a, b Instance) bool {
 	if a == nil || b == nil {
 		return a == b
