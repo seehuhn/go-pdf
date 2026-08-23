@@ -25,9 +25,14 @@ import (
 	"seehuhn.de/go/pdf/internal/limits"
 )
 
-// Getter represents a PDF file opened for reading.
-//
-// TODO(voss): find a better name for this
+// Getter represents a PDF file opened for reading.  The interface gives
+// read helpers access to indirect objects without committing to a concrete
+// reader implementation: it is implemented by Reader, by Writer (for files
+// being written incrementally) and by the repair-path adapter in
+// sequential.go.  The name is deliberately plain: the interface is wide
+// enough to be implemented by all three, and every alternative considered
+// (File, Document, ObjectSource) describes one implementation rather than
+// the capability.
 type Getter interface {
 	GetMeta() *MetaInfo
 
