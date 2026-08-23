@@ -1190,11 +1190,15 @@ func (x *Placeholder) Set(val Native) error {
 
 // AsString formats a PDF object as a string, in the same way as the
 // it would be written to a PDF file.
+//
+// AsString panics if obj cannot be formatted as PDF text.  This is the
+// case for direct stream objects, and for content-stream operators
+// outside a content stream; ordinary PDF objects never panic.
 func AsString(obj Object) string {
 	buf := &bytes.Buffer{}
 	err := Format(buf, OptPretty, obj)
 	if err != nil {
-		panic(err) // TODO(voss): unreachable?
+		panic(err) // unreachable for ordinary PDF objects, see above
 	}
 	return buf.String()
 }
