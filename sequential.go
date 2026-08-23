@@ -392,7 +392,11 @@ func (fi *FileInfo) checkObjects() error {
 					objInfo.Subtype = t
 
 					if t == "ObjStm" {
-						// TODO(voss): what to do if the generation number is not 0?
+						// The stream's own generation number need not be zero
+						// in damaged or hand-edited files; makeXRef records
+						// whatever generation the scan found.  References to
+						// objects *contained* in the stream always have
+						// generation 0 (PDF 32000-2 §7.5.4).
 						_, hasFirst := o.Dict["First"]
 						if hasFirst {
 							section.ObjectStreams = append(section.ObjectStreams, objInfo)
