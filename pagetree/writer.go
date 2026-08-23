@@ -161,7 +161,7 @@ func (w *Writer) Close() (pdf.Reference, error) {
 	w.parent.outObjects = append(w.parent.outObjects, w.outObjects...)
 	w.outObjects = nil
 	if len(w.parent.outObjects) >= objStreamChunkSize {
-		// TODO(voss): strictly obey the chunk size?
+		// this can overshoot objStreamChunkSize by the size of one handover
 		err := w.parent.flush()
 		if err != nil {
 			return 0, err
@@ -294,7 +294,10 @@ func (w *Writer) NewRange() (*Writer, error) {
 			RM:     w.RM,
 			tail:   w.tail,
 		}
-		// TODO(voss): should we close this child already here?
+		// The child is deliberately left open: closing it here would merge
+		// its nodes into w.tail before the new range exists, losing the
+		// insertion point this synthetic child encodes.  Parent.Close()
+		// closes all children in order.
 		w.children = append(w.children, before)
 		w.tail = nil
 	}
