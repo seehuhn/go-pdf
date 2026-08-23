@@ -279,15 +279,20 @@ func (r *Reader) decode2D() {
 		entry := mainTable[value]
 
 		if entry.State == S_EOL {
-			// TODO(voss): add error handling
-			if r.peekBits(11) == 0 {
-				if a0 >= 0 {
-					// error ...
-				}
-			} else {
-				// error ...
+			// No 2D mode code begins with seven zero bits, so the lookup
+			// table only reports S_EOL for an all-zero prefix; anything
+			// that is not a full end-of-line marker is an invalid code.
+			if r.peekBits(11) != 0 {
+				r.err = errors.New("ccittfax: invalid 2D mode code")
+				return
 			}
-			break // End of line reached
+			if a0 >= 0 {
+				// An end-of-line marker in the middle of a line truncates
+				// the current row: treat the data as malformed.
+				r.err = errors.New("ccittfax: premature end of line in 2D data")
+				return
+			}
+			break // end of line before any pixel: leave the row empty
 		} else {
 			r.consumeBits(int(entry.Width))
 		}
