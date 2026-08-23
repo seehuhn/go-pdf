@@ -48,9 +48,14 @@ type RectilinearMeasure struct {
 	// Origin specifies the origin of the measurement coordinate system.
 	Origin [2]float64
 
-	// CYX is the y-to-x axis conversion factor.
-	// TODO(voss): Clarify the semantics when Y units match X units.
-	// Zero means the value is not present in the PDF.
+	// CYX is the y-to-x axis conversion factor: a distance of one y-axis
+	// unit expressed in x-axis units.  It is meaningful only when Y is
+	// present.  Zero means the entry was absent from the PDF: if Y is
+	// also absent, both axes share the units of X; if Y is present, the
+	// axes are incommensurable (such as time against temperature), and
+	// PDF 32000-2 Table 267 rules out the mixed-axis calculations
+	// (distance, area and angle).  On write, CYX is emitted only when
+	// non-zero and the /Y axis is present.
 	CYX float64
 
 	// SingleUse determines if Embed returns a dictionary (true) or
