@@ -85,8 +85,6 @@ func TestEmbed(t *testing.T) {
 	if len(fontDict.SubsetTag) != 6 {
 		t.Errorf("wrong subset tag: %q", fontDict.SubsetTag)
 	}
-
-	// TODO(voss): more tests
 }
 
 // The metrics and the font program come from separate files and need not name

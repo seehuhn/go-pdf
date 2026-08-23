@@ -82,8 +82,9 @@ func TestEmbedSimple(t *testing.T) {
 			if len(dict.SubsetTag) != 6 {
 				t.Errorf("wrong subset tag: %q", dict.SubsetTag)
 			}
-
-			// TODO(voss): more tests
+			if dict.Descriptor.FontBBox.LLx == 0 && dict.Descriptor.FontBBox.URx == 0 {
+				t.Error("descriptor FontBBox is empty")
+			}
 		})
 	}
 }
