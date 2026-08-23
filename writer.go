@@ -102,7 +102,6 @@ func (w *Writer) isEncrypted() bool {
 	return w.w.enc != nil
 }
 
-// TODO(voss): is this more generally useful?
 type allocatedObject struct {
 	ref Reference
 	obj Object
