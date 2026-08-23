@@ -109,8 +109,8 @@ func (w *Writer) mergeNodes(nodes []*nodeInfo, a, b int) []*nodeInfo {
 		return nodes
 	}
 	if a < 0 || b > len(nodes) || b-a < 2 || b-a > maxDegree {
-		// TODO(voss): remove
-		panic(fmt.Errorf("invalid subtree node range %d, %d", a, b))
+		w.err = fmt.Errorf("invalid subtree node range %d, %d", a, b)
+		return nodes
 	}
 	if a == b {
 		return nodes
