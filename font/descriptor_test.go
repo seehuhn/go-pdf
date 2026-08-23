@@ -68,6 +68,41 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+// TestExtractDescriptorMalformed checks that malformed individual entries
+// are tolerated: the affected field keeps its zero value, while the rest of
+// the descriptor is still extracted.  Only a bad FontName is fatal.
+func TestExtractDescriptorMalformed(t *testing.T) {
+	data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+
+	dict := pdf.Dict{
+		"Type":       pdf.Name("FontDescriptor"),
+		"FontName":   pdf.Name("Test"),
+		"FontFamily": pdf.Integer(12),  // wrong type
+		"Ascent":     pdf.Name("high"), // wrong type
+		"Descent":    pdf.Number(-70),
+		"Flags":      pdf.String("not an int"), // wrong type
+	}
+	fd, err := ExtractDescriptor(pdf.NewCursor(data), dict, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fd.FontName != "Test" {
+		t.Errorf("FontName: got %q, want %q", fd.FontName, "Test")
+	}
+	if fd.FontFamily != "" || fd.Ascent != 0 {
+		t.Errorf("malformed entries not zeroed: family %q, ascent %v",
+			fd.FontFamily, fd.Ascent)
+	}
+	if fd.Descent != -70 {
+		t.Errorf("Descent: got %v, want -70", fd.Descent)
+	}
+
+	dict["FontName"] = pdf.Integer(3)
+	if _, err := ExtractDescriptor(pdf.NewCursor(data), dict, false); err == nil {
+		t.Error("mistyped FontName not reported as an error")
+	}
+}
+
 func FuzzFontDescriptor(f *testing.F) {
 	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		fd := &Descriptor{}

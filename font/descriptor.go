@@ -76,7 +76,11 @@ type Descriptor struct {
 // If obj is nil or does not resolve to a FontDescriptor dictionary, the result
 // is nil.
 //
-// TODO(voss): be more robust against malformed FontDescriptor dictionaries.
+// Individual entries are extracted best-effort: a malformed value leaves
+// the corresponding field at its zero value rather than failing the whole
+// descriptor.  Only a mistyped FontName is fatal, because the name
+// identifies the font; a missing FontName yields an empty name, which is
+// legal for Type 3 fonts.
 func ExtractDescriptor(c pdf.Cursor, obj pdf.Object, _ bool) (*Descriptor, error) {
 	fontDescriptor, err := c.DictTyped(obj, "FontDescriptor")
 	if err != nil {
@@ -94,16 +98,11 @@ func ExtractDescriptor(c pdf.Cursor, obj pdf.Object, _ bool) (*Descriptor, error
 	}
 	res.FontName = string(fontName)
 
-	fontFamily, err := c.String(fontDescriptor["FontFamily"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "FontFamily")
+	if v, err := c.String(fontDescriptor["FontFamily"]); err == nil {
+		res.FontFamily = string(v)
 	}
-	res.FontFamily = string(fontFamily)
 
-	fontStretch, err := c.Name(fontDescriptor["FontStretch"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "FontStretch")
-	}
+	fontStretch, _ := c.Name(fontDescriptor["FontStretch"])
 	switch fontStretch {
 	case "UltraCondensed":
 		res.FontStretch = os2.WidthUltraCondensed
@@ -125,18 +124,12 @@ func ExtractDescriptor(c pdf.Cursor, obj pdf.Object, _ bool) (*Descriptor, error
 		res.FontStretch = os2.WidthUltraExpanded
 	}
 
-	fontWeight, err := c.Number(fontDescriptor["FontWeight"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "FontWeight")
-	}
+	fontWeight, _ := c.Number(fontDescriptor["FontWeight"])
 	if fontWeight >= 1 && fontWeight <= 1000 {
 		res.FontWeight = os2.Weight(math.Round(fontWeight)).Rounded()
 	}
 
-	flags, err := c.Integer(fontDescriptor["Flags"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "Flags")
-	}
+	flags, _ := c.Integer(fontDescriptor["Flags"])
 	res.IsFixedPitch = flags&flagFixedPitch != 0
 	res.IsSerif = flags&flagSerif != 0
 	res.IsSymbolic = flags&flagSymbolic != 0
@@ -159,41 +152,29 @@ func ExtractDescriptor(c pdf.Cursor, obj pdf.Object, _ bool) (*Descriptor, error
 		}
 	}
 
-	italicAngle, err := c.Number(fontDescriptor["ItalicAngle"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "ItalicAngle")
+	if v, err := c.Number(fontDescriptor["ItalicAngle"]); err == nil {
+		res.ItalicAngle = v
 	}
-	res.ItalicAngle = italicAngle
 
-	ascent, err := c.Number(fontDescriptor["Ascent"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "Ascent")
+	if v, err := c.Number(fontDescriptor["Ascent"]); err == nil {
+		res.Ascent = v
 	}
-	res.Ascent = ascent
 
-	descent, err := c.Number(fontDescriptor["Descent"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "Descent")
+	if v, err := c.Number(fontDescriptor["Descent"]); err == nil {
+		res.Descent = v
 	}
-	res.Descent = descent
 
-	leading, err := c.Number(fontDescriptor["Leading"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "Leading")
+	if v, err := c.Number(fontDescriptor["Leading"]); err == nil {
+		res.Leading = v
 	}
-	res.Leading = leading
 
-	capHeight, err := c.Number(fontDescriptor["CapHeight"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "CapHeight")
+	if v, err := c.Number(fontDescriptor["CapHeight"]); err == nil {
+		res.CapHeight = v
 	}
-	res.CapHeight = capHeight
 
-	xHeight, err := c.Number(fontDescriptor["XHeight"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "XHeight")
+	if v, err := c.Number(fontDescriptor["XHeight"]); err == nil {
+		res.XHeight = v
 	}
-	res.XHeight = xHeight
 
 	if stemVObj, ok := fontDescriptor["StemV"]; ok {
 		stemV, err := c.Number(stemVObj)
@@ -205,29 +186,21 @@ func ExtractDescriptor(c pdf.Cursor, obj pdf.Object, _ bool) (*Descriptor, error
 		res.StemV = -1
 	}
 
-	stemH, err := c.Number(fontDescriptor["StemH"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "StemH")
+	if v, err := c.Number(fontDescriptor["StemH"]); err == nil {
+		res.StemH = v
 	}
-	res.StemH = stemH
 
-	maxWidth, err := c.Number(fontDescriptor["MaxWidth"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "MaxWidth")
+	if v, err := c.Number(fontDescriptor["MaxWidth"]); err == nil {
+		res.MaxWidth = v
 	}
-	res.MaxWidth = maxWidth
 
-	avgWidth, err := c.Number(fontDescriptor["AvgWidth"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "AvgWidth")
+	if v, err := c.Number(fontDescriptor["AvgWidth"]); err == nil {
+		res.AvgWidth = v
 	}
-	res.AvgWidth = avgWidth
 
-	missingWidth, err := c.Number(fontDescriptor["MissingWidth"])
-	if err != nil {
-		return nil, pdf.Wrap(err, "MissingWidth")
+	if v, err := c.Number(fontDescriptor["MissingWidth"]); err == nil {
+		res.MissingWidth = v
 	}
-	res.MissingWidth = missingWidth
 
 	return res, nil
 }
@@ -307,13 +280,11 @@ func (d *Descriptor) AsDict() pdf.Dict {
 			URy: b.URy,
 		}
 	}
-	if d.Ascent != 0 {
-		// TODO(voss): required, except for Type 3 fonts
-		dict["Ascent"] = pdf.Number(d.Ascent)
-	}
-	if d.Descent != 0 {
-		dict["Descent"] = pdf.Number(d.Descent)
-	}
+	// /Ascent and /Descent are required entries (except for Type 3
+	// fonts), so they are written unconditionally: an explicit zero is
+	// preferable to omitting a required key.
+	dict["Ascent"] = pdf.Number(d.Ascent)
+	dict["Descent"] = pdf.Number(d.Descent)
 	if d.Leading != 0 {
 		dict["Leading"] = pdf.Number(d.Leading)
 	}
