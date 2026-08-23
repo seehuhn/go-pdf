@@ -30,8 +30,6 @@ import (
 )
 
 func TestExtractText(t *testing.T) {
-	t.Skip("reenable this, once ReadFont() is fully implemented")
-
 	// TODO(voss): test both, fonts with and without ToUnicode maps
 
 	line1 := "Hello World!"
