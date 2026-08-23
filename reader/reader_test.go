@@ -124,9 +124,13 @@ func TestParameters(t *testing.T) {
 	if p.TextLeading != 12 {
 		t.Errorf("Tl: got %v, want 12", p.TextLeading)
 	}
-	// TODO(voss): compare the fonts
 	if p.TextFontSize != 14 {
 		t.Errorf("Font: got %v, %v, want %v, 14", p.TextFont, p.TextFontSize, testFont)
+	}
+	// the decoded text font must be the standard Helvetica instance which
+	// was set on write
+	if got, want := p.TextFont.PostScriptName(), testFont.PostScriptName(); got != want {
+		t.Errorf("TextFont PostScriptName: got %q, want %q", got, want)
 	}
 	if p.TextRenderingMode != graphics.TextRenderingModeFillStrokeClip {
 		t.Errorf("TextRenderingMode: got %v, want %v", p.TextRenderingMode, graphics.TextRenderingModeFillStrokeClip)
