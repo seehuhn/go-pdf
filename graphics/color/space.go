@@ -144,7 +144,10 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 				// another Pattern color space.
 				d.MarkAsInvalid()
 			} else {
-				// TODO(voss): do we need to look this up in the resource dictionary?
+				// No lookup in the resource dictionary is needed: for an
+				// uncolored pattern the base colour space travels inside
+				// the colour-space array itself; the /Pattern resource
+				// subdictionary holds only the pattern dictionaries.
 				res = spacePatternUncolored{
 					base: base,
 				}
