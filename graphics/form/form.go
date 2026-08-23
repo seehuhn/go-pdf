@@ -110,7 +110,10 @@ type Form struct {
 	// is the integer key of the form's entry in the structural parent tree.
 	StructParent optional.UInt
 
-	// TODO(voss): StructParents
+	// StructParents (optional; required if the form is a content item in
+	// a structure tree with multiple content items) is the integer key of
+	// the form's entry in the structural parent tree.
+	StructParents optional.UInt
 
 	// AssociatedFiles (optional; PDF 2.0) is an array of files associated with
 	// the form XObject. The relationship that the associated files have to the
@@ -280,6 +283,13 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["StructParent"] = pdf.Integer(key)
 	}
 
+	if key, ok := f.StructParents.Get(); ok {
+		if err := pdf.CheckVersion(e.Out(), "form XObject StructParents entry", pdf.V1_3); err != nil {
+			return nil, err
+		}
+		dict["StructParents"] = pdf.Integer(key)
+	}
+
 	if f.AssociatedFiles != nil {
 		if err := pdf.CheckVersion(e.Out(), "form XObject AF entry", pdf.V2_0); err != nil {
 			return nil, err
@@ -388,6 +398,10 @@ func (f *Form) Equal(other *Form) bool {
 	}
 
 	if !f.StructParent.Equal(other.StructParent) {
+		return false
+	}
+
+	if !f.StructParents.Equal(other.StructParents) {
 		return false
 	}
 	return true
