@@ -482,7 +482,10 @@ rangesLoop:
 }
 
 func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	// TODO(voss): decide this based on the CMap content?
+	// Embedding by name is keyed on object identity with the predefined
+	// cache, not on CMap content: a modified copy of a predefined CMap
+	// must be written out in full, and comparing content would cost a
+	// serialisation round trip for no practical benefit.
 	if f.IsPredefined() {
 		return pdf.Name(f.Name), nil
 	}
