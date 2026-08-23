@@ -82,12 +82,17 @@ func (e *Encryption) String() string {
 }
 
 // Version represents a version of the PDF standard.
+//
+// Versions are encoded as 100*major+minor, so that the natural integer
+// order coincides with the order of PDF versions.  The zero value means
+// "no version set".  Values beyond MaxVersion can occur when reading a
+// file written against a future version of the standard; the library
+// itself writes at most MaxVersion.
 type Version int
 
 // PDF versions supported by this library.
 const (
-	_ Version = iota
-	V1_0
+	V1_0 Version = 100 + iota
 	V1_1
 	V1_2
 	V1_3
@@ -95,53 +100,44 @@ const (
 	V1_5
 	V1_6
 	V1_7
-	V2_0
+
+	V2_0 Version = 200
 
 	MaxVersion = V2_0
 )
 
-// ParseVersion parses a PDF version string.
+// ParseVersion parses a PDF version string such as "1.7" or "2.0".
+// Well-formed versions newer than MaxVersion (e.g. "2.3") parse
+// successfully, so that files written against a future version of the
+// standard can still be read.
 func ParseVersion(verString string) (Version, error) {
-	switch verString {
-	case "1.0":
-		return V1_0, nil
-	case "1.1":
-		return V1_1, nil
-	case "1.2":
-		return V1_2, nil
-	case "1.3":
-		return V1_3, nil
-	case "1.4":
-		return V1_4, nil
-	case "1.5":
-		return V1_5, nil
-	case "1.6":
-		return V1_6, nil
-	case "1.7":
-		return V1_7, nil
-	case "2.0":
-		return V2_0, nil
+	if len(verString) != 3 || verString[1] != '.' {
+		return 0, errVersion
 	}
-	return 0, errVersion
+	major := verString[0]
+	minor := verString[2]
+	if major < '1' || major > '9' || minor < '0' || minor > '9' {
+		return 0, errVersion
+	}
+	return Version(100*int(major-'0') + int(minor-'0')), nil
 }
 
 // ToString returns the string representation of ver, e.g. "1.7".
-// If ver does not correspond to a supported PDF version, an error is
-// returned.
+// If ver does not correspond to a PDF version supported by this library,
+// an error is returned; use [Version.String] to format versions read
+// from files written against a future version of the standard.
 func (ver Version) ToString() (string, error) {
-	if ver >= V1_0 && ver <= V1_7 {
-		return "1." + string([]byte{byte(ver - V1_0 + '0')}), nil
-	}
-	if ver == V2_0 {
-		return "2.0", nil
+	if ver >= V1_0 && ver <= V1_7 || ver == V2_0 {
+		return ver.String(), nil
 	}
 	return "", errVersion
 }
 
 func (ver Version) String() string {
-	versionString, err := ver.ToString()
-	if err != nil {
-		versionString = "pdf.Version(" + strconv.Itoa(int(ver)) + ")"
+	major := int(ver) / 100
+	minor := int(ver) % 100
+	if major >= 1 && major <= 9 && minor <= 9 {
+		return strconv.Itoa(major) + "." + strconv.Itoa(minor)
 	}
-	return versionString
+	return "pdf.Version(" + strconv.Itoa(int(ver)) + ")"
 }

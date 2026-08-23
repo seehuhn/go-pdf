@@ -360,12 +360,21 @@ func TestReadHeaderVersion(t *testing.T) {
 		}
 	}
 
-	for _, in := range []string{"%PDF-1.9\n", "%PDF-1.50\n"} {
+	for _, in := range []string{"%PDF-1.50\n"} {
 		s = newScanner(strings.NewReader(in), nil, nil)
 		_, err = s.ReadHeaderVersion()
 		if !errors.Is(err, errVersion) {
 			t.Errorf("%q: wrong error %q", in, err)
 		}
+	}
+
+	// well-formed versions beyond MaxVersion are representable
+	s = newScanner(strings.NewReader("%PDF-2.3\n"), nil, nil)
+	version, err = s.ReadHeaderVersion()
+	if err != nil {
+		t.Errorf("%q: unexpected error %q", "%PDF-2.3", err)
+	} else if version != Version(203) {
+		t.Errorf("wrong version %d", int(version))
 	}
 }
 
