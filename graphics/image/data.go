@@ -253,11 +253,22 @@ func (d *Dict) Load() (*Data, error) {
 	pix := make([]float32, width*height*ncomp)
 	vals := make([]float32, ncomp)
 
-	for y := range height {
-		for x := range width {
-			readSamples(data, width, ncomp, bpc, x, y, decode, vals)
-			offset := (y*width + x) * ncomp
-			copy(pix[offset:], vals)
+	if bpc == 8 && len(data) >= len(pix) {
+		// 8-bit samples are byte-aligned and contiguous, so decoding each
+		// one is a table lookup
+		lut := decodeLUT8(ncomp, decode)
+		for i := 0; i < len(pix); i += ncomp {
+			for c := range ncomp {
+				pix[i+c] = lut[c][data[i+c]]
+			}
+		}
+	} else {
+		for y := range height {
+			for x := range width {
+				readSamples(data, width, ncomp, bpc, x, y, decode, vals)
+				offset := (y*width + x) * ncomp
+				copy(pix[offset:], vals)
+			}
 		}
 	}
 
@@ -269,6 +280,20 @@ func (d *Dict) Load() (*Data, error) {
 		CS:     cs,
 		NComp:  ncomp,
 	}, nil
+}
+
+// decodeLUT8 tabulates the decoded component value of every 8-bit sample
+// value, one table per colour channel.  The tables reproduce the arithmetic
+// [readSamples] performs, so the two agree bit for bit.
+func decodeLUT8(ncomp int, decode []float64) [][256]float32 {
+	lut := make([][256]float32, ncomp)
+	for c := range ncomp {
+		lo, hi := decode[2*c], decode[2*c+1]
+		for v := range 256 {
+			lut[c][v] = float32(lo + float64(v)/255*(hi-lo))
+		}
+	}
+	return lut
 }
 
 // readSamples reads n color component values for pixel (x, y) from raw image

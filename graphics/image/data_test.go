@@ -584,3 +584,94 @@ func diff32(a, b uint32) uint32 {
 	}
 	return b - a
 }
+
+// TestDecodeLUT8MatchesReadSamples checks that the table-driven fast path in
+// Load reproduces readSamples exactly, for every 8-bit sample value.
+func TestDecodeLUT8MatchesReadSamples(t *testing.T) {
+	cases := []struct {
+		name   string
+		ncomp  int
+		decode []float64
+	}{
+		{"gray default", 1, []float64{0, 1}},
+		{"gray inverted", 1, []float64{1, 0}},
+		{"rgb default", 3, []float64{0, 1, 0, 1, 0, 1}},
+		{"rgb asymmetric", 3, []float64{0.25, 0.75, -1, 1, 1, -1}},
+		{"cmyk default", 4, []float64{0, 1, 0, 1, 0, 1, 0, 1}},
+		{"indexed", 1, []float64{0, 255}},
+		{"lab ranges", 3, []float64{0, 100, -100, 100, -100, 100}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			data := make([]byte, 256*tc.ncomp)
+			for i := range data {
+				data[i] = byte(i / tc.ncomp)
+			}
+
+			lut := decodeLUT8(tc.ncomp, tc.decode)
+			vals := make([]float32, tc.ncomp)
+			for x := range 256 {
+				readSamples(data, 256, tc.ncomp, 8, x, 0, tc.decode, vals)
+				for c := range tc.ncomp {
+					got := lut[c][data[x*tc.ncomp+c]]
+					if got != vals[c] {
+						t.Errorf("sample %d channel %d: lut gave %v, readSamples gave %v",
+							x, c, got, vals[c])
+					}
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkLoad measures sample decoding across the supported bit depths.
+// The 8-bit cases exercise the table-driven fast path in Load, the others
+// the general readSamples loop.
+func BenchmarkLoad(b *testing.B) {
+	cases := []struct {
+		name string
+		cs   color.Space
+		bpc  int
+	}{
+		{"Gray1", color.SpaceDeviceGray, 1},
+		{"Gray4", color.SpaceDeviceGray, 4},
+		{"Gray8", color.SpaceDeviceGray, 8},
+		{"RGB8", color.SpaceDeviceRGB, 8},
+		{"RGB16", color.SpaceDeviceRGB, 16},
+		{"CMYK8", color.SpaceDeviceCMYK, 8},
+	}
+
+	const width, height = 512, 512
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			ncomp := tc.cs.Channels()
+			data := make([]byte, expectedDataSize(width, ncomp, tc.bpc, height))
+			for i := range data {
+				data[i] = byte(i * 7)
+			}
+			dict := &Dict{
+				Width:            width,
+				Height:           height,
+				ColorSpace:       tc.cs,
+				BitsPerComponent: tc.bpc,
+				Data: &FlateSource{
+					Width:            width,
+					Colors:           ncomp,
+					BitsPerComponent: tc.bpc,
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write(data)
+						return err
+					},
+				},
+			}
+
+			b.SetBytes(int64(len(data)))
+			for b.Loop() {
+				if _, err := dict.Load(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
