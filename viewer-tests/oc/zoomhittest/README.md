@@ -64,4 +64,4 @@ drawn; for the last column, whether the cursor and the click agree with it.
 
 | viewer | below 200% | 200–400% | above 400% | cursor follows the frame? | switches at |
 |--------|------------|----------|------------|---------------------------|-------------|
-|        |            |          |            |                           |             |
+| macQuire (2026-08-28) | not drawn | drawn | not drawn | yes | 200% and 400% |
