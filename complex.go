@@ -183,7 +183,7 @@ func (x String) AsDate() (Date, error) {
 			return Date(t), nil
 		}
 	}
-	return zero, errNoDate
+	return zero, &MalformedFileError{Err: errNoDate}
 }
 
 // Rectangle represents a PDF rectangle.

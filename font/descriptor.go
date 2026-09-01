@@ -139,7 +139,9 @@ func ExtractDescriptor(c pdf.Cursor, obj pdf.Object, _ bool) (*Descriptor, error
 	res.IsSmallCap = flags&flagSmallCap != 0
 	res.ForceBold = flags&flagForceBold != 0
 
-	fontBBox, err := c.Rectangle(fontDescriptor["FontBBox"])
+	// A malformed FontBBox leaves the zero rectangle, rather than making the
+	// whole descriptor unreadable.
+	fontBBox, err := pdf.Optional(c.Rectangle(fontDescriptor["FontBBox"]))
 	if err != nil {
 		return nil, pdf.Wrap(err, "FontBBox")
 	}

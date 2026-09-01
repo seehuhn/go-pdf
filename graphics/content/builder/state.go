@@ -89,7 +89,7 @@ func (b *Builder) SetLineJoin(join graphics.LineJoinStyle) {
 //
 // This implements the PDF graphics operator "M".
 func (b *Builder) SetMiterLimit(limit float64) {
-	if limit < 1 {
+	if !isFinite(limit) || limit < 1 {
 		b.Err = fmt.Errorf("SetMiterLimit: invalid miter limit %f", limit)
 		return
 	}
@@ -103,6 +103,10 @@ func (b *Builder) SetMiterLimit(limit float64) {
 //
 // This implements the PDF graphics operator "d".
 func (b *Builder) SetLineDash(pattern []float64, phase float64) {
+	if err := graphics.CheckDashPattern(pattern, phase); err != nil {
+		b.Err = fmt.Errorf("SetLineDash: %v", err)
+		return
+	}
 	if b.isSet(graphics.StateLineDash) &&
 		sliceNearlyEqual(pattern, b.State.GState.DashPattern) &&
 		nearlyEqual(phase, b.State.GState.DashPhase) {
@@ -134,7 +138,7 @@ func (b *Builder) SetRenderingIntent(intent graphics.RenderingIntent) {
 //
 // This implements the PDF graphics operator "i".
 func (b *Builder) SetFlatnessTolerance(flatness float64) {
-	if flatness < 0 || flatness > 100 {
+	if !isFinite(flatness) || flatness < 0 || flatness > 100 {
 		b.Err = fmt.Errorf("SetFlatnessTolerance: invalid flatness tolerance %f", flatness)
 		return
 	}
@@ -148,8 +152,8 @@ func (b *Builder) SetFlatnessTolerance(flatness float64) {
 //
 // This implements the PDF graphics operator "w".
 func (b *Builder) SetLineWidth(width float64) {
-	if width < 0 {
-		b.Err = fmt.Errorf("SetLineWidth: negative width %f", width)
+	if !isFinite(width) || width < 0 {
+		b.Err = fmt.Errorf("SetLineWidth: invalid width %f", width)
 		return
 	}
 	if b.isSet(graphics.StateLineWidth) && nearlyEqual(width, b.State.GState.LineWidth) {
@@ -161,6 +165,14 @@ func (b *Builder) SetLineWidth(width float64) {
 func nearlyEqual(a, b float64) bool {
 	const ε = 1e-6
 	return math.Abs(a-b) < ε
+}
+
+// isFinite reports whether x has a PDF number representation.  Infinities and
+// NaN have none.  NaN needs the separate test because every ordered
+// comparison against it is false, so it slips through a range check written
+// as a rejection of the bad values.
+func isFinite(x float64) bool {
+	return !math.IsInf(x, 0) && !math.IsNaN(x)
 }
 
 // SetExtGState sets selected graphics state parameters.

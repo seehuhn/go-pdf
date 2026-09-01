@@ -152,8 +152,15 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 			switch tp {
 			case "Page":
 				for _, name := range inheritable {
-					_, isPresent := node[name]
-					if val, canInherit := inherited[name]; !isPresent && canInherit {
+					ok, err := usable(c, name, node[name])
+					if err != nil {
+						i.Err = err
+						return
+					}
+					if ok {
+						continue
+					}
+					if val, canInherit := inherited[name]; canInherit {
 						node[name] = val
 					}
 				}
@@ -173,14 +180,18 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 					return
 				}
 
-				hasInheritables := false
+				var found []pdf.Name
 				for _, name := range inheritable {
-					if _, isPresent := node[name]; isPresent {
-						hasInheritables = true
-						break
+					ok, err := usable(c, name, node[name])
+					if err != nil {
+						i.Err = err
+						return
+					}
+					if ok {
+						found = append(found, name)
 					}
 				}
-				if hasInheritables {
+				if len(found) > 0 {
 					if len(todo) > 0 {
 						stack = append(stack, &frame{
 							todo:      todo,
@@ -188,10 +199,8 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 						})
 						todo = nil
 					}
-					for _, name := range inheritable {
-						if tmp, ok := node[name]; ok {
-							inherited[name] = tmp
-						}
+					for _, name := range found {
+						inherited[name] = node[name]
 					}
 				}
 
@@ -205,6 +214,23 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 		}
 	}
 	return yield
+}
+
+// usable reports whether val can serve as the value of the inheritable entry
+// name.  A null value is equivalent to a missing entry.  A page box which is
+// not a rectangle, or which has no area, also counts as missing, so that an
+// ancestor's box can take its place.
+func usable(c pdf.Cursor, name pdf.Name, val pdf.Object) (bool, error) {
+	switch name {
+	case "MediaBox", "CropBox":
+		r, err := pdf.Optional(c.Rectangle(val))
+		if err != nil {
+			return false, err
+		}
+		return r != nil && r.Dx() > 0 && r.Dy() > 0, nil
+	default:
+		return val != nil, nil
+	}
 }
 
 func getInheritable(v pdf.Version) []pdf.Name {

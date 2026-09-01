@@ -396,6 +396,9 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		return true, err
 
 	case Real:
+		if math.IsInf(float64(x), 0) || math.IsNaN(float64(x)) {
+			return false, errNonFiniteNumber
+		}
 		if needSep {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
@@ -706,6 +709,7 @@ func (x Integer) AsPDF(opt OutputOptions) Native {
 }
 
 // Real represents an real number in a PDF file.
+// The value must be finite; infinities and NaN are not allowed.
 type Real float64
 
 func (x Real) isNative() {}
@@ -754,6 +758,10 @@ func ParseString(buf []byte) (String, error) {
 }
 
 var errInvalidString = errors.New("malformed PDF string")
+
+// errNonFiniteNumber reports an attempt to write an infinity or a NaN, neither
+// of which PDF can represent.
+var errNonFiniteNumber = errors.New("number has no PDF representation")
 
 // Name represents a name object in a PDF file.
 type Name string
@@ -1191,9 +1199,10 @@ func (x *Placeholder) Set(val Native) error {
 // AsString formats a PDF object as a string, in the same way as the
 // it would be written to a PDF file.
 //
-// AsString panics if obj cannot be formatted as PDF text.  This is the
-// case for direct stream objects, and for content-stream operators
-// outside a content stream; ordinary PDF objects never panic.
+// AsString panics if obj cannot be formatted as PDF text.  This is the case
+// for direct stream objects, for content-stream operators outside a content
+// stream, and for numbers PDF cannot represent (infinities and NaN); ordinary
+// PDF objects never panic.
 func AsString(obj Object) string {
 	buf := &bytes.Buffer{}
 	err := Format(buf, OptPretty, obj)

@@ -101,7 +101,7 @@ func ExtractNumberFormat(c pdf.Cursor, obj pdf.Object, isDirect bool) (*NumberFo
 	}
 	nf.Unit = string(unit)
 
-	conversion, err := c.Number(dict["C"])
+	conversion, err := pdf.Optional(c.Number(dict["C"]))
 	if err != nil {
 		return nil, err
 	}

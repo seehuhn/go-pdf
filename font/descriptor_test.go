@@ -195,3 +195,39 @@ func embedFD(fd *Descriptor, v pdf.Version) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
+
+// TestDescriptorMalformedFontBBox checks that a FontBBox which cannot be read
+// leaves the zero rectangle, instead of making the whole descriptor
+// unreadable.  A font is still usable without a bounding box.
+func TestDescriptorMalformedFontBBox(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		box  pdf.Object
+	}{
+		{"null element", pdf.Array{pdf.Integer(0), nil, pdf.Integer(100), pdf.Integer(100)}},
+		{"wrong length", pdf.Array{pdf.Integer(0), pdf.Integer(0)}},
+		{"not an array", pdf.Integer(7)},
+		{"dangling reference", pdf.NewReference(9999, 0)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			dict := pdf.Dict{
+				"Type":     pdf.Name("FontDescriptor"),
+				"FontName": pdf.Name("Test"),
+				"Flags":    pdf.Integer(flagSymbolic),
+				"FontBBox": tc.box,
+			}
+
+			fd, err := ExtractDescriptor(pdf.NewCursor(w), dict, true)
+			if err != nil {
+				t.Fatalf("descriptor unreadable: %v", err)
+			}
+			if fd.FontName != "Test" {
+				t.Errorf("FontName = %q, want %q", fd.FontName, "Test")
+			}
+			if !fd.FontBBox.IsZero() {
+				t.Errorf("FontBBox = %v, want the zero rectangle", fd.FontBBox)
+			}
+		})
+	}
+}

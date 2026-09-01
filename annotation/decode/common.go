@@ -133,14 +133,14 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	// CA (optional) - default value is 1.0
 	if dict["CA"] != nil {
 		if ca, err := c.Number(dict["CA"]); err == nil {
-			common.StrokingTransparency = 1 - ca
+			common.StrokingTransparency = 1 - min(max(ca, 0), 1)
 		}
 	}
 
 	// ca (optional) - if not present, defaults to the same value as CA
 	if dict["ca"] != nil {
 		if ca, err := c.Number(dict["ca"]); err == nil {
-			common.NonStrokingTransparency = 1 - ca
+			common.NonStrokingTransparency = 1 - min(max(ca, 0), 1)
 		}
 	} else {
 		common.NonStrokingTransparency = common.StrokingTransparency

@@ -166,7 +166,7 @@ func decodeVMetrics(c pdf.Cursor, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 	count := 0
 	for len(a) > 0 {
 		if len(a) < 2 {
-			return nil, errInvalidVMetrics
+			return nil, errInvalidVMetrics()
 		}
 
 		// The first element is always a CID value
@@ -174,7 +174,7 @@ func decodeVMetrics(c pdf.Cursor, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 		if err != nil {
 			return nil, err
 		} else if x < 0 || x > 65535 {
-			return nil, errInvalidVMetrics
+			return nil, errInvalidVMetrics()
 		}
 		cidVal := cid.CID(x)
 
@@ -186,7 +186,7 @@ func decodeVMetrics(c pdf.Cursor, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 		switch obj := elem2.(type) {
 		case pdf.Array: // Individual format: cid [dy1 ox1 oy1 ...]
 			if len(obj)%3 != 0 {
-				return nil, errInvalidVMetrics
+				return nil, errInvalidVMetrics()
 			}
 
 			for i := 0; i < len(obj); i += 3 {
@@ -204,11 +204,11 @@ func decodeVMetrics(c pdf.Cursor, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 				}
 
 				if cidVal > 65535 {
-					return nil, errInvalidVMetrics
+					return nil, errInvalidVMetrics()
 				}
 				count++
 				if count > 65536 {
-					return nil, errInvalidVMetrics
+					return nil, errInvalidVMetrics()
 				}
 				res[cidVal] = dict.VMetrics{
 					DeltaY: dy,
@@ -222,14 +222,14 @@ func decodeVMetrics(c pdf.Cursor, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 
 		case pdf.Integer: // Range format: cid1 cid2 dy ox oy
 			if len(a) < 5 {
-				return nil, errInvalidVMetrics
+				return nil, errInvalidVMetrics()
 			}
 
 			x, err := c.Integer(elem2)
 			if err != nil {
 				return nil, err
 			} else if x < 0 || x > 65535 {
-				return nil, errInvalidVMetrics
+				return nil, errInvalidVMetrics()
 			}
 			cidEnd := cid.CID(x)
 
@@ -249,7 +249,7 @@ func decodeVMetrics(c pdf.Cursor, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 			for c := cidVal; c <= cidEnd; c++ {
 				count++
 				if count > 65536 {
-					return nil, errInvalidVMetrics
+					return nil, errInvalidVMetrics()
 				}
 				res[c] = dict.VMetrics{
 					DeltaY: dy,
@@ -261,13 +261,15 @@ func decodeVMetrics(c pdf.Cursor, obj pdf.Object) (map[cid.CID]dict.VMetrics, er
 			a = a[5:]
 
 		default:
-			return nil, errInvalidVMetrics
+			return nil, errInvalidVMetrics()
 		}
 	}
 
 	return res, nil
 }
 
-var (
-	errInvalidVMetrics = pdf.Error("invalid vertical metrics")
-)
+// errInvalidVMetrics reports malformed vertical metrics.  A new value is
+// created for each call, since pdf.Wrap appends locations in place.
+func errInvalidVMetrics() error {
+	return pdf.Error("invalid vertical metrics")
+}

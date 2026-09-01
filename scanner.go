@@ -292,12 +292,15 @@ func (s *scanner) ReadInteger() (Integer, error) {
 
 	x, err := strconv.ParseInt(string(res), 10, 64)
 	if err != nil {
-		return 0, &MalformedFileError{Err: err}
+		return 0, &MalformedFileError{Err: errors.New("malformed integer")}
 	}
 	return Integer(x), nil
 }
 
-// ReadNumber reads an integer or real number.
+// ReadNumber reads an integer or real number.  A numeric token with no PDF
+// value - one too long to record, or outside the range of float64 - yields a
+// null object: the token has been consumed in full, so the enclosing object
+// can still be read.
 func (s *scanner) ReadNumber() (Native, error) {
 	hasDot := false
 	first := true
@@ -325,19 +328,19 @@ func (s *scanner) ReadNumber() (Native, error) {
 		return nil, err
 	}
 	if overflow {
-		return nil, &MalformedFileError{Err: errors.New("number too long")}
+		return nil, nil
 	}
 
 	if !hasDot {
 		if x, err := strconv.ParseInt(string(res), 10, 64); err == nil {
 			return Integer(x), nil
 		}
-		// fall through: very large integer literals are returned as Real
+		// fall through: large integer literals are returned as Real
 	}
 
 	x, err := strconv.ParseFloat(string(res), 64)
 	if err != nil {
-		return nil, &MalformedFileError{Err: err}
+		return nil, nil
 	}
 	return Real(x), nil
 }

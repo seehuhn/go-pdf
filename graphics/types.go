@@ -184,7 +184,7 @@ type Halftone interface {
 //
 // Each function must have one input and one output.
 // Use [function.Identity] to represent the PDF name /Identity.
-// Use nil to represent the device-specific default transfer function.
+// Use nil to represent the device-dependent default transfer function.
 type TransferFunctions struct {
 	Red   pdf.Function
 	Green pdf.Function

@@ -27,6 +27,10 @@ import (
 )
 
 // ExtGState extracts an extended graphics state from a PDF file.
+//
+// Numeric parameters which are defined only over a range of values are
+// snapped into that range, so that every value returned here can be written
+// back out again.
 func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGState, error) {
 
 	dict, err := c.DictTyped(obj, "ExtGState")
@@ -98,7 +102,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			} else if err != nil {
 				return nil, err
 			}
-			res.LineWidth = lw
+			res.LineWidth = max(lw, 0)
 			set |= graphics.StateLineWidth
 		case "LC":
 			lineCap, err := c.Integer(v)
@@ -135,10 +139,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			} else if err != nil {
 				return nil, err
 			}
-			if miterLimit < 1 {
-				miterLimit = 1
-			}
-			res.MiterLimit = miterLimit
+			res.MiterLimit = max(miterLimit, 1)
 			set |= graphics.StateMiterLimit
 		case "D":
 			dashPattern, phase, err := readDash(c, v)
@@ -192,7 +193,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			} else if err != nil {
 				return nil, err
 			}
-			res.StrokeAlpha = ca
+			res.StrokeAlpha = min(max(ca, 0), 1)
 			set |= graphics.StateStrokeAlpha
 		case "ca":
 			ca, err := c.Number(v)
@@ -201,7 +202,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			} else if err != nil {
 				return nil, err
 			}
-			res.FillAlpha = ca
+			res.FillAlpha = min(max(ca, 0), 1)
 			set |= graphics.StateFillAlpha
 		case "AIS":
 			ais, err := c.Boolean(v)
@@ -312,7 +313,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			} else if err != nil {
 				return nil, err
 			}
-			res.FlatnessTolerance = fl
+			res.FlatnessTolerance = min(max(fl, 0), 100)
 			set |= graphics.StateFlatnessTolerance
 		case "SM":
 			sm, err := c.Number(v)
@@ -321,7 +322,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			} else if err != nil {
 				return nil, err
 			}
-			res.SmoothnessTolerance = sm
+			res.SmoothnessTolerance = min(max(sm, 0), 1)
 			set |= graphics.StateSmoothnessTolerance
 		}
 	}
@@ -465,6 +466,7 @@ func readDash(c pdf.Cursor, obj pdf.Object) (pat []float64, ph float64, err erro
 		}
 		pat[i] = x
 	}
+	pat, phase = graphics.RepairDashPattern(pat, phase)
 	return pat, phase, nil
 }
 

@@ -865,3 +865,44 @@ func TestRotationFromDegrees(t *testing.T) {
 		}
 	}
 }
+
+func TestPage_Decode_MediaBoxDefault(t *testing.T) {
+	letter := &pdf.Rectangle{URx: 612, URy: 792}
+	for _, tc := range []struct {
+		name string
+		box  pdf.Object
+	}{
+		{"missing", nil},
+		{"null element", pdf.Array{pdf.Integer(0), pdf.Integer(0), nil, pdf.Integer(100)}},
+		{"zero area", pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(0), pdf.Integer(100)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			parentRef := w.Alloc()
+			if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			dict := pdf.Dict{
+				"Type":      pdf.Name("Page"),
+				"Parent":    parentRef,
+				"Resources": pdf.Dict{},
+			}
+			if tc.box != nil {
+				dict["MediaBox"] = tc.box
+			}
+
+			x := pdf.NewExtractor(w)
+			p, err := Decode(pdf.CursorAt(x, nil), dict, false)
+			if err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
+			if d := cmp.Diff(letter, p.MediaBox); d != "" {
+				t.Errorf("unexpected MediaBox (-want +got):\n%s", d)
+			}
+		})
+	}
+}

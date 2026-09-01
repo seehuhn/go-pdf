@@ -99,37 +99,20 @@ func as[T Native](resolved Native) (T, error) {
 	}
 }
 
-// asInteger coerces an already-resolved object to an Integer.  A nil object
-// yields 0.  Real values are rounded to the nearest integer; other types yield
-// a [MalformedFileError].
+// asInteger coerces an already-resolved object to an Integer.  Real values are
+// rounded to the nearest integer; a nil object or any other type yields a
+// [MalformedFileError].
 func asInteger(resolved Native) (Integer, error) {
 	switch x := resolved.(type) {
-	case nil:
-		return 0, nil
 	case Integer:
 		return x, nil
 	case Real:
 		return Integer(math.Round(float64(x))), nil
+	case nil:
+		return 0, &MalformedFileError{Err: errNoInteger}
 	default:
 		return 0, &MalformedFileError{
 			Err: fmt.Errorf("expected Integer but got %T", resolved),
-		}
-	}
-}
-
-// asNumber coerces an already-resolved object to a Number.  A nil object yields
-// 0; non-numeric types yield a [MalformedFileError].
-func asNumber(resolved Native) (Number, error) {
-	switch x := resolved.(type) {
-	case nil:
-		return 0, nil
-	case Integer:
-		return Number(x), nil
-	case Real:
-		return Number(x), nil
-	default:
-		return 0, &MalformedFileError{
-			Err: fmt.Errorf("expected Number but got %T", resolved),
 		}
 	}
 }

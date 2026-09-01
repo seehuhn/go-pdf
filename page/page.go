@@ -650,10 +650,13 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// MediaBox (required, inheritable)
-	if mediaBox, err := c.Rectangle(dict["MediaBox"]); err != nil {
+	p.MediaBox, err = readBox(c, dict["MediaBox"])
+	if err != nil {
 		return nil, err
-	} else if mediaBox != nil {
-		p.MediaBox = mediaBox
+	}
+	if p.MediaBox == nil {
+		// a page without a usable MediaBox is US Letter, as in other readers
+		p.MediaBox = &pdf.Rectangle{URx: 612, URy: 792}
 	}
 
 	// Resources (required, inheritable)
@@ -677,40 +680,34 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// CropBox (optional, inheritable)
-	if cropBox, err := c.Rectangle(dict["CropBox"]); err != nil {
+	p.CropBox, err = readBox(c, dict["CropBox"])
+	if err != nil {
 		return nil, err
-	} else if cropBox != nil {
-		p.CropBox = cropBox
 	}
 
 	// BleedBox (optional)
-	if bleedBox, err := c.Rectangle(dict["BleedBox"]); err != nil {
+	p.BleedBox, err = readBox(c, dict["BleedBox"])
+	if err != nil {
 		return nil, err
-	} else if bleedBox != nil {
-		p.BleedBox = bleedBox
 	}
 
 	// TrimBox (optional)
-	if trimBox, err := c.Rectangle(dict["TrimBox"]); err != nil {
+	p.TrimBox, err = readBox(c, dict["TrimBox"])
+	if err != nil {
 		return nil, err
-	} else if trimBox != nil {
-		p.TrimBox = trimBox
 	}
 
 	// ArtBox (optional)
-	if artBox, err := c.Rectangle(dict["ArtBox"]); err != nil {
+	p.ArtBox, err = readBox(c, dict["ArtBox"])
+	if err != nil {
 		return nil, err
-	} else if artBox != nil {
-		p.ArtBox = artBox
 	}
 
 	// clip optional boxes to MediaBox
-	if p.MediaBox != nil {
-		p.CropBox = clipBox(p.CropBox, p.MediaBox)
-		p.BleedBox = clipBox(p.BleedBox, p.MediaBox)
-		p.TrimBox = clipBox(p.TrimBox, p.MediaBox)
-		p.ArtBox = clipBox(p.ArtBox, p.MediaBox)
-	}
+	p.CropBox = clipBox(p.CropBox, p.MediaBox)
+	p.BleedBox = clipBox(p.BleedBox, p.MediaBox)
+	p.TrimBox = clipBox(p.TrimBox, p.MediaBox)
+	p.ArtBox = clipBox(p.ArtBox, p.MediaBox)
 
 	// BoxColorInfo (optional)
 	if bci, err := pdf.DecodeOptional(c, dict["BoxColorInfo"], boxcolor.ExtractInfo); err != nil {
@@ -935,6 +932,19 @@ func checkContainedIn(name string, box, mediaBox *pdf.Rectangle) error {
 		return fmt.Errorf("%s %s extends beyond MediaBox %s", name, box, mediaBox)
 	}
 	return nil
+}
+
+// readBox reads a page box.  A box which is missing, malformed, or has no
+// area yields nil.
+func readBox(c pdf.Cursor, obj pdf.Object) (*pdf.Rectangle, error) {
+	r, err := pdf.Optional(c.Rectangle(obj))
+	if err != nil || r == nil {
+		return nil, err
+	}
+	if r.Dx() <= 0 || r.Dy() <= 0 {
+		return nil, nil
+	}
+	return r, nil
 }
 
 func clipBox(box, bounds *pdf.Rectangle) *pdf.Rectangle {

@@ -18,6 +18,7 @@ package boxcolor
 
 import (
 	"bytes"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -282,4 +283,68 @@ func TestStyleValidation(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for solid style with dash pattern, but got none")
 	}
+}
+
+// TestStyleDashRules checks the rules of PDF 32000-2 8.4.3.6 for the /D entry
+// of a box style dictionary: the lengths must be non-negative and must not
+// all be zero.  Values which a PDF file can contain but the rules do not
+// allow are repaired on read, so that they can be written back out again.
+func TestStyleDashRules(t *testing.T) {
+	t.Run("read", func(t *testing.T) {
+		for _, tc := range []struct {
+			in   pdf.Array
+			want []float64
+		}{
+			{pdf.Array{pdf.Integer(3), pdf.Integer(2)}, []float64{3, 2}},
+			{pdf.Array{pdf.Integer(-1), pdf.Integer(2)}, []float64{0, 2}},
+			{pdf.Array{pdf.Integer(-1)}, []float64{3}}, // default
+			{pdf.Array{pdf.Integer(0), pdf.Integer(0)}, []float64{3}},
+			{pdf.Array{}, []float64{3}},
+		} {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			dict := pdf.Dict{"S": pdf.Name("D"), "D": tc.in}
+
+			style, err := ExtractStyle(pdf.NewCursor(w), dict, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.want, style.DashPattern); diff != "" {
+				t.Errorf("%v: DashPattern (-want +got):\n%s", tc.in, diff)
+			}
+
+			// whatever we read must be writable again
+			rm := pdf.NewResourceManager(w)
+			if _, err := rm.Embed(style); err != nil {
+				t.Errorf("%v: cannot write back: %v", tc.in, err)
+			}
+		}
+	})
+
+	t.Run("write", func(t *testing.T) {
+		for _, tc := range []struct {
+			dash    []float64
+			wantErr bool
+		}{
+			{[]float64{3, 2}, false},
+			{[]float64{0, 2}, false}, // a zero length is allowed
+			{[]float64{-1}, true},
+			{[]float64{0, 0}, true},
+			{[]float64{math.NaN()}, true},
+			{[]float64{math.Inf(1)}, true},
+		} {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
+
+			style := &Style{
+				Style:       StyleDashed,
+				LineWidth:   1,
+				DashPattern: tc.dash,
+				SingleUse:   true,
+			}
+			_, err := rm.Embed(style)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("%v: got error %v, want error: %v", tc.dash, err, tc.wantErr)
+			}
+		}
+	})
 }

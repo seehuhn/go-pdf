@@ -70,8 +70,8 @@ func cursorCast[T Native](c Cursor, obj Object) (T, error) {
 }
 
 // Integer resolves any indirect reference and returns the object as an Integer.
-// A nil object yields 0. Real values are rounded to the nearest integer; other
-// types yield an error.
+// Real values are rounded to the nearest integer; a nil object or any other
+// type yields a [MalformedFileError].
 func (c Cursor) Integer(obj Object) (Integer, error) {
 	resolved, err := c.resolve(obj)
 	if err != nil {
@@ -81,14 +81,24 @@ func (c Cursor) Integer(obj Object) (Integer, error) {
 }
 
 // Number resolves any indirect reference and returns the object as a float64.
-// A nil object yields 0; non-numeric types yield an error.
+// A nil object or a non-numeric type yields a [MalformedFileError].
 func (c Cursor) Number(obj Object) (float64, error) {
 	resolved, err := c.resolve(obj)
 	if err != nil {
 		return 0, err
 	}
-	n, err := asNumber(resolved)
-	return float64(n), err
+	switch x := resolved.(type) {
+	case Integer:
+		return float64(x), nil
+	case Real:
+		return float64(x), nil
+	case nil:
+		return 0, &MalformedFileError{Err: errNoNumber}
+	default:
+		return 0, &MalformedFileError{
+			Err: fmt.Errorf("expected Number but got %T", resolved),
+		}
+	}
 }
 
 // Array resolves any indirect reference and returns the object as an Array.
@@ -106,10 +116,6 @@ func (c Cursor) Dict(obj Object) (Dict, error) { return cursorCast[Dict](c, obj)
 // Name resolves any indirect reference and returns the object as a Name.
 // A nil object yields the empty Name.
 func (c Cursor) Name(obj Object) (Name, error) { return cursorCast[Name](c, obj) }
-
-// Real resolves any indirect reference and returns the object as a Real.
-// A nil object yields 0.
-func (c Cursor) Real(obj Object) (Real, error) { return cursorCast[Real](c, obj) }
 
 // Stream resolves any indirect reference and returns the object as a stream.
 // A nil object yields nil.
@@ -185,14 +191,14 @@ func (c Cursor) Rectangle(obj Object) (*Rectangle, error) {
 		return nil, nil
 	}
 	if len(a) != 4 {
-		return nil, errNoRectangle
+		return nil, &MalformedFileError{Err: errNoRectangle}
 	}
 	values, err := c.FloatArray(a)
 	if err != nil {
 		return nil, err
 	}
 	if len(values) != 4 {
-		return nil, errNoRectangle
+		return nil, &MalformedFileError{Err: errNoRectangle}
 	}
 	return &Rectangle{
 		LLx: math.Min(values[0], values[2]),

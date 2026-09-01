@@ -206,3 +206,58 @@ func TestIterator(t *testing.T) {
 		t.Fatalf("unexpected rotations (-want +got):\n%s", d)
 	}
 }
+
+func TestIteratorInheritUnusableBox(t *testing.T) {
+	rootBox := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(595), pdf.Integer(842)}
+	ownBox := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(100), pdf.Integer(200)}
+	for _, tc := range []struct {
+		name string
+		box  pdf.Object // the page's own MediaBox, nil for none
+		want pdf.Object
+	}{
+		{"missing", nil, rootBox},
+		{"null element", pdf.Array{pdf.Integer(1), nil, pdf.Integer(2), pdf.Integer(3)}, rootBox},
+		{"wrong length", pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)}, rootBox},
+		{"zero area", pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(0), pdf.Integer(100)}, rootBox},
+		{"usable", ownBox, ownBox},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rootRef := data.Alloc()
+			midRef := data.Alloc()
+			pageRef := data.Alloc()
+
+			page := pdf.Dict{"Type": pdf.Name("Page"), "Parent": midRef}
+			if tc.box != nil {
+				page["MediaBox"] = tc.box
+			}
+			data.Put(pageRef, page)
+			// the intermediate node's box is unusable and must be skipped
+			data.Put(midRef, pdf.Dict{
+				"Type":     pdf.Name("Pages"),
+				"Parent":   rootRef,
+				"Count":    pdf.Integer(1),
+				"Kids":     pdf.Array{pageRef},
+				"MediaBox": pdf.Array{pdf.Integer(1), nil, pdf.Integer(2), pdf.Integer(3)},
+			})
+			data.Put(rootRef, pdf.Dict{
+				"Type":     pdf.Name("Pages"),
+				"Count":    pdf.Integer(1),
+				"Kids":     pdf.Array{midRef},
+				"MediaBox": rootBox,
+			})
+			data.GetMeta().Catalog.Pages = rootRef
+
+			n := 0
+			for _, dict := range pagetree.NewIterator(data).All() {
+				n++
+				if d := cmp.Diff(tc.want, dict["MediaBox"]); d != "" {
+					t.Errorf("unexpected MediaBox (-want +got):\n%s", d)
+				}
+			}
+			if n != 1 {
+				t.Errorf("got %d pages, want 1", n)
+			}
+		})
+	}
+}

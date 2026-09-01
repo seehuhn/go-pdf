@@ -234,7 +234,7 @@ func extractGeospatialMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (Measu
 
 	// LPTS (optional)
 	if dict["LPTS"] != nil {
-		lpts, err := c.FloatArray(dict["LPTS"])
+		lpts, err := pdf.Optional(c.FloatArray(dict["LPTS"]))
 		if err != nil {
 			return nil, err
 		}
@@ -248,7 +248,7 @@ func extractGeospatialMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (Measu
 
 	// Bounds (optional)
 	if dict["Bounds"] != nil {
-		bounds, err := c.FloatArray(dict["Bounds"])
+		bounds, err := pdf.Optional(c.FloatArray(dict["Bounds"]))
 		if err != nil {
 			return nil, err
 		}
@@ -287,7 +287,7 @@ func extractGeospatialMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (Measu
 
 	// PCSM (optional, must be exactly 12 elements)
 	if dict["PCSM"] != nil {
-		pcsm, err := c.FloatArray(dict["PCSM"])
+		pcsm, err := pdf.Optional(c.FloatArray(dict["PCSM"]))
 		if err != nil {
 			return nil, err
 		}

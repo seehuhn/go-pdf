@@ -105,7 +105,7 @@ func extractType0(c pdf.Cursor, stream *pdf.Stream) (*Type0, error) {
 		return nil, err
 	}
 
-	order, err := c.Integer(d["Order"])
+	order, err := pdf.Optional(c.Integer(d["Order"]))
 	if err != nil {
 		return nil, err
 	}

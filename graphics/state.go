@@ -84,6 +84,7 @@ type State struct {
 	TextLineMatrix matrix.Matrix
 
 	// LineWidth is the thickness of stroked paths, in user space units.
+	// The value must be non-negative.
 	//
 	// The value 0 stands for the thinnest line that can be rendered at device
 	// resolution.  Obviously, the result is device-dependent.
@@ -95,7 +96,8 @@ type State struct {
 	// LineJoin is the shape used at corners of stroked paths.
 	LineJoin LineJoinStyle
 
-	// MiterLimit is the maximum miter length to line width ratio for mitered joins.
+	// MiterLimit is the maximum miter length to line width ratio for mitered
+	// joins.  The value must be at least 1.
 	MiterLimit float64
 
 	// DashPattern specifies the lengths of alternating dashes and gaps, in user space units.
@@ -117,10 +119,12 @@ type State struct {
 	// SoftMask specifies mask shape or opacity values for transparency.
 	SoftMask SoftClip
 
-	// StrokeAlpha is the constant opacity for stroking operations, from 0 to 1.
+	// StrokeAlpha is the constant opacity for stroking operations.
+	// The value must be in the range 0 (transparent) to 1 (opaque).
 	StrokeAlpha float64
 
-	// FillAlpha is the constant opacity for non-stroking operations, from 0 to 1.
+	// FillAlpha is the constant opacity for non-stroking operations.
+	// The value must be in the range 0 (transparent) to 1 (opaque).
 	FillAlpha float64
 
 	// AlphaSourceFlag specifies whether soft mask and alpha are interpreted
@@ -142,12 +146,12 @@ type State struct {
 
 	// BlackGeneration specifies the black generation function to be used for
 	// color conversion from DeviceRGB to DeviceCMYK.  The value nil represents
-	// a device-specific default function.
+	// the device-dependent default function.
 	BlackGeneration pdf.Function
 
 	// UndercolorRemoval specifies the undercolor removal function to be used
 	// for color conversion from DeviceRGB to DeviceCMYK.  The value nil
-	// represents a device-specific default function.
+	// represents the device-dependent default function.
 	UndercolorRemoval pdf.Function
 
 	// TransferFunctions (deprecated in PDF 2.0) represents the transfer
@@ -164,15 +168,16 @@ type State struct {
 	// HalftoneOriginY (PDF 2.0) is the Y coordinate of the halftone origin.
 	HalftoneOriginY float64
 
-	// FlatnessTolerance is a positive number specifying the precision with
-	// which curves are rendered on the output device, in device pixels.
+	// FlatnessTolerance specifies the precision with which curves are
+	// rendered on the output device, as a maximum error in device pixels.
 	// Smaller numbers give smoother curves, but also increase the amount of
-	// computation needed.
+	// computation needed.  The value must be in the range 0 to 100, where 0
+	// selects the output device's default tolerance.
 	FlatnessTolerance float64
 
 	// SmoothnessTolerance controls the precision for rendering color
-	// gradients.  This is a number from 0 (accurate) to 1 (fast), as a
-	// fraction of the range of each color component.
+	// gradients, as a fraction of the range of each color component.
+	// The value must be in the range 0 (accurate) to 1 (fast).
 	SmoothnessTolerance float64
 
 	// ClipPaths is the list of active clipping paths.

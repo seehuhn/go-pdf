@@ -221,7 +221,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 			lr.Prefix = string(p)
 		}
 
-		st, err := c.Integer(dict["St"])
+		st, err := pdf.Optional(c.Integer(dict["St"]))
 		if err == nil && st >= 1 {
 			lr.Start = int(min(st, limits.MaxPageLabelStart))
 		}

@@ -19,8 +19,10 @@ package boxcolor
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -113,14 +115,15 @@ func ExtractStyle(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Style, error) {
 	if dArray, err := pdf.Optional(c.Array(dict["D"])); err != nil {
 		return nil, err
 	} else if style.Style != StyleSolid {
-		if len(dArray) > 0 {
-			style.DashPattern = make([]float64, len(dArray))
-			for i, v := range dArray {
-				n, _ := c.Number(v)
-				style.DashPattern[i] = max(0, n)
-			}
+		pattern := make([]float64, len(dArray))
+		for i, v := range dArray {
+			n, _ := c.Number(v)
+			pattern[i] = n
+		}
+		if pattern = graphics.RepairDashArray(pattern); len(pattern) > 0 {
+			style.DashPattern = pattern
 		} else {
-			style.DashPattern = []float64{3}
+			style.DashPattern = slices.Clone(defaultDashPattern)
 		}
 	}
 
@@ -164,13 +167,11 @@ func (s *Style) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// dash pattern (must be nil for solid styles)
 	if (s.Style == "" || s.Style == StyleSolid) && s.DashPattern != nil {
-		return nil, fmt.Errorf("dash pattern must be nil for solid line style")
+		return nil, errors.New("dash pattern must be nil for solid line style")
 	}
 	dashPattern := s.DashPattern
-	for i, v := range dashPattern {
-		if v < 0 {
-			return nil, fmt.Errorf("dash pattern element %d must be non-negative: %g", i, v)
-		}
+	if err := graphics.CheckDashArray(dashPattern); err != nil {
+		return nil, err
 	}
 	if len(dashPattern) > 0 && (len(dashPattern) != 1 || dashPattern[0] != defaultDashPattern[0]) {
 		dashArray := make(pdf.Array, len(dashPattern))

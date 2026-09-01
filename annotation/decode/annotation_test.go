@@ -19,6 +19,7 @@ package decode
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -36,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/trapnet"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/mock"
+	"seehuhn.de/go/pdf/oc"
 	"seehuhn.de/go/pdf/sound"
 )
 
@@ -230,6 +232,75 @@ func TestAnnotationTypes(t *testing.T) {
 	}
 }
 
+// TestOpacityRangeOnRead checks that opacity values outside the range 0 to 1
+// are snapped into it when read, rather than being carried into the
+// annotation as given.
+func TestOpacityRangeOnRead(t *testing.T) {
+	for _, tc := range []struct {
+		ca               pdf.Number
+		wantTransparency float64
+	}{
+		{1, 0},
+		{0, 1},
+		{0.25, 0.75},
+		{2, 0},  // clamped to 1
+		{-1, 1}, // clamped to 0
+	} {
+		t.Run(fmt.Sprintf("%v", tc.ca), func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			dict := pdf.Dict{
+				"Type":    pdf.Name("Annot"),
+				"Subtype": pdf.Name("Text"),
+				"Rect":    pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(1), pdf.Integer(1)},
+				"CA":      tc.ca,
+				"ca":      tc.ca,
+			}
+
+			x := pdf.NewExtractor(w)
+			a, err := pdf.Decode(pdf.CursorAt(x, nil), dict, Annotation)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			common := a.GetCommon()
+			if common.StrokingTransparency != tc.wantTransparency {
+				t.Errorf("StrokingTransparency = %v, want %v",
+					common.StrokingTransparency, tc.wantTransparency)
+			}
+			if common.NonStrokingTransparency != tc.wantTransparency {
+				t.Errorf("NonStrokingTransparency = %v, want %v",
+					common.NonStrokingTransparency, tc.wantTransparency)
+			}
+		})
+	}
+}
+
+// TestOpacityRangeOnWrite checks that opacity values the specification does
+// not allow are refused when writing.
+func TestOpacityRangeOnWrite(t *testing.T) {
+	for _, v := range []float64{-1, 2, math.NaN(), math.Inf(+1), math.Inf(-1)} {
+		for _, field := range []string{"stroking", "non-stroking"} {
+			t.Run(fmt.Sprintf("%s/%v", field, v), func(t *testing.T) {
+				common := annotation.Common{
+					Rect:       pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+					Appearance: defaultAppearanceDict,
+				}
+				if field == "stroking" {
+					common.StrokingTransparency = v
+				} else {
+					common.NonStrokingTransparency = v
+				}
+
+				w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+				rm := pdf.NewResourceManager(w)
+				if _, err := (&annotation.Text{Common: common}).Encode(rm); err == nil {
+					t.Error("expected an error, got none")
+				}
+			})
+		}
+	}
+}
+
 func TestOpacity(t *testing.T) {
 	tests := []struct {
 		name                  string
@@ -378,4 +449,33 @@ func FuzzRoundTrip(f *testing.F) {
 		// Make sure we can write the annotation, and read it back.
 		roundTripFile(t, pdf.GetVersion(r), annot)
 	})
+}
+
+// TestOpacityCheckedBeforeWriting checks that an out-of-range opacity is
+// refused before any object reaches the file.  The check has to come first,
+// since embedding the optional content group and the associated files writes
+// objects which would otherwise be left behind unreferenced.
+func TestOpacityCheckedBeforeWriting(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	a := &annotation.Text{
+		Common: annotation.Common{
+			Rect:                 pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+			Appearance:           defaultAppearanceDict,
+			OptionalContent:      &oc.Group{Name: "Layer"},
+			StrokingTransparency: 2, // out of range
+		},
+	}
+
+	// object numbers are handed out in order, so a gap means the failed
+	// encode stored something in the file
+	before := w.Alloc().Number()
+	if _, err := a.Encode(rm); err == nil {
+		t.Fatal("expected an error, got none")
+	}
+	after := w.Alloc().Number()
+	if n := after - before - 1; n != 0 {
+		t.Errorf("%d objects written before the error was reported", n)
+	}
 }

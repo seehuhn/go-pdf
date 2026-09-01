@@ -19,6 +19,7 @@ package extract
 import (
 	"fmt"
 	"io"
+	"math"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -143,34 +144,40 @@ func extractType1(c pdf.Cursor, stream *pdf.Stream) (*pattern.Type1, error) {
 		return nil, pdf.Errorf("invalid TilingType: %d (must be 1, 2, or 3)", tilingType)
 	}
 
-	// extract required BBox
-	bbox, err := c.Rectangle(dict["BBox"])
-	if err != nil || bbox == nil || bbox.IsZero() {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing or invalid BBox"),
-		}
+	// BBox, XStep and YStep (all required).  Each side of the cell can stand
+	// in for the other: a missing or degenerate box falls back to a cell
+	// matching the tiling step, and a missing step falls back to the
+	// corresponding side of the box.  Only a pattern which gives neither is
+	// unusable, since a zero step would tile forever.
+	bbox, err := pdf.Optional(c.Rectangle(dict["BBox"]))
+	if err != nil {
+		return nil, err
+	}
+	if bbox != nil && (bbox.Dx() <= 0 || bbox.Dy() <= 0) {
+		bbox = nil
 	}
 
-	// extract required XStep
-	xStep, err := c.Number(dict["XStep"])
+	xStep, err := pdf.Optional(c.Number(dict["XStep"]))
 	if err != nil {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing or invalid XStep"),
+		return nil, err
+	}
+	yStep, err := pdf.Optional(c.Number(dict["YStep"]))
+	if err != nil {
+		return nil, err
+	}
+	if bbox != nil {
+		if xStep == 0 {
+			xStep = bbox.Dx()
+		}
+		if yStep == 0 {
+			yStep = bbox.Dy()
 		}
 	}
-	if xStep == 0 {
-		return nil, pdf.Errorf("XStep cannot be zero")
+	if xStep == 0 || yStep == 0 {
+		return nil, pdf.Error("pattern has neither BBox nor tiling step")
 	}
-
-	// extract required YStep
-	yStep, err := c.Number(dict["YStep"])
-	if err != nil {
-		return nil, &pdf.MalformedFileError{
-			Err: fmt.Errorf("missing or invalid YStep"),
-		}
-	}
-	if yStep == 0 {
-		return nil, pdf.Errorf("YStep cannot be zero")
+	if bbox == nil {
+		bbox = &pdf.Rectangle{URx: math.Abs(xStep), URy: math.Abs(yStep)}
 	}
 
 	pat := &pattern.Type1{

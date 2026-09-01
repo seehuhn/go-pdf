@@ -19,6 +19,7 @@ package pdf
 import (
 	"bytes"
 	"io"
+	"math"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -55,6 +56,26 @@ func TestFormat(t *testing.T) {
 		if out != test.out {
 			t.Errorf("string wrongly formatted, expected %q but got %q",
 				test.out, out)
+		}
+	}
+}
+
+// TestFormatNonFinite checks that numbers PDF cannot represent are refused,
+// rather than written out as a token like "NaN." which no reader can parse
+// back.  Reals and Numbers are covered separately because Number picks its
+// own representation, and containers because the error has to travel out
+// through them.
+func TestFormatNonFinite(t *testing.T) {
+	for _, v := range []float64{math.NaN(), math.Inf(+1), math.Inf(-1)} {
+		for _, obj := range []Object{
+			Real(v),
+			Number(v),
+			Array{Integer(1), Real(v)},
+			Dict{"X": Number(v)},
+		} {
+			if err := Format(io.Discard, OptPretty, obj); err == nil {
+				t.Errorf("%v as %T: expected an error, got none", v, obj)
+			}
 		}
 	}
 }

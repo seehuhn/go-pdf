@@ -17,6 +17,8 @@
 package builder
 
 import (
+	"fmt"
+	"math"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -95,5 +97,87 @@ func TestBuilder_ElisionAfterSet(t *testing.T) {
 	b.SetLineWidth(5.0)
 	if len(b.Stream) != 1 {
 		t.Errorf("Second set should elide, got %d ops", len(b.Stream))
+	}
+}
+
+// TestNonFiniteStateValuesRejected checks that the graphics state setters
+// which validate a range reject non-finite values too.  A NaN fails every
+// ordered comparison, so a check written as a rejection of the bad values
+// would let one through and emit a token no PDF processor can read back.
+func TestNonFiniteStateValuesRejected(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		set  func(*Builder, float64)
+	}{
+		{"SetLineWidth", (*Builder).SetLineWidth},
+		{"SetMiterLimit", (*Builder).SetMiterLimit},
+		{"SetFlatnessTolerance", (*Builder).SetFlatnessTolerance},
+	} {
+		for _, v := range []float64{
+			math.NaN(),
+			math.Inf(+1),
+			math.Inf(-1),
+		} {
+			t.Run(fmt.Sprintf("%s/%v", tc.name, v), func(t *testing.T) {
+				b := New(content.Page, nil, pdf.V2_0)
+				tc.set(b, v)
+				if b.Err == nil {
+					t.Error("expected an error, got none")
+				}
+				if len(b.Stream) != 0 {
+					t.Errorf("emitted %d operators, want 0", len(b.Stream))
+				}
+			})
+		}
+	}
+}
+
+// TestSetLineDashRejectsInvalid checks that dash patterns the specification
+// does not allow are refused, rather than written into the content stream.
+func TestSetLineDashRejectsInvalid(t *testing.T) {
+	for _, tc := range []struct {
+		pattern []float64
+		phase   float64
+	}{
+		{[]float64{-1}, 0},          // negative dash length
+		{[]float64{0}, 0},           // all dash lengths zero
+		{[]float64{0, 0}, 0},        //
+		{nil, 1},                    // solid line with a non-zero phase
+		{[]float64{math.NaN()}, 0},  // no PDF representation
+		{[]float64{math.Inf(1)}, 0}, //
+		{[]float64{3}, math.NaN()},  //
+	} {
+		t.Run(fmt.Sprintf("%v/%v", tc.pattern, tc.phase), func(t *testing.T) {
+			b := New(content.Page, nil, pdf.V2_0)
+			b.SetLineDash(tc.pattern, tc.phase)
+			if b.Err == nil {
+				t.Error("expected an error, got none")
+			}
+			if len(b.Stream) != 0 {
+				t.Errorf("emitted %d operators, want 0", len(b.Stream))
+			}
+		})
+	}
+}
+
+// TestSetLineDashAccepts checks that valid dash patterns are still written.
+func TestSetLineDashAccepts(t *testing.T) {
+	for _, tc := range []struct {
+		pattern []float64
+		phase   float64
+	}{
+		{nil, 0},          // solid line
+		{[]float64{3}, 0}, //
+		{[]float64{3, 2}, 1},
+		{[]float64{3, 0}, 0}, // only "all zero" is forbidden
+		{[]float64{2}, -5},   // a negative phase has defined semantics
+	} {
+		t.Run(fmt.Sprintf("%v/%v", tc.pattern, tc.phase), func(t *testing.T) {
+			b := New(content.Page, nil, pdf.V2_0)
+			b.SetLineDash(tc.pattern, tc.phase)
+			if b.Err != nil {
+				t.Error(b.Err)
+			}
+		})
 	}
 }

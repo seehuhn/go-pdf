@@ -272,3 +272,53 @@ func TestGeospatialEmbedValidation(t *testing.T) {
 		})
 	}
 }
+
+// TestGeospatialMalformedOptionalArrays checks that an unreadable optional
+// array is dropped rather than making the whole measure dictionary
+// unreadable.  The required GPTS entry still comes through.
+func TestGeospatialMalformedOptionalArrays(t *testing.T) {
+	gpts := pdf.Array{
+		pdf.Number(48.8566), pdf.Number(2.3522),
+		pdf.Number(48.8606), pdf.Number(2.3370),
+	}
+	for _, key := range []pdf.Name{"LPTS", "Bounds", "PCSM"} {
+		for _, tc := range []struct {
+			name string
+			val  pdf.Object
+		}{
+			{"null element", pdf.Array{pdf.Integer(0), nil, pdf.Integer(1), pdf.Integer(1)}},
+			{"not an array", pdf.Integer(7)},
+			{"dangling reference", pdf.NewReference(9999, 0)},
+		} {
+			t.Run(string(key)+"/"+tc.name, func(t *testing.T) {
+				w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+				dict := pdf.Dict{
+					"Type":    pdf.Name("Measure"),
+					"Subtype": pdf.Name("GEO"),
+					"GCS": pdf.Dict{
+						"Type": pdf.Name("GEOGCS"),
+						"EPSG": pdf.Integer(4326),
+					},
+					"GPTS": gpts,
+					key:    tc.val,
+				}
+
+				m, err := Extract(pdf.NewCursor(w), dict, true)
+				if err != nil {
+					t.Fatalf("measure unreadable: %v", err)
+				}
+				gm, ok := m.(*GeospatialMeasure)
+				if !ok {
+					t.Fatalf("expected a geospatial measure, got %T", m)
+				}
+				if len(gm.GPTS) != 4 {
+					t.Errorf("GPTS = %v, want 4 values", gm.GPTS)
+				}
+				if gm.LPTS != nil || gm.Bounds != nil || gm.PCSM != nil {
+					t.Errorf("unreadable %s was kept: LPTS=%v Bounds=%v PCSM=%v",
+						key, gm.LPTS, gm.Bounds, gm.PCSM)
+				}
+			})
+		}
+	}
+}

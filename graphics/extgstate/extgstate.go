@@ -21,6 +21,7 @@ package extgstate
 import (
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 
 	"seehuhn.de/go/pdf"
@@ -54,6 +55,10 @@ type ExtGState struct {
 	TextKnockout bool
 
 	// LineWidth is the thickness of stroked paths, in user space units.
+	// The value must be non-negative.
+	//
+	// The value 0 stands for the thinnest line that can be rendered at device
+	// resolution.  Obviously, the result is device-dependent.
 	LineWidth float64
 
 	// LineCap is the shape used at the ends of open stroked paths.
@@ -62,7 +67,8 @@ type ExtGState struct {
 	// LineJoin is the shape used at corners of stroked paths.
 	LineJoin graphics.LineJoinStyle
 
-	// MiterLimit is the maximum miter length to line width ratio for mitered joins.
+	// MiterLimit is the maximum miter length to line width ratio for mitered
+	// joins.  The value must be at least 1.
 	MiterLimit float64
 
 	// DashPattern specifies the lengths of alternating dashes and gaps, in user space units.
@@ -84,10 +90,12 @@ type ExtGState struct {
 	// SoftMask specifies mask shape or opacity values for transparency.
 	SoftMask graphics.SoftClip
 
-	// StrokeAlpha is the constant opacity for stroking operations, from 0 to 1.
+	// StrokeAlpha is the constant opacity for stroking operations.
+	// The value must be in the range 0 (transparent) to 1 (opaque).
 	StrokeAlpha float64
 
-	// FillAlpha is the constant opacity for non-stroking operations, from 0 to 1.
+	// FillAlpha is the constant opacity for non-stroking operations.
+	// The value must be in the range 0 (transparent) to 1 (opaque).
 	FillAlpha float64
 
 	// AlphaSourceFlag specifies whether soft mask and alpha are interpreted
@@ -109,12 +117,12 @@ type ExtGState struct {
 
 	// BlackGeneration specifies the black generation function to be used for
 	// color conversion from DeviceRGB to DeviceCMYK.  The value nil represents
-	// the device-specific default function.
+	// the device-dependent default function.
 	BlackGeneration pdf.Function
 
 	// UndercolorRemoval specifies the undercolor removal function to be used
 	// for color conversion from DeviceRGB to DeviceCMYK.  The value nil
-	// represents the device-specific default function.
+	// represents the device-dependent default function.
 	UndercolorRemoval pdf.Function
 
 	// TransferFunctions (deprecated in PDF 2.0) represents the transfer
@@ -131,15 +139,16 @@ type ExtGState struct {
 	// HalftoneOriginY (PDF 2.0) is the Y coordinate of the halftone origin.
 	HalftoneOriginY float64
 
-	// FlatnessTolerance is a positive number specifying the precision with
-	// which curves are rendered on the output device, in device pixels.
+	// FlatnessTolerance specifies the precision with which curves are
+	// rendered on the output device, as a maximum error in device pixels.
 	// Smaller numbers give smoother curves, but also increase the amount of
-	// computation needed.
+	// computation needed.  The value must be in the range 0 to 100, where 0
+	// selects the output device's default tolerance.
 	FlatnessTolerance float64
 
 	// SmoothnessTolerance controls the precision for rendering color
-	// gradients.  This is a number from 0 (accurate) to 1 (fast), as a
-	// fraction of the range of each color component.
+	// gradients, as a fraction of the range of each color component.
+	// The value must be in the range 0 (accurate) to 1 (fast).
 	SmoothnessTolerance float64
 
 	// SingleUse can be set if the extended graphics state is used only in a
@@ -315,6 +324,18 @@ func (e *ExtGState) Equal(other *ExtGState) bool {
 	return true
 }
 
+// checkRange returns an error unless x lies in the range from lo to hi,
+// inclusive.  The test accepts the valid values instead of rejecting the
+// invalid ones, so that a NaN, which fails every ordered comparison, is
+// refused too.  Use math.MaxFloat64 for hi where the parameter has no upper
+// limit; this still refuses the infinities, which PDF cannot represent.
+func checkRange(name string, x, lo, hi float64) error {
+	if !(x >= lo && x <= hi) {
+		return fmt.Errorf("%s out of range: %g", name, x)
+	}
+	return nil
+}
+
 // Embed adds the graphics state dictionary to a PDF file.
 //
 // This implements the [pdf.Embedder] interface.
@@ -361,6 +382,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateLineWidth != 0 {
+		if err := checkRange("LineWidth", e.LineWidth, 0, math.MaxFloat64); err != nil {
+			return nil, err
+		}
 		dict["LW"] = pdf.Number(e.LineWidth)
 	} else {
 		if e.LineWidth != 0 {
@@ -382,6 +406,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateMiterLimit != 0 {
+		if err := checkRange("MiterLimit", e.MiterLimit, 1, math.MaxFloat64); err != nil {
+			return nil, err
+		}
 		dict["ML"] = pdf.Number(e.MiterLimit)
 	} else {
 		if e.MiterLimit != 0 {
@@ -389,6 +416,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateLineDash != 0 {
+		if err := graphics.CheckDashPattern(e.DashPattern, e.DashPhase); err != nil {
+			return nil, err
+		}
 		pat := make(pdf.Array, len(e.DashPattern))
 		for i, x := range e.DashPattern {
 			pat[i] = pdf.Number(x)
@@ -442,6 +472,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateStrokeAlpha != 0 {
+		if err := checkRange("StrokeAlpha", e.StrokeAlpha, 0, 1); err != nil {
+			return nil, err
+		}
 		dict["CA"] = pdf.Number(e.StrokeAlpha)
 	} else {
 		if e.StrokeAlpha != 0 {
@@ -449,6 +482,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateFillAlpha != 0 {
+		if err := checkRange("FillAlpha", e.FillAlpha, 0, 1); err != nil {
+			return nil, err
+		}
 		dict["ca"] = pdf.Number(e.FillAlpha)
 	} else {
 		if e.FillAlpha != 0 {
@@ -600,6 +636,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateFlatnessTolerance != 0 {
+		if err := checkRange("FlatnessTolerance", e.FlatnessTolerance, 0, 100); err != nil {
+			return nil, err
+		}
 		dict["FL"] = pdf.Number(e.FlatnessTolerance)
 	} else {
 		if e.FlatnessTolerance != 0 {
@@ -607,6 +646,9 @@ func (e *ExtGState) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	if set&graphics.StateSmoothnessTolerance != 0 {
+		if err := checkRange("SmoothnessTolerance", e.SmoothnessTolerance, 0, 1); err != nil {
+			return nil, err
+		}
 		dict["SM"] = pdf.Number(e.SmoothnessTolerance)
 	} else {
 		if e.SmoothnessTolerance != 0 {

@@ -62,9 +62,9 @@ type Common struct {
 	Appearance *appearance.Dict
 
 	// NonStrokingTransparency is the transparency value for nonstroking
-	// operations on the annotation in its closed state. The value 1 means
-	// fully transparent, 0 means fully opaque. Ignored if the annotation has
-	// an appearance stream.
+	// operations on the annotation in its closed state. The value must be in
+	// the range 0 to 1, where 1 means fully transparent and 0 means fully
+	// opaque. Ignored if the annotation has an appearance stream.
 	//
 	// For PDF versions prior to 2.0, this field must equal StrokingTransparency.
 	//
@@ -73,9 +73,9 @@ type Common struct {
 	NonStrokingTransparency float64
 
 	// StrokingTransparency is the transparency value for stroking operations
-	// on annotation in its closed state. The value 1 means fully transparent,
-	// 0 means fully opaque. Ignored if the annotation has an appearance
-	// stream.
+	// on annotation in its closed state. The value must be in the range 0 to
+	// 1, where 1 means fully transparent and 0 means fully opaque. Ignored if
+	// the annotation has an appearance stream.
 	//
 	// For non-markup annotations prior to PDF 2.0, this field must be 0.
 	//
@@ -189,6 +189,16 @@ func AppearanceRequired(subtype pdf.Name, rect pdf.Rectangle, v pdf.Version) boo
 // This is used when BS (BorderStyle) is present, since Border is ignored in that case.
 func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool, ignoreBorder bool) error {
 	w := rm.Out
+
+	// The range is checked by accepting the valid values rather than
+	// rejecting the invalid ones, so that a NaN, which fails every ordered
+	// comparison, is refused too.
+	if !(c.StrokingTransparency >= 0 && c.StrokingTransparency <= 1) {
+		return errors.New("StrokingTransparency out of range")
+	}
+	if !(c.NonStrokingTransparency >= 0 && c.NonStrokingTransparency <= 1) {
+		return errors.New("NonStrokingTransparency out of range")
+	}
 
 	if rm.Out.GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Annot")

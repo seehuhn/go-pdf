@@ -18,6 +18,8 @@ package extgstate_test
 
 import (
 	"bytes"
+	"fmt"
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -281,6 +283,15 @@ func FuzzRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Skip("invalid PDF")
 		}
+
+		// The reader accepts version numbers the writer cannot produce, so
+		// that files written against a future version of the standard can
+		// still be read (see [pdf.ParseVersion]).
+		version := pdf.GetVersion(r)
+		if _, err := version.ToString(); err != nil {
+			t.Skip("version not supported")
+		}
+
 		objPDF := r.GetMeta().Trailer["Quir:E"]
 		if objPDF == nil {
 			t.Skip("missing PDF object")
@@ -292,6 +303,242 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("malformed PDF object")
 		}
 
-		roundTripTest(t, pdf.GetVersion(r), objGo)
+		roundTripTest(t, version, objGo)
 	})
+}
+
+// rangedFields lists the numeric graphics state parameters which are defined
+// only over a range of values, together with that range and accessors for the
+// corresponding Go field.  A value of math.MaxFloat64 for hi means that the
+// parameter has no upper limit.
+var rangedFields = []struct {
+	key    pdf.Name
+	bit    graphics.Bits
+	get    func(*extgstate.ExtGState) float64
+	set    func(*extgstate.ExtGState, float64)
+	lo, hi float64
+}{
+	{
+		key: "LW",
+		bit: graphics.StateLineWidth,
+		get: func(e *extgstate.ExtGState) float64 { return e.LineWidth },
+		set: func(e *extgstate.ExtGState, x float64) { e.LineWidth = x },
+		lo:  0, hi: math.MaxFloat64,
+	},
+	{
+		key: "ML",
+		bit: graphics.StateMiterLimit,
+		get: func(e *extgstate.ExtGState) float64 { return e.MiterLimit },
+		set: func(e *extgstate.ExtGState, x float64) { e.MiterLimit = x },
+		lo:  1, hi: math.MaxFloat64,
+	},
+	{
+		key: "CA",
+		bit: graphics.StateStrokeAlpha,
+		get: func(e *extgstate.ExtGState) float64 { return e.StrokeAlpha },
+		set: func(e *extgstate.ExtGState, x float64) { e.StrokeAlpha = x },
+		lo:  0, hi: 1,
+	},
+	{
+		key: "ca",
+		bit: graphics.StateFillAlpha,
+		get: func(e *extgstate.ExtGState) float64 { return e.FillAlpha },
+		set: func(e *extgstate.ExtGState, x float64) { e.FillAlpha = x },
+		lo:  0, hi: 1,
+	},
+	{
+		key: "FL",
+		bit: graphics.StateFlatnessTolerance,
+		get: func(e *extgstate.ExtGState) float64 { return e.FlatnessTolerance },
+		set: func(e *extgstate.ExtGState, x float64) { e.FlatnessTolerance = x },
+		lo:  0, hi: 100,
+	},
+	{
+		key: "SM",
+		bit: graphics.StateSmoothnessTolerance,
+		get: func(e *extgstate.ExtGState) float64 { return e.SmoothnessTolerance },
+		set: func(e *extgstate.ExtGState, x float64) { e.SmoothnessTolerance = x },
+		lo:  0, hi: 1,
+	},
+}
+
+// TestRangeOnRead checks that values outside the range a graphics state
+// parameter is defined over are snapped into it when read, rather than being
+// carried into the graphics state as given.
+func TestRangeOnRead(t *testing.T) {
+	for _, f := range rangedFields {
+		cases := []struct{ in, want float64 }{
+			{f.lo - 1, f.lo},
+			{f.lo, f.lo},
+			{min(f.lo+1, f.hi), min(f.lo+1, f.hi)},
+		}
+		if f.hi != math.MaxFloat64 {
+			cases = append(cases, struct{ in, want float64 }{f.hi + 1, f.hi})
+		}
+
+		for _, tc := range cases {
+			t.Run(fmt.Sprintf("%s/%v", f.key, tc.in), func(t *testing.T) {
+				w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				dict := pdf.Dict{
+					"Type": pdf.Name("ExtGState"),
+					f.key:  pdf.Number(tc.in),
+				}
+
+				x := pdf.NewExtractor(w)
+				e, err := pdf.Decode(pdf.CursorAt(x, nil), dict, extract.ExtGState)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if got := f.get(e); got != tc.want {
+					t.Errorf("%s = %v, want %v", f.key, got, tc.want)
+				}
+			})
+		}
+	}
+}
+
+// TestRangeOnWrite checks that out-of-range values are refused when writing,
+// instead of producing an ExtGState the specification does not allow.  Values
+// with no PDF number representation are covered too: an infinity is out of
+// range because the bounds are finite, and a NaN because the check is written
+// as an acceptance of the valid values.
+func TestRangeOnWrite(t *testing.T) {
+	for _, f := range rangedFields {
+		bad := []float64{f.lo - 1, math.NaN(), math.Inf(+1), math.Inf(-1)}
+		if f.hi != math.MaxFloat64 {
+			bad = append(bad, f.hi+1)
+		}
+
+		for _, v := range bad {
+			t.Run(fmt.Sprintf("%s/%v", f.key, v), func(t *testing.T) {
+				w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				rm := pdf.NewResourceManager(w)
+
+				e := &extgstate.ExtGState{Set: f.bit}
+				f.set(e, v)
+				if _, err := rm.Embed(e); err == nil {
+					t.Error("expected an error, got none")
+				}
+			})
+		}
+	}
+}
+
+// TestRangeOnWriteValid checks that the range test does not reject values
+// inside the range.
+func TestRangeOnWriteValid(t *testing.T) {
+	for _, f := range rangedFields {
+		valid := []float64{f.lo, f.lo + 1}
+		if f.hi != math.MaxFloat64 {
+			valid = []float64{f.lo, (f.lo + f.hi) / 2, f.hi}
+		}
+
+		for _, v := range valid {
+			t.Run(fmt.Sprintf("%s/%v", f.key, v), func(t *testing.T) {
+				w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				rm := pdf.NewResourceManager(w)
+
+				e := &extgstate.ExtGState{Set: f.bit}
+				f.set(e, v)
+				if _, err := rm.Embed(e); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+	}
+}
+
+// TestDashPatternOnRead checks that dash patterns the specification does not
+// allow are repaired when read, so that they can be written back out again.
+func TestDashPatternOnRead(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		in          pdf.Object
+		wantPattern []float64
+		wantPhase   float64
+	}{
+		{
+			name:        "valid",
+			in:          pdf.Array{pdf.Array{pdf.Integer(3), pdf.Integer(2)}, pdf.Integer(1)},
+			wantPattern: []float64{3, 2},
+			wantPhase:   1,
+		},
+		{
+			name:        "negative length",
+			in:          pdf.Array{pdf.Array{pdf.Integer(-1), pdf.Integer(2)}, pdf.Integer(1)},
+			wantPattern: []float64{0, 2},
+			wantPhase:   1,
+		},
+		{
+			name:        "all zero",
+			in:          pdf.Array{pdf.Array{pdf.Integer(0), pdf.Integer(0)}, pdf.Integer(5)},
+			wantPattern: []float64{},
+			wantPhase:   0,
+		},
+		{
+			name:        "solid line with phase",
+			in:          pdf.Array{pdf.Array{}, pdf.Integer(7)},
+			wantPattern: []float64{},
+			wantPhase:   0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			dict := pdf.Dict{
+				"Type": pdf.Name("ExtGState"),
+				"D":    tc.in,
+			}
+
+			x := pdf.NewExtractor(w)
+			e, err := pdf.Decode(pdf.CursorAt(x, nil), dict, extract.ExtGState)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(tc.wantPattern, e.DashPattern); diff != "" {
+				t.Errorf("DashPattern (-want +got):\n%s", diff)
+			}
+			if e.DashPhase != tc.wantPhase {
+				t.Errorf("DashPhase = %v, want %v", e.DashPhase, tc.wantPhase)
+			}
+
+			// the value we read must be one we can write back out
+			rm := pdf.NewResourceManager(w)
+			if _, err := rm.Embed(e); err != nil {
+				t.Errorf("cannot write back: %v", err)
+			}
+		})
+	}
+}
+
+// TestDashPatternOnWrite checks that dash patterns the specification does not
+// allow are refused when writing.
+func TestDashPatternOnWrite(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		pattern []float64
+		phase   float64
+	}{
+		{"negative length", []float64{-1}, 0},
+		{"all zero", []float64{0, 0}, 0},
+		{"solid line with phase", []float64{}, 1},
+		{"NaN length", []float64{math.NaN()}, 0},
+		{"infinite length", []float64{math.Inf(1)}, 0},
+		{"NaN phase", []float64{3}, math.NaN()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+
+			e := &extgstate.ExtGState{
+				Set:         graphics.StateLineDash,
+				DashPattern: tc.pattern,
+				DashPhase:   tc.phase,
+			}
+			if _, err := rm.Embed(e); err == nil {
+				t.Error("expected an error, got none")
+			}
+		})
+	}
 }

@@ -149,3 +149,26 @@ func TestActualTextAsDirectDict(t *testing.T) {
 		})
 	}
 }
+
+// TestErrNoActualTextNotShared checks that each failure yields a fresh error
+// value.  A shared *pdf.MalformedFileError would accumulate locations across
+// unrelated calls, since pdf.Wrap appends to the location list in place.
+func TestErrNoActualTextNotShared(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	dict := pdf.Dict{"Type": pdf.Name("MCR")}
+
+	var messages []string
+	for range 3 {
+		_, err := ExtractActualText(pdf.NewCursor(w), dict, true)
+		if err == nil {
+			t.Fatal("expected an error, got none")
+		}
+		messages = append(messages, pdf.Wrap(err, "here").Error())
+	}
+
+	for i, msg := range messages {
+		if msg != messages[0] {
+			t.Errorf("error %d differs from the first: %q vs %q", i, msg, messages[0])
+		}
+	}
+}

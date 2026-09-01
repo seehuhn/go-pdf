@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 )
 
 // PDF 2.0 sections: 12.5.2
@@ -178,17 +179,8 @@ func ExtractBorder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Border, error)
 	if len(border) > 3 {
 		if dashArray, err := pdf.Optional(c.FloatArray(border[3])); err != nil {
 			return nil, err
-		} else {
-			// filter out negative values
-			var dashes []float64
-			for _, num := range dashArray {
-				if num > 0 {
-					dashes = append(dashes, num)
-				}
-			}
-			if len(dashes) > 0 {
-				b.DashArray = dashes
-			}
+		} else if dashes := graphics.RepairDashArray(dashArray); len(dashes) > 0 {
+			b.DashArray = dashes
 		}
 	}
 
@@ -211,10 +203,8 @@ func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if b.Width <= 0 {
 		return nil, fmt.Errorf("invalid border width %f", b.Width)
 	}
-	for _, v := range b.DashArray {
-		if v <= 0 {
-			return nil, fmt.Errorf("invalid dash value %f", v)
-		}
+	if err := graphics.CheckDashArray(b.DashArray); err != nil {
+		return nil, err
 	}
 
 	borderArray := pdf.Array{
@@ -229,9 +219,6 @@ func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 		dashArray := make(pdf.Array, len(b.DashArray))
 		for i, v := range b.DashArray {
-			if v < 0 {
-				return nil, fmt.Errorf("invalid dash value %f in border dash array", v)
-			}
 			dashArray[i] = pdf.Number(v)
 		}
 		borderArray = append(borderArray, dashArray)

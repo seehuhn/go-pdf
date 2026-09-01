@@ -203,12 +203,28 @@ func TestReadIntegerBomb(t *testing.T) {
 
 func TestReadNumberBomb(t *testing.T) {
 	withSizeBound(t, &maxNameBytes, 100)
-	body := strings.Repeat("9", maxNameBytes+50) + ".0 "
+	body := strings.Repeat("9", maxNameBytes+50) + ".0 /Next "
 	s := testScanner(body)
-	if _, err := s.ReadObject(); err == nil {
-		t.Fatal("expected error, got nil")
-	} else if !IsMalformed(err) {
-		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+
+	// the token is consumed in full, but has no PDF value
+	obj, err := s.ReadObject()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if obj != nil {
+		t.Errorf("expected null, got %s", AsString(obj))
+	}
+
+	// the scanner is still positioned at a token boundary
+	if err := s.SkipWhiteSpace(); err != nil {
+		t.Fatal(err)
+	}
+	next, err := s.ReadObject()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if next != Name("Next") {
+		t.Errorf("expected /Next, got %s", AsString(next))
 	}
 }
 
@@ -507,8 +523,9 @@ var testCases = []struct {
 	{"0.5", Real(.5), true},
 	{"+0.5", Real(.5), true},
 	{"-0.5", Real(-.5), true},
-	{".", nil, false},
-	{".+5", nil, false},
+	// tokens which are consumed in full but have no PDF value read as null
+	{".", nil, true},
+	{".+5", nil, true},
 
 	{"/a", Name("a"), true},
 	{"/1234567890123456789012345678901", Name("1234567890123456789012345678901"), true},

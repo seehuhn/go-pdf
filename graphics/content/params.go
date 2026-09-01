@@ -46,6 +46,9 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 
 	case OpSetLineWidth: // w
 		if w, ok := getNumber(args, 0); ok {
+			if w < 0 {
+				w = 0
+			}
 			p.LineWidth = w
 			s.GState.Set |= graphics.StateLineWidth
 		}
@@ -86,8 +89,8 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 			if patArr, ok := args[0].(pdf.Array); ok {
 				if phase, pok := getNumber(args, 1); pok {
 					if pat, dok := convertDashPattern(patArr); dok {
-						p.DashPattern = pat
-						p.DashPhase = phase
+						p.DashPattern, p.DashPhase =
+							graphics.RepairDashPattern(pat, phase)
 						s.GState.Set |= graphics.StateLineDash
 					}
 				}

@@ -75,7 +75,7 @@ func ExtractActualText(c pdf.Cursor, obj pdf.Object, isDirect bool) (*ActualText
 
 	atObj, hasActualText := dict["ActualText"]
 	if !hasActualText {
-		return nil, errNoActualText
+		return nil, errNoActualText()
 	}
 
 	a := &ActualText{
@@ -93,8 +93,13 @@ func ExtractActualText(c pdf.Cursor, obj pdf.Object, isDirect bool) (*ActualText
 	return a, nil
 }
 
-var errNoActualText = &pdf.MalformedFileError{
-	Err: errors.New("not an ActualText property list"),
+// errNoActualText reports a property list which is not an ActualText list.
+// A new value is created for each call, since pdf.Wrap appends locations in
+// place.
+func errNoActualText() error {
+	return &pdf.MalformedFileError{
+		Err: errors.New("not an ActualText property list"),
+	}
 }
 
 // Embed writes the property list to the PDF file.

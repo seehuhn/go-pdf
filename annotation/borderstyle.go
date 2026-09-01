@@ -16,7 +16,13 @@
 
 package annotation
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+	"slices"
+
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
+)
 
 // PDF 2.0 sections: 12.5.4
 
@@ -74,16 +80,12 @@ func ExtractBorderStyle(c pdf.Cursor, obj pdf.Object, _ bool) (*BorderStyle, err
 		if err != nil {
 			return nil, err
 		}
-		for _, ai := range a {
-			if ai < 0 {
-				a = nil
-				break
-			}
-		}
+		a = graphics.RepairDashArray(a)
 		if len(a) > 0 {
 			style.DashArray = a
 		} else {
-			style.DashArray = borderStyleDefaultDash
+			// clone, so that a caller cannot modify the shared default
+			style.DashArray = slices.Clone(borderStyleDefaultDash)
 		}
 	}
 
@@ -103,7 +105,7 @@ func (b *BorderStyle) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if b.Width < 0 {
-		return nil, pdf.Error("negative border width")
+		return nil, errors.New("negative border width")
 	}
 	if b.Width != 1 {
 		d["W"] = pdf.Number(b.Width)
@@ -115,21 +117,21 @@ func (b *BorderStyle) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if b.Style == "D" {
 		if len(b.DashArray) == 0 {
-			return nil, pdf.Error("missing dash array")
+			return nil, errors.New("missing dash array")
+		}
+		if err := graphics.CheckDashArray(b.DashArray); err != nil {
+			return nil, err
 		}
 		defaultDash := len(b.DashArray) == 1 && b.DashArray[0] == 3
-		if b.DashArray != nil && !defaultDash {
+		if !defaultDash {
 			a := make(pdf.Array, len(b.DashArray))
 			for i, d := range b.DashArray {
-				if d < 0 {
-					return nil, pdf.Error("negative dash value")
-				}
 				a[i] = pdf.Number(d)
 			}
 			d["D"] = a
 		}
 	} else if b.DashArray != nil {
-		return nil, pdf.Error("unexpected dash array")
+		return nil, errors.New("unexpected dash array")
 	}
 
 	if b.SingleUse {

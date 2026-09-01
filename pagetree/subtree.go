@@ -206,8 +206,9 @@ func inheritKey(key pdf.Name, parentDict pdf.Dict, childNodes []*nodeInfo) {
 		buf.Reset()
 		err := pdf.Format(buf, 0, val)
 		if err != nil {
-			// This should not happen, since buf cannot have write errors.
-			// If the impossible happens anyway, just give up on inheritance.
+			// The value has no PDF representation.  Give up on inheritance
+			// and leave the error to be reported when the child dictionary
+			// is written.
 			return
 		}
 		r := buf.String()
