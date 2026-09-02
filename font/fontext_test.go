@@ -575,7 +575,7 @@ func TestFontNameStableAcrossWriteReadWrite(t *testing.T) {
 			if err := rm.Close(); err != nil {
 				t.Fatal(err)
 			}
-			second, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(w), nil), ref, false)
+			second, err := extract.Dict(pdf.NewCursor(w), ref, false)
 			if err != nil {
 				t.Fatal(err)
 			}

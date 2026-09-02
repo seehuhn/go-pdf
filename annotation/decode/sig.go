@@ -126,18 +126,21 @@ func sigSeedValue(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.SigSeedValue,
 	if ts, err := pdf.Optional(c.Dict(dict["TimeStamp"])); err != nil {
 		return nil, err
 	} else if ts != nil {
-		stamp := &acroform.SigSeedValueTimeStamp{}
-		if url, err := pdf.Optional(c.String(ts["URL"])); err != nil {
+		// a timestamp dictionary exists to name a server, and there is no
+		// server to fall back on, so one without a URL is dropped
+		url, err := pdf.Optional(c.String(ts["URL"]))
+		if err != nil {
 			return nil, err
-		} else {
-			stamp.URL = string(url)
 		}
-		if ff, err := pdf.Optional(c.Integer(ts["Ff"])); err != nil {
-			return nil, err
-		} else {
-			stamp.Required = ff == 1
+		if len(url) > 0 {
+			stamp := &acroform.SigSeedValueTimeStamp{URL: string(url)}
+			if ff, err := pdf.Optional(c.Integer(ts["Ff"])); err != nil {
+				return nil, err
+			} else {
+				stamp.Required = ff == 1
+			}
+			sv.TimeStamp = stamp
 		}
-		sv.TimeStamp = stamp
 	}
 
 	if sv.LegalAttestation, err = readTextStringArray(c, dict["LegalAttestation"]); err != nil {

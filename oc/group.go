@@ -17,7 +17,6 @@
 package oc
 
 import (
-	"errors"
 	"slices"
 
 	"seehuhn.de/go/pdf"
@@ -30,8 +29,9 @@ import (
 // of graphics that can be made visible or invisible dynamically by PDF processors.
 // This corresponds to Table 96 in the PDF specification.
 type Group struct {
-	// Name specifies the name of the optional content group, suitable for
-	// presentation in an interactive PDF processor's user interface.
+	// Name (optional) specifies the name of the optional content group,
+	// suitable for presentation in an interactive PDF processor's user
+	// interface.
 	Name string
 
 	// Intent (optional) represents the intended use of the graphics in the group.
@@ -59,14 +59,12 @@ func ExtractGroup(c pdf.Cursor, obj pdf.Object, _ bool) (*Group, error) {
 
 	group := &Group{}
 
-	// extract Name (required)
-	if name, err := pdf.Optional(c.TextString(dict["Name"])); err != nil {
+	// Name (optional)
+	name, err := pdf.Optional(c.TextString(dict["Name"]))
+	if err != nil {
 		return nil, err
-	} else if name != "" {
-		group.Name = string(name)
-	} else {
-		group.Name = "Unnamed"
 	}
+	group.Name = string(name)
 
 	// Intent (optional) can be either a single name or an array of names.
 	intent, err := c.Resolve(dict["Intent"])
@@ -102,11 +100,7 @@ func ExtractGroup(c pdf.Cursor, obj pdf.Object, _ bool) (*Group, error) {
 
 // Embed adds the optional content group to a PDF file.
 func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	// validate required fields
-	if g.Name == "" {
-		return nil, errors.New("Group.Name is required")
-	}
-
+	// the Name key is required in the file, so it is written even when empty
 	dict := pdf.Dict{
 		"Type": pdf.Name("OCG"),
 		"Name": pdf.TextString(g.Name),

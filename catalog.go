@@ -289,8 +289,8 @@ func (c *Catalog) Encode(rm *ResourceManager) (Native, error) {
 		if err := CheckVersion(out, "Catalog Version entry", V1_4); err != nil {
 			return nil, err
 		}
-		if vs, err := c.Version.ToString(); err == nil {
-			dict["Version"] = Name(vs)
+		if c.Version.IsSupported() {
+			dict["Version"] = Name(c.Version.String())
 		}
 	}
 

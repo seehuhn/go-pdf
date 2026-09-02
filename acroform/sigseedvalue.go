@@ -64,7 +64,7 @@ const (
 
 // SigSeedValueTimeStamp specifies a timestamp server for signing.
 type SigSeedValueTimeStamp struct {
-	// URL is the URL of an RFC 3161 timestamping server. It is required.
+	// URL (required) is the URL of an RFC 3161 timestamping server.
 	URL string
 
 	// Required indicates that the signature must carry a timestamp.

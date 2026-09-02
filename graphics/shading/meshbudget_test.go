@@ -41,7 +41,7 @@ func meshStreamData(t *testing.T, sh graphics.Shading) []byte {
 	if err := buf.Close(); err != nil {
 		t.Fatal(err)
 	}
-	data, err := pdf.CursorAt(pdf.NewExtractor(buf), nil).ReadAll(embedded, limits.MaxShadingBytes)
+	data, err := pdf.NewCursor(buf).ReadAll(embedded, limits.MaxShadingBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

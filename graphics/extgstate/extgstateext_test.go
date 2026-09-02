@@ -288,7 +288,7 @@ func FuzzRoundTrip(f *testing.F) {
 		// that files written against a future version of the standard can
 		// still be read (see [pdf.ParseVersion]).
 		version := pdf.GetVersion(r)
-		if _, err := version.ToString(); err != nil {
+		if !version.IsSupported() {
 			t.Skip("version not supported")
 		}
 

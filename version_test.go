@@ -59,6 +59,9 @@ func TestVersion(t *testing.T) {
 		if got := v.String(); got != test.in {
 			t.Errorf("%q: wrong String() %q", test.in, got)
 		}
+		if got := v.IsSupported(); got != test.supported {
+			t.Errorf("%q: IsSupported() = %v, want %v", test.in, got, test.supported)
+		}
 		s, err := v.ToString()
 		if test.supported != (err == nil) {
 			t.Errorf("%q: unexpected ToString error %v", test.in, err)

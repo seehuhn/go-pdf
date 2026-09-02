@@ -489,7 +489,7 @@ func TestType5UnreadableColorantDropped(t *testing.T) {
 	for name, bad := range badColorants {
 		t.Run(name, func(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+			c := pdf.NewCursor(w)
 
 			dict := pdf.Dict{
 				"HalftoneType": pdf.Integer(5),
@@ -544,7 +544,7 @@ func TestType5NonPrimaryColorantTransferFunction(t *testing.T) {
 
 		t.Run(name, func(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+			c := pdf.NewCursor(w)
 
 			ht, err := Extract(c, pdf.Dict{
 				"HalftoneType": pdf.Integer(5),
@@ -600,7 +600,7 @@ func TestType1SpotFunctionUnusable(t *testing.T) {
 	for name, spot := range spotFunctions {
 		t.Run(name, func(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+			c := pdf.NewCursor(w)
 
 			dict := pdf.Dict{
 				"HalftoneType": pdf.Integer(1),

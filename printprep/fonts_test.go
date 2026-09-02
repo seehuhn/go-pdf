@@ -299,7 +299,7 @@ func firstPageFontDict(t *testing.T, r pdf.Getter) dict.Dict {
 		t.Fatalf("want 1 font, got %d", len(fonts))
 	}
 	for _, ref := range fonts {
-		d, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(r), nil), ref, false)
+		d, err := extract.Dict(pdf.NewCursor(r), ref, false)
 		if err != nil {
 			t.Fatal(err)
 		}

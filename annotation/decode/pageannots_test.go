@@ -59,7 +59,7 @@ func TestPageAnnotationsIRTRepair(t *testing.T) {
 		"Rect": pageAnnotRect, "IRT": stray,
 	})
 
-	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+	c := pdf.NewCursor(w)
 	refs, annots, err := PageAnnotations(c, pdf.Array{parent, reply, dangling})
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func TestPageAnnotationsSkip(t *testing.T) {
 		"Rect": pageAnnotRect,
 	})
 
-	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+	c := pdf.NewCursor(w)
 	refs, annots, err := PageAnnotations(c, pdf.Array{a, direct, bogus, b})
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestPageAnnotationsLinksWidgets(t *testing.T) {
 	w.Put(formRef, pdf.Dict{"Fields": pdf.Array{fieldRef}})
 	w.GetMeta().Catalog.AcroForm = formRef
 
-	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+	c := pdf.NewCursor(w)
 	_, annots, err := PageAnnotations(c, pdf.Array{widgetRef})
 	if err != nil {
 		t.Fatal(err)

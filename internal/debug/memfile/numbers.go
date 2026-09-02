@@ -48,11 +48,13 @@ const maxReports = 5
 // Binary stream contents are skipped, so compressed or encoded data cannot
 // produce spurious hits.  Printable stream contents are scanned, since
 // uncompressed content streams contain the operator numbers we want to
-// check.
+// check.  The contents of string objects are skipped everywhere, since the
+// text a document shows or names a thing with is not a number the library
+// computed.
 func CheckNumbers(data []byte) []string {
 	var res []string
 	add := func(region []byte) {
-		for _, loc := range longDecimalRe.FindAllIndex(region, -1) {
+		for _, loc := range longDecimalRe.FindAllIndex(maskStrings(region), -1) {
 			lo := max(loc[0]-40, 0)
 			hi := min(loc[1]+12, len(region))
 			res = append(res, fmt.Sprintf("%.60q", region[lo:hi]))
@@ -79,6 +81,54 @@ func CheckNumbers(data []byte) []string {
 		}
 	}
 	return res
+}
+
+// maskStrings returns a copy of region in which every literal string,
+// delimiters included, is replaced by spaces.  Its length is unchanged, so
+// a position in the copy also addresses the original.
+//
+// Without this, a document which names a layer "0000000.00000000000" or
+// shows that text on a page would be reported as carrying an unrounded
+// number, and the fault would lie with the check rather than with the
+// library.  A '(' with no matching ')' is left alone: it is prose rather
+// than a string, and blanking what follows would hide real numbers.
+//
+// A balanced pair of parentheses in prose, in an XMP stream say, is masked
+// like a string, and a number between them goes unreported.  This is
+// accepted: the library writes no computed numbers into such text.
+//
+// Hex strings need no such treatment: they hold hex digits, and a number
+// needs a decimal point.
+func maskStrings(region []byte) []byte {
+	out := bytes.Clone(region)
+	for i := 0; i < len(out); i++ {
+		if out[i] != '(' {
+			continue
+		}
+		// find the matching ')', honouring escapes and nesting
+		depth := 1
+		j := i + 1
+		for ; j < len(out) && depth > 0; j++ {
+			switch out[j] {
+			case '\\':
+				j++ // the escaped byte is not a delimiter
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+		}
+		if depth > 0 {
+			// no matching ')': this is not a string, and blanking the rest
+			// of the region would hide the numbers in it
+			continue
+		}
+		for k := i; k < j; k++ {
+			out[k] = ' '
+		}
+		i = j - 1
+	}
+	return out
 }
 
 // splitRegions partitions data into the regions outside stream keywords and

@@ -132,7 +132,7 @@ func embedType1(t *testing.T, F *type1.Instance) *dict.Type1 {
 		t.Fatal(err)
 	}
 
-	fontDict, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(w), nil), ref, false)
+	fontDict, err := extract.Dict(pdf.NewCursor(w), ref, false)
 	if err != nil {
 		t.Fatal(err)
 	}

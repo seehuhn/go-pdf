@@ -3745,9 +3745,9 @@ types:
     required: true
     introduced: '1.5'
     goType: string
-    purpose: 'Name specifies the name of the optional content group, suitable for
+    purpose: 'Name (optional) specifies the name of the optional content group,
 
-      presentation in an interactive PDF processor''s user interface.'
+      suitable for presentation in an interactive PDF processor''s user interface.'
   - goName: Intent
     pdfKey: Intent
     pdfType: array;name

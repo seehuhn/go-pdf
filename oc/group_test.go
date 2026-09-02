@@ -24,6 +24,7 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 var groupTestCases = []struct {
@@ -35,6 +36,12 @@ var groupTestCases = []struct {
 		group: &Group{
 			Name: "Test Group",
 		},
+	},
+	{
+		// a document may leave a group unnamed; the name it does not give
+		// must not become one the library invented
+		name:  "unnamed",
+		group: &Group{},
 	},
 	{
 		name: "with_single_intent",
@@ -163,18 +170,19 @@ func normalizeGroup(g *Group) {
 	}
 }
 
-func TestGroupValidation(t *testing.T) {
-	buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
-	rm := pdf.NewResourceManager(buf)
+// TestUnnamedGroup checks that a group whose dictionary carries no Name is
+// read with an empty name, and not with a name the library invented for it.
+// A user interface decides what to show for a group the document does not
+// name.
+func TestUnnamedGroup(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
 
-	// Test empty name should fail
-	group := &Group{
-		Name: "",
+	group, err := ExtractGroup(c, pdf.Dict{"Type": pdf.Name("OCG")}, false)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	_, err := rm.Embed(group)
-	if err == nil {
-		t.Error("expected error for empty Group.Name, but got none")
+	if group.Name != "" {
+		t.Errorf("got name %q, want an empty name", group.Name)
 	}
 }
 
@@ -276,6 +284,12 @@ func FuzzGroupRoundTrip(f *testing.F) {
 			t.Skip("malformed object")
 		}
 
-		testGroupRoundTrip(t, pdf.GetVersion(r), data)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testGroupRoundTrip(t, version, data)
 	})
 }

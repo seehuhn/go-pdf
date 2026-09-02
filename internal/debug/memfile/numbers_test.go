@@ -136,3 +136,40 @@ func TestNewPDFWriterCleanFile(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCheckNumbersSkipStrings(t *testing.T) {
+	for _, data := range [][]byte{
+		[]byte("<< /Type /OCG /Name (0000000.00000000000) >>"),     // a layer name
+		[]byte("<< /T (a\\) 137.63799999999998) >>"),               // escaped delimiter
+		[]byte("<< /T ((137.63799999999998)) >>"),                  // nested parentheses
+		[]byte("stream\nBT (137.63799999999998) Tj ET\nendstream"), // shown text
+	} {
+		if hits := CheckNumbers(data); len(hits) != 0 {
+			t.Errorf("%q: got %d hits, want 0: %q", data, len(hits), hits)
+		}
+	}
+}
+
+func TestCheckNumbersAfterString(t *testing.T) {
+	data := []byte("<< /T (text) /X 137.63799999999998 >>")
+	hits := CheckNumbers(data)
+	if len(hits) != 1 {
+		t.Fatalf("got %d hits, want 1: %q", len(hits), hits)
+	}
+	if !strings.Contains(hits[0], "137.637") {
+		t.Errorf("hit %q does not mention the offending number", hits[0])
+	}
+}
+
+func TestCheckNumbersUnterminatedString(t *testing.T) {
+	// a lone '(' in the prose of a metadata stream is not a string, and must
+	// not hide the numbers which follow it
+	data := []byte("stream\n<x>a lone ( paren</x> 137.63799999999998\nendstream")
+	hits := CheckNumbers(data)
+	if len(hits) != 1 {
+		t.Fatalf("got %d hits, want 1: %q", len(hits), hits)
+	}
+	if !strings.Contains(hits[0], "137.637") {
+		t.Errorf("hit %q does not mention the offending number", hits[0])
+	}
+}

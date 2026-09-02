@@ -83,11 +83,9 @@ func (e *Encryption) String() string {
 
 // Version represents a version of the PDF standard.
 //
-// Versions are encoded as 100*major+minor, so that the natural integer
-// order coincides with the order of PDF versions.  The zero value means
-// "no version set".  Values beyond MaxVersion can occur when reading a
-// file written against a future version of the standard; the library
-// itself writes at most MaxVersion.
+// Versions are encoded as 100*major+minor.  The zero value means "no version
+// set".  Reading a file can yield a version the library cannot write.  Use
+// [Version.IsSupported] to test whether a version can be written.
 type Version int
 
 // PDF versions supported by this library.
@@ -107,9 +105,9 @@ const (
 )
 
 // ParseVersion parses a PDF version string such as "1.7" or "2.0".
-// Well-formed versions newer than MaxVersion (e.g. "2.3") parse
-// successfully, so that files written against a future version of the
-// standard can still be read.
+// Any well-formed version string parses successfully, including versions
+// the library cannot write, so that files written against another
+// version of the standard can still be read.
 func ParseVersion(verString string) (Version, error) {
 	if len(verString) != 3 || verString[1] != '.' {
 		return 0, errVersion
@@ -122,15 +120,22 @@ func ParseVersion(verString string) (Version, error) {
 	return Version(100*int(major-'0') + int(minor-'0')), nil
 }
 
+// IsSupported reports whether ver is one of the PDF versions this library
+// supports, namely 1.0 to 1.7 and 2.0.  Other versions can be read, but a
+// file cannot be written against them.
+func (ver Version) IsSupported() bool {
+	return ver >= V1_0 && ver <= V1_7 || ver == V2_0
+}
+
 // ToString returns the string representation of ver, e.g. "1.7".
-// If ver does not correspond to a PDF version supported by this library,
-// an error is returned; use [Version.String] to format versions read
-// from files written against a future version of the standard.
+// If the library cannot write ver, an error is returned; use
+// [Version.String] to format versions read from files written against
+// another version of the standard.
 func (ver Version) ToString() (string, error) {
-	if ver >= V1_0 && ver <= V1_7 || ver == V2_0 {
-		return ver.String(), nil
+	if !ver.IsSupported() {
+		return "", errVersion
 	}
-	return "", errVersion
+	return ver.String(), nil
 }
 
 func (ver Version) String() string {
