@@ -586,11 +586,6 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		embedded, err := rm.Embed(tc.spec)
 		if err != nil {
 			continue

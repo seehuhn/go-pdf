@@ -75,9 +75,6 @@ func TestEncryptionMetaInfo(t *testing.T) {
 				t.Errorf("writer Encryption = %+v, want %+v", got, c.want)
 			}
 
-			if err := memfile.AddBlankPage(w); err != nil {
-				t.Fatalf("AddBlankPage: %v", err)
-			}
 			if err := w.Close(); err != nil {
 				t.Fatalf("Close: %v", err)
 			}
@@ -105,9 +102,6 @@ func TestEncryptionMetaInfoUnencrypted(t *testing.T) {
 		t.Errorf("writer Encryption: got %+v, want nil", got)
 	}
 
-	if err := memfile.AddBlankPage(w); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}

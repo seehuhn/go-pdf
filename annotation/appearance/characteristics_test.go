@@ -114,9 +114,6 @@ func FuzzCharacteristicsRoundTrip(f *testing.F) {
 	for _, version := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
 		for _, data := range characteristicsCases {
 			w, buf := memfile.NewPDFWriter(f, version, opt)
-			if memfile.AddBlankPage(w) != nil {
-				continue
-			}
 			rm := pdf.NewResourceManager(w)
 			ref, err := rm.Embed(data)
 			if err != nil {

@@ -203,11 +203,6 @@ func testRoundTrip(t *testing.T, v pdf.Version, o *Outline) {
 
 	w, buf := memfile.NewPDFWriter(t, v, nil)
 
-	err := memfile.AddBlankPage(w)
-	if err != nil {
-		t.Fatalf("add blank page: %v", err)
-	}
-
 	rm := pdf.NewResourceManager(w)
 	outlineRef, err := rm.Store(o)
 	if err != nil {
@@ -259,11 +254,6 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, tc := range testCases {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 		outlineRef, err := rm.Store(tc.outline)
 		if err != nil {
@@ -305,14 +295,9 @@ func FuzzRoundTrip(f *testing.F) {
 func TestStructEntry(t *testing.T) {
 	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
-	err := memfile.AddBlankPage(w)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// allocate a dummy structure element
 	seRef := w.Alloc()
-	err = w.Put(seRef, pdf.Dict{
+	err := w.Put(seRef, pdf.Dict{
 		"Type": pdf.Name("StructElem"),
 		"S":    pdf.Name("P"),
 	})
@@ -365,11 +350,6 @@ func TestReadLoop(t *testing.T) {
 	for _, good := range []bool{true, false} {
 		w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		refRoot := w.Alloc()
 		refA := w.Alloc()
 		refB := w.Alloc()
@@ -409,7 +389,7 @@ func TestReadLoop(t *testing.T) {
 			"Last":  refC,
 		}
 
-		err = w.Put(refA, A)
+		err := w.Put(refA, A)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -514,9 +494,6 @@ func buildOutline(t *testing.T, n int, item func(i int, refs []pdf.Reference) pd
 	t.Helper()
 
 	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(w); err != nil {
-		t.Fatal(err)
-	}
 
 	refs := make([]pdf.Reference, n)
 	for i := range refs {

@@ -313,11 +313,6 @@ func FuzzViewportRoundTrip(f *testing.F) {
 	for _, tc := range viewportTestCases {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 
 		embedded, err := rm.Embed(tc.data)
@@ -407,11 +402,6 @@ func FuzzViewPortArrayRoundTrip(f *testing.F) {
 	// build seed corpus from test cases
 	for _, tc := range viewportArrayTestCases {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
-
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
 
 		rm := pdf.NewResourceManager(w)
 

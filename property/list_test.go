@@ -159,11 +159,6 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, tc := range testCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		var obj pdf.Object = tc.Dict
 		if tc.IsIndirect {
 			ref := w.Alloc()
@@ -175,7 +170,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		w.GetMeta().Trailer["Quir:E"] = obj
-		err = w.Close()
+		err := w.Close()
 		if err != nil {
 			continue
 		}

@@ -240,11 +240,6 @@ func FuzzGroupRoundTrip(f *testing.F) {
 	for _, tc := range groupTestCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 
 		obj, err := rm.Embed(tc.group)

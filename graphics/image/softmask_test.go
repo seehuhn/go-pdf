@@ -315,11 +315,6 @@ func FuzzSoftMaskRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 		rm := pdf.NewResourceManager(w)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		ref, err := rm.Embed(tt.softMask)
 		if err != nil {
 			continue

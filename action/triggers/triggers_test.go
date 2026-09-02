@@ -126,10 +126,6 @@ func FuzzAnnotationRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
 
-		if err := memfile.AddBlankPage(w); err != nil {
-			continue
-		}
-
 		obj, err := tc.aa.Encode(rm)
 		if err != nil {
 			continue
@@ -234,10 +230,6 @@ func FuzzPageRoundTrip(f *testing.F) {
 	for _, tc := range pageTestCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
-
-		if err := memfile.AddBlankPage(w); err != nil {
-			continue
-		}
 
 		obj, err := tc.aa.Encode(rm)
 		if err != nil {
@@ -347,10 +339,6 @@ func FuzzFormRoundTrip(f *testing.F) {
 	for _, tc := range formTestCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
-
-		if err := memfile.AddBlankPage(w); err != nil {
-			continue
-		}
 
 		obj, err := tc.aa.Encode(rm)
 		if err != nil {
@@ -470,10 +458,6 @@ func FuzzCatalogRoundTrip(f *testing.F) {
 	for _, tc := range catalogTestCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		rm := pdf.NewResourceManager(w)
-
-		if err := memfile.AddBlankPage(w); err != nil {
-			continue
-		}
 
 		obj, err := tc.aa.Encode(rm)
 		if err != nil {

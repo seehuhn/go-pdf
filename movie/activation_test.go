@@ -428,9 +428,6 @@ func FuzzActivationRoundTrip(f *testing.F) {
 
 	for _, tc := range activationRoundTripCases {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
-		if err := memfile.AddBlankPage(w); err != nil {
-			continue
-		}
 		rm := pdf.NewResourceManager(w)
 		obj, err := rm.Embed(tc.act)
 		if err != nil {

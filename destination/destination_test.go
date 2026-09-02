@@ -543,13 +543,6 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, tc := range testCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
-		// AddBlankPage creates a minimal valid PDF structure.
-		// Without this, the seeds will be rejected by pdf.NewReader.
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 
 		obj, err := tc.Dest.Encode(rm)
@@ -574,15 +567,8 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, tc := range decodeTestCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
-		// AddBlankPage creates a minimal valid PDF structure.
-		// Without this, the seeds will be rejected by pdf.NewReader.
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		w.GetMeta().Trailer["Quir:E"] = tc.Obj
-		err = w.Close()
+		err := w.Close()
 		if err != nil {
 			continue
 		}

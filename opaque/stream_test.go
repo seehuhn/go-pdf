@@ -29,9 +29,6 @@ import (
 // the wrapped stream.
 func TestStreamReader(t *testing.T) {
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	body := []byte("hello, stream world")
 	ref := src.Alloc()
 	w, err := src.OpenStream(ref, pdf.Dict{"Custom": pdf.Name("Demo")})
@@ -75,9 +72,6 @@ func TestStreamReader(t *testing.T) {
 // caller-supplied extras overlay the translated dict.
 func TestStreamWriteAtCrossFile(t *testing.T) {
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 
 	// build a stream whose dict references another indirect dict.
 	innerRef := src.Alloc()
@@ -188,9 +182,6 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 		UserPassword:  "u",
 		OwnerPassword: "o",
 	})
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	streamRef := src.Alloc()
 	w, err := src.OpenStream(streamRef, pdf.Dict{"Tag": pdf.Name("Encrypted")})
 	if err != nil {
@@ -262,9 +253,6 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 // copier and writer manage themselves.
 func TestStreamWriteAtRejectsForbiddenKeys(t *testing.T) {
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	streamRef := src.Alloc()
 	w, err := src.OpenStream(streamRef, nil)
 	if err != nil {

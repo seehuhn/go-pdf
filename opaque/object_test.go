@@ -72,9 +72,6 @@ func TestExtractRoundTripCrossFile(t *testing.T) {
 	// Build the source: an outer dict whose /Inner entry references an
 	// indirect dict in the same file.
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	innerRef := src.Alloc()
 	if err := src.Put(innerRef, pdf.Dict{"Y": pdf.Integer(99)}); err != nil {
 		t.Fatalf("Put inner: %v", err)
@@ -154,9 +151,6 @@ func TestExtractRoundTripCrossFile(t *testing.T) {
 func TestEmbedDedup(t *testing.T) {
 	// Source PDF with one indirect dict.
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	srcRef := src.Alloc()
 	if err := src.Put(srcRef, pdf.Dict{"X": pdf.Integer(42)}); err != nil {
 		t.Fatalf("Put: %v", err)
@@ -215,9 +209,6 @@ func TestEmbedDedup(t *testing.T) {
 func TestObjectAs(t *testing.T) {
 	// Build source PDF with a dict containing a known integer.
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	srcRef := src.Alloc()
 	if err := src.Put(srcRef, pdf.Dict{"N": pdf.Integer(7)}); err != nil {
 		t.Fatalf("Put: %v", err)

@@ -349,9 +349,6 @@ func FuzzRoundTrip(f *testing.F) {
 				continue
 			}
 			w, buf := memfile.NewPDFWriter(f, version, opt)
-			if err := memfile.AddBlankPage(w); err != nil {
-				continue
-			}
 			rm := pdf.NewResourceManager(w)
 			stored, err := rm.Embed(r)
 			if err != nil {

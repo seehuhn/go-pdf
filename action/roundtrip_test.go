@@ -358,11 +358,6 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, action := range actionTestCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 		obj, err := action.Encode(rm)
 		if err != nil {

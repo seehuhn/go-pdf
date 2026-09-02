@@ -141,11 +141,6 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, tc := range testCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_4, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		d := &Dict{
 			DeviceColorant: tc.dict.DeviceColorant,
 			ColorSpace:     tc.dict.ColorSpace,

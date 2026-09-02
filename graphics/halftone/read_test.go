@@ -257,9 +257,6 @@ func roundTripTest(t *testing.T, originalHalftone graphics.Halftone) {
 func TestMaliciousInputRejected(t *testing.T) {
 	t.Run("Type16HugeDims", func(t *testing.T) {
 		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-		if err := memfile.AddBlankPage(w); err != nil {
-			t.Fatal(err)
-		}
 		ref := w.Alloc()
 		dict := pdf.Dict{
 			"Type":         pdf.Name("Halftone"),
@@ -283,9 +280,6 @@ func TestMaliciousInputRejected(t *testing.T) {
 
 	t.Run("Type10HugeDims", func(t *testing.T) {
 		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-		if err := memfile.AddBlankPage(w); err != nil {
-			t.Fatal(err)
-		}
 		ref := w.Alloc()
 		dict := pdf.Dict{
 			"Type":         pdf.Name("Halftone"),
@@ -309,9 +303,6 @@ func TestMaliciousInputRejected(t *testing.T) {
 
 	t.Run("Type5InlineNesting", func(t *testing.T) {
 		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-		if err := memfile.AddBlankPage(w); err != nil {
-			t.Fatal(err)
-		}
 		inner := pdf.Dict{
 			"Type":         pdf.Name("Halftone"),
 			"HalftoneType": pdf.Integer(1),
@@ -343,9 +334,6 @@ func TestMaliciousInputRejected(t *testing.T) {
 	t.Run("Type5DeepLinearChain", func(t *testing.T) {
 		const chainLen = 1000
 		w, buf := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-		if err := memfile.AddBlankPage(w); err != nil {
-			t.Fatal(err)
-		}
 		// terminating Type 1 halftone
 		leafRef := w.Alloc()
 		if err := w.Put(leafRef, pdf.Dict{
@@ -404,13 +392,6 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, cases := range testCases {
 		for _, tc := range cases {
 			w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
-
-			// AddBlankPage creates a minimal valid PDF structure.
-			// Without this, the seeds will likely be rejected by pdf.NewReader.
-			err := memfile.AddBlankPage(w)
-			if err != nil {
-				continue
-			}
 
 			rm := pdf.NewResourceManager(w)
 

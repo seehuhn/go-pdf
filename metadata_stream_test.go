@@ -179,9 +179,6 @@ func TestMetadataCatalogPlaintext(t *testing.T) {
 		},
 	}
 	w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
-	if err := memfile.AddBlankPage(w); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -264,9 +261,6 @@ func TestMetadataPaddedCatalogRequiresPlaintext(t *testing.T) {
 		UserPassword: "u",
 	}
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, opt)
-	if err := memfile.AddBlankPage(w); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	// no DocumentMetadata was declared up front, so Catalog.Metadata
 	// was nil at NewWriter; replacing it here trips the pointer check
 	packet.PadToLength = 1024
@@ -307,9 +301,6 @@ func TestMetadataNonCatalogStreamEncrypted(t *testing.T) {
 	}
 	if err := rm.Close(); err != nil {
 		t.Fatalf("rm close: %v", err)
-	}
-	if err := memfile.AddBlankPage(w); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
 	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
@@ -375,9 +366,6 @@ func TestMetadataNonCatalogPlaintext(t *testing.T) {
 	if err := rm.Close(); err != nil {
 		t.Fatalf("rm close: %v", err)
 	}
-	if err := memfile.AddBlankPage(w); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -427,9 +415,6 @@ func TestMetadataPlaintextRoundTrip(t *testing.T) {
 			},
 		}
 		w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
-		if err := memfile.AddBlankPage(w); err != nil {
-			t.Fatalf("AddBlankPage: %v", err)
-		}
 		if err := w.Close(); err != nil {
 			t.Fatalf("Close: %v", err)
 		}
@@ -468,9 +453,6 @@ func TestMetadataPlaintextRoundTrip(t *testing.T) {
 		if err := rm.Close(); err != nil {
 			t.Fatalf("rm close: %v", err)
 		}
-		if err := memfile.AddBlankPage(w); err != nil {
-			t.Fatalf("AddBlankPage: %v", err)
-		}
 		if err := w.Close(); err != nil {
 			t.Fatalf("Close: %v", err)
 		}
@@ -501,9 +483,6 @@ func TestMetadataPlaintextRoundTrip(t *testing.T) {
 			DocumentMetadata: &pdf.MetadataStream{Data: packet},
 		}
 		w, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
-		if err := memfile.AddBlankPage(w); err != nil {
-			t.Fatalf("AddBlankPage: %v", err)
-		}
 		if err := w.Close(); err != nil {
 			t.Fatalf("Close: %v", err)
 		}

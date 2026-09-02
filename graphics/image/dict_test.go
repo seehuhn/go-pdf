@@ -880,11 +880,6 @@ func FuzzDictRoundTrip(f *testing.F) {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 		rm := pdf.NewResourceManager(w)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		ref, err := rm.Embed(tc.data)
 		if err != nil {
 			continue
@@ -910,7 +905,6 @@ func FuzzDictRoundTrip(f *testing.F) {
 	// dict directly.
 	{
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
-		_ = memfile.AddBlankPage(w)
 		ref := w.Alloc()
 		body, err := w.OpenStream(ref, pdf.Dict{
 			"Type":    pdf.Name("XObject"),

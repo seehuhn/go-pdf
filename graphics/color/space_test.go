@@ -743,11 +743,6 @@ func FuzzSpaceRoundTrip(f *testing.F) {
 		for _, space := range testColorSpaces {
 			w, buf := memfile.NewPDFWriter(f, version, opt)
 
-			err := memfile.AddBlankPage(w)
-			if err != nil {
-				continue
-			}
-
 			rm := pdf.NewResourceManager(w)
 			obj, err := rm.Embed(space)
 			if err != nil {

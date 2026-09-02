@@ -323,9 +323,6 @@ func TestRoundTrip(t *testing.T) {
 func TestCompressionParamsCrossFile(t *testing.T) {
 	// Build source: an inner dict referenced from the /CP dict of a Sound.
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	if err := memfile.AddBlankPage(src); err != nil {
-		t.Fatalf("AddBlankPage: %v", err)
-	}
 	innerRef := src.Alloc()
 	if err := src.Put(innerRef, pdf.Dict{"Quality": pdf.Integer(7)}); err != nil {
 		t.Fatalf("Put inner: %v", err)
@@ -381,8 +378,10 @@ func TestCompressionParamsCrossFile(t *testing.T) {
 		t.Fatalf("dst.Close: %v", err)
 	}
 
-	// Verify the destination's /CP entry: the inner reference must be
-	// fresh (not the source's), and resolve to the expected payload.
+	// Verify the destination's /CP entry: the inner reference must resolve,
+	// within the destination, to the expected payload.  Comparing it with
+	// the source's reference would say nothing, since two files number
+	// their objects independently.
 	dstX := pdf.NewExtractor(dst)
 	dstStream, err := pdf.CursorAt(dstX, nil).Stream(dst.GetMeta().Trailer["Quir:E"])
 	if err != nil {
@@ -395,9 +394,6 @@ func TestCompressionParamsCrossFile(t *testing.T) {
 	dstProfileRef, ok := dstCP["Profile"].(pdf.Reference)
 	if !ok {
 		t.Fatalf("dst /CP/Profile is %T, want pdf.Reference", dstCP["Profile"])
-	}
-	if dstProfileRef == innerRef {
-		t.Error("dst reused the source-file reference for /CP/Profile")
 	}
 	dstProfile, err := pdf.CursorAt(dstX, nil).Dict(dstProfileRef)
 	if err != nil {
@@ -669,9 +665,6 @@ func FuzzRoundTrip(f *testing.F) {
 
 	for _, tc := range roundTripCases {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
-		if err := memfile.AddBlankPage(w); err != nil {
-			continue
-		}
 		rm := pdf.NewResourceManager(w)
 		s := *tc.sound
 		if s.Data == nil {

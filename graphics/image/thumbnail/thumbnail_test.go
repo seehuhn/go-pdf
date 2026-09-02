@@ -472,11 +472,6 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 	for _, tc := range thumbnailTestCases {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 		ref, err := rm.Embed(tc.thumbnail)
 		if err != nil {

@@ -120,11 +120,6 @@ func FuzzBorderEffectRoundTrip(f *testing.F) {
 		for _, tc := range borderEffectTestCases {
 			w, buf := memfile.NewPDFWriter(f, v, opt)
 
-			err := memfile.AddBlankPage(w)
-			if err != nil {
-				continue
-			}
-
 			rm := pdf.NewResourceManager(w)
 
 			embedded, err := rm.Embed(tc.data)

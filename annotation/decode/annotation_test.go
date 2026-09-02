@@ -384,11 +384,6 @@ func FuzzRoundTrip(f *testing.F) {
 			w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 			rm := pdf.NewResourceManager(w)
 
-			err := memfile.AddBlankPage(w)
-			if err != nil {
-				continue
-			}
-
 			a := shallowCopy(tc.annotation)
 			common := a.GetCommon()
 			common.Appearance = appearanceFor(a)
@@ -415,14 +410,9 @@ func FuzzRoundTrip(f *testing.F) {
 	for _, dict := range testDicts {
 		w, out := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		w.GetMeta().Trailer["Quir:E"] = dict
 
-		err = w.Close()
+		err := w.Close()
 		if err != nil {
 			continue
 		}

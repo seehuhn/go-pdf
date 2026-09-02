@@ -555,11 +555,6 @@ func FuzzConfigurationRoundTrip(f *testing.F) {
 	for _, tc := range confTestCases {
 		w, buf := memfile.NewPDFWriter(f, tc.version, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 		obj, err := rm.Embed(tc.data)
 		if err != nil {

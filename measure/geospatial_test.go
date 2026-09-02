@@ -164,11 +164,6 @@ func FuzzGeospatialRoundTrip(f *testing.F) {
 	for _, tc := range geospatialTestCases {
 		w, buf := memfile.NewPDFWriter(f, pdf.V2_0, opt)
 
-		err := memfile.AddBlankPage(w)
-		if err != nil {
-			continue
-		}
-
 		rm := pdf.NewResourceManager(w)
 		embedded, err := rm.Embed(tc.data)
 		if err != nil {

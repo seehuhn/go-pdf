@@ -168,9 +168,6 @@ func roundTripForm(t *testing.T, version pdf.Version, want *acroform.Interactive
 	t.Helper()
 
 	w, buf := memfile.NewPDFWriter(t, version, nil)
-	if err := memfile.AddBlankPage(w); err != nil {
-		t.Fatalf("add blank page: %v", err)
-	}
 
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Store(want)
@@ -386,9 +383,6 @@ func FuzzFormRoundTrip(f *testing.F) {
 // returning false if it cannot be encoded at the given version.
 func encodeFormBytes(tb testing.TB, version pdf.Version, opt *pdf.WriterOptions, form *acroform.InteractiveForm) ([]byte, bool) {
 	w, buf := memfile.NewPDFWriter(tb, version, opt)
-	if err := memfile.AddBlankPage(w); err != nil {
-		return nil, false
-	}
 	rm := pdf.NewResourceManager(w)
 	// the widgets reserve their references (as a page would); the form is
 	// encoded at Close and fills them in
