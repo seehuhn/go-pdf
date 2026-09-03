@@ -171,11 +171,17 @@ func TestUpdaterRejectsWrongPassword(t *testing.T) {
 	}
 }
 
-func TestUpdaterRejectsLowerVersion(t *testing.T) {
+func TestUpdaterVersionIsMinimum(t *testing.T) {
 	f, _ := newBaseFile(t, pdf.V1_4, nil)
-	_, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{Version: pdf.V1_3})
-	if err == nil {
-		t.Error("lowering the version succeeded")
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{Version: pdf.V1_3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.GetMeta().Version != pdf.V1_4 {
+		t.Errorf("version lowered to %s", w.GetMeta().Version)
+	}
+	if w.GetMeta().Catalog.Version != 0 {
+		t.Errorf("catalog /Version set to %s", w.GetMeta().Catalog.Version)
 	}
 }
 

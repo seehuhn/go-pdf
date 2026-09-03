@@ -31,9 +31,10 @@ type UpdateOptions struct {
 	// is always tried first.
 	Password string
 
-	// Version, if non-zero, raises the document version by writing the
-	// catalog /Version entry.  It must not be lower than the version of
-	// the original.  Only objects written by the update are checked
+	// Version, if non-zero, is the minimum version of the updated document.
+	// If the original's version is lower, the document is raised to this
+	// version by writing the catalog /Version entry; otherwise the option
+	// has no effect.  Only objects written by the update are checked
 	// against the raised version; the caller is responsible for the
 	// original content still conforming.
 	Version Version
@@ -107,13 +108,7 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 		return nil, err
 	}
 
-	v := base.meta.Version
-	if opt.Version != 0 {
-		if opt.Version < v {
-			return nil, fmt.Errorf("cannot lower PDF version from %s to %s", v, opt.Version)
-		}
-		v = opt.Version
-	}
+	v := max(base.meta.Version, opt.Version)
 
 	// the highest object number in use, whether listed by /Size or not
 	next := base.trailerSize
