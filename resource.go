@@ -101,7 +101,7 @@ func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
 	}
 
 	if ref != 0 && val != ref {
-		return nil, fmt.Errorf("%T did not embed itself at the requested reference", r)
+		return nil, fmt.Errorf("%T: %w", r, errEmbedMismatch)
 	}
 
 	e.rm.Out.objects[r] = val
@@ -152,7 +152,6 @@ func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native
 // file is closed.
 type ResourceManager struct {
 	Out      *Writer
-	reserved map[any]bool
 	deferred []func(*EmbedHelper) error
 	isClosed bool
 }
@@ -160,8 +159,7 @@ type ResourceManager struct {
 // NewResourceManager creates a new ResourceManager.
 func NewResourceManager(w *Writer) *ResourceManager {
 	return &ResourceManager{
-		Out:      w,
-		reserved: make(map[any]bool),
+		Out: w,
 	}
 }
 
@@ -206,7 +204,7 @@ func (rm *ResourceManager) GetReference(enc Encoder) Reference {
 	}
 	ref := rm.Out.Alloc()
 	rm.Out.objects[enc] = ref
-	rm.reserved[enc] = true
+	rm.Out.reserved[enc] = rm
 	return ref
 }
 
@@ -239,7 +237,7 @@ func (rm *ResourceManager) StoreDeferred(enc Encoder) Reference {
 func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
 	native, isSet := rm.Out.lookup(enc)
 	ref, _ := native.(Reference)
-	if isSet && ref != 0 && !rm.reserved[enc] {
+	if isSet && ref != 0 && rm.Out.reserved[enc] == nil {
 		return ref, nil
 	}
 
@@ -273,15 +271,18 @@ func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
 // (from [ResourceManager.GetReference]) or a freshly allocated one, fulfilling
 // any reservation.
 func (rm *ResourceManager) putEncoded(enc Encoder, native Native) (Reference, error) {
-	ref, isSet := rm.Out.objects[enc].(Reference)
-	if !isSet {
+	var ref Reference
+	if existing, ok := rm.Out.lookup(enc); ok {
+		ref, _ = existing.(Reference)
+	}
+	if ref == 0 {
 		ref = rm.Out.Alloc()
 		rm.Out.objects[enc] = ref
 	}
 	if err := rm.Out.Put(ref, native); err != nil {
 		return 0, err
 	}
-	delete(rm.reserved, enc)
+	delete(rm.Out.reserved, enc)
 	return ref, nil
 }
 
@@ -325,30 +326,47 @@ func (rm *ResourceManager) Replace(orig, repl any) (Reference, error) {
 
 	switch r := repl.(type) {
 	case Encoder:
-		// preset the reference so a self-referencing Encoder (one that
+		// Preset the reference so a self-referencing Encoder (one that
 		// calls rm.GetReference(repl) while encoding, e.g. to point a
 		// child back at itself) picks up the original's reference rather
 		// than allocating a fresh, unrelated one.
+		prevRef, hadPrevRef := rm.Out.objects[repl].(Reference)
 		rm.Out.objects[repl] = ref
 		native, err := r.Encode(rm)
 		if err != nil {
+			delete(rm.Out.objects, repl)
 			return 0, err
 		}
 		if native == nil {
+			delete(rm.Out.objects, repl)
 			return 0, errors.New("Replace: replacement encodes to nothing")
 		}
 		if _, isRef := native.(Reference); isRef {
+			delete(rm.Out.objects, repl)
 			return 0, errors.New("encode must not return a reference")
 		}
 		if rm.Out.sameAsStored(ref, native) {
-			delete(rm.reserved, repl)
+			// only clear a reservation on repl that was for this same
+			// reference; a reservation for a different, unrelated
+			// reference must still be caught as dangling by Close
+			if !hadPrevRef || prevRef == ref {
+				delete(rm.Out.reserved, repl)
+			}
 			return ref, nil
 		}
 		return rm.putEncoded(r, native)
 	case Embedder:
+		prevRef, hadPrevRef := rm.Out.objects[repl].(Reference)
 		e := &EmbedHelper{rm: rm, copiers: map[*Extractor]*Copier{}}
 		delete(rm.Out.objects, repl) // EmbedAt must not see a stale entry
-		if _, err := e.EmbedAt(ref, r); err != nil {
+		_, err := e.EmbedAt(ref, r)
+		if errors.Is(err, errEmbedMismatch) {
+			err = errors.New("Replace: replacement does not embed as an indirect object")
+		}
+		if err != nil {
+			if hadPrevRef {
+				rm.Out.objects[repl] = prevRef
+			}
 			return 0, err
 		}
 		return ref, nil
@@ -379,22 +397,27 @@ func (rm *ResourceManager) Close() error {
 	}
 
 	// every reference handed out by GetReference must eventually be written by
-	// Store; a leftover reservation is a reference to an object that was never
-	// written, i.e. a dangling reference in the output file
-	if len(rm.reserved) > 0 {
-		return fmt.Errorf("reference reserved but never written: %s", reservedTypeList(rm.reserved))
+	// Store; a leftover reservation made by this manager is a reference to an
+	// object that was never written, i.e. a dangling reference in the output
+	// file
+	if list := reservedTypeList(rm.Out.reserved, rm); list != "" {
+		return fmt.Errorf("reference reserved but never written: %s", list)
 	}
 
 	rm.isClosed = true
 	return nil
 }
 
-// reservedTypeList returns the distinct Go types of the encoders still holding
-// a reserved-but-unwritten reference, sorted for a deterministic message.
-func reservedTypeList(reserved map[any]bool) string {
+// reservedTypeList returns the distinct Go types of the encoders reserved by
+// owner that still hold an unwritten reference, sorted for a deterministic
+// message.
+func reservedTypeList(reserved map[any]*ResourceManager, owner *ResourceManager) string {
 	seen := make(map[string]bool)
 	var names []string
-	for enc := range reserved {
+	for enc, rm := range reserved {
+		if rm != owner {
+			continue
+		}
 		name := fmt.Sprintf("%T", enc)
 		if !seen[name] {
 			seen[name] = true
@@ -404,6 +427,10 @@ func reservedTypeList(reserved map[any]bool) string {
 	sort.Strings(names)
 	return strings.Join(names, ", ")
 }
+
+// errEmbedMismatch reports that an Embedder given an explicit reference did
+// not embed itself there, e.g. because it chose to embed inline instead.
+var errEmbedMismatch = errors.New("did not embed itself at the requested reference")
 
 // ErrCycle reports that a chain of indirect references loops back on itself.
 var ErrCycle = errors.New("cycle in recursive structure")
@@ -443,7 +470,10 @@ func (p *CycleCheck) depth() int {
 // Extractor caches extracted PDF objects to ensure that extracting the same
 // reference multiple times returns the same Go object.
 //
-// The Extractor is safe for concurrent use from multiple goroutines.
+// The Extractor is safe for concurrent use from multiple goroutines.  An
+// exception: an Extractor whose Getter is a *Writer must not be used from
+// more than one goroutine, since decoding records provenance on the Writer,
+// which is not safe for concurrent use.
 type Extractor struct {
 	R     Getter
 	mu    sync.Mutex
@@ -513,7 +543,21 @@ func (x *Extractor) cacheStoreOrLoad(refs []Reference, tp reflect.Type, res any)
 func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
 	ka := extractorKey{ref: ref, tp: reflect.TypeFor[A]()}
 	kb := extractorKey{ref: ref, tp: reflect.TypeFor[B]()}
+	a, b = storeOrLoadPairLocked(x, ka, kb, a, b)
+
+	if w, ok := x.R.(*Writer); ok {
+		w.recordOrigin(a, ref)
+		w.recordOrigin(b, ref)
+	}
+
+	return a, b
+}
+
+// storeOrLoadPairLocked performs the cache lookup-or-store of a and b under
+// x.mu, returning the values now published in the cache.
+func storeOrLoadPairLocked[A, B any](x *Extractor, ka, kb extractorKey, a A, b B) (A, B) {
 	x.mu.Lock()
+	defer x.mu.Unlock()
 	if v, ok := x.cache[ka]; ok {
 		a = v.(A)
 	} else {
@@ -524,12 +568,5 @@ func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
 	} else {
 		x.cache[kb] = b
 	}
-	x.mu.Unlock()
-
-	if w, ok := x.R.(*Writer); ok {
-		w.recordOrigin(a, ref)
-		w.recordOrigin(b, ref)
-	}
-
 	return a, b
 }

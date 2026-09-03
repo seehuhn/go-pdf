@@ -39,6 +39,10 @@ type Cursor struct {
 }
 
 // NewCursor returns a root cursor that reads from r.
+//
+// If r is a *Writer, the returned Cursor's Extractor must not be used from
+// more than one goroutine: decoding records provenance on the Writer, which
+// is not safe for concurrent use.
 func NewCursor(r Getter) Cursor {
 	return Cursor{x: NewExtractor(r)}
 }
@@ -287,6 +291,9 @@ func (c Cursor) Version() Version {
 // The decode function receives a Cursor positioned at the resolved object, the
 // resolved object itself, and a flag that is true when obj was a direct
 // (non-reference) object.
+//
+// If c reads from a *Writer, Decode records provenance on it; an Extractor
+// whose Getter is a *Writer must not be used from more than one goroutine.
 func Decode[T any](c Cursor, obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
 	var zero T
 	x := c.x

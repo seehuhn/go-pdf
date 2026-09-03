@@ -26,6 +26,10 @@ import (
 )
 
 // UpdateOptions controls an incremental update.
+//
+// In update mode, GetMeta().Catalog and GetMeta().Info are values decoded
+// from the original file; they must be replaced by modified copies, never
+// edited in place, or the edit is silently lost.
 type UpdateOptions struct {
 	// Password is used to open an encrypted original.  The empty string
 	// is always tried first.
@@ -148,6 +152,7 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 		nextRef:        uint32(next),
 		xref:           make(map[uint32]*xRefEntry),
 		objects:        make(map[any]Native),
+		reserved:       make(map[any]*ResourceManager),
 		objstms:        newObjstmCache(),
 		outputOptions:  outOpt,
 		refIsPlaintext: map[Reference]bool{},
@@ -160,19 +165,23 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	w.baseInfo = base.meta.Info
 
 	// the base Reader decoded these values, not the Writer, so their
-	// provenance is recorded here
-	if ref, ok := base.meta.Trailer["Root"].(Reference); ok {
+	// provenance is recorded here.  The trailer entry may itself be a
+	// reference to a further reference before reaching the object; the
+	// chain is followed, as Decode does, and the last reference of the
+	// chain is recorded, since that is where a replacement takes effect.
+	if catalogObj, path, err := resolvePath(base, nil, base.meta.Trailer["Root"], true); err == nil && path != nil {
+		ref := path.Ref
 		w.recordOrigin(w.baseCatalog, ref)
 		if m := w.baseCatalog.Metadata; m != nil {
-			if dict, _ := base.Get(ref, true); dict != nil {
-				if mref, ok := dict.(Dict)["Metadata"].(Reference); ok {
+			if dict, ok := catalogObj.(Dict); ok {
+				if mref, ok := dict["Metadata"].(Reference); ok {
 					w.recordOrigin(m, mref)
 				}
 			}
 		}
 	}
-	if ref, ok := base.meta.Trailer["Info"].(Reference); ok && w.baseInfo != nil {
-		w.recordOrigin(w.baseInfo, ref)
+	if _, path, err := resolvePath(base, nil, base.meta.Trailer["Info"], true); err == nil && path != nil && w.baseInfo != nil {
+		w.recordOrigin(w.baseInfo, path.Ref)
 	}
 
 	// separate the update from an original which does not end in white space

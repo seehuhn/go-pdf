@@ -37,7 +37,7 @@ import (
 var sizePat = regexp.MustCompile(`/Size\s+(\d+)`)
 
 // trailerSize returns the /Size named in the last trailer of data.
-func trailerSize(t *testing.T, data []byte) uint32 {
+func trailerSize(t testing.TB, data []byte) uint32 {
 	t.Helper()
 	m := sizePat.FindAllSubmatch(data, -1)
 	if m == nil {
@@ -52,7 +52,7 @@ func trailerSize(t *testing.T, data []byte) uint32 {
 
 // newBaseFile writes a one-page document plus one extra object holding
 // pdf.Name("old"), and returns the file and that object's reference.
-func newBaseFile(t *testing.T, v pdf.Version, opt *pdf.WriterOptions) (*memfile.MemFile, pdf.Reference) {
+func newBaseFile(t testing.TB, v pdf.Version, opt *pdf.WriterOptions) (*memfile.MemFile, pdf.Reference) {
 	t.Helper()
 	w, f := memfile.NewPDFWriter(t, v, opt)
 	ref := w.Alloc()
@@ -206,7 +206,7 @@ func TestUpdaterToCopiesOriginal(t *testing.T) {
 }
 
 // reopen parses the file and fails the test on error.
-func reopen(t *testing.T, data []byte) *pdf.Reader {
+func reopen(t testing.TB, data []byte) *pdf.Reader {
 	t.Helper()
 	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)), nil)
 	if err != nil {
@@ -218,7 +218,7 @@ func reopen(t *testing.T, data []byte) *pdf.Reader {
 var prevPat = regexp.MustCompile(`/Prev\s+(\d+)`)
 
 // lastStartXRef returns the value following the last startxref keyword.
-func lastStartXRef(t *testing.T, data []byte) int64 {
+func lastStartXRef(t testing.TB, data []byte) int64 {
 	t.Helper()
 	i := bytes.LastIndex(data, []byte("startxref"))
 	if i < 0 {
@@ -547,7 +547,7 @@ func TestUpdateInfo(t *testing.T) {
 	}
 }
 
-func newMetadata(t *testing.T, title string) *pdf.MetadataStream {
+func newMetadata(t testing.TB, title string) *pdf.MetadataStream {
 	t.Helper()
 	packet := xmp.NewPacket()
 	dc := &xmp.DublinCore{}
@@ -1068,6 +1068,99 @@ func TestUpdateInfoDirectDict(t *testing.T) {
 	}
 }
 
+// buildRootChainFile returns a base file whose /Root points at an object
+// that is itself an indirect reference to the catalog dictionary, plus the
+// reference of that extra chain link and the reference of the catalog
+// dictionary it ultimately points to.  The catalog carries a document
+// metadata stream, which exercises the code path that follows /Metadata
+// off the resolved catalog dictionary.
+func buildRootChainFile(t testing.TB, v pdf.Version) (f *memfile.MemFile, chainRef, root pdf.Reference) {
+	t.Helper()
+	opt := &pdf.WriterOptions{DocumentMetadata: newMetadata(t, "root-chain")}
+	base, _ := newBaseFile(t, v, opt)
+	data := bytes.Clone(base.Data)
+	root, ok := reopen(t, data).GetMeta().Trailer["Root"].(pdf.Reference)
+	if !ok {
+		t.Fatal("base file has no direct Root reference")
+	}
+	prev := lastStartXRef(t, data)
+	size := trailerSize(t, data)
+	chainRef = pdf.NewReference(size, 0)
+
+	buf := bytes.NewBuffer(data)
+	chainPos := buf.Len()
+	fmt.Fprintf(buf, "%d 0 obj\n%d 0 R\nendobj\n", chainRef.Number(), root.Number())
+	pos := buf.Len()
+	fmt.Fprintf(buf, "xref\n%d 1\n%010d %05d n\r\ntrailer\n<< /Size %d /Root %d 0 R /Prev %d >>\nstartxref\n%d\n%%%%EOF\n",
+		chainRef.Number(), chainPos, 0, size+1, chainRef.Number(), prev, pos)
+	return &memfile.MemFile{Data: buf.Bytes()}, chainRef, root
+}
+
+// TestUpdateRootReferenceChain regresses a panic in NewUpdater when /Root
+// chains through an extra reference before reaching the catalog dictionary
+// (e.g. "1 0 obj 2 0 R endobj" as the /Root object): NewUpdater must not
+// panic, an empty update must reopen unchanged, and a changed catalog must
+// be written at the last reference of the chain rather than as a further
+// copy.  The trailer's /Root entry, which closeUpdate always reconstructs,
+// collapses to that last reference directly; the intermediate chain link is
+// never rewritten.
+func TestUpdateRootReferenceChain(t *testing.T) {
+	f, chainRef, root := buildRootChainFile(t, pdf.V1_4)
+	n := len(f.Data)
+
+	w, err := pdf.NewUpdater(f, int64(n), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(f.Data[n:], objectHeader(root)) {
+		t.Error("unchanged catalog was written again")
+	}
+	if bytes.Contains(f.Data[n:], objectHeader(chainRef)) {
+		t.Error("chain link rewritten unnecessarily")
+	}
+
+	r := reopen(t, f.Data)
+	if r.GetMeta().Catalog.Pages == 0 {
+		t.Error("catalog lost")
+	}
+	if got, ok := r.GetMeta().Trailer["Root"].(pdf.Reference); !ok || got != root {
+		t.Errorf("Root = %v, want the catalog's own reference %v", r.GetMeta().Trailer["Root"], root)
+	}
+
+	// a changed catalog is written at the last reference of the chain,
+	// not appended as a further link
+	n = len(f.Data)
+	w, err = pdf.NewUpdater(f, int64(n), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat := *w.GetMeta().Catalog
+	cat.PageMode = "UseOutlines"
+	w.GetMeta().Catalog = &cat
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// the object header may start right at n, without a preceding
+	// newline of its own (the prior section already ends in one)
+	if !bytes.Contains(f.Data[n-1:], objectHeader(root)) {
+		t.Error("changed catalog not written at the chain's last reference")
+	}
+	if bytes.Contains(f.Data[n-1:], objectHeader(chainRef)) {
+		t.Error("chain link rewritten unnecessarily")
+	}
+
+	r2 := reopen(t, f.Data)
+	if r2.GetMeta().Catalog.PageMode != "UseOutlines" {
+		t.Errorf("PageMode = %q after update", r2.GetMeta().Catalog.PageMode)
+	}
+	if got, ok := r2.GetMeta().Trailer["Root"].(pdf.Reference); !ok || got != root {
+		t.Errorf("Root = %v, want the catalog's own reference %v", r2.GetMeta().Trailer["Root"], root)
+	}
+}
+
 func FuzzUpdate(f *testing.F) {
 	for i := range 4 {
 		for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_4, pdf.V1_5, pdf.V1_7, pdf.V2_0} {
@@ -1087,6 +1180,12 @@ func FuzzUpdate(f *testing.F) {
 			}
 			f.Add(bytes.Clone(file.Data))
 		}
+	}
+
+	// /Root chains through an extra reference before reaching the
+	// catalog (see TestUpdateRootReferenceChain)
+	if chainFile, _, _ := buildRootChainFile(f, pdf.V1_4); chainFile != nil {
+		f.Add(bytes.Clone(chainFile.Data))
 	}
 
 	f.Fuzz(func(t *testing.T, in []byte) {

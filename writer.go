@@ -67,6 +67,14 @@ type Writer struct {
 	// and from the resource managers, for values written to it.
 	objects map[any]Native
 
+	// reserved marks values whose reference has been allocated by
+	// GetReference but whose object has not yet been written, mapped to
+	// the ResourceManager that made the reservation.  Kept on the Writer,
+	// not the ResourceManager, so a reservation made through one manager
+	// on a Writer is honoured when a different manager on the same Writer
+	// stores the value.
+	reserved map[any]*ResourceManager
+
 	// base is the original file when the Writer appends an incremental
 	// update, and nil when it writes a new file.  In update mode xref holds
 	// only the entries written in this session.
@@ -300,10 +308,11 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		},
 		origW: w,
 
-		nextRef: 1,
-		xref:    xref,
-		objects: make(map[any]Native),
-		objstms: newObjstmCache(),
+		nextRef:  1,
+		xref:     xref,
+		objects:  make(map[any]Native),
+		reserved: make(map[any]*ResourceManager),
+		objstms:  newObjstmCache(),
 
 		outputOptions: outOpt,
 
@@ -1006,7 +1015,11 @@ func (w *Writer) Origin(v any) Reference {
 // lookup returns how v is represented in the file.  A reference to an
 // object freed in this session counts as absent.
 func (w *Writer) lookup(v any) (Native, bool) {
-	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Pointer && rv.IsNil() {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return nil, false
+	}
+	if t := reflect.TypeOf(v); t == nil || !t.Comparable() {
 		return nil, false
 	}
 	native, ok := w.objects[v]
