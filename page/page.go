@@ -26,7 +26,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/decode"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -184,9 +183,8 @@ type Page struct {
 	Transition *transition.Transition
 
 	// Annots (optional) lists annotations associated with the page.
-	// The PDF spec requires annotation dictionaries to be indirect objects,
-	// so each entry includes the object reference.
-	Annots []annotation.Annotation
+	// Use AddAnnots to add annotations to a page that has none.
+	Annots *Annots
 
 	// AA (optional) defines additional actions for page open/close events.
 	AA *triggers.Page
@@ -425,17 +423,15 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		dict["Trans"] = transObj
 	}
 
-	// Annots (spec requires indirect references)
-	if len(p.Annots) > 0 {
-		arr := make(pdf.Array, len(p.Annots))
-		for i, ai := range p.Annots {
-			ref, err := rm.Store(ai)
-			if err != nil {
-				return nil, err
-			}
-			arr[i] = ref
+	// Annots
+	if p.Annots != nil {
+		annots, err := rm.Embed(p.Annots)
+		if err != nil {
+			return nil, err
 		}
-		dict["Annots"] = arr
+		if annots != nil {
+			dict["Annots"] = annots
+		}
 	}
 
 	// AA
@@ -765,11 +761,17 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 		p.Transition = trans
 	}
 
-	// Annots (optional; spec requires indirect references)
-	if _, annots, err := decode.PageAnnotations(c, dict["Annots"]); err != nil {
-		return nil, err
-	} else {
-		p.Annots = annots
+	// Annots
+	if obj := dict["Annots"]; obj != nil {
+		_, isRef := obj.(pdf.Reference)
+		annots, err := pdf.Decode(c, obj, decodeAnnots)
+		if err != nil {
+			return nil, err
+		}
+		if annots != nil {
+			annots.SingleUse = !isRef
+			p.Annots = annots
+		}
 	}
 
 	// AA (optional)
@@ -897,6 +899,15 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	return p, nil
+}
+
+// AddAnnots adds annotations to the page, creating an indirect list if the
+// page has none.
+func (p *Page) AddAnnots(annots ...annotation.Annotation) {
+	if p.Annots == nil {
+		p.Annots = &Annots{}
+	}
+	p.Annots.Add(annots...)
 }
 
 // NewIter returns a single-use iterator over the page's combined content

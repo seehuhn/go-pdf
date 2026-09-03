@@ -272,7 +272,7 @@ func addFileAttachment(page *document.Page, name string, data []byte) {
 		FS: spec,
 	}
 
-	page.Page.Annots = append(page.Page.Annots, annot)
+	page.Page.AddAnnots(annot)
 }
 
 func allocatePageRefs(doc *document.MultiPage, n int) []pdf.Reference {
@@ -411,7 +411,7 @@ func addPageLink(page *document.Page, fromDoc, toDoc string, toPage int, rect pd
 		}
 	}
 
-	page.Page.Annots = append(page.Page.Annots, link)
+	page.Page.AddAnnots(link)
 
 	return nil
 }

@@ -193,7 +193,7 @@ func (p *Page) Buttons(labels []string) []pdf.Rectangle {
 
 // Add places annotations on the page.
 func (p *Page) Add(annots ...annotation.Annotation) {
-	p.Doc.Page.Annots = append(p.Doc.Page.Annots, annots...)
+	p.Doc.Page.AddAnnots(annots...)
 }
 
 // Close writes the page and closes the file.

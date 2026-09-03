@@ -246,7 +246,7 @@ type writer struct {
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
-	w.page.Page.Annots = append(w.page.Page.Annots, a)
+	w.page.Page.AddAnnots(a)
 }
 
 // inkShape builds an InkList that fits inside the given bounding rectangle.

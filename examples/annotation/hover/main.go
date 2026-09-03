@@ -109,7 +109,7 @@ func run() error {
 		},
 		DefaultAppearance: fmt.Sprintf("/Helv %g Tf 0 g", fontSize),
 	}
-	doc.Page.Annots = append(doc.Page.Annots, ft)
+	doc.Page.AddAnnots(ft)
 
 	return doc.Close()
 }

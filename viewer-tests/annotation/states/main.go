@@ -132,7 +132,7 @@ func run() error {
 		Highlight: annotation.HighlightPush,
 		Action:    &action.GoTo{Dest: &destination.Fit{Page: pageRef}},
 	}
-	doc.Page.Annots = append(doc.Page.Annots, link)
+	doc.Page.AddAnnots(link)
 	drawGuide(doc, rect)
 	y -= rowGap
 
@@ -151,7 +151,7 @@ func run() error {
 		},
 		DefaultAppearance: fmt.Sprintf("/Helv %g Tf 0 g", fontSize),
 	}
-	doc.Page.Annots = append(doc.Page.Annots, freeText)
+	doc.Page.AddAnnots(freeText)
 	drawGuide(doc, rect)
 	y -= rowGap
 
@@ -167,7 +167,7 @@ func run() error {
 	// a highlighting mode other than Push overrides the down appearance
 	// (§12.5.6.19); the default is Invert
 	widget.Highlight = annotation.HighlightPush
-	doc.Page.Annots = append(doc.Page.Annots, widget)
+	doc.Page.AddAnnots(widget)
 	drawGuide(doc, rect)
 
 	// the form is stored before the page is closed, so that the merged

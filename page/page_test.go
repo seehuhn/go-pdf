@@ -560,7 +560,7 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 				Parent:    parentRef,
 				MediaBox:  &pdf.Rectangle{URx: 612, URy: 792},
 				Resources: &content.Resources{SingleUse: true},
-				Annots:    []annotation.Annotation{annot},
+				Annots:    &Annots{List: []annotation.Annotation{annot}},
 			}
 
 			dict, err := p1.Encode(rm)
@@ -583,18 +583,18 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if len(p2.Annots) != 1 {
-				t.Fatalf("got %d annotations, want 1", len(p2.Annots))
+			if p2.Annots == nil || len(p2.Annots.List) != 1 {
+				t.Fatalf("got %+v, want 1 annotation", p2.Annots)
 			}
 			a, err := pdf.Decode(pdf.CursorAt(x, nil), annotRef, decode.Annotation)
 			if err != nil {
 				t.Fatalf("failed to get annotation by reference: %v", err)
 			}
-			if p2.Annots[0] != a {
-				t.Errorf("annotation mismatch: got %v, want %v", p2.Annots[0], a)
+			if p2.Annots.List[0] != a {
+				t.Errorf("annotation mismatch: got %v, want %v", p2.Annots.List[0], a)
 			}
-			if _, ok := p2.Annots[0].(*annotation.Link); !ok {
-				t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots[0])
+			if _, ok := p2.Annots.List[0].(*annotation.Link); !ok {
+				t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots.List[0])
 			}
 		})
 	}
@@ -687,8 +687,8 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 	}
 
 	// all three annotations should remain
-	if len(p.Annots) != 3 {
-		t.Fatalf("got %d annotations, want 3", len(p.Annots))
+	if p.Annots == nil || len(p.Annots.List) != 3 {
+		t.Fatalf("got %+v, want 3 annotations", p.Annots)
 	}
 
 	// the on-page reply should keep its InReplyTo; the off-page orphan
@@ -727,11 +727,11 @@ func TestAnnotEncodeWithoutReservedRef(t *testing.T) {
 		Parent:    parentRef,
 		MediaBox:  &pdf.Rectangle{URx: 612, URy: 792},
 		Resources: &content.Resources{SingleUse: true},
-		Annots: []annotation.Annotation{&annotation.Link{
+		Annots: &Annots{List: []annotation.Annotation{&annotation.Link{
 			Common: annotation.Common{
 				Rect: pdf.Rectangle{URx: 100, URy: 50},
 			},
-		}},
+		}}},
 	}
 
 	dict, err := p.Encode(rm)
@@ -753,11 +753,11 @@ func TestAnnotEncodeWithoutReservedRef(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p2.Annots) != 1 {
-		t.Fatalf("got %d annotations, want 1", len(p2.Annots))
+	if p2.Annots == nil || len(p2.Annots.List) != 1 {
+		t.Fatalf("got %+v, want 1 annotation", p2.Annots)
 	}
-	if _, ok := p2.Annots[0].(*annotation.Link); !ok {
-		t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots[0])
+	if _, ok := p2.Annots.List[0].(*annotation.Link); !ok {
+		t.Errorf("annotation type = %T, want *annotation.Link", p2.Annots.List[0])
 	}
 }
 

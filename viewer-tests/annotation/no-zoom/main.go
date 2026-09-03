@@ -360,7 +360,7 @@ func writePage(doc *document.MultiPage, F, B font.Instance, rotate page.Rotation
 		// NoRotate is implicit here, so the rectangle is anchored the same way
 		// as the NoRotate box above
 		rect := f.anchorRect(x, iconY+20, 20, 20)
-		p.Page.Annots = append(p.Page.Annots, &annotation.Text{
+		p.Page.AddAnnots(&annotation.Text{
 			Common: annotation.Common{
 				Rect:     rect,
 				Flags:    annotation.FlagPrint,
@@ -419,9 +419,9 @@ func addBox(p *document.Page, f frame, F, B font.Instance, b box) {
 	}
 
 	if b.asLink {
-		p.Page.Annots = append(p.Page.Annots, &annotation.Link{Common: common})
+		p.Page.AddAnnots(&annotation.Link{Common: common})
 	} else {
-		p.Page.Annots = append(p.Page.Annots, &annotation.Square{Common: common})
+		p.Page.AddAnnots(&annotation.Square{Common: common})
 	}
 
 	// the anchor is the upper-left corner of the rectangle in the page's own

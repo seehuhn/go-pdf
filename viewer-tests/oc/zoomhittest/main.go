@@ -147,7 +147,7 @@ func createDocument(filename string) error {
 		Action: &action.URI{URI: "https://example.com/zoom"},
 	}
 	drawCorners(page, link.Rect)
-	page.Page.Annots = append(page.Page.Annots, link)
+	page.Page.AddAnnots(link)
 
 	// no Order entry: the group is managed by the zoom level, so it is kept
 	// out of the layers panel (§8.11.4.3).  A manual switch there would count

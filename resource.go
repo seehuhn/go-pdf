@@ -109,6 +109,11 @@ func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
 	return val, nil
 }
 
+// Store encodes enc through the resource manager and returns its reference.
+func (e *EmbedHelper) Store(enc Encoder) (Reference, error) {
+	return e.rm.Store(enc)
+}
+
 func (e *EmbedHelper) CopierFrom(x *Extractor) *Copier {
 	if c, ok := e.copiers[x]; ok {
 		return c

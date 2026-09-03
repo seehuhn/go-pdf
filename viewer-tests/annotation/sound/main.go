@@ -166,7 +166,7 @@ type writer struct {
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
-	w.page.Page.Annots = append(w.page.Page.Annots, a)
+	w.page.Page.AddAnnots(a)
 }
 
 func (w *writer) addPair(left *annotation.Sound, label string) error {

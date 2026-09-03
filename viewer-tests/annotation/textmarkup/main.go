@@ -150,7 +150,7 @@ type writer struct {
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {
-	w.page.Page.Annots = append(w.page.Page.Annots, a)
+	w.page.Page.AddAnnots(a)
 }
 
 // addRowWithBorder is like addRow but sets Border.Width on both annotations.

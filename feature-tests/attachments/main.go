@@ -204,7 +204,7 @@ func addFileAttachment(page *document.Page, style *fallback.Generator,
 	if err := style.AddAppearance(fa); err != nil {
 		return err
 	}
-	page.Page.Annots = append(page.Page.Annots, fa)
+	page.Page.AddAnnots(fa)
 	return nil
 }
 

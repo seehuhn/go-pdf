@@ -2326,7 +2326,7 @@ types:
     refTypes:
     - type: Annotation
       collection: array
-    goType: '[]annotation.Annotation'
+    goType: '*Annots'
     purpose: Annots (optional) lists annotations associated with the page.
   - goName: AA
     pdfKey: AA

@@ -266,7 +266,7 @@ func createDocument(filename string) error {
 	drawCorners(page, parent.Rect)
 	drawCorners(page, link.Rect)
 
-	page.Page.Annots = append(page.Page.Annots, parent, reply, link, sound, toggle)
+	page.Page.AddAnnots(parent, reply, link, sound, toggle)
 
 	// Order is what puts the group in the viewer's layers panel: groups left
 	// out of it "shall not be presented in any user interface" (§8.11.4.3).

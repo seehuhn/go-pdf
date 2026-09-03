@@ -71,7 +71,7 @@ func run() error {
 	page.TextEnd()
 
 	// polygon annotation with both Vertices and Path
-	page.Page.Annots = append(page.Page.Annots, &rawPolygon{})
+	page.Page.AddAnnots(&rawPolygon{})
 
 	return page.Close()
 }

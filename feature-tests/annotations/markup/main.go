@@ -123,7 +123,7 @@ func pageReplyThreading(doc *document.MultiPage) error {
 		Icon: annotation.TextIconComment,
 	}
 
-	p.Page.Annots = append(p.Page.Annots, parent, reply1, reply2)
+	p.Page.AddAnnots(parent, reply1, reply2)
 	return p.Close()
 }
 
@@ -214,9 +214,7 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 		State: annotation.TextStateAccepted,
 	}
 
-	p.Page.Annots = append(p.Page.Annots,
-		caret, strikeout, replyToCaret, nestedReply, stateAnnot,
-	)
+	p.Page.AddAnnots(caret, strikeout, replyToCaret, nestedReply, stateAnnot)
 	return p.Close()
 }
 
@@ -244,7 +242,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 300, Y: y}, {X: 72, Y: y},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, hl)
+	p.Page.AddAnnots(hl)
 	y -= 50
 
 	// underline
@@ -265,7 +263,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 250, Y: y}, {X: 72, Y: y},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, ul)
+	p.Page.AddAnnots(ul)
 	y -= 50
 
 	// squiggly
@@ -286,7 +284,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{X: 220, Y: y}, {X: 72, Y: y},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, sq)
+	p.Page.AddAnnots(sq)
 	y -= 50
 
 	// freetext
@@ -302,7 +300,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		DefaultAppearance: "/Helvetica 10 Tf 0 0 0 rg",
 	}
-	p.Page.Annots = append(p.Page.Annots, ft)
+	p.Page.AddAnnots(ft)
 	y -= 70
 
 	// stamp
@@ -319,7 +317,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Icon: "Approved",
 	}
-	p.Page.Annots = append(p.Page.Annots, st)
+	p.Page.AddAnnots(st)
 	y -= 70
 
 	// line
@@ -336,7 +334,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Coords: [4]float64{72, y - 15, 300, y - 15},
 	}
-	p.Page.Annots = append(p.Page.Annots, ln)
+	p.Page.AddAnnots(ln)
 	y -= 60
 
 	// square
@@ -352,7 +350,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			Subject:      "Box",
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, sqr)
+	p.Page.AddAnnots(sqr)
 	y -= 80
 
 	// ink
@@ -371,7 +369,7 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 			{{X: 80, Y: y - 10}, {X: 100, Y: y - 30}, {X: 120, Y: y - 10}, {X: 140, Y: y - 30}},
 		},
 	}
-	p.Page.Annots = append(p.Page.Annots, ink)
+	p.Page.AddAnnots(ink)
 
 	return p.Close()
 }
@@ -444,8 +442,6 @@ func pageEdgeCases(doc *document.MultiPage) error {
 		Icon: annotation.TextIconComment,
 	}
 
-	p.Page.Annots = append(p.Page.Annots,
-		nodate, longText, empty, reply,
-	)
+	p.Page.AddAnnots(nodate, longText, empty, reply)
 	return p.Close()
 }

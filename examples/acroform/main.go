@@ -257,7 +257,7 @@ func (b *formBuilder) attach(field acroform.Field, rect pdf.Rectangle, mk *appea
 		b.err = err
 		return nil
 	}
-	b.page.Page.Annots = append(b.page.Page.Annots, w)
+	b.page.Page.AddAnnots(w)
 	return w
 }
 

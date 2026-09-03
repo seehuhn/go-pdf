@@ -93,7 +93,7 @@ func withoutAP(filename string) error {
 			FillColor: color.DeviceRGB{0.5056, 0.9555, 0.9956},
 		}
 
-		page.Page.Annots = append(page.Page.Annots, a)
+		page.Page.AddAnnots(a)
 	}
 
 	return page.Close()
@@ -156,7 +156,7 @@ func withAP(filename string) error {
 				return err
 			}
 
-			page.Page.Annots = append(page.Page.Annots, a)
+			page.Page.AddAnnots(a)
 		}
 	}
 

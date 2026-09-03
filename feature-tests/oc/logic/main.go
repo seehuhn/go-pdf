@@ -290,7 +290,7 @@ func addToggleLink(page *document.Page, x, y, size float64, group *oc.Group) {
 		},
 		Highlight: annotation.HighlightNone,
 	}
-	page.Page.Annots = append(page.Page.Annots, link)
+	page.Page.AddAnnots(link)
 }
 
 // drawAND draws an AND gate (D-shape): flat left + semicircular right.

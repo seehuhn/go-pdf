@@ -251,7 +251,7 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 			}
 		}
 
-		wr.page.Page.Annots = append(wr.page.Page.Annots, widget)
+		wr.page.Page.AddAnnots(widget)
 	}
 	return nil
 }

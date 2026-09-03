@@ -94,16 +94,16 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p1.Annots) != 2 {
-		t.Fatalf("page 1: got %d annots, want 2", len(p1.Annots))
+	if p1.Annots == nil || len(p1.Annots.List) != 2 {
+		t.Fatalf("page 1: got %+v, want 2 annots", p1.Annots)
 	}
-	mergedW, ok := p1.Annots[0].(*annotation.Widget)
+	mergedW, ok := p1.Annots.List[0].(*annotation.Widget)
 	if !ok {
-		t.Fatalf("annot 0 is %T, want *Widget", p1.Annots[0])
+		t.Fatalf("annot 0 is %T, want *Widget", p1.Annots.List[0])
 	}
-	multiW, ok := p1.Annots[1].(*annotation.Widget)
+	multiW, ok := p1.Annots.List[1].(*annotation.Widget)
 	if !ok {
-		t.Fatalf("annot 1 is %T, want *Widget", p1.Annots[1])
+		t.Fatalf("annot 1 is %T, want *Widget", p1.Annots.List[1])
 	}
 	if mergedW.Field == nil {
 		t.Error("merged widget: Field not linked by page decode")
