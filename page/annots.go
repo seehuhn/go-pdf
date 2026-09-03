@@ -24,6 +24,8 @@ import (
 
 // Annots is the list of annotations of a page.
 type Annots struct {
+	// List holds the page's annotations, in the order they are drawn and
+	// scanned for input.
 	List []annotation.Annotation
 
 	// SingleUse can be set if the list is written inline into the page
@@ -34,6 +36,10 @@ type Annots struct {
 }
 
 // Add appends annotations to the list.
+//
+// Do not call this on a list decoded through the Writer you are writing to:
+// decoded values are immutable and the addition would be silently lost.
+// Copy the list and use [pdf.ResourceManager.Replace] instead.
 func (a *Annots) Add(annots ...annotation.Annotation) {
 	a.List = append(a.List, annots...)
 }
@@ -64,11 +70,16 @@ func (a *Annots) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// decodeAnnots reads an /Annots array.
+// decodeAnnots reads an /Annots array.  An empty or malformed array reads as
+// nil, matching [Annots.Embed], which writes nothing for an empty list; this
+// keeps a read-write-read cycle stable.
 func decodeAnnots(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Annots, error) {
 	_, list, err := decode.PageAnnotations(c, obj)
 	if err != nil {
 		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, nil
 	}
 	return &Annots{List: list, SingleUse: isDirect}, nil
 }

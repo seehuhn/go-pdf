@@ -26,7 +26,8 @@ import (
 	"seehuhn.de/go/pdf/property"
 )
 
-// Resources extracts a resource dictionary from a PDF file.
+// Resources extracts a resource dictionary from a PDF file.  An absent or
+// null /Resources entry yields nil, not an empty dictionary.
 func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources, error) {
 	dict, err := c.Dict(obj)
 	if err != nil {

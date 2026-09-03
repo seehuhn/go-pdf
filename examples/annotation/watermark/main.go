@@ -175,9 +175,28 @@ func run(inputName, text string, replace bool) error {
 			}
 			continue
 		}
-		p := *old
-		p.Annots = annots
-		if _, err := rm.Replace(old, &p); err != nil {
+
+		// old.Annots is absent or inline, so the page dictionary itself
+		// changes.  The stored dictionary is edited directly rather than
+		// going through page.Encode(&p): page.Decode substitutes US
+		// Letter for a missing /MediaBox, and a page inheriting a
+		// different box from the page tree would otherwise gain a wrong
+		// explicit /MediaBox (clipping CropBox against it).  Editing the
+		// raw dictionary leaves every entry but /Annots untouched.
+		pageDict, err := c.Dict(pageRef)
+		if err != nil {
+			return err
+		}
+		annotsObj, err := rm.Embed(annots)
+		if err != nil {
+			return err
+		}
+		if annotsObj != nil {
+			pageDict["Annots"] = annotsObj
+		} else {
+			delete(pageDict, "Annots")
+		}
+		if err := w.Put(pageRef, pageDict); err != nil {
 			return err
 		}
 	}

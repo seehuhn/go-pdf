@@ -899,6 +899,10 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 
 // AddAnnots adds annotations to the page, creating an indirect list if the
 // page has none.
+//
+// Do not call this on a page decoded through the Writer you are writing to:
+// decoded values are immutable and the addition would be silently lost.
+// Copy the page and use [pdf.ResourceManager.Replace] instead.
 func (p *Page) AddAnnots(annots ...annotation.Annotation) {
 	if p.Annots == nil {
 		p.Annots = &Annots{}
