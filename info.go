@@ -158,12 +158,10 @@ func ExtractInfo(c Cursor, obj Object, _ bool) (*Info, error) {
 	return info, nil
 }
 
-// Embed adds the Info dictionary to a PDF file.
+// encode builds the Info dictionary without writing it to w.
 //
-// This implements the [Embedder] interface.
-//
-// If all fields are empty, the function returns nil.
-func (info *Info) Embed(e *EmbedHelper) (Native, error) {
+// It returns nil if all fields are empty.
+func (info *Info) encode(w *Writer) (Dict, error) {
 	if info == nil {
 		return nil, nil
 	}
@@ -189,13 +187,13 @@ func (info *Info) Embed(e *EmbedHelper) (Native, error) {
 		dict["Producer"] = info.Producer
 	}
 	if !info.CreationDate.IsZero() {
-		dict["CreationDate"] = info.CreationDate.AsPDF(e.Out().GetOptions())
+		dict["CreationDate"] = info.CreationDate.AsPDF(w.GetOptions())
 	}
 	if !info.ModDate.IsZero() {
-		dict["ModDate"] = info.ModDate.AsPDF(e.Out().GetOptions())
+		dict["ModDate"] = info.ModDate.AsPDF(w.GetOptions())
 	}
 	if trapped, ok := info.Trapped.Get(); ok {
-		if err := CheckVersion(e.Out(), "Info Trapped entry", V1_3); err != nil {
+		if err := CheckVersion(w, "Info Trapped entry", V1_3); err != nil {
 			return nil, err
 		}
 		if trapped {
@@ -210,6 +208,22 @@ func (info *Info) Embed(e *EmbedHelper) (Native, error) {
 	}
 
 	if len(dict) == 0 {
+		return nil, nil
+	}
+	return dict, nil
+}
+
+// Embed adds the Info dictionary to a PDF file.
+//
+// This implements the [Embedder] interface.
+//
+// If all fields are empty, the function returns nil.
+func (info *Info) Embed(e *EmbedHelper) (Native, error) {
+	dict, err := info.encode(e.Out())
+	if err != nil {
+		return nil, err
+	}
+	if dict == nil {
 		return nil, nil
 	}
 

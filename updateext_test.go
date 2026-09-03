@@ -24,8 +24,11 @@ import (
 	"strconv"
 	"testing"
 
+	"golang.org/x/text/language"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/xmp"
 )
 
 var sizePat = regexp.MustCompile(`/Size\s+(\d+)`)
@@ -388,8 +391,192 @@ func TestUpdateEmpty(t *testing.T) {
 		t.Errorf("got %v, want /old", obj)
 	}
 	if !bytes.Contains(f.Data[n:], []byte("0 0\n")) {
-		// closeUpdate always rewrites the catalog until Task 6 adds the
-		// before/after comparison, so the table is not empty yet
-		t.Skip("empty table section lacks the 0 0 subsection")
+		t.Error("empty table section lacks the 0 0 subsection")
+	}
+}
+
+// objectHeader returns the token that starts the given object in the file.
+func objectHeader(ref pdf.Reference) []byte {
+	return []byte(fmt.Sprintf("\n%d %d obj", ref.Number(), ref.Generation()))
+}
+
+func TestUpdateCatalogUnchanged(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_4, pdf.V1_7} {
+		t.Run(v.String(), func(t *testing.T) {
+			f, _ := newBaseFile(t, v, nil)
+			root0 := reopen(t, f.Data).GetMeta().Trailer["Root"]
+			n := len(f.Data)
+
+			w, err := pdf.NewUpdater(f, int64(n), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Put(w.Alloc(), pdf.Name("added")); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			root1 := reopen(t, f.Data).GetMeta().Trailer["Root"]
+			if root0 != root1 {
+				t.Errorf("Root changed from %v to %v", root0, root1)
+			}
+			if bytes.Contains(f.Data[n:], objectHeader(root0.(pdf.Reference))) {
+				t.Error("unchanged catalog was written again")
+			}
+		})
+	}
+}
+
+func TestUpdateCatalogChanged(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_7, nil)
+	root0 := reopen(t, f.Data).GetMeta().Trailer["Root"]
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.PageMode = "UseOutlines"
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r := reopen(t, f.Data)
+	if r.GetMeta().Catalog.PageMode != "UseOutlines" {
+		t.Errorf("PageMode = %q after update", r.GetMeta().Catalog.PageMode)
+	}
+	if r.GetMeta().Trailer["Root"] != root0 {
+		t.Errorf("changed catalog moved from %v to %v", root0, r.GetMeta().Trailer["Root"])
+	}
+}
+
+func TestUpdateInfo(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_7, nil)
+	if reopen(t, f.Data).GetMeta().Info != nil {
+		t.Fatal("base file unexpectedly has an Info dictionary")
+	}
+
+	// add
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Info = &pdf.Info{Title: "first", Custom: map[string]string{"Team": "docs"}}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r := reopen(t, f.Data)
+	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != "first" || r.GetMeta().Info.Custom["Team"] != "docs" {
+		t.Fatalf("Info after adding: %+v", r.GetMeta().Info)
+	}
+	infoRef, ok := r.GetMeta().Trailer["Info"].(pdf.Reference)
+	if !ok {
+		t.Fatal("Info is not an indirect object")
+	}
+
+	// unchanged
+	n := len(f.Data)
+	applyEmptyUpdate(t, f)
+	r = reopen(t, f.Data)
+	if r.GetMeta().Trailer["Info"] != infoRef {
+		t.Errorf("unchanged Info moved to %v", r.GetMeta().Trailer["Info"])
+	}
+	if bytes.Contains(f.Data[n:], objectHeader(infoRef)) {
+		t.Error("unchanged Info was written again")
+	}
+
+	// change
+	w, err = pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Info.Title = "second"
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r = reopen(t, f.Data)
+	if r.GetMeta().Info.Title != "second" || r.GetMeta().Trailer["Info"] != infoRef {
+		t.Errorf("changed Info: %+v at %v", r.GetMeta().Info, r.GetMeta().Trailer["Info"])
+	}
+
+	// remove
+	w, err = pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Info = nil
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r = reopen(t, f.Data)
+	if r.GetMeta().Info != nil {
+		t.Errorf("Info still present: %+v", r.GetMeta().Info)
+	}
+	if obj, _ := r.Get(infoRef, true); obj != nil {
+		t.Errorf("old Info object not freed: %v", obj)
+	}
+}
+
+func newMetadata(t *testing.T, title string) *pdf.MetadataStream {
+	t.Helper()
+	packet := xmp.NewPacket()
+	dc := &xmp.DublinCore{}
+	dc.Title.Set(language.Und, title)
+	if err := packet.Set(dc); err != nil {
+		t.Fatal(err)
+	}
+	return &pdf.MetadataStream{Data: packet}
+}
+
+func TestUpdateMetadata(t *testing.T) {
+	w0, f := memfile.NewPDFWriter(t, pdf.V1_7, &pdf.WriterOptions{DocumentMetadata: newMetadata(t, "one")})
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+	catalogMetadataRef := func(t *testing.T) pdf.Reference {
+		t.Helper()
+		r := reopen(t, f.Data)
+		dict, err := r.Get(r.GetMeta().Trailer["Root"].(pdf.Reference), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref, ok := dict.(pdf.Dict)["Metadata"].(pdf.Reference)
+		if !ok {
+			t.Fatal("catalog has no Metadata reference")
+		}
+		return ref
+	}
+	meta0 := catalogMetadataRef(t)
+
+	// unchanged
+	n := len(f.Data)
+	applyEmptyUpdate(t, f)
+	if got := catalogMetadataRef(t); got != meta0 {
+		t.Errorf("unchanged metadata moved from %v to %v", meta0, got)
+	}
+	if bytes.Contains(f.Data[n:], objectHeader(meta0)) {
+		t.Error("unchanged metadata stream was written again")
+	}
+
+	// replaced
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Metadata = newMetadata(t, "two")
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := catalogMetadataRef(t); got == meta0 {
+		t.Error("replaced metadata keeps the old reference")
+	}
+	r := reopen(t, f.Data)
+	var dc xmp.DublinCore
+	if err := r.GetMeta().Catalog.Metadata.Data.Get(&dc); err != nil {
+		t.Fatal(err)
+	}
+	if got := dc.Title.Best(language.Und); got != "two" {
+		t.Errorf("metadata title = %q, want two", got)
 	}
 }

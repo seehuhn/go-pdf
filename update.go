@@ -278,17 +278,26 @@ func (w *Writer) getUpdate(ref Reference, canObjStm, scalarOnly bool) (Native, e
 // closeUpdate writes the catalog and Info dictionary of an incremental
 // update and returns the trailer dictionary.
 func (w *Writer) closeUpdate() (Dict, error) {
+	// a replaced metadata stream is embedded fresh, at a reference marked
+	// plaintext when the original exempts metadata from encryption
+	if m := w.meta.Catalog.Metadata; m != nil && m != w.documentMetadata {
+		ref := w.Alloc()
+		if w.w.enc != nil && w.w.enc.sec.unencryptedMetadata {
+			w.refIsPlaintext[ref] = true
+		}
+		e := &EmbedHelper{rm: w.rm, copiers: map[*Extractor]*Copier{}}
+		if _, err := e.EmbedAt(ref, m); err != nil {
+			return nil, err
+		}
+	}
+
 	catDict, err := w.meta.Catalog.Encode(w.rm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode document catalog: %w", err)
 	}
-	var infoDict Native
-	if w.meta.Info != nil {
-		e := &EmbedHelper{rm: w.rm, copiers: map[*Extractor]*Copier{}}
-		infoDict, err = w.meta.Info.Embed(e)
-		if err != nil {
-			return nil, err
-		}
+	infoDict, err := w.meta.Info.encode(w)
+	if err != nil {
+		return nil, err
 	}
 	if err := w.rm.Close(); err != nil {
 		return nil, err
@@ -297,15 +306,27 @@ func (w *Writer) closeUpdate() (Dict, error) {
 	trailer := w.meta.Trailer.Clone()
 
 	rootRef := w.baseRoot
-	if rootRef == 0 {
-		rootRef = w.Alloc()
-	}
-	if err := w.Put(rootRef, catDict); err != nil {
-		return nil, err
+	if rootRef == 0 || !Equal(catDict, w.baseCatalogDict) {
+		if rootRef == 0 {
+			rootRef = w.Alloc()
+		}
+		if err := w.Put(rootRef, catDict); err != nil {
+			return nil, err
+		}
 	}
 	trailer["Root"] = rootRef
 
-	if infoDict != nil {
+	switch {
+	case infoDict == nil:
+		delete(trailer, "Info")
+		if w.baseInfoRef != 0 && !w.base.xref[w.baseInfoRef.Number()].IsFree() {
+			if err := w.Free(w.baseInfoRef); err != nil {
+				return nil, err
+			}
+		}
+	case w.baseInfoRef != 0 && Equal(infoDict, w.baseInfoDict):
+		trailer["Info"] = w.baseInfoRef
+	default:
 		infoRef := w.baseInfoRef
 		if infoRef == 0 {
 			infoRef = w.Alloc()
@@ -314,8 +335,6 @@ func (w *Writer) closeUpdate() (Dict, error) {
 			return nil, err
 		}
 		trailer["Info"] = infoRef
-	} else {
-		delete(trailer, "Info")
 	}
 
 	// ID[0] is the permanent identifier and feeds the encryption key.
