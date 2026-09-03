@@ -101,7 +101,7 @@ func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
 	}
 
 	if ref != 0 && val != ref {
-		panic("wrong reference")
+		return nil, fmt.Errorf("%T did not embed itself at the requested reference", r)
 	}
 
 	e.rm.Out.objects[r] = val
@@ -297,6 +297,55 @@ func (rm *ResourceManager) StoreEncoded(enc Encoder, obj Native) (Reference, err
 		return 0, errors.New("StoreEncoded must not store a reference")
 	}
 	return rm.putEncoded(enc, obj)
+}
+
+// Replace writes repl in place of orig, a value decoded through rm.Out.
+// It returns the original's reference; afterwards both values embed as that
+// reference.
+//
+// repl must implement [Encoder] or [Embedder].  An Encoder whose encoding
+// equals the original object is not written.  Replacing the same object
+// twice is an error, as is replacing an object written in this session.
+func (rm *ResourceManager) Replace(orig, repl any) (Reference, error) {
+	ref := rm.Out.Origin(orig)
+	if ref == 0 {
+		return 0, errors.New("Replace: original has no provenance")
+	}
+	if rm.isClosed {
+		return 0, errors.New("resource manager is already closed")
+	}
+
+	switch r := repl.(type) {
+	case Encoder:
+		native, err := r.Encode(rm)
+		if err != nil {
+			return 0, err
+		}
+		if native == nil {
+			return 0, errors.New("Replace: replacement encodes to nothing")
+		}
+		if _, isRef := native.(Reference); isRef {
+			return 0, errors.New("encode must not return a reference")
+		}
+		if rm.Out.sameAsStored(ref, native) {
+			rm.Out.objects[repl] = ref
+			return ref, nil
+		}
+		if err := rm.Out.Put(ref, native); err != nil {
+			return 0, err
+		}
+		rm.Out.objects[repl] = ref
+		return ref, nil
+	case Embedder:
+		e := &EmbedHelper{rm: rm, copiers: map[*Extractor]*Copier{}}
+		delete(rm.Out.objects, repl) // EmbedAt must not see a stale entry
+		if _, err := e.EmbedAt(ref, r); err != nil {
+			return 0, err
+		}
+		return ref, nil
+	default:
+		return 0, fmt.Errorf("Replace: %T is neither an Encoder nor an Embedder", repl)
+	}
 }
 
 // Close runs all deferred calls registered with [EmbedHelper.Defer] or

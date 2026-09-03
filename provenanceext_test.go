@@ -203,6 +203,96 @@ func TestOriginFollowsReferenceChain(t *testing.T) {
 	}
 }
 
+func TestReplaceWritesInPlace(t *testing.T) {
+	f := newUpdateBase(t)
+	orig := bytes.Clone(f.Data)
+	w, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
+	old, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repl := *old
+	repl.Title = "replaced"
+	rm := pdf.NewResourceManager(w)
+	ref, err := rm.Replace(old, &repl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref != infoRef {
+		t.Errorf("Replace wrote at %v, want %v", ref, infoRef)
+	}
+	if got, _ := rm.Embed(old); got != infoRef {
+		t.Errorf("original embeds as %v after Replace", got)
+	}
+	if got, _ := rm.Embed(&repl); got != infoRef {
+		t.Errorf("replacement embeds as %v after Replace", got)
+	}
+	if _, err := rm.Replace(old, &repl); err == nil {
+		t.Error("second Replace of the same object succeeded")
+	}
+	if _, err := rm.Replace(old, "not an encoder"); err == nil {
+		t.Error("Replace with a non-Encoder succeeded")
+	}
+	if _, err := rm.Replace(&pdf.Info{}, &repl); err == nil {
+		t.Error("Replace of a value without provenance succeeded")
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != "replaced" {
+		t.Errorf("Info after update: %+v", r.GetMeta().Info)
+	}
+}
+
+func TestReplaceSkipsEqualEncoding(t *testing.T) {
+	w0, f := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref0 := w0.Alloc()
+	if err := w0.Put(ref0, pdf.Dict{"Type": pdf.Name("Catalog"), "Pages": w0.GetMeta().Catalog.Pages}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+	orig := bytes.Clone(f.Data)
+
+	w, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := pdf.Decode(pdf.NewCursor(w), ref0, pdf.DecodeCatalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repl := *old
+	rm := pdf.NewResourceManager(w)
+	if _, err := rm.Replace(old, &repl); err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(f.Data[len(orig):], []byte("/Catalog")) {
+		t.Error("an equal replacement was written")
+	}
+}
+
 func TestOriginVoidAfterFree(t *testing.T) {
 	f := newUpdateBase(t)
 	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)

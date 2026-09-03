@@ -225,7 +225,7 @@ func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if r.SingleUse {
 		return dict, nil
 	}
-	ref := rm.Alloc()
+	ref := rm.AllocSelf()
 	err := rm.Out().Put(ref, dict)
 	if err != nil {
 		return nil, err

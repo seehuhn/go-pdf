@@ -250,7 +250,7 @@ func (info *Info) Embed(e *EmbedHelper) (Native, error) {
 		return nil, nil
 	}
 
-	ref := e.Alloc()
+	ref := e.AllocSelf()
 	if err := e.Out().Put(ref, dict); err != nil {
 		return nil, err
 	}

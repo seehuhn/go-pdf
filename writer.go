@@ -1028,3 +1028,22 @@ func (w *Writer) recordOrigin(v any, ref Reference) {
 	}
 	w.objects[v] = ref
 }
+
+// sameAsStored reports whether native equals the object stored at ref in the
+// original file of an incremental update.  Only dictionaries and arrays
+// compare; streams always report false.
+func (w *Writer) sameAsStored(ref Reference, native Native) bool {
+	if w.base == nil {
+		return false
+	}
+	switch native.(type) {
+	case Dict, Array:
+	default:
+		return false
+	}
+	old, err := w.base.Get(ref, true)
+	if err != nil {
+		return false
+	}
+	return Equal(native, old)
+}
