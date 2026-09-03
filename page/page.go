@@ -664,11 +664,7 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 
 	// Contents (optional)
 	if contentsObj := dict["Contents"]; contentsObj != nil {
-		resolved, err := c.Resolve(contentsObj)
-		if err != nil {
-			return nil, err
-		}
-		segments, err := ExtractContents(c, resolved)
+		segments, err := ExtractContents(c, contentsObj)
 		if err != nil {
 			return nil, err
 		}

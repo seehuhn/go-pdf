@@ -112,19 +112,12 @@ func objectHeader(ref pdf.Reference) []byte {
 }
 
 // writeBase writes a one-page file whose page carries an annotation list of
-// the given kind, plus a Resources dictionary with a font, and returns the
-// file and the page reference.  The Font subdictionary gives the "/Font"
-// sub-check in TestUpdateReplacesPageOnly something to catch: without it,
-// "no /Font was written again" would hold trivially even if the page's
-// resources were re-embedded.
-//
-// A content stream is deliberately not added here: [Source], which
-// represents a decoded /Contents stream, carries no provenance (tracking it
-// is out of scope for this design; see the design doc's "Out of scope"
-// section), so [Source.Embed] always writes a fresh stream object on every
-// re-encode.  Giving the page real content would make the "page rewrite
-// leaves other objects untouched" tests fail regardless of any fix, since a
-// content stream is never left untouched.
+// the given kind, plus a Resources dictionary with a font and a content
+// stream, and returns the file and the page reference.  The Font
+// subdictionary gives the "/Font" sub-check in TestUpdateReplacesPageOnly
+// something to catch: without it, "no /Font was written again" would hold
+// trivially even if the page's resources were re-embedded.  Likewise the
+// content stream gives the "stream" sub-check something to catch.
 func writeBase(t *testing.T, singleUse bool) (*memfile.MemFile, pdf.Reference) {
 	t.Helper()
 	w, f := memfile.NewPDFWriter(t, pdf.V1_7, nil)
@@ -140,6 +133,12 @@ func writeBase(t *testing.T, singleUse bool) (*memfile.MemFile, pdf.Reference) {
 			Font: map[pdf.Name]font.Instance{
 				"F1": font.Must(standard.TimesRoman.New()),
 			},
+		},
+		Contents: []Segment{
+			&content.Operators{Ops: []content.Operator{
+				{Name: content.OpPushGraphicsState},
+				{Name: content.OpPopGraphicsState},
+			}},
 		},
 		Annots: &Annots{
 			List:      []annotation.Annotation{&annotation.Square{Common: annotation.Common{Rect: pdf.Rectangle{URx: 10, URy: 10}}}},
@@ -216,6 +215,60 @@ func TestUpdateReplacesPageOnly(t *testing.T) {
 	}
 	if got.Annots == nil || len(got.Annots.List) != 2 {
 		t.Errorf("page has %d annotations after update, want 2", len(got.Annots.List))
+	}
+}
+
+// TestContentSegmentsHaveProvenance checks that a page's content-stream
+// segments, decoded through an update Writer, carry provenance, and that
+// replacing the page with one carrying an extra annotation appends no
+// content stream.
+func TestContentSegmentsHaveProvenance(t *testing.T) {
+	f, pageRef := writeBase(t, true)
+	orig := bytes.Clone(f.Data)
+
+	w, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	old, err := pdf.Decode(c, pageRef, Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(old.Contents) == 0 {
+		t.Fatal("test setup: page has no content segments")
+	}
+	for i, seg := range old.Contents {
+		src, ok := seg.(*Source)
+		if !ok {
+			t.Fatalf("Contents[%d] is %T, want *Source", i, seg)
+		}
+		if w.Origin(src) == 0 {
+			t.Errorf("Contents[%d] has no provenance", i)
+		}
+	}
+
+	rm := pdf.NewResourceManager(w)
+	p := *old
+	p.Annots = &Annots{List: append([]annotation.Annotation{}, old.Annots.List...), SingleUse: true}
+	p.Annots.Add(&annotation.Square{Common: annotation.Common{Rect: pdf.Rectangle{URx: 20, URy: 20}}})
+	if _, err := rm.Replace(old, &p); err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	appended := f.Data[len(orig):]
+	body := appended
+	if i := bytes.Index(body, []byte("/Type/XRef")); i >= 0 {
+		body = body[:i]
+	}
+	if bytes.Contains(body, []byte("stream")) {
+		t.Error("content stream was written again")
 	}
 }
 
