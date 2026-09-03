@@ -19,7 +19,9 @@ package pdf
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -375,5 +377,138 @@ func TestReadXRefNewestTrailerWins(t *testing.T) {
 	}
 	if len(r.meta.ID) != 2 || !bytes.Equal(r.meta.ID[0], newID) {
 		t.Errorf("ID = %x, want newest trailer's value", r.meta.ID)
+	}
+}
+
+// appendUpdateSection appends an update section holding the given objects
+// (object number to body), free entries for freed, a cross-reference table
+// covering exactly those numbers, and a trailer holding extra plus /Prev.
+func appendUpdateSection(t *testing.T, data []byte, objects map[uint32]string, freed []uint32, extra string) []byte {
+	t.Helper()
+	prev := lastStartXRef(t, data)
+	buf := bytes.NewBuffer(bytes.Clone(data))
+	type entry struct {
+		pos  int64
+		free bool
+	}
+	entries := map[uint32]entry{}
+	for _, n := range freed {
+		entries[n] = entry{free: true}
+	}
+	for _, n := range slices.Sorted(maps.Keys(objects)) {
+		entries[n] = entry{pos: int64(buf.Len())}
+		fmt.Fprintf(buf, "%d 0 obj\n%s\nendobj\n", n, objects[n])
+	}
+	xrefPos := buf.Len()
+	buf.WriteString("xref\n")
+	for _, n := range slices.Sorted(maps.Keys(entries)) {
+		e := entries[n]
+		if e.free {
+			fmt.Fprintf(buf, "%d 1\n0000000000 00001 f\r\n", n)
+		} else {
+			fmt.Fprintf(buf, "%d 1\n%010d 00000 n\r\n", n, e.pos)
+		}
+	}
+	fmt.Fprintf(buf, "trailer\n<< /Prev %d %s >>\nstartxref\n%d\n%%%%EOF\n",
+		prev, extra, xrefPos)
+	return buf.Bytes()
+}
+
+// writeBaseFileWith writes a one-page PDF 1.4 file containing one extra
+// object with the given body, and returns the bytes and that object's
+// reference.
+func writeBaseFileWith(t *testing.T, body Object) ([]byte, Reference) {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_4, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(w); err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	if err := w.Put(ref, body); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes(), ref
+}
+
+func TestReadXRefChainNewestObjectWins(t *testing.T) {
+	data, ref := writeBaseFileWith(t, Name("old"))
+	extra := fmt.Sprintf("/Size %d /Root %d 0 R", trailerSize(t, data), rootRef(t, data).Number())
+	data = appendUpdateSection(t, data, map[uint32]string{ref.Number(): "/new"}, nil, extra)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := r.Get(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != Name("new") {
+		t.Errorf("got %v, want /new", obj)
+	}
+}
+
+func TestReadXRefChainFreeEntryDeletes(t *testing.T) {
+	data, ref := writeBaseFileWith(t, Name("old"))
+	extra := fmt.Sprintf("/Size %d /Root %d 0 R", trailerSize(t, data), rootRef(t, data).Number())
+	data = appendUpdateSection(t, data, nil, []uint32{ref.Number()}, extra)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := r.Get(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != nil {
+		t.Errorf("got %v, want null for freed object", obj)
+	}
+}
+
+func TestReadXRefHybridXRefStm(t *testing.T) {
+	data := writeBaseFile(t, nil, "")
+	prev := lastStartXRef(t, data)
+	size := uint32(trailerSize(t, data))
+	hidden := size     // only listed in the cross-reference stream
+	stmNum := size + 1 // the cross-reference stream object
+
+	buf := bytes.NewBuffer(bytes.Clone(data))
+	hiddenPos := buf.Len()
+	fmt.Fprintf(buf, "%d 0 obj\n/hidden\nendobj\n", hidden)
+
+	// one type-1 entry for hidden: W [1 4 2]
+	entry := []byte{1,
+		byte(hiddenPos >> 24), byte(hiddenPos >> 16), byte(hiddenPos >> 8), byte(hiddenPos),
+		0, 0}
+	stmPos := buf.Len()
+	fmt.Fprintf(buf, "%d 0 obj\n<< /Type /XRef /Size %d /W [1 4 2] /Index [%d 1] /Length %d >>\nstream\n",
+		stmNum, size+2, hidden, len(entry))
+	buf.Write(entry)
+	buf.WriteString("\nendstream\nendobj\n")
+
+	xrefPos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root %d 0 R /Prev %d /XRefStm %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size+2, rootRef(t, data).Number(), prev, stmPos, xrefPos)
+	data = buf.Bytes()
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := r.Get(NewReference(hidden, 0), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != Name("hidden") {
+		t.Errorf("got %v, want /hidden via /XRefStm", obj)
+	}
+	if r.meta.Catalog.Pages == 0 {
+		t.Error("catalog lost when following /Prev after /XRefStm")
 	}
 }
