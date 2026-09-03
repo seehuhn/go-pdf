@@ -252,7 +252,9 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			width = 19
 		}
 
-		if xref[i] != nil {
+		// offByOne is fixed for every entry but the first (see below),
+		// so this checks the same key the entry would be stored under
+		if xref[i-offByOne] != nil {
 			s.pos += width
 			continue
 		}

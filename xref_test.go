@@ -498,6 +498,31 @@ func TestReadXRefChainFreeEntryDeletes(t *testing.T) {
 	}
 }
 
+// TestDecodeXRefSectionOffByOneSkipUsesCorrectedKey covers a malformed
+// classic xref subsection that starts at object 1 with a free entry meant
+// for object 0 (see the offByOne repair below).  When a newer section
+// already defines the entry at the subsection's raw index, the "already
+// defined" check must skip based on the corrected key, not the raw index,
+// or the entry the correction was shifting into place is silently lost.
+func TestDecodeXRefSectionOffByOneSkipUsesCorrectedKey(t *testing.T) {
+	data := []byte(
+		"0000000000 65535 f\r\n" + // raw index 1 -> object 0 (free)
+			"0000000000 00000 n\r\n" + // raw index 2 -> object 1
+			"0000000000 00000 n\r\n" + // raw index 3 -> object 2
+			"0000000161 00000 n\r\n") // raw index 4 -> object 3
+
+	xref := map[uint32]*xRefEntry{
+		4: {Pos: 358}, // object 4, already defined by a newer xref section
+	}
+	s := newScanner(bytes.NewReader(data), nil, nil)
+	if err := decodeXRefSection(xref, s, 1, 5); err != nil {
+		t.Fatal(err)
+	}
+	if xref[3] == nil || xref[3].Pos != 161 {
+		t.Errorf("xref[3] = %v, want an entry with Pos 161", xref[3])
+	}
+}
+
 func TestReadXRefHybridXRefStm(t *testing.T) {
 	data := writeBaseFile(t, nil, "")
 	prev := lastStartXRef(t, data)

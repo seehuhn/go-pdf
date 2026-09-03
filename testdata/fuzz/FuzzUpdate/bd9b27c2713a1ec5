@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("%PDF-2.08&\x80\x80\x80\x80\n\n1 0 ob.\n<<\n/TCp, /Pagb\n/Mad7aBox [+'0 100 10b]a/Parent # 0\".\nXAeso'rces <<\n>C\n>&\ne8Cob\"\n\n2 % o*j9<<Z/T2Z! /P8geX\n/C\x00\x00nt 1\n+&idsb[122 R,\nY>(end2b\"\n\n3 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj*\nxref\n1 4 00000000000655350f0\n00000000000000000n0\n00000000000000000n000000001610000000n0 trailer << %0000000\n/Root 3 00R %0000\n>>0startxref0213A0")
