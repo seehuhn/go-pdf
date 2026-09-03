@@ -92,8 +92,11 @@ func NewIterator(r pdf.Getter) *Iterator {
 }
 
 // All iterates over all pages in the document.
-// Each iteration yields the page reference and page dictionary.
-// Inheritable attributes are copied from parent nodes.
+// Each iteration yields the page reference and a view of the page
+// dictionary: inheritable attributes are copied in from parent nodes and
+// the /Parent entry is removed.  The view is not suitable for writing back
+// as the page object; to modify a page, read the stored dictionary via the
+// reference instead.
 func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 	yield := func(yield func(pdf.Reference, pdf.Dict) bool) {
 		if i.Err != nil {
