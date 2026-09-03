@@ -446,7 +446,9 @@ func TestUpdateCatalogChanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.GetMeta().Catalog.PageMode = "UseOutlines"
+	cat := *w.GetMeta().Catalog
+	cat.PageMode = "UseOutlines"
+	w.GetMeta().Catalog = &cat
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -457,6 +459,22 @@ func TestUpdateCatalogChanged(t *testing.T) {
 	}
 	if r.GetMeta().Trailer["Root"] != root0 {
 		t.Errorf("changed catalog moved from %v to %v", root0, r.GetMeta().Trailer["Root"])
+	}
+}
+
+func TestUpdateInPlaceEditIsIgnored(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_7, nil)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// decoded values are immutable: an in-place edit is not written
+	w.GetMeta().Catalog.PageMode = "UseOutlines"
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := reopen(t, f.Data).GetMeta().Catalog.PageMode; got != "" {
+		t.Errorf("in-place edit was written: PageMode = %q", got)
 	}
 }
 
@@ -500,7 +518,9 @@ func TestUpdateInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.GetMeta().Info.Title = "second"
+	info := *w.GetMeta().Info
+	info.Title = "second"
+	w.GetMeta().Info = &info
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -573,7 +593,9 @@ func TestUpdateMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.GetMeta().Catalog.Metadata = newMetadata(t, "two")
+	cat := *w.GetMeta().Catalog
+	cat.Metadata = newMetadata(t, "two")
+	w.GetMeta().Catalog = &cat
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -747,7 +769,9 @@ func TestUpdateToMatchesInPlace(t *testing.T) {
 		if err := w.Put(ref, pdf.Name("added")); err != nil {
 			t.Fatal(err)
 		}
-		w.GetMeta().Catalog.PageMode = "UseThumbs"
+		cat := *w.GetMeta().Catalog
+		cat.PageMode = "UseThumbs"
+		w.GetMeta().Catalog = &cat
 		if err := w.Close(); err != nil {
 			t.Fatal(err)
 		}

@@ -36,7 +36,8 @@ type UpdateOptions struct {
 	// version by writing the catalog /Version entry; otherwise the option
 	// has no effect.  Only objects written by the update are checked
 	// against the raised version; the caller is responsible for the
-	// original content still conforming.
+	// original content still conforming.  The catalog is copied before the
+	// version is raised.
 	Version Version
 
 	// HumanReadable requests pretty printing and disables object streams
@@ -128,10 +129,13 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 
 	meta := base.meta
 	meta.Version = v
-	if opt.Version > base.meta.Version {
-		meta.Catalog.Version = opt.Version
-	}
 	meta.Trailer = base.meta.Trailer.Clone()
+	if opt.Version > base.meta.Version {
+		// decoded values are immutable; raise the version on a copy
+		cat := *base.meta.Catalog
+		cat.Version = opt.Version
+		meta.Catalog = &cat
+	}
 
 	w := &Writer{
 		meta: meta,
@@ -153,31 +157,23 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	}
 	w.rm = NewResourceManager(w)
 
-	if ref, ok := base.meta.Trailer["Root"].(Reference); ok {
-		w.baseRoot = ref
-	}
-	if obj, err := base.Get(w.baseRoot, true); err == nil {
-		w.baseCatalogDict, _ = obj.(Dict)
-	}
-	switch info := base.meta.Trailer["Info"].(type) {
-	case Reference:
-		// a reference whose generation does not match the xref entry
-		// resolves to nil; baseInfoRef must track that so a later Free
-		// call agrees with what Get already treated as absent
-		if obj, err := base.Get(info, true); err == nil && obj != nil {
-			w.baseInfoRef = info
-			w.baseInfoDict, _ = obj.(Dict)
-		}
-	case Dict:
-		w.baseInfoDict = info
-	}
+	w.baseCatalog = base.meta.Catalog
+	w.baseInfo = base.meta.Info
 
-	// an unchanged metadata stream re-embeds as a cache hit at its old
-	// reference instead of being written again
-	if m := base.meta.Catalog.Metadata; m != nil {
-		if ref, ok := w.baseCatalogDict["Metadata"].(Reference); ok {
-			w.objects[m] = ref
+	// the base Reader decoded these values, not the Writer, so their
+	// provenance is recorded here
+	if ref, ok := base.meta.Trailer["Root"].(Reference); ok {
+		w.recordOrigin(w.baseCatalog, ref)
+		if m := w.baseCatalog.Metadata; m != nil {
+			if dict, _ := base.Get(ref, true); dict != nil {
+				if mref, ok := dict.(Dict)["Metadata"].(Reference); ok {
+					w.recordOrigin(m, mref)
+				}
+			}
 		}
+	}
+	if ref, ok := base.meta.Trailer["Info"].(Reference); ok && w.baseInfo != nil {
+		w.recordOrigin(w.baseInfo, ref)
 	}
 
 	// separate the update from an original which does not end in white space
@@ -272,7 +268,7 @@ func (w *Writer) getUpdate(ref Reference, canObjStm, scalarOnly bool) (Native, e
 func (w *Writer) closeUpdate() (Dict, error) {
 	// a replaced metadata stream is embedded fresh, at a reference marked
 	// plaintext when the original exempts metadata from encryption
-	if m := w.meta.Catalog.Metadata; m != nil && m != w.documentMetadata {
+	if m := w.meta.Catalog.Metadata; m != nil && w.Origin(m) == 0 {
 		ref := w.Alloc()
 		if w.w.enc != nil && w.w.enc.sec.unencryptedMetadata {
 			w.refIsPlaintext[ref] = true
@@ -283,50 +279,54 @@ func (w *Writer) closeUpdate() (Dict, error) {
 		}
 	}
 
-	catDict, err := w.meta.Catalog.Encode(w.rm)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode document catalog: %w", err)
-	}
-	infoDict, err := w.meta.Info.encode(w)
-	if err != nil {
-		return nil, err
-	}
-	if err := w.rm.Close(); err != nil {
-		return nil, err
-	}
-
 	trailer := w.meta.Trailer.Clone()
 
-	rootRef := w.baseRoot
-	if rootRef == 0 || !Equal(catDict, w.baseCatalogDict) {
-		if rootRef == 0 {
-			rootRef = w.Alloc()
+	var rootRef Reference
+	switch {
+	case w.meta.Catalog == w.baseCatalog && w.Origin(w.baseCatalog) != 0:
+		rootRef = w.Origin(w.baseCatalog)
+	case w.Origin(w.baseCatalog) != 0:
+		var err error
+		rootRef, err = w.rm.Replace(w.baseCatalog, w.meta.Catalog)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write document catalog: %w", err)
 		}
-		if err := w.Put(rootRef, catDict); err != nil {
-			return nil, err
+	default:
+		var err error
+		rootRef, err = w.rm.Store(w.meta.Catalog)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write document catalog: %w", err)
 		}
 	}
 	trailer["Root"] = rootRef
 
+	baseInfoRef := w.Origin(w.baseInfo)
 	switch {
-	case infoDict == nil:
+	case w.meta.Info == nil || w.meta.Info.isEmpty():
 		delete(trailer, "Info")
-		if w.baseInfoRef != 0 && !w.base.xref[w.baseInfoRef.Number()].IsFree() {
-			if err := w.Free(w.baseInfoRef); err != nil {
+		if baseInfoRef != 0 {
+			if err := w.Free(baseInfoRef); err != nil {
 				return nil, err
 			}
 		}
-	case w.baseInfoRef != 0 && Equal(infoDict, w.baseInfoDict):
-		trailer["Info"] = w.baseInfoRef
-	default:
-		infoRef := w.baseInfoRef
-		if infoRef == 0 {
-			infoRef = w.Alloc()
-		}
-		if err := w.Put(infoRef, infoDict); err != nil {
+	case w.meta.Info == w.baseInfo:
+		trailer["Info"] = baseInfoRef
+	case baseInfoRef != 0:
+		ref, err := w.rm.Replace(w.baseInfo, w.meta.Info)
+		if err != nil {
 			return nil, err
 		}
-		trailer["Info"] = infoRef
+		trailer["Info"] = ref
+	default:
+		ref, err := w.rm.Embed(w.meta.Info)
+		if err != nil {
+			return nil, err
+		}
+		trailer["Info"] = ref
+	}
+
+	if err := w.rm.Close(); err != nil {
+		return nil, err
 	}
 
 	// ID[0] is the permanent identifier and feeds the encryption key.

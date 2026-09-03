@@ -76,14 +76,11 @@ type Writer struct {
 	// xref are absolute; offsets written to the file subtract this value.
 	headerOffset int64
 
-	// baseRoot and baseCatalogDict are the catalog reference and dictionary
-	// of the original file in update mode; baseInfoRef and baseInfoDict the
-	// same for the Info dictionary (zero and nil if absent).  Close compares
-	// the re-encoded values against these to decide what to write.
-	baseRoot        Reference
-	baseCatalogDict Dict
-	baseInfoRef     Reference
-	baseInfoDict    Dict
+	// baseCatalog and baseInfo are the original's catalog and Info in
+	// update mode.  Close compares the pointers in meta against them to
+	// see whether the caller replaced either value.
+	baseCatalog *Catalog
+	baseInfo    *Info
 
 	// objstms caches decoded object streams, mirroring the Reader field of
 	// the same name; see objstm.go.
@@ -447,6 +444,10 @@ func (w *Writer) writeXRefSection(trailer Dict) error {
 }
 
 // GetMeta returns the MetaInfo for the PDF file.
+//
+// In update mode Catalog and Info are values decoded from the original and
+// must not be modified in place; assign a modified copy instead.  Values
+// left unchanged are not written again.
 func (w *Writer) GetMeta() *MetaInfo {
 	return &w.meta
 }
@@ -991,6 +992,9 @@ func (w *posWriter) Flush() error {
 // embedded inline, and for values whose object has been freed in this
 // session.
 func (w *Writer) Origin(v any) Reference {
+	if v == nil {
+		return 0
+	}
 	native, ok := w.lookup(v)
 	if !ok {
 		return 0
@@ -1002,6 +1006,9 @@ func (w *Writer) Origin(v any) Reference {
 // lookup returns how v is represented in the file.  A reference to an
 // object freed in this session counts as absent.
 func (w *Writer) lookup(v any) (Native, bool) {
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return nil, false
+	}
 	native, ok := w.objects[v]
 	if !ok {
 		return nil, false
