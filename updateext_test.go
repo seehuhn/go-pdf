@@ -853,6 +853,146 @@ func TestUpdateCompressedObjects(t *testing.T) {
 	}
 }
 
+// TestUpdateOnHybridOriginal verifies that an update can be applied to a
+// hybrid-reference original, whose newest section is a classic
+// cross-reference table with an /XRefStm pointing at a hidden
+// cross-reference stream (PDF 32000-1, 7.5.8.4).
+func TestUpdateOnHybridOriginal(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_4, nil)
+	data := base.Data
+	prev := lastStartXRef(t, data)
+	size := trailerSize(t, data)
+	hidden := size     // only listed in the cross-reference stream
+	stmNum := size + 1 // the cross-reference stream object
+
+	root, ok := reopen(t, data).GetMeta().Trailer["Root"].(pdf.Reference)
+	if !ok {
+		t.Fatal("base file has no direct Root reference")
+	}
+
+	buf := bytes.NewBuffer(bytes.Clone(data))
+	hiddenPos := buf.Len()
+	fmt.Fprintf(buf, "%d 0 obj\n/hidden\nendobj\n", hidden)
+
+	// one type-1 entry for hidden: W [1 4 2]
+	entry := []byte{1,
+		byte(hiddenPos >> 24), byte(hiddenPos >> 16), byte(hiddenPos >> 8), byte(hiddenPos),
+		0, 0}
+	stmPos := buf.Len()
+	fmt.Fprintf(buf, "%d 0 obj\n<< /Type /XRef /Size %d /W [1 4 2] /Index [%d 1] /Length %d >>\nstream\n",
+		stmNum, size+2, hidden, len(entry))
+	buf.Write(entry)
+	buf.WriteString("\nendstream\nendobj\n")
+
+	xrefPos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root %d 0 R /Prev %d /XRefStm %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size+2, root.Number(), prev, stmPos, xrefPos)
+
+	f := &memfile.MemFile{Data: buf.Bytes()}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	if err := w.Put(ref, pdf.Name("added")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r := reopen(t, f.Data)
+	if obj, err := r.Get(pdf.NewReference(hidden, 0), true); err != nil || obj != pdf.Name("hidden") {
+		t.Errorf("hidden object = %v, %v, want /hidden", obj, err)
+	}
+	if obj, err := r.Get(ref, true); err != nil || obj != pdf.Name("added") {
+		t.Errorf("added object = %v, %v, want /added", obj, err)
+	}
+	if r.GetMeta().Catalog.Pages == 0 {
+		t.Error("catalog lost")
+	}
+	if got, ok := r.GetMeta().Trailer["Root"].(pdf.Reference); !ok || got != root {
+		t.Errorf("Root = %v, want %v", r.GetMeta().Trailer["Root"], root)
+	}
+}
+
+func TestUpdaterToGetNewObjectBeforeClose(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_4, nil)
+	orig := bytes.Clone(f.Data)
+	dst := memfile.New()
+	w, err := pdf.NewUpdaterTo(bytes.NewReader(orig), int64(len(orig)), dst, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	if err := w.Put(ref, pdf.Name("added")); err != nil {
+		t.Fatal(err)
+	}
+	obj, err := w.Get(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != pdf.Name("added") {
+		t.Errorf("got %v, want /added", obj)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUpdateHeaderJunkPreservedExactly(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_7, nil)
+	combined := append([]byte("JUNK BEFORE HEADER\n"), base.Data...)
+	orig := bytes.Clone(combined)
+	f := &memfile.MemFile{Data: combined}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	if err := w.Put(ref, pdf.Name("added")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(f.Data[:len(orig)], orig) {
+		t.Error("header junk not preserved exactly")
+	}
+}
+
+func TestUpdateRootDirectDict(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_4, nil)
+	data := bytes.Clone(base.Data)
+	pagesRef := reopen(t, data).GetMeta().Catalog.Pages
+	prev := lastStartXRef(t, data)
+	size := trailerSize(t, data)
+
+	buf := bytes.NewBuffer(data)
+	pos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root << /Type /Catalog /Pages %d 0 R >> /Prev %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size, pagesRef.Number(), prev, pos)
+	f := &memfile.MemFile{Data: buf.Bytes()}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r := reopen(t, f.Data)
+	if r.GetMeta().Catalog.Pages != pagesRef {
+		t.Errorf("Pages = %v, want %v", r.GetMeta().Catalog.Pages, pagesRef)
+	}
+	if _, ok := r.GetMeta().Trailer["Root"].(pdf.Reference); !ok {
+		t.Errorf("Root is %T, want pdf.Reference", r.GetMeta().Trailer["Root"])
+	}
+}
+
 func FuzzUpdate(f *testing.F) {
 	for i := range 4 {
 		for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_4, pdf.V1_5, pdf.V1_7, pdf.V2_0} {

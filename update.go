@@ -129,14 +129,7 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 		bufferedW = bufio.NewWriter(dst)
 	}
 
-	outOpt := defaultOutputOptions(v)
-	if opt.HumanReadable {
-		outOpt &= ^(optObjStm | optXRefStream)
-		outOpt |= OptPretty | OptDictTypes
-	}
-	if v < V2_0 {
-		outOpt |= OptTrimStandardFonts
-	}
+	outOpt := outputOptionsFor(v, opt.HumanReadable)
 
 	meta := base.meta
 	meta.Version = v
@@ -216,7 +209,7 @@ func (w *Writer) Free(ref Reference) error {
 	}
 	entry := w.base.xref[ref.Number()]
 	if entry.IsFree() || entry.Generation != ref.Generation() {
-		return fmt.Errorf("Free: object %s is not in use", ref)
+		return fmt.Errorf("Writer.Free: object %s is not in use", ref)
 	}
 	gen := entry.Generation
 	if gen < maxGeneration {

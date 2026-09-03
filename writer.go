@@ -143,6 +143,20 @@ func Create(name string, v Version, opt *WriterOptions) (*Writer, error) {
 	return pdf, nil
 }
 
+// outputOptionsFor returns the default output options for version v,
+// adjusted for human-readable output.
+func outputOptionsFor(v Version, humanReadable bool) OutputOptions {
+	outOpt := defaultOutputOptions(v)
+	if humanReadable {
+		outOpt &= ^(optObjStm | optXRefStream)
+		outOpt |= OptPretty | OptDictTypes
+	}
+	if v < V2_0 {
+		outOpt |= OptTrimStandardFonts
+	}
+	return outOpt
+}
+
 // NewWriter prepares a PDF file for writing, using the provided io.Writer.
 //
 // After writing the content to the file, [Writer.Close] must be called to
@@ -264,14 +278,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		Generation: maxGeneration,
 	}
 
-	outOpt := defaultOutputOptions(v)
-	if opt.HumanReadable {
-		outOpt &= ^(optObjStm | optXRefStream)
-		outOpt |= OptPretty | OptDictTypes
-	}
-	if v < V2_0 {
-		outOpt |= OptTrimStandardFonts
-	}
+	outOpt := outputOptionsFor(v, opt.HumanReadable)
 
 	pdf := &Writer{
 		meta: MetaInfo{
