@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bufio"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -272,4 +273,71 @@ func (w *Writer) getUpdate(ref Reference, canObjStm, scalarOnly bool) (Native, e
 		}
 	}
 	return obj, nil
+}
+
+// closeUpdate writes the catalog and Info dictionary of an incremental
+// update and returns the trailer dictionary.
+func (w *Writer) closeUpdate() (Dict, error) {
+	catDict, err := w.meta.Catalog.Encode(w.rm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode document catalog: %w", err)
+	}
+	var infoDict Native
+	if w.meta.Info != nil {
+		e := &EmbedHelper{rm: w.rm, copiers: map[*Extractor]*Copier{}}
+		infoDict, err = w.meta.Info.Embed(e)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := w.rm.Close(); err != nil {
+		return nil, err
+	}
+
+	trailer := w.meta.Trailer.Clone()
+
+	rootRef := w.baseRoot
+	if rootRef == 0 {
+		rootRef = w.Alloc()
+	}
+	if err := w.Put(rootRef, catDict); err != nil {
+		return nil, err
+	}
+	trailer["Root"] = rootRef
+
+	if infoDict != nil {
+		infoRef := w.baseInfoRef
+		if infoRef == 0 {
+			infoRef = w.Alloc()
+		}
+		if err := w.Put(infoRef, infoDict); err != nil {
+			return nil, err
+		}
+		trailer["Info"] = infoRef
+	} else {
+		delete(trailer, "Info")
+	}
+
+	// ID[0] is the permanent identifier and feeds the encryption key;
+	// ID[1] identifies the version last written
+	id1 := make([]byte, 16)
+	if _, err := io.ReadFull(rand.Reader, id1); err != nil {
+		return nil, err
+	}
+	switch {
+	case len(w.meta.ID) == 2:
+		w.meta.ID = [][]byte{w.meta.ID[0], id1}
+	case w.meta.Version >= V2_0:
+		w.meta.ID = [][]byte{id1, id1}
+	default:
+		w.meta.ID = nil
+	}
+	if w.meta.ID != nil {
+		trailer["ID"] = Array{String(w.meta.ID[0]), String(w.meta.ID[1])}
+	} else {
+		delete(trailer, "ID")
+	}
+
+	trailer["Prev"] = Integer(w.base.startXRef)
+	return trailer, nil
 }

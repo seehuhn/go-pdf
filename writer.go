@@ -337,6 +337,22 @@ func (w *Writer) Close() error {
 		return errors.New("Close() while stream is open")
 	}
 
+	var trailer Dict
+	var err error
+	if w.base != nil {
+		trailer, err = w.closeUpdate()
+	} else {
+		trailer, err = w.closeNew()
+	}
+	if err != nil {
+		return err
+	}
+	return w.writeXRefSection(trailer)
+}
+
+// closeNew writes the catalog and Info dictionary of a new file and
+// returns the trailer dictionary.
+func (w *Writer) closeNew() (Dict, error) {
 	trailer := w.meta.Trailer.Clone()
 
 	// the document metadata stream was committed during NewWriter and its
@@ -344,19 +360,19 @@ func (w *Writer) Close() error {
 	// dedup.  Replacing or clearing Metadata after NewWriter is invalid
 	// because the file already references the committed stream.
 	if w.meta.Catalog.Metadata != w.documentMetadata {
-		return errors.New("Catalog.Metadata changed after NewWriter")
+		return nil, errors.New("Catalog.Metadata changed after NewWriter")
 	}
 
 	catRef, err := w.rm.Store(w.meta.Catalog)
 	if err != nil {
-		return fmt.Errorf("failed to write document catalog: %w", err)
+		return nil, fmt.Errorf("failed to write document catalog: %w", err)
 	}
 	trailer["Root"] = catRef
 
 	if w.meta.Info != nil {
 		infoRef, err := w.rm.Embed(w.meta.Info)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if infoRef != nil {
 			trailer["Info"] = infoRef
@@ -368,7 +384,7 @@ func (w *Writer) Close() error {
 	}
 
 	if err := w.rm.Close(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if w.meta.ID != nil {
@@ -376,13 +392,19 @@ func (w *Writer) Close() error {
 	} else {
 		delete(trailer, "ID")
 	}
+	return trailer, nil
+}
 
+// writeXRefSection writes the cross-reference section, the trailer and the
+// end-of-file marker, then flushes and, for files opened by Create or
+// Update, closes the underlying file.
+func (w *Writer) writeXRefSection(trailer Dict) error {
 	// don't encrypt the encryption dictionary and the xref dict
 	w.w.enc = nil
 
-	// write the cross reference table and trailer
 	xRefPos := w.w.pos
 	trailer["Size"] = Integer(w.nextRef)
+	var err error
 	if w.outputOptions.HasAny(optXRefStream) {
 		err = w.writeXRefStream(trailer)
 	} else {
@@ -391,7 +413,7 @@ func (w *Writer) Close() error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(w.w, "startxref\n%d\n%%%%EOF\n", xRefPos)
+	_, err = fmt.Fprintf(w.w, "startxref\n%d\n%%%%EOF\n", xRefPos-w.headerOffset)
 	if err != nil {
 		return err
 	}
@@ -406,7 +428,6 @@ func (w *Writer) Close() error {
 			return err
 		}
 	}
-
 	return nil
 }
 
