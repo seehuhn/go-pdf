@@ -1023,6 +1023,51 @@ func TestUpdateRootDirectDict(t *testing.T) {
 	}
 }
 
+// TestUpdateInfoDirectDict verifies that an untouched update of an original
+// whose trailer carries a direct (non-conforming but readable) /Info
+// dictionary allocates a fresh indirect object, rather than writing the
+// zero reference into the trailer.
+func TestUpdateInfoDirectDict(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_4, nil)
+	data := bytes.Clone(base.Data)
+	root, ok := reopen(t, data).GetMeta().Trailer["Root"].(pdf.Reference)
+	if !ok {
+		t.Fatal("base file has no direct Root reference")
+	}
+	prev := lastStartXRef(t, data)
+	size := trailerSize(t, data)
+
+	buf := bytes.NewBuffer(data)
+	pos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root %d 0 R /Info << /Title (x) >> /Prev %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size, root.Number(), prev, pos)
+	f := &memfile.MemFile{Data: buf.Bytes()}
+
+	if info := reopen(t, f.Data).GetMeta().Info; info == nil || info.Title != "x" {
+		t.Fatalf("base file Info = %+v, want direct dictionary with Title \"x\"", info)
+	}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r := reopen(t, f.Data)
+	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != "x" {
+		t.Fatalf("Info = %+v, want Title \"x\"", r.GetMeta().Info)
+	}
+	ref, ok := r.GetMeta().Trailer["Info"].(pdf.Reference)
+	if !ok {
+		t.Fatalf("Info is %T, want pdf.Reference", r.GetMeta().Trailer["Info"])
+	}
+	if ref.Number() == 0 {
+		t.Errorf("Info reference is %v, want a non-zero object number", ref)
+	}
+}
+
 func FuzzUpdate(f *testing.F) {
 	for i := range 4 {
 		for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_4, pdf.V1_5, pdf.V1_7, pdf.V2_0} {

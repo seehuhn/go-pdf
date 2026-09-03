@@ -144,16 +144,15 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 			enc: base.enc,
 			pos: size,
 		},
-		origW:            dst,
-		nextRef:          uint32(next),
-		xref:             make(map[uint32]*xRefEntry),
-		objects:          make(map[any]Native),
-		objstms:          newObjstmCache(),
-		outputOptions:    outOpt,
-		documentMetadata: base.meta.Catalog.Metadata,
-		refIsPlaintext:   map[Reference]bool{},
-		base:             base,
-		headerOffset:     base.headerOffset,
+		origW:          dst,
+		nextRef:        uint32(next),
+		xref:           make(map[uint32]*xRefEntry),
+		objects:        make(map[any]Native),
+		objstms:        newObjstmCache(),
+		outputOptions:  outOpt,
+		refIsPlaintext: map[Reference]bool{},
+		base:           base,
+		headerOffset:   base.headerOffset,
 	}
 	w.rm = NewResourceManager(w)
 
@@ -309,7 +308,7 @@ func (w *Writer) closeUpdate() (Dict, error) {
 				return nil, err
 			}
 		}
-	case w.meta.Info == w.baseInfo:
+	case w.meta.Info == w.baseInfo && baseInfoRef != 0:
 		trailer["Info"] = baseInfoRef
 	case baseInfoRef != 0:
 		ref, err := w.rm.Replace(w.baseInfo, w.meta.Info)
