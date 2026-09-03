@@ -69,6 +69,15 @@ type Writer struct {
 	// xref are absolute; offsets written to the file subtract this value.
 	headerOffset int64
 
+	// baseRoot and baseCatalogDict are the catalog reference and dictionary
+	// of the original file in update mode; baseInfoRef and baseInfoDict the
+	// same for the Info dictionary (zero and nil if absent).  Close compares
+	// the re-encoded values against these to decide what to write.
+	baseRoot        Reference
+	baseCatalogDict Dict
+	baseInfoRef     Reference
+	baseInfoDict    Dict
+
 	// objstms caches decoded object streams, mirroring the Reader field of
 	// the same name; see objstm.go.
 	objstms *objstmCache
@@ -436,6 +445,10 @@ func (w *Writer) Get(ref Reference, canObjStm bool) (Native, error) {
 // integer; refusing composites prevents unbounded recursion on a cyclic
 // /Length.
 func (w *Writer) get(ref Reference, canObjStm, scalarOnly bool) (obj Native, err error) {
+	if w.base != nil {
+		return w.getUpdate(ref, canObjStm, scalarOnly)
+	}
+
 	r, ok := w.origW.(io.ReadSeeker)
 	if !ok {
 		return nil, errors.New("Get() not supported by the underlying io.Writer")
