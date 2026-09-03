@@ -318,8 +318,8 @@ func (w *Writer) closeUpdate() (Dict, error) {
 		delete(trailer, "Info")
 	}
 
-	// ID[0] is the permanent identifier and feeds the encryption key;
-	// ID[1] identifies the version last written
+	// ID[0] is the permanent identifier and feeds the encryption key.
+	// ID[1] identifies the version last written.
 	id1 := make([]byte, 16)
 	if _, err := io.ReadFull(rand.Reader, id1); err != nil {
 		return nil, err

@@ -383,13 +383,13 @@ func TestUpdateEmpty(t *testing.T) {
 	if len(f.Data) == n {
 		t.Fatal("empty update wrote nothing")
 	}
+	r := reopen(t, f.Data)
+	if obj, _ := r.Get(oldRef, true); obj != pdf.Name("old") {
+		t.Errorf("got %v, want /old", obj)
+	}
 	if !bytes.Contains(f.Data[n:], []byte("0 0\n")) {
 		// closeUpdate always rewrites the catalog until Task 6 adds the
 		// before/after comparison, so the table is not empty yet
 		t.Skip("empty table section lacks the 0 0 subsection")
-	}
-	r := reopen(t, f.Data)
-	if obj, _ := r.Get(oldRef, true); obj != pdf.Name("old") {
-		t.Errorf("got %v, want /old", obj)
 	}
 }
