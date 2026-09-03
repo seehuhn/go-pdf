@@ -79,6 +79,12 @@ type Reader struct {
 
 	headerOffset int64 // byte position of '%' in '%PDF-'
 
+	// startXRef is the header-relative offset of the newest cross-reference
+	// section, and trailerSize the /Size entry of its trailer (0 if absent).
+	// Both are needed to append an incremental update.
+	startXRef   int64
+	trailerSize int64
+
 	enc         *encryptInfo       // read-only after construction
 	unencrypted map[Reference]bool // read-only after construction
 

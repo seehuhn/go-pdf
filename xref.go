@@ -62,6 +62,8 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		return nil, nil, err
 	}
 
+	r.startXRef = start - r.headerOffset
+
 	xref := make(map[uint32]*xRefEntry)
 	trailer := Dict{}
 	first := true
@@ -127,7 +129,22 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 					trailer[key] = val
 				}
 			}
+			if size, ok := dict["Size"].(Integer); ok && size > 0 {
+				r.trailerSize = int64(size)
+			}
 			first = false
+		} else {
+			// Some writers put only changed entries into an update trailer.
+			// Take the document entry points from the newest trailer that
+			// has them, as pdf.js and MuPDF do.
+			for _, key := range []Name{"Root", "Encrypt", "ID"} {
+				if _, ok := trailer[key]; ok {
+					continue
+				}
+				if val, ok := dict[key]; ok {
+					trailer[key] = val
+				}
+			}
 		}
 
 		prev := dict["Prev"]

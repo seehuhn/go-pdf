@@ -18,6 +18,9 @@ package pdf
 
 import (
 	"bytes"
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -235,5 +238,142 @@ func TestLastOccurence(t *testing.T) {
 	}
 	if pos != 1023 {
 		t.Errorf("found wrong position: expected 1023, got %d", pos)
+	}
+}
+
+// lastStartXRef returns the value following the last startxref keyword.
+func lastStartXRef(t *testing.T, data []byte) int64 {
+	t.Helper()
+	i := bytes.LastIndex(data, []byte("startxref"))
+	if i < 0 {
+		t.Fatal("no startxref keyword")
+	}
+	// Skip whitespace after "startxref"
+	j := i + 9
+	for j < len(data) && (data[j] == ' ' || data[j] == '\t' || data[j] == '\n' || data[j] == '\r') {
+		j++
+	}
+	var pos int64
+	if _, err := fmt.Sscanf(string(data[j:]), "%d", &pos); err != nil {
+		t.Fatal(err)
+	}
+	return pos
+}
+
+var rootRefPat = regexp.MustCompile(`/Root\s+(\d+)\s+0\s+R`)
+
+// rootRef returns the catalog reference named in the last trailer of data.
+func rootRef(t *testing.T, data []byte) Reference {
+	t.Helper()
+	m := rootRefPat.FindAllSubmatch(data, -1)
+	if m == nil {
+		t.Fatal("no /Root entry")
+	}
+	n, err := strconv.Atoi(string(m[len(m)-1][1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return NewReference(uint32(n), 0)
+}
+
+var sizePat = regexp.MustCompile(`/Size\s+(\d+)`)
+
+// trailerSize returns the /Size named in the last trailer of data.
+func trailerSize(t *testing.T, data []byte) int {
+	t.Helper()
+	m := sizePat.FindAllSubmatch(data, -1)
+	if m == nil {
+		t.Fatal("no /Size entry")
+	}
+	n, err := strconv.Atoi(string(m[len(m)-1][1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// appendEmptySection appends an update section with no entries whose
+// trailer holds extra plus /Prev, and returns the new file contents.
+func appendEmptySection(t *testing.T, data []byte, extra string) []byte {
+	t.Helper()
+	prev := lastStartXRef(t, data)
+	buf := bytes.NewBuffer(bytes.Clone(data))
+	pos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Prev %d %s >>\nstartxref\n%d\n%%%%EOF\n",
+		prev, extra, pos)
+	return buf.Bytes()
+}
+
+// writeBaseFile writes a one-page PDF 1.4 file with the given options and
+// an Info title, and returns its bytes.
+func writeBaseFile(t *testing.T, opt *WriterOptions, title string) []byte {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_4, opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(w); err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Info.Title = TextString(title)
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestReadXRefRecordsNewestSection(t *testing.T) {
+	data := writeBaseFile(t, nil, "")
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.startXRef != lastStartXRef(t, data) {
+		t.Errorf("startXRef = %d, want %d", r.startXRef, lastStartXRef(t, data))
+	}
+	if r.trailerSize != int64(trailerSize(t, data)) {
+		t.Errorf("trailerSize = %d, want %d", r.trailerSize, trailerSize(t, data))
+	}
+}
+
+func TestReadXRefMergesRootFromOlderTrailer(t *testing.T) {
+	data := writeBaseFile(t, nil, "")
+	data = appendEmptySection(t, data, fmt.Sprintf("/Size %d", trailerSize(t, data)))
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatalf("open failed: %v", err)
+	}
+	if r.meta.Catalog.Pages == 0 {
+		t.Error("catalog not found via older trailer")
+	}
+}
+
+func TestReadXRefDoesNotMergeInfo(t *testing.T) {
+	data := writeBaseFile(t, nil, "hello")
+	extra := fmt.Sprintf("/Size %d /Root %d 0 R", trailerSize(t, data), rootRef(t, data).Number())
+	data = appendEmptySection(t, data, extra)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.meta.Info != nil {
+		t.Errorf("info merged from older trailer: %v", r.meta.Info)
+	}
+}
+
+func TestReadXRefNewestTrailerWins(t *testing.T) {
+	id0 := bytes.Repeat([]byte{0xAA}, 16)
+	data := writeBaseFile(t, &WriterOptions{ID: [][]byte{id0}}, "")
+	newID := bytes.Repeat([]byte{0xBB}, 16)
+	extra := fmt.Sprintf("/Size %d /Root %d 0 R /ID [<%x> <%x>]",
+		trailerSize(t, data), rootRef(t, data).Number(), newID, newID)
+	data = appendEmptySection(t, data, extra)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.meta.ID) != 2 || !bytes.Equal(r.meta.ID[0], newID) {
+		t.Errorf("ID = %x, want newest trailer's value", r.meta.ID)
 	}
 }
