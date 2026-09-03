@@ -580,3 +580,272 @@ func TestUpdateMetadata(t *testing.T) {
 		t.Errorf("metadata title = %q, want two", got)
 	}
 }
+
+func TestUpdateEncrypted(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_4, pdf.V1_7, pdf.V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			opt := &pdf.WriterOptions{UserPassword: "u", OwnerPassword: "o"}
+			f, _ := newBaseFile(t, v, opt)
+			n := len(f.Data)
+
+			w, err := pdf.NewUpdater(f, int64(n), &pdf.UpdateOptions{Password: "u"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			strRef := w.Alloc()
+			if err := w.Put(strRef, pdf.String("top secret text")); err != nil {
+				t.Fatal(err)
+			}
+			stmRef := w.Alloc()
+			ws, err := w.OpenStream(stmRef, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ws.Write([]byte("top secret stream")); err != nil {
+				t.Fatal(err)
+			}
+			if err := ws.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			if bytes.Contains(f.Data[n:], []byte("top secret")) {
+				t.Error("update contains plaintext")
+			}
+
+			r, err := pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), &pdf.ReaderOptions{Password: "u"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			obj, err := r.Get(strRef, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s, _ := obj.(pdf.String); string(s) != "top secret text" {
+				t.Errorf("string = %q", obj)
+			}
+			obj, err = r.Get(stmRef, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stm, ok := obj.(*pdf.Stream)
+			if !ok {
+				t.Fatalf("stream object is %T", obj)
+			}
+			body, err := pdf.ReadAll(r, nil, stm, 1<<20)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(body) != "top secret stream" {
+				t.Errorf("stream = %q", body)
+			}
+		})
+	}
+}
+
+func TestUpdateHeaderJunk(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_7, nil)
+	f := &memfile.MemFile{Data: append([]byte("JUNK BEFORE HEADER\n"), base.Data...)}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	if err := w.Put(ref, pdf.Name("added")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r := reopen(t, f.Data)
+	if obj, _ := r.Get(ref, true); obj != pdf.Name("added") {
+		t.Errorf("got %v, want /added", obj)
+	}
+	if r.GetMeta().Catalog.Pages == 0 {
+		t.Error("catalog lost")
+	}
+}
+
+func TestUpdateNoTrailingNewline(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_4, nil)
+	f.Data = bytes.TrimRight(f.Data, "\r\n")
+	if !bytes.HasSuffix(f.Data, []byte("%%EOF")) {
+		t.Fatal("base file does not end in the EOF marker")
+	}
+	n := len(f.Data)
+
+	w, err := pdf.NewUpdater(f, int64(n), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	if err := w.Put(ref, pdf.Name("added")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if f.Data[n] != '\n' {
+		t.Errorf("update starts with %q, want a newline", f.Data[n])
+	}
+	r := reopen(t, f.Data)
+	if obj, _ := r.Get(ref, true); obj != pdf.Name("added") {
+		t.Errorf("got %v, want /added", obj)
+	}
+}
+
+func TestUpdateChainOfThree(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_7, nil)
+	var refs []pdf.Reference
+	for i := range 3 {
+		w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref := w.Alloc()
+		if err := w.Put(ref, pdf.Integer(i)); err != nil {
+			t.Fatal(err)
+		}
+		refs = append(refs, ref)
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := bytes.Count(f.Data, []byte("startxref")); got != 4 {
+		t.Errorf("%d startxref keywords, want 4", got)
+	}
+	r := reopen(t, f.Data)
+	for i, ref := range refs {
+		if obj, _ := r.Get(ref, true); obj != pdf.Integer(i) {
+			t.Errorf("object %v = %v, want %d", ref, obj, i)
+		}
+	}
+}
+
+func TestUpdateToMatchesInPlace(t *testing.T) {
+	f, oldRef := newBaseFile(t, pdf.V1_7, nil)
+	orig := bytes.Clone(f.Data)
+
+	edit := func(t *testing.T, w *pdf.Writer) pdf.Reference {
+		t.Helper()
+		if err := w.Put(oldRef, pdf.Name("new")); err != nil {
+			t.Fatal(err)
+		}
+		ref := w.Alloc()
+		if err := w.Put(ref, pdf.Name("added")); err != nil {
+			t.Fatal(err)
+		}
+		w.GetMeta().Catalog.PageMode = "UseThumbs"
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return ref
+	}
+
+	wIn, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refIn := edit(t, wIn)
+
+	dst := memfile.New()
+	wTo, err := pdf.NewUpdaterTo(bytes.NewReader(orig), int64(len(orig)), dst, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refTo := edit(t, wTo)
+
+	if refIn != refTo {
+		t.Errorf("allocated %v in place but %v in copy", refIn, refTo)
+	}
+	if !bytes.Equal(dst.Data[:len(orig)], orig) {
+		t.Error("copy does not start with the original")
+	}
+	for _, data := range [][]byte{f.Data, dst.Data} {
+		r := reopen(t, data)
+		if obj, _ := r.Get(oldRef, true); obj != pdf.Name("new") {
+			t.Errorf("got %v, want /new", obj)
+		}
+		if obj, _ := r.Get(refIn, true); obj != pdf.Name("added") {
+			t.Errorf("got %v, want /added", obj)
+		}
+		if r.GetMeta().Catalog.PageMode != "UseThumbs" {
+			t.Errorf("PageMode = %q", r.GetMeta().Catalog.PageMode)
+		}
+	}
+}
+
+func TestUpdateVersionRaised(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_4, nil)
+	n := len(f.Data)
+	w, err := pdf.NewUpdater(f, int64(n), &pdf.UpdateOptions{Version: pdf.V1_7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r := reopen(t, f.Data)
+	if r.GetMeta().Version != pdf.V1_7 || r.GetMeta().Catalog.Version != pdf.V1_7 {
+		t.Errorf("version %s, catalog version %s, want 1.7", r.GetMeta().Version, r.GetMeta().Catalog.Version)
+	}
+	// a 1.7 update uses a cross-reference stream even after a 1.4 original
+	if !bytes.Contains(f.Data[n:], []byte("XRef")) {
+		t.Error("raised-version update did not write a cross-reference stream")
+	}
+}
+
+func TestUpdateSectionTypeFollowsVersion(t *testing.T) {
+	f14, _ := newBaseFile(t, pdf.V1_4, nil)
+	n := len(f14.Data)
+	applyEmptyUpdate(t, f14)
+	if !bytes.Contains(f14.Data[n:], []byte("trailer")) {
+		t.Error("1.4 update did not write a cross-reference table")
+	}
+
+	f17, _ := newBaseFile(t, pdf.V1_7, nil)
+	n = len(f17.Data)
+	applyEmptyUpdate(t, f17)
+	if bytes.Contains(f17.Data[n:], []byte("trailer")) {
+		t.Error("1.7 update wrote a cross-reference table")
+	}
+
+	// HumanReadable forces a table
+	w, err := pdf.NewUpdater(f17, int64(len(f17.Data)), &pdf.UpdateOptions{HumanReadable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n = len(f17.Data)
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(f17.Data[n:], []byte("trailer")) {
+		t.Error("HumanReadable update did not write a cross-reference table")
+	}
+	reopen(t, f17.Data)
+}
+
+func TestUpdateCompressedObjects(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_7, nil)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs := []pdf.Reference{w.Alloc(), w.Alloc()}
+	if err := w.WriteCompressed(refs, pdf.Name("a"), pdf.Name("b")); err != nil {
+		t.Fatal(err)
+	}
+	if obj, err := w.Get(refs[1], true); err != nil || obj != pdf.Name("b") {
+		t.Errorf("Get of compressed object before Close: %v, %v", obj, err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r := reopen(t, f.Data)
+	if obj, _ := r.Get(refs[0], true); obj != pdf.Name("a") {
+		t.Errorf("got %v, want /a", obj)
+	}
+}
