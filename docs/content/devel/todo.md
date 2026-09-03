@@ -73,7 +73,6 @@ weight = 100
 
 - implement JPXDecode filters
 - implement Crypt filters
-- allow for incremental updates to PDF files
 - add a way to repair broken xref tables?
 - implement public-key encryption (PDF spec §7.6.5).
   Currently the only supported `/Encrypt /Filter` is `Standard`; files

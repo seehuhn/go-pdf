@@ -234,14 +234,6 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32) error {
 	offByOne := uint32(0)
 	for i := start; i < end; i++ {
-		if xref[i] != nil {
-			err := s.Discard(20)
-			if err != nil {
-				return err
-			}
-			continue
-		}
-
 		buf, err := s.PeekN(20)
 		if err != nil {
 			return err
@@ -250,6 +242,19 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			return &MalformedFileError{
 				Err: io.ErrUnexpectedEOF,
 			}
+		}
+
+		// some mal-formed PDF files use one-byte line endings; the
+		// width must be computed the same way whether or not the entry
+		// is skipped below, so that later entries stay aligned
+		width := 20
+		if buf[19] != '\n' && buf[19] != '\r' {
+			width = 19
+		}
+
+		if xref[i] != nil {
+			s.pos += width
+			continue
 		}
 
 		a, err := strconv.ParseInt(string(buf[:10]), 10, 64)
@@ -291,13 +296,7 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			}
 		}
 
-		if buf[19] == '\n' || buf[19] == '\r' {
-			s.pos += 20
-		} else {
-			// Some mal-formed PDF files use one-byte line endings.
-			// Try to fix this up ...
-			s.pos += 19
-		}
+		s.pos += width
 	}
 	return nil
 }

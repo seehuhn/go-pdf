@@ -23,7 +23,10 @@ import (
 	"slices"
 	"strconv"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/pdf"
@@ -848,4 +851,75 @@ func TestUpdateCompressedObjects(t *testing.T) {
 	if obj, _ := r.Get(refs[0], true); obj != pdf.Name("a") {
 		t.Errorf("got %v, want /a", obj)
 	}
+}
+
+func FuzzUpdate(f *testing.F) {
+	for i := range 4 {
+		for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_4, pdf.V1_5, pdf.V1_7, pdf.V2_0} {
+			w, file := memfile.NewPDFWriter(f, v, &pdf.WriterOptions{HumanReadable: i%2 == 0})
+			switch i {
+			case 1:
+				w.GetMeta().Info.Title = "test"
+			case 2:
+				w.GetMeta().Info.ModDate = pdf.Date(time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
+			case 3:
+				if err := w.Put(w.Alloc(), pdf.String("AAAAAAAAAAAAAAAAAA")); err != nil {
+					f.Fatal(err)
+				}
+			}
+			if err := w.Close(); err != nil {
+				f.Fatal(err)
+			}
+			f.Add(bytes.Clone(file.Data))
+		}
+	}
+
+	f.Fuzz(func(t *testing.T, in []byte) {
+		r1, err := pdf.NewReader(bytes.NewReader(in), int64(len(in)), nil)
+		if err != nil {
+			return
+		}
+		cat1 := r1.GetMeta().Catalog
+		info1 := r1.GetMeta().Info
+
+		file := &memfile.MemFile{Data: bytes.Clone(in)}
+
+		// an update which changes nothing
+		w, err := pdf.NewUpdater(file, int64(len(file.Data)), nil)
+		if err != nil {
+			return
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("empty update failed: %v", err)
+		}
+
+		// an update which adds one object
+		w, err = pdf.NewUpdater(file, int64(len(file.Data)), nil)
+		if err != nil {
+			t.Fatalf("second open failed: %v", err)
+		}
+		ref := w.Alloc()
+		if err := w.Put(ref, pdf.Name("x")); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("update failed: %v", err)
+		}
+
+		r2, err := pdf.NewReader(bytes.NewReader(file.Data), int64(len(file.Data)), nil)
+		if err != nil {
+			t.Fatalf("reopen failed: %v", err)
+		}
+		if obj, err := r2.Get(ref, true); err != nil || obj != pdf.Name("x") {
+			t.Errorf("added object reads as %v, %v", obj, err)
+		}
+		ignore := cmpopts.IgnoreFields(pdf.Catalog{}, "Metadata")
+		equateLang := cmpopts.EquateComparable(language.Tag{})
+		if diff := cmp.Diff(cat1, r2.GetMeta().Catalog, ignore, equateLang); diff != "" {
+			t.Errorf("catalog changed (-before +after):\n%s", diff)
+		}
+		if diff := cmp.Diff(info1, r2.GetMeta().Info); diff != "" {
+			t.Errorf("info changed (-before +after):\n%s", diff)
+		}
+	})
 }

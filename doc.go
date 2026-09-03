@@ -47,6 +47,9 @@
 //	    log.Fatal(err)
 //	}
 //
+// [Update], [NewUpdater] and [NewUpdaterTo] append an incremental update to
+// an existing file.
+//
 // The following classes represent the native PDF object types: [Array],
 // [Boolean], [Dict], [Integer], [Name], [Real], [Reference], [*Stream], [String].
 // All of these implement the [Object] interface.

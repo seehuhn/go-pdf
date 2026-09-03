@@ -172,8 +172,11 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	}
 	switch info := base.meta.Trailer["Info"].(type) {
 	case Reference:
-		w.baseInfoRef = info
-		if obj, err := base.Get(info, true); err == nil {
+		// a reference whose generation does not match the xref entry
+		// resolves to nil; baseInfoRef must track that so a later Free
+		// call agrees with what Get already treated as absent
+		if obj, err := base.Get(info, true); err == nil && obj != nil {
+			w.baseInfoRef = info
 			w.baseInfoDict, _ = obj.(Dict)
 		}
 	case Dict:

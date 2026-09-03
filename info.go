@@ -155,14 +155,39 @@ func ExtractInfo(c Cursor, obj Object, _ bool) (*Info, error) {
 		}
 	}
 
+	if info.isEmpty() {
+		// an Info dictionary with no observable content is
+		// indistinguishable from a missing one, and encode collapses it
+		// to nil; decoding it the same way keeps read-write-read stable
+		return nil, nil
+	}
+
 	return info, nil
+}
+
+// isEmpty reports whether info has no content that encode would write.
+func (info *Info) isEmpty() bool {
+	if info == nil {
+		return true
+	}
+	if info.Title != "" || info.Author != "" || info.Subject != "" ||
+		info.Keywords != "" || info.Creator != "" || info.Producer != "" {
+		return false
+	}
+	if !info.CreationDate.IsZero() || !info.ModDate.IsZero() {
+		return false
+	}
+	if _, ok := info.Trapped.Get(); ok {
+		return false
+	}
+	return len(info.Custom) == 0
 }
 
 // encode builds the Info dictionary without writing it to w.
 //
 // It returns nil if all fields are empty.
 func (info *Info) encode(w *Writer) (Dict, error) {
-	if info == nil {
+	if info.isEmpty() {
 		return nil, nil
 	}
 
@@ -207,9 +232,6 @@ func (info *Info) encode(w *Writer) (Dict, error) {
 		dict[Name(key)] = TextString(val)
 	}
 
-	if len(dict) == 0 {
-		return nil, nil
-	}
 	return dict, nil
 }
 
