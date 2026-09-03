@@ -293,6 +293,81 @@ func TestReplaceSkipsEqualEncoding(t *testing.T) {
 	}
 }
 
+// selfRefEncoder embeds its own reference in its dictionary, as outline
+// nodes do for their children's /Parent entries.
+type selfRefEncoder struct{ Label pdf.Name }
+
+func (s *selfRefEncoder) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	return pdf.Dict{"Label": s.Label, "Self": rm.GetReference(s)}, nil
+}
+
+func decodeSelfRef(c pdf.Cursor, obj pdf.Object, _ bool) (*selfRefEncoder, error) {
+	dict, err := c.Dict(obj)
+	if err != nil {
+		return nil, err
+	}
+	label, err := c.Name(dict["Label"])
+	if err != nil {
+		return nil, err
+	}
+	return &selfRefEncoder{Label: label}, nil
+}
+
+func TestReplaceSelfReferencingEncoder(t *testing.T) {
+	w0, f := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	selfRef := w0.Alloc()
+	if err := w0.Put(selfRef, pdf.Dict{"Label": pdf.Name("old"), "Self": selfRef}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+	orig := bytes.Clone(f.Data)
+
+	w, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := pdf.Decode(pdf.NewCursor(w), selfRef, decodeSelfRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repl := &selfRefEncoder{Label: "new"}
+	rm := pdf.NewResourceManager(w)
+	ref, err := rm.Replace(old, repl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ref != selfRef {
+		t.Errorf("Replace wrote at %v, want %v", ref, selfRef)
+	}
+	if _, err := rm.Replace(old, repl); err == nil {
+		t.Error("second Replace of the same object succeeded")
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dict, err := pdf.NewCursor(r).Dict(selfRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dict["Label"] != pdf.Name("new") {
+		t.Errorf("Label = %v, want new", dict["Label"])
+	}
+	if dict["Self"] != pdf.Object(selfRef) {
+		t.Errorf("Self = %v, want %v", dict["Self"], selfRef)
+	}
+}
+
 func TestOriginVoidAfterFree(t *testing.T) {
 	f := newUpdateBase(t)
 	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)

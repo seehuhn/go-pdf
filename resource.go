@@ -307,16 +307,24 @@ func (rm *ResourceManager) StoreEncoded(enc Encoder, obj Native) (Reference, err
 // equals the original object is not written.  Replacing the same object
 // twice is an error, as is replacing an object written in this session.
 func (rm *ResourceManager) Replace(orig, repl any) (Reference, error) {
+	if rm.isClosed {
+		return 0, errors.New("resource manager is already closed")
+	}
 	ref := rm.Out.Origin(orig)
 	if ref == 0 {
 		return 0, errors.New("Replace: original has no provenance")
 	}
-	if rm.isClosed {
-		return 0, errors.New("resource manager is already closed")
+	if rm.Out.xref[ref.Number()] != nil {
+		return 0, errors.New("Replace: object already written in this session")
 	}
 
 	switch r := repl.(type) {
 	case Encoder:
+		// preset the reference so a self-referencing Encoder (one that
+		// calls rm.GetReference(repl) while encoding, e.g. to point a
+		// child back at itself) picks up the original's reference rather
+		// than allocating a fresh, unrelated one.
+		rm.Out.objects[repl] = ref
 		native, err := r.Encode(rm)
 		if err != nil {
 			return 0, err
@@ -328,14 +336,10 @@ func (rm *ResourceManager) Replace(orig, repl any) (Reference, error) {
 			return 0, errors.New("encode must not return a reference")
 		}
 		if rm.Out.sameAsStored(ref, native) {
-			rm.Out.objects[repl] = ref
+			delete(rm.reserved, repl)
 			return ref, nil
 		}
-		if err := rm.Out.Put(ref, native); err != nil {
-			return 0, err
-		}
-		rm.Out.objects[repl] = ref
-		return ref, nil
+		return rm.putEncoded(r, native)
 	case Embedder:
 		e := &EmbedHelper{rm: rm, copiers: map[*Extractor]*Copier{}}
 		delete(rm.Out.objects, repl) // EmbedAt must not see a stale entry
