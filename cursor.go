@@ -332,6 +332,11 @@ func Decode[T any](c Cursor, obj Object, decode func(Cursor, Object, bool) (T, e
 	// callers share one object (see cacheStoreOrLoad)
 	if len(refs) > 0 {
 		res, _ = x.cacheStoreOrLoad(refs, tp, res).(T)
+		// a value decoded through a Writer stands for the object it was
+		// read from; the last reference of the chain is that object
+		if w, ok := x.R.(*Writer); ok {
+			w.recordOrigin(res, refs[len(refs)-1])
+		}
 	}
 
 	return res, nil

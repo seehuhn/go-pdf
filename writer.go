@@ -25,6 +25,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"reflect"
 	"strconv"
 )
 
@@ -983,4 +984,47 @@ func (w *posWriter) Write(p []byte) (int, error) {
 
 func (w *posWriter) Flush() error {
 	return w.w.Flush()
+}
+
+// Origin returns the reference of the object a value decoded through w was
+// read from.  It returns 0 for values without provenance, for values
+// embedded inline, and for values whose object has been freed in this
+// session.
+func (w *Writer) Origin(v any) Reference {
+	native, ok := w.lookup(v)
+	if !ok {
+		return 0
+	}
+	ref, _ := native.(Reference)
+	return ref
+}
+
+// lookup returns how v is represented in the file.  A reference to an
+// object freed in this session counts as absent.
+func (w *Writer) lookup(v any) (Native, bool) {
+	native, ok := w.objects[v]
+	if !ok {
+		return nil, false
+	}
+	if ref, isRef := native.(Reference); isRef {
+		if entry := w.xref[ref.Number()]; entry != nil && entry.Pos < 0 {
+			return nil, false
+		}
+	}
+	return native, true
+}
+
+// recordOrigin remembers that v was decoded from the object at ref.
+// The first record for a value wins.
+func (w *Writer) recordOrigin(v any, ref Reference) {
+	if v == nil {
+		return
+	}
+	if !reflect.TypeOf(v).Comparable() {
+		return
+	}
+	if _, ok := w.objects[v]; ok {
+		return
+	}
+	w.objects[v] = ref
 }

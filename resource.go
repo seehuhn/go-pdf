@@ -84,7 +84,7 @@ func (e *EmbedHelper) Embed(r Embedder) (Native, error) {
 }
 
 func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
-	if existing, ok := e.rm.Out.objects[r]; ok {
+	if existing, ok := e.rm.Out.lookup(r); ok {
 		return existing, nil
 	}
 	if e.rm.isClosed {
@@ -119,7 +119,7 @@ func (e *EmbedHelper) CopierFrom(x *Extractor) *Copier {
 }
 
 func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
-	if existing, ok := e.rm.Out.objects[obj]; ok {
+	if existing, ok := e.rm.Out.lookup(obj); ok {
 		return existing, nil
 	}
 	if e.rm.isClosed {
@@ -194,8 +194,10 @@ func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*EmbedHelper, T
 // when two objects need to reference each other (e.g. a widget annotation and
 // its parent field).
 func (rm *ResourceManager) GetReference(enc Encoder) Reference {
-	if ref, ok := rm.Out.objects[enc].(Reference); ok {
-		return ref
+	if native, ok := rm.Out.lookup(enc); ok {
+		if r, isRef := native.(Reference); isRef {
+			return r
+		}
 	}
 	ref := rm.Out.Alloc()
 	rm.Out.objects[enc] = ref
@@ -230,8 +232,9 @@ func (rm *ResourceManager) StoreDeferred(enc Encoder) Reference {
 // that returns a nil object writes nothing; Store then returns the zero
 // reference, which callers treat as "unset".
 func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
-	ref, isSet := rm.Out.objects[enc].(Reference)
-	if isSet && !rm.reserved[enc] {
+	native, isSet := rm.Out.lookup(enc)
+	ref, _ := native.(Reference)
+	if isSet && ref != 0 && !rm.reserved[enc] {
 		return ref, nil
 	}
 
@@ -247,8 +250,10 @@ func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
 		// already refer to the object. Otherwise the encoder chose to write
 		// nothing, reported as the zero reference, which callers treat as
 		// "unset".
-		if ref, ok := rm.Out.objects[enc].(Reference); ok {
-			return ref, nil
+		if native, ok := rm.Out.lookup(enc); ok {
+			if r, isRef := native.(Reference); isRef {
+				return r, nil
+			}
 		}
 		return 0, nil
 	}
@@ -451,7 +456,6 @@ func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
 	ka := extractorKey{ref: ref, tp: reflect.TypeFor[A]()}
 	kb := extractorKey{ref: ref, tp: reflect.TypeFor[B]()}
 	x.mu.Lock()
-	defer x.mu.Unlock()
 	if v, ok := x.cache[ka]; ok {
 		a = v.(A)
 	} else {
@@ -462,5 +466,12 @@ func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
 	} else {
 		x.cache[kb] = b
 	}
+	x.mu.Unlock()
+
+	if w, ok := x.R.(*Writer); ok {
+		w.recordOrigin(a, ref)
+		w.recordOrigin(b, ref)
+	}
+
 	return a, b
 }

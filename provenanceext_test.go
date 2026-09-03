@@ -54,3 +54,179 @@ func TestTwoManagersShareObjects(t *testing.T) {
 		t.Errorf("title written %d times, want 1", n)
 	}
 }
+
+// newUpdateBase writes a one-page file with an Info dictionary and one
+// extra object, and returns it.
+func newUpdateBase(t *testing.T) *memfile.MemFile {
+	t.Helper()
+	w, f := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	w.GetMeta().Info.Title = "base"
+	if err := w.Put(w.Alloc(), pdf.Name("extra")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func TestOriginOfDecodedValue(t *testing.T) {
+	f := newUpdateBase(t)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	pagesRef := w.GetMeta().Catalog.Pages
+	pg, err := pdf.Decode(c, pagesRef, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
+		d, err := c.Dict(obj)
+		return &d, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Origin(pg); got != pagesRef {
+		t.Errorf("Origin = %v, want %v", got, pagesRef)
+	}
+	if got := w.Origin(&pdf.Dict{}); got != 0 {
+		t.Errorf("Origin of unrelated value = %v, want 0", got)
+	}
+}
+
+func TestDecodedValueEmbedsAsOrigin(t *testing.T) {
+	f := newUpdateBase(t)
+	orig := bytes.Clone(f.Data)
+	w, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
+	info, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm := pdf.NewResourceManager(w)
+	got, err := rm.Embed(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != infoRef {
+		t.Errorf("embedded as %v, want %v", got, infoRef)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(f.Data[len(orig):], []byte("(base)")) {
+		t.Error("unchanged Info was written again")
+	}
+}
+
+func TestValueFromOtherGetterHasNoOrigin(t *testing.T) {
+	f := newUpdateBase(t)
+	r, err := pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	infoRef := r.GetMeta().Trailer["Info"].(pdf.Reference)
+	info, err := pdf.Decode(pdf.NewCursor(r), infoRef, pdf.ExtractInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Origin(info); got != 0 {
+		t.Errorf("Origin = %v for a value from another Getter", got)
+	}
+	rm := pdf.NewResourceManager(w)
+	got, err := rm.Embed(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == infoRef {
+		t.Error("value from another Getter reused the original reference")
+	}
+}
+
+func TestInlineValueHasNoOrigin(t *testing.T) {
+	f := newUpdateBase(t)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	v, err := pdf.Decode(c, pdf.Dict{"A": pdf.Integer(1)}, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
+		d, err := c.Dict(obj)
+		return &d, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Origin(v); got != 0 {
+		t.Errorf("Origin = %v for an inline value", got)
+	}
+}
+
+func TestOriginFollowsReferenceChain(t *testing.T) {
+	w0, f := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	target := w0.Alloc()
+	middle := w0.Alloc()
+	if err := w0.Put(target, pdf.Dict{"Kind": pdf.Name("target")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w0.Put(middle, target); err != nil {
+		t.Fatal(err)
+	}
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := pdf.Decode(pdf.NewCursor(w), middle, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
+		d, err := c.Dict(obj)
+		return &d, err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Origin(v); got != target {
+		t.Errorf("Origin = %v, want the last reference %v", got, target)
+	}
+}
+
+func TestOriginVoidAfterFree(t *testing.T) {
+	f := newUpdateBase(t)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
+	info, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Free(infoRef); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Origin(info); got != 0 {
+		t.Errorf("Origin = %v after Free, want 0", got)
+	}
+	rm := pdf.NewResourceManager(w)
+	got, err := rm.Embed(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == infoRef {
+		t.Error("embedding after Free reused the freed reference")
+	}
+}

@@ -157,9 +157,12 @@ func TestExtractConditionalBadType(t *testing.T) {
 	}
 }
 
-// TestExtractConditionalInferTypeRoundTrip checks that a membership dictionary
-// read without its /Type entry is written back with one, so the read-write-read
-// cycle is stable.
+// TestExtractConditionalInferTypeRoundTrip checks that a membership
+// dictionary read without its /Type entry keeps its inferred type across a
+// read-write-read cycle.  The decoded value has provenance, so embedding it
+// again resolves to the original object rather than writing a repaired
+// copy; the inference must therefore be stable when the object is decoded
+// again.
 func TestExtractConditionalInferTypeRoundTrip(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
@@ -193,12 +196,8 @@ func TestExtractConditionalInferTypeRoundTrip(t *testing.T) {
 	if err := rm.Close(); err != nil {
 		t.Fatal(err)
 	}
-	dict, err := pdf.NewCursor(w).Dict(embedded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dict["Type"] != pdf.Name("OCMD") {
-		t.Errorf("Type = %v, want OCMD", dict["Type"])
+	if embedded != mdRef {
+		t.Errorf("embedded as %v, want the original object %v", embedded, mdRef)
 	}
 
 	back, err := pdf.Decode(pdf.NewCursor(w), embedded, ExtractConditional)
