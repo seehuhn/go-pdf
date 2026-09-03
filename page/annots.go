@@ -64,12 +64,11 @@ func (a *Annots) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
-// decodeAnnots reads an /Annots array.  The caller sets SingleUse from the
-// way the array was referenced.
-func decodeAnnots(c pdf.Cursor, obj pdf.Object, _ bool) (*Annots, error) {
+// decodeAnnots reads an /Annots array.
+func decodeAnnots(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Annots, error) {
 	_, list, err := decode.PageAnnotations(c, obj)
 	if err != nil {
 		return nil, err
 	}
-	return &Annots{List: list}, nil
+	return &Annots{List: list, SingleUse: isDirect}, nil
 }

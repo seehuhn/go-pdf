@@ -763,15 +763,11 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 
 	// Annots
 	if obj := dict["Annots"]; obj != nil {
-		_, isRef := obj.(pdf.Reference)
 		annots, err := pdf.Decode(c, obj, decodeAnnots)
 		if err != nil {
 			return nil, err
 		}
-		if annots != nil {
-			annots.SingleUse = !isRef
-			p.Annots = annots
-		}
+		p.Annots = annots
 	}
 
 	// AA (optional)
