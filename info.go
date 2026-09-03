@@ -57,7 +57,8 @@ type Info struct {
 
 // ExtractInfo reads an Info dictionary from a PDF file.
 //
-// If obj is nil, the function returns nil.
+// If obj is nil, the function returns nil.  It also returns nil if the
+// dictionary has no observable content.
 func ExtractInfo(c Cursor, obj Object, _ bool) (*Info, error) {
 	if obj == nil {
 		return nil, nil
