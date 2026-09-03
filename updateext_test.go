@@ -397,7 +397,7 @@ func TestUpdateEmpty(t *testing.T) {
 
 // objectHeader returns the token that starts the given object in the file.
 func objectHeader(ref pdf.Reference) []byte {
-	return []byte(fmt.Sprintf("\n%d %d obj", ref.Number(), ref.Generation()))
+	return fmt.Appendf(nil, "\n%d %d obj", ref.Number(), ref.Generation())
 }
 
 func TestUpdateCatalogUnchanged(t *testing.T) {
