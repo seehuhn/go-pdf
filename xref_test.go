@@ -382,19 +382,20 @@ func TestReadXRefNewestTrailerWins(t *testing.T) {
 	}
 }
 
-var idPat = regexp.MustCompile(`/ID\s*\[.*?\]`)
-
 // TestReadXRefMergesEncryptFromOlderTrailer verifies that /Encrypt is taken
 // from an older trailer in the /Prev chain when the newest trailer omits it,
 // the same way /Root already is.
 func TestReadXRefMergesEncryptFromOlderTrailer(t *testing.T) {
 	data := writeBaseFile(t, &WriterOptions{UserPassword: "u", OwnerPassword: "o"}, "")
-	idText := idPat.Find(data)
-	if idText == nil {
+	base, err := NewReader(bytes.NewReader(data), int64(len(data)), &ReaderOptions{Password: "u"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(base.meta.ID) != 2 {
 		t.Fatal("no /ID entry in base file")
 	}
-	extra := fmt.Sprintf("/Size %d /Root %d 0 R %s",
-		trailerSize(t, data), rootRef(t, data).Number(), idText)
+	extra := fmt.Sprintf("/Size %d /Root %d 0 R /ID [<%x> <%x>]",
+		trailerSize(t, data), rootRef(t, data).Number(), base.meta.ID[0], base.meta.ID[1])
 	data = appendEmptySection(t, data, extra)
 
 	r, err := NewReader(bytes.NewReader(data), int64(len(data)), &ReaderOptions{Password: "u"})
