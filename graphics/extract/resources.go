@@ -33,9 +33,9 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 		return nil, err
 	}
 
-	// handle nil - return empty resource
+	// an absent /Resources entry is inherited, not an empty dictionary
 	if dict == nil {
-		return &content.Resources{SingleUse: true}, nil
+		return nil, nil
 	}
 
 	// create result with SingleUse based on indirectness

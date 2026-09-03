@@ -26,9 +26,10 @@
 //
 // The result is written to test.pdf as an incremental update: the original
 // file is copied unchanged and the new objects are appended, together with a
-// cross-reference section listing only the objects which changed.  Each page
-// dictionary is rewritten at its original object number with a new /Annots
-// array; everything else in the file stays as it was.
+// cross-reference section listing only the objects which changed.  Each
+// page's annotation list is rewritten at its original object number when it
+// is an indirect object; otherwise the page dictionary is.  Nothing else in
+// the file changes.
 package main
 
 import (
@@ -43,7 +44,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
-	"seehuhn.de/go/pdf/annotation/decode"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
@@ -52,6 +52,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -135,48 +136,48 @@ func run(inputName, text string, replace bool) error {
 			return err
 		}
 
-		// The view is not the page object itself: it lacks the /Parent
-		// entry, and inherited attributes appear in it that the page does
-		// not carry.  Modify the stored dictionary instead, so that the
-		// rewritten page differs from the original only in /Annots.
-		pageDict, err := c.Dict(pageRef)
+		old, err := pdf.Decode(c, pageRef, page.Decode)
 		if err != nil {
 			return err
 		}
 
-		refs, annots, err := decode.PageAnnotations(c, pageDict["Annots"])
-		if err != nil {
-			return err
-		}
-		kept := make(pdf.Array, 0, len(refs)+1)
-		for i, a := range annots {
-			if _, isWatermark := a.(*annotation.Watermark); isWatermark && replace {
-				// an annotation object may be shared between pages
-				if !freed[refs[i]] {
-					freed[refs[i]] = true
-					if err := w.Free(refs[i]); err != nil {
-						return err
+		// Values decoded through the writer stand for the objects they were
+		// read from and must not be modified; a new list is built instead.
+		annots := &page.Annots{}
+		if old.Annots != nil {
+			annots.SingleUse = old.Annots.SingleUse
+			for _, a := range old.Annots.List {
+				if _, isWatermark := a.(*annotation.Watermark); isWatermark && replace {
+					// an annotation object may be shared between pages
+					if ref := w.Origin(a); ref != 0 && !freed[ref] {
+						freed[ref] = true
+						if err := w.Free(ref); err != nil {
+							return err
+						}
 					}
+					continue
 				}
-				continue
+				annots.Add(a)
 			}
-			kept = append(kept, refs[i])
 		}
-
-		wm := &annotation.Watermark{
+		annots.Add(&annotation.Watermark{
 			Common: annotation.Common{
 				Rect:       *mediaBox,
 				Flags:      annotation.FlagPrint | annotation.FlagReadOnly,
 				Appearance: &appearance.Dict{Normal: stamp.form(*mediaBox, int(rotate))},
 			},
-		}
-		wmRef, err := rm.Store(wm)
-		if err != nil {
-			return err
-		}
-		pageDict["Annots"] = append(kept, wmRef)
+		})
 
-		if err := w.Put(pageRef, pageDict); err != nil {
+		if old.Annots != nil && w.Origin(old.Annots) != 0 {
+			// an indirect list is replaced on its own; the page stays as it is
+			if _, err := rm.Replace(old.Annots, annots); err != nil {
+				return err
+			}
+			continue
+		}
+		p := *old
+		p.Annots = annots
+		if _, err := rm.Replace(old, &p); err != nil {
 			return err
 		}
 	}
