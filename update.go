@@ -143,6 +143,7 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 		origW:            dst,
 		nextRef:          uint32(next),
 		xref:             make(map[uint32]*xRefEntry),
+		objects:          make(map[any]Native),
 		objstms:          newObjstmCache(),
 		outputOptions:    outOpt,
 		documentMetadata: base.meta.Catalog.Metadata,
@@ -175,7 +176,7 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	// reference instead of being written again
 	if m := base.meta.Catalog.Metadata; m != nil {
 		if ref, ok := w.baseCatalogDict["Metadata"].(Reference); ok {
-			w.rm.embedded[m] = ref
+			w.objects[m] = ref
 		}
 	}
 

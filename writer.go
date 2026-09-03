@@ -60,6 +60,12 @@ type Writer struct {
 	xref    map[uint32]*xRefEntry
 	nextRef uint32
 
+	// objects records how a value is represented in the file: a Reference
+	// for indirect objects, or an inline Native for values embedded
+	// directly.  Entries come from Decode, for values read from the file,
+	// and from the resource managers, for values written to it.
+	objects map[any]Native
+
 	// base is the original file when the Writer appends an incremental
 	// update, and nil when it writes a new file.  In update mode xref holds
 	// only the entries written in this session.
@@ -298,6 +304,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 		nextRef: 1,
 		xref:    xref,
+		objects: make(map[any]Native),
 		objstms: newObjstmCache(),
 
 		outputOptions: outOpt,

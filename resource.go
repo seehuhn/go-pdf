@@ -84,7 +84,7 @@ func (e *EmbedHelper) Embed(r Embedder) (Native, error) {
 }
 
 func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
-	if existing, ok := e.rm.embedded[r]; ok {
+	if existing, ok := e.rm.Out.objects[r]; ok {
 		return existing, nil
 	}
 	if e.rm.isClosed {
@@ -104,7 +104,7 @@ func (e *EmbedHelper) EmbedAt(ref Reference, r Embedder) (Native, error) {
 		panic("wrong reference")
 	}
 
-	e.rm.embedded[r] = val
+	e.rm.Out.objects[r] = val
 
 	return val, nil
 }
@@ -119,7 +119,7 @@ func (e *EmbedHelper) CopierFrom(x *Extractor) *Copier {
 }
 
 func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
-	if existing, ok := e.rm.embedded[obj]; ok {
+	if existing, ok := e.rm.Out.objects[obj]; ok {
 		return existing, nil
 	}
 	if e.rm.isClosed {
@@ -131,14 +131,15 @@ func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native
 		return nil, fmt.Errorf("failed to embed resource: %w", err)
 	}
 
-	e.rm.embedded[obj] = val
+	e.rm.Out.objects[obj] = val
 
 	return val, nil
 }
 
 // ResourceManager helps to avoid duplicate resources in a PDF file.
 // It is used to embed object implementing the [Embedder] interface.
-// Each such object is embedded only once.
+// Values are deduplicated per Writer: a value embedded through any
+// resource manager of a Writer is written once.
 //
 // Use the [ResourceManagerEmbed] function to embed resources.
 //
@@ -146,7 +147,6 @@ func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native
 // file is closed.
 type ResourceManager struct {
 	Out      *Writer
-	embedded map[any]Native
 	reserved map[any]bool
 	deferred []func(*EmbedHelper) error
 	isClosed bool
@@ -156,7 +156,6 @@ type ResourceManager struct {
 func NewResourceManager(w *Writer) *ResourceManager {
 	return &ResourceManager{
 		Out:      w,
-		embedded: make(map[any]Native),
 		reserved: make(map[any]bool),
 	}
 }
@@ -195,11 +194,11 @@ func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*EmbedHelper, T
 // when two objects need to reference each other (e.g. a widget annotation and
 // its parent field).
 func (rm *ResourceManager) GetReference(enc Encoder) Reference {
-	if ref, ok := rm.embedded[enc].(Reference); ok {
+	if ref, ok := rm.Out.objects[enc].(Reference); ok {
 		return ref
 	}
 	ref := rm.Out.Alloc()
-	rm.embedded[enc] = ref
+	rm.Out.objects[enc] = ref
 	rm.reserved[enc] = true
 	return ref
 }
@@ -231,7 +230,7 @@ func (rm *ResourceManager) StoreDeferred(enc Encoder) Reference {
 // that returns a nil object writes nothing; Store then returns the zero
 // reference, which callers treat as "unset".
 func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
-	ref, isSet := rm.embedded[enc].(Reference)
+	ref, isSet := rm.Out.objects[enc].(Reference)
 	if isSet && !rm.reserved[enc] {
 		return ref, nil
 	}
@@ -248,7 +247,7 @@ func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
 		// already refer to the object. Otherwise the encoder chose to write
 		// nothing, reported as the zero reference, which callers treat as
 		// "unset".
-		if ref, ok := rm.embedded[enc].(Reference); ok {
+		if ref, ok := rm.Out.objects[enc].(Reference); ok {
 			return ref, nil
 		}
 		return 0, nil
@@ -264,10 +263,10 @@ func (rm *ResourceManager) Store(enc Encoder) (Reference, error) {
 // (from [ResourceManager.GetReference]) or a freshly allocated one, fulfilling
 // any reservation.
 func (rm *ResourceManager) putEncoded(enc Encoder, native Native) (Reference, error) {
-	ref, isSet := rm.embedded[enc].(Reference)
+	ref, isSet := rm.Out.objects[enc].(Reference)
 	if !isSet {
 		ref = rm.Out.Alloc()
-		rm.embedded[enc] = ref
+		rm.Out.objects[enc] = ref
 	}
 	if err := rm.Out.Put(ref, native); err != nil {
 		return 0, err
