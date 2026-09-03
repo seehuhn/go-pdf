@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestFindXref(t *testing.T) {
@@ -510,5 +512,47 @@ func TestReadXRefHybridXRefStm(t *testing.T) {
 	}
 	if r.meta.Catalog.Pages == 0 {
 		t.Error("catalog lost when following /Prev after /XRefStm")
+	}
+}
+
+func TestXRefRunsOf(t *testing.T) {
+	xref := map[uint32]*xRefEntry{}
+	for _, n := range []uint32{1, 2, 3, 7, 9, 10} {
+		xref[n] = &xRefEntry{}
+	}
+	got := xRefRunsOf(xref, 11)
+	want := []xRefRun{{1, 3}, {7, 1}, {9, 3}}
+	if diff := cmp.Diff(want, got, cmp.AllowUnexported(xRefRun{})); diff != "" {
+		t.Errorf("runs differ (-want +got):\n%s", diff)
+	}
+	if got := xRefRunsOf(nil); len(got) != 0 {
+		t.Errorf("empty map gave runs %v", got)
+	}
+}
+
+func TestXRefStreamListsItself(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(w); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data := buf.Bytes()
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmNum := w.nextRef - 1 // the last allocated object is the xref stream
+	entry := r.xref[stmNum]
+	if entry.IsFree() {
+		t.Fatalf("xref stream object %d has no in-use entry", stmNum)
+	}
+	if entry.Pos != lastStartXRef(t, data) {
+		t.Errorf("xref stream entry points to %d, want %d", entry.Pos, lastStartXRef(t, data))
 	}
 }

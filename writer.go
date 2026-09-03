@@ -60,6 +60,15 @@ type Writer struct {
 	xref    map[uint32]*xRefEntry
 	nextRef uint32
 
+	// base is the original file when the Writer appends an incremental
+	// update, and nil when it writes a new file.  In update mode xref holds
+	// only the entries written in this session.
+	base *Reader
+
+	// headerOffset is the byte position of '%' in '%PDF-'.  Positions in
+	// xref are absolute; offsets written to the file subtract this value.
+	headerOffset int64
+
 	// objstms caches decoded object streams, mirroring the Reader field of
 	// the same name; see objstm.go.
 	objstms *objstmCache

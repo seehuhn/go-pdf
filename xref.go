@@ -22,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"math/bits"
+	"slices"
 	"strconv"
 
 	"seehuhn.de/go/pdf/internal/limits"
@@ -561,25 +563,71 @@ func (w *Writer) setXRef(ref Reference, entry *xRefEntry) error {
 	return nil
 }
 
+// xRefRun is a contiguous range of object numbers covered by a
+// cross-reference section.
+type xRefRun struct {
+	start, count uint32
+}
+
+// xRefRunsOf returns the contiguous runs covering the keys of xref and the
+// extra numbers, in increasing order.
+func xRefRunsOf(xref map[uint32]*xRefEntry, extra ...uint32) []xRefRun {
+	nums := slices.AppendSeq(slices.Clone(extra), maps.Keys(xref))
+	slices.Sort(nums)
+	nums = slices.Compact(nums)
+	var runs []xRefRun
+	for _, n := range nums {
+		if k := len(runs); k > 0 && runs[k-1].start+runs[k-1].count == n {
+			runs[k-1].count++
+		} else {
+			runs = append(runs, xRefRun{start: n, count: 1})
+		}
+	}
+	return runs
+}
+
+// xRefRuns returns the object-number runs the cross-reference section must
+// cover: every number for a new file, only the entries written in this
+// session for an incremental update.
+func (w *Writer) xRefRuns(extra ...uint32) []xRefRun {
+	if w.base == nil {
+		return []xRefRun{{0, w.nextRef}}
+	}
+	return xRefRunsOf(w.xref, extra...)
+}
+
 func (w *Writer) writeXRefTable(xRefDict Dict) error {
-	_, err := fmt.Fprintf(w.w, "xref\n0 %d\n", w.nextRef)
+	runs := w.xRefRuns()
+	if len(runs) == 0 {
+		// an update which changed nothing still needs one subsection
+		runs = []xRefRun{{}}
+	}
+
+	_, err := w.w.Write([]byte("xref\n"))
 	if err != nil {
 		return err
 	}
-	for i := uint32(0); i < w.nextRef; i++ {
-		entry := w.xref[i]
-		if entry != nil && entry.InStream != 0 {
-			return errors.New("cannot use xref tables with object streams")
-		}
-		if entry != nil && entry.Pos >= 0 {
-			_, err = fmt.Fprintf(w.w, "%010d %05d n\r\n",
-				entry.Pos, entry.Generation)
-		} else {
-			// free object
-			_, err = w.w.Write([]byte("0000000000 65535 f\r\n"))
-		}
+	for _, run := range runs {
+		_, err = fmt.Fprintf(w.w, "%d %d\n", run.start, run.count)
 		if err != nil {
 			return err
+		}
+		for i := run.start; i < run.start+run.count; i++ {
+			entry := w.xref[i]
+			switch {
+			case entry != nil && entry.InStream != 0:
+				return errors.New("cannot use xref tables with object streams")
+			case entry != nil && entry.Pos >= 0:
+				_, err = fmt.Fprintf(w.w, "%010d %05d n\r\n",
+					entry.Pos-w.headerOffset, entry.Generation)
+			case entry != nil:
+				_, err = fmt.Fprintf(w.w, "0000000000 %05d f\r\n", entry.Generation)
+			default:
+				_, err = w.w.Write([]byte("0000000000 65535 f\r\n"))
+			}
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -602,32 +650,49 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 	xRefDict["Type"] = Name("XRef")
 	xRefDict["Size"] = Integer(w.nextRef)
 
+	runs := w.xRefRuns(ref.Number())
+	// the stream lists itself; it starts at the current position because
+	// its data is assembled in memory before OpenStream is called
+	own := &xRefEntry{Pos: w.w.pos}
+	if len(runs) != 1 || runs[0].start != 0 || runs[0].count != w.nextRef {
+		var index Array
+		for _, run := range runs {
+			index = append(index, Integer(run.start), Integer(run.count))
+		}
+		xRefDict["Index"] = index
+	}
+
 	maxField2 := uint64(0)
 	maxField3 := uint64(0)
-	for i := uint32(0); i < w.nextRef; i++ {
-		entry := w.xref[i]
-		if entry == nil {
-			continue
-		}
-		var f2, f3 uint64
-		if entry.InStream != 0 {
-			f2 = uint64(entry.InStream.Number())
-			f3 = uint64(entry.Pos)
-		} else if entry.Pos >= 0 {
-			f2 = uint64(entry.Pos)
-			f3 = uint64(entry.Generation)
-		} else {
-			gen := entry.Generation
-			if gen == maxGeneration {
-				gen = 0
+	for _, run := range runs {
+		for i := run.start; i < run.start+run.count; i++ {
+			entry := w.xref[i]
+			if i == ref.Number() {
+				entry = own
 			}
-			f3 = uint64(gen)
-		}
-		if f2 > maxField2 {
-			maxField2 = f2
-		}
-		if f3 > maxField3 {
-			maxField3 = f3
+			if entry == nil {
+				continue
+			}
+			var f2, f3 uint64
+			if entry.InStream != 0 {
+				f2 = uint64(entry.InStream.Number())
+				f3 = uint64(entry.Pos)
+			} else if entry.Pos >= 0 {
+				f2 = uint64(entry.Pos - w.headerOffset)
+				f3 = uint64(entry.Generation)
+			} else {
+				gen := entry.Generation
+				if gen == maxGeneration {
+					gen = 0
+				}
+				f3 = uint64(gen)
+			}
+			if f2 > maxField2 {
+				maxField2 = f2
+			}
+			if f3 > maxField3 {
+				maxField3 = f3
+			}
 		}
 	}
 	w2 := (bits.Len64(maxField2) + 7) / 8
@@ -647,59 +712,64 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 		return err
 	}
 	wx := bufio.NewWriter(wxRaw)
-	for i := uint32(0); i < w.nextRef; i++ {
-		entry := w.xref[i]
-		if entry == nil {
-			err := wx.WriteByte(0)
-			if err != nil {
-				return err
+	for _, run := range runs {
+		for i := run.start; i < run.start+run.count; i++ {
+			entry := w.xref[i]
+			if i == ref.Number() {
+				entry = own
 			}
-			err = encodeInt64(wx, 0, w2)
-			if err != nil {
-				return err
-			}
-			err = encodeInt64(wx, 0, w3)
-			if err != nil {
-				return err
-			}
-		} else if entry.Pos < 0 {
-			err := wx.WriteByte(0)
-			if err != nil {
-				return err
-			}
-			err = encodeInt64(wx, 0, w2)
-			if err != nil {
-				return err
-			}
-			err = encodeInt64(wx, uint64(entry.Generation), w3)
-			if err != nil {
-				return err
-			}
-		} else if entry.InStream == 0 {
-			err := wx.WriteByte(1)
-			if err != nil {
-				return err
-			}
-			err = encodeInt64(wx, uint64(entry.Pos), w2)
-			if err != nil {
-				return err
-			}
-			err = encodeInt64(wx, uint64(entry.Generation), w3)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := wx.WriteByte(2)
-			if err != nil {
-				return err
-			}
-			err = encodeInt64(wx, uint64(entry.InStream.Number()), w2)
-			if err != nil {
-				return err
-			}
-			err = encodeInt64(wx, uint64(entry.Pos), w3)
-			if err != nil {
-				return err
+			if entry == nil {
+				err := wx.WriteByte(0)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, 0, w2)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, 0, w3)
+				if err != nil {
+					return err
+				}
+			} else if entry.Pos < 0 {
+				err := wx.WriteByte(0)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, 0, w2)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, uint64(entry.Generation), w3)
+				if err != nil {
+					return err
+				}
+			} else if entry.InStream == 0 {
+				err := wx.WriteByte(1)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, uint64(entry.Pos-w.headerOffset), w2)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, uint64(entry.Generation), w3)
+				if err != nil {
+					return err
+				}
+			} else {
+				err := wx.WriteByte(2)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, uint64(entry.InStream.Number()), w2)
+				if err != nil {
+					return err
+				}
+				err = encodeInt64(wx, uint64(entry.Pos), w3)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
