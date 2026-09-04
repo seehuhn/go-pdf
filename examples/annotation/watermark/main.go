@@ -124,12 +124,10 @@ func run(inputName, text string, replace bool) error {
 	for pageRef, view := range pagetree.NewIterator(w).All() {
 		// The iterator yields a view of the page with inherited attributes
 		// filled in, so MediaBox and Rotate can be read from it directly.
-		mediaBox, err := pdf.Optional(c.Rectangle(view["MediaBox"]))
+		// The view always has a usable MediaBox.
+		mediaBox, err := c.Rectangle(view["MediaBox"])
 		if err != nil {
 			return err
-		}
-		if mediaBox == nil {
-			mediaBox = &pdf.Rectangle{URx: 612, URy: 792} // US Letter
 		}
 		rotate, err := pdf.Optional(c.Integer(view["Rotate"]))
 		if err != nil {
@@ -177,26 +175,13 @@ func run(inputName, text string, replace bool) error {
 		}
 
 		// old.Annots is absent or inline, so the page dictionary itself
-		// changes.  The stored dictionary is edited directly rather than
-		// going through page.Encode(&p): page.Decode substitutes US
-		// Letter for a missing /MediaBox, and a page inheriting a
-		// different box from the page tree would otherwise gain a wrong
-		// explicit /MediaBox (clipping CropBox against it).  Editing the
-		// raw dictionary leaves every entry but /Annots untouched.
-		pageDict, err := c.Dict(pageRef)
-		if err != nil {
-			return err
-		}
-		annotsObj, err := rm.Embed(annots)
-		if err != nil {
-			return err
-		}
-		if annotsObj != nil {
-			pageDict["Annots"] = annotsObj
-		} else {
-			delete(pageDict, "Annots")
-		}
-		if err := w.Put(pageRef, pageDict); err != nil {
+		// changes.  The decoded page is immutable; a copy carrying the new
+		// list replaces it at its original object number.  A MediaBox or
+		// rotation the page inherits from the page tree is nil in the copy
+		// and stays omitted, so the inherited values remain in force.
+		p := *old
+		p.Annots = annots
+		if _, err := rm.Replace(old, &p); err != nil {
 			return err
 		}
 	}

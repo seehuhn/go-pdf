@@ -122,6 +122,11 @@ type Page struct {
 
 	// MediaBox (inheritable) defines the boundaries of the physical medium
 	// on which the page is displayed or printed.
+	//
+	// A nil value means that the page has no box of its own.  When reading,
+	// this indicates that the page dictionary does not contain a usable
+	// MediaBox entry.  When writing, the entry is omitted and the box of
+	// the parent Pages node applies.
 	MediaBox *pdf.Rectangle
 
 	// Resources (inheritable) contains resources required by the page contents.
@@ -624,8 +629,13 @@ func (p *Page) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 // Decode reads a page dictionary from a PDF object.
-// The page dictionary should already have inherited attributes resolved
-// (e.g., via [pagetree.Iterator]).
+//
+// Inheritable attributes are taken from the given dictionary alone; the
+// page tree is not consulted.  Pass a view with inherited attributes
+// filled in (as yielded by [pagetree.Iterator] or [pagetree.GetPage]) to
+// get the values in force for the page.  Otherwise an inherited MediaBox
+// is reported as nil, an inherited rotation as [RotateInherit], and the
+// other page boxes are left unclipped.
 //
 // Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
@@ -649,10 +659,6 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	p.MediaBox, err = readBox(c, dict["MediaBox"])
 	if err != nil {
 		return nil, err
-	}
-	if p.MediaBox == nil {
-		// a page without a usable MediaBox is US Letter, as in other readers
-		p.MediaBox = &pdf.Rectangle{URx: 612, URy: 792}
 	}
 
 	// Resources (required, inheritable)
@@ -695,11 +701,13 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 		return nil, err
 	}
 
-	// clip optional boxes to MediaBox
-	p.CropBox = clipBox(p.CropBox, p.MediaBox)
-	p.BleedBox = clipBox(p.BleedBox, p.MediaBox)
-	p.TrimBox = clipBox(p.TrimBox, p.MediaBox)
-	p.ArtBox = clipBox(p.ArtBox, p.MediaBox)
+	// clip optional boxes to MediaBox, where the page has one of its own
+	if p.MediaBox != nil {
+		p.CropBox = clipBox(p.CropBox, p.MediaBox)
+		p.BleedBox = clipBox(p.BleedBox, p.MediaBox)
+		p.TrimBox = clipBox(p.TrimBox, p.MediaBox)
+		p.ArtBox = clipBox(p.ArtBox, p.MediaBox)
+	}
 
 	// BoxColorInfo (optional)
 	if bci, err := pdf.DecodeOptional(c, dict["BoxColorInfo"], boxcolor.ExtractInfo); err != nil {

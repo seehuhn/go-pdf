@@ -866,8 +866,11 @@ func TestRotationFromDegrees(t *testing.T) {
 	}
 }
 
-func TestPage_Decode_MediaBoxDefault(t *testing.T) {
-	letter := &pdf.Rectangle{URx: 612, URy: 792}
+func TestPage_Decode_MediaBoxInherited(t *testing.T) {
+	// A page dictionary without a usable MediaBox of its own yields a nil
+	// MediaBox, the other boxes are left unclipped, and the entry is
+	// omitted when the page is written back.
+	cropBox := &pdf.Rectangle{LLx: -10, LLy: -10, URx: 700, URy: 800}
 	for _, tc := range []struct {
 		name string
 		box  pdf.Object
@@ -882,14 +885,12 @@ func TestPage_Decode_MediaBoxDefault(t *testing.T) {
 			if err := w.Put(parentRef, pdf.Dict{"Type": pdf.Name("Pages")}); err != nil {
 				t.Fatal(err)
 			}
-			if err := w.Close(); err != nil {
-				t.Fatal(err)
-			}
 
 			dict := pdf.Dict{
 				"Type":      pdf.Name("Page"),
 				"Parent":    parentRef,
 				"Resources": pdf.Dict{},
+				"CropBox":   cropBox,
 			}
 			if tc.box != nil {
 				dict["MediaBox"] = tc.box
@@ -900,8 +901,20 @@ func TestPage_Decode_MediaBoxDefault(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decode failed: %v", err)
 			}
-			if d := cmp.Diff(letter, p.MediaBox); d != "" {
-				t.Errorf("unexpected MediaBox (-want +got):\n%s", d)
+			if p.MediaBox != nil {
+				t.Errorf("MediaBox = %v, want nil", p.MediaBox)
+			}
+			if d := cmp.Diff(cropBox, p.CropBox); d != "" {
+				t.Errorf("unexpected CropBox (-want +got):\n%s", d)
+			}
+
+			rm := pdf.NewResourceManager(w)
+			obj, err := p.Encode(rm)
+			if err != nil {
+				t.Fatalf("encode failed: %v", err)
+			}
+			if _, ok := obj.(pdf.Dict)["MediaBox"]; ok {
+				t.Errorf("MediaBox written for a page without a box of its own")
 			}
 		})
 	}

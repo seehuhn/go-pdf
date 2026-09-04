@@ -17,6 +17,7 @@
 package pagetree_test
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -207,56 +208,144 @@ func TestIterator(t *testing.T) {
 	}
 }
 
-func TestIteratorInheritUnusableBox(t *testing.T) {
+// walkers lists the two ways of obtaining a page view, so that tests can
+// check both for the same behaviour.
+var walkers = []struct {
+	name string
+	get  func(r pdf.Getter) (pdf.Dict, error)
+}{
+	{"Iterator", func(r pdf.Getter) (pdf.Dict, error) {
+		it := pagetree.NewIterator(r)
+		var got pdf.Dict
+		n := 0
+		for _, dict := range it.All() {
+			got = dict
+			n++
+		}
+		if it.Err != nil {
+			return nil, it.Err
+		}
+		if n != 1 {
+			return nil, fmt.Errorf("got %d pages, want 1", n)
+		}
+		return got, nil
+	}},
+	{"GetPage", func(r pdf.Getter) (pdf.Dict, error) {
+		_, dict, err := pagetree.GetPage(r, 0)
+		return dict, err
+	}},
+}
+
+func TestInheritUnusableBox(t *testing.T) {
 	rootBox := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(595), pdf.Integer(842)}
 	ownBox := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(100), pdf.Integer(200)}
+	letter := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(612), pdf.Integer(792)}
 	for _, tc := range []struct {
-		name string
-		box  pdf.Object // the page's own MediaBox, nil for none
-		want pdf.Object
+		name    string
+		box     pdf.Object // the page's own MediaBox, nil for none
+		rootBox pdf.Object // the root's MediaBox, nil for none
+		want    pdf.Object
 	}{
-		{"missing", nil, rootBox},
-		{"null element", pdf.Array{pdf.Integer(1), nil, pdf.Integer(2), pdf.Integer(3)}, rootBox},
-		{"wrong length", pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)}, rootBox},
-		{"zero area", pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(0), pdf.Integer(100)}, rootBox},
-		{"usable", ownBox, ownBox},
+		{"missing", nil, rootBox, rootBox},
+		{"null element", pdf.Array{pdf.Integer(1), nil, pdf.Integer(2), pdf.Integer(3)}, rootBox, rootBox},
+		{"wrong length", pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)}, rootBox, rootBox},
+		{"zero area", pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(0), pdf.Integer(100)}, rootBox, rootBox},
+		{"usable", ownBox, rootBox, ownBox},
+		{"none anywhere", nil, nil, letter},
+		{"unusable everywhere", pdf.Array{pdf.Integer(1), pdf.Integer(2), pdf.Integer(3)}, nil, letter},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-			rootRef := data.Alloc()
-			midRef := data.Alloc()
-			pageRef := data.Alloc()
+		for _, walker := range walkers {
+			t.Run(tc.name+"/"+walker.name, func(t *testing.T) {
+				data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				rootRef := data.Alloc()
+				midRef := data.Alloc()
+				pageRef := data.Alloc()
 
-			page := pdf.Dict{"Type": pdf.Name("Page"), "Parent": midRef}
-			if tc.box != nil {
-				page["MediaBox"] = tc.box
-			}
-			data.Put(pageRef, page)
-			// the intermediate node's box is unusable and must be skipped
-			data.Put(midRef, pdf.Dict{
+				page := pdf.Dict{"Type": pdf.Name("Page"), "Parent": midRef}
+				if tc.box != nil {
+					page["MediaBox"] = tc.box
+				}
+				data.Put(pageRef, page)
+				// the intermediate node's box is unusable and must be skipped
+				data.Put(midRef, pdf.Dict{
+					"Type":     pdf.Name("Pages"),
+					"Parent":   rootRef,
+					"Count":    pdf.Integer(1),
+					"Kids":     pdf.Array{pageRef},
+					"MediaBox": pdf.Array{pdf.Integer(1), nil, pdf.Integer(2), pdf.Integer(3)},
+				})
+				root := pdf.Dict{
+					"Type":  pdf.Name("Pages"),
+					"Count": pdf.Integer(1),
+					"Kids":  pdf.Array{midRef},
+				}
+				if tc.rootBox != nil {
+					root["MediaBox"] = tc.rootBox
+				}
+				data.Put(rootRef, root)
+				data.GetMeta().Catalog.Pages = rootRef
+
+				dict, err := walker.get(data)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if d := cmp.Diff(tc.want, dict["MediaBox"]); d != "" {
+					t.Errorf("unexpected MediaBox (-want +got):\n%s", d)
+				}
+				if _, ok := dict["Parent"]; ok {
+					t.Error("view still has a Parent entry")
+				}
+			})
+		}
+	}
+}
+
+func TestInheritNullBox(t *testing.T) {
+	// An intermediate node with "/MediaBox null" must not hide the root's
+	// box.  The writer drops nil dictionary entries, so the null value is
+	// patched into the file bytes after writing.
+	rootBox := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(595), pdf.Integer(842)}
+	for _, walker := range walkers {
+		t.Run(walker.name, func(t *testing.T) {
+			w, f := memfile.NewPDFWriter(t, pdf.V1_4, nil)
+			rootRef := w.Alloc()
+			midRef := w.Alloc()
+			pageRef := w.Alloc()
+			w.Put(pageRef, pdf.Dict{"Type": pdf.Name("Page"), "Parent": midRef})
+			w.Put(midRef, pdf.Dict{
 				"Type":     pdf.Name("Pages"),
 				"Parent":   rootRef,
 				"Count":    pdf.Integer(1),
 				"Kids":     pdf.Array{pageRef},
-				"MediaBox": pdf.Array{pdf.Integer(1), nil, pdf.Integer(2), pdf.Integer(3)},
+				"MediaBox": pdf.Name("NULLME"),
 			})
-			data.Put(rootRef, pdf.Dict{
+			w.Put(rootRef, pdf.Dict{
 				"Type":     pdf.Name("Pages"),
 				"Count":    pdf.Integer(1),
 				"Kids":     pdf.Array{midRef},
 				"MediaBox": rootBox,
 			})
-			data.GetMeta().Catalog.Pages = rootRef
-
-			n := 0
-			for _, dict := range pagetree.NewIterator(data).All() {
-				n++
-				if d := cmp.Diff(tc.want, dict["MediaBox"]); d != "" {
-					t.Errorf("unexpected MediaBox (-want +got):\n%s", d)
-				}
+			w.GetMeta().Catalog.Pages = rootRef
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
 			}
-			if n != 1 {
-				t.Errorf("got %d pages, want 1", n)
+
+			// same length, so that the cross-reference offsets stay valid
+			data := bytes.Replace(f.Data, []byte("/NULLME"), []byte(" null  "), 1)
+			if bytes.Equal(data, f.Data) {
+				t.Fatal("marker not found in file")
+			}
+			r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			dict, err := walker.get(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d := cmp.Diff(rootBox, dict["MediaBox"]); d != "" {
+				t.Errorf("unexpected MediaBox (-want +got):\n%s", d)
 			}
 		})
 	}

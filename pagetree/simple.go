@@ -50,8 +50,11 @@ func NumPages(r pdf.Getter) (int, error) {
 
 // GetPage returns the page dictionary for a given page number.
 // Page numbers start at 0.
-// Inheritable attributes are copied from the parent nodes.
-// The /Parent attribute is removed from the returned dictionary.
+//
+// The returned dictionary is a view of the page: inheritable attributes are
+// copied in from parent nodes and the /Parent entry is removed.  The view
+// is not suitable for writing back as the page object; to modify a page,
+// read the stored dictionary via the reference instead.
 func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 	c := pdf.NewCursor(r)
 	if pageNo < 0 {
@@ -101,14 +104,9 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 				break
 			}
 
-			for _, name := range inheritable {
-				if _, ok := pageTreeNode[name]; !ok {
-					if val, ok := inherited[name]; ok {
-						pageTreeNode[name] = val
-					}
-				}
+			if err := fillInherited(c, pageTreeNode, inherited, inheritable); err != nil {
+				return 0, nil, err
 			}
-			delete(pageTreeNode, "Parent")
 			return ref, pageTreeNode, nil
 
 		case "Pages":
@@ -120,8 +118,12 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 				return 0, nil, errInvalidPageTree
 			} else if skip < count {
 				for _, name := range inheritable {
-					if tmp, ok := pageTreeNode[name]; ok {
-						inherited[name] = tmp
+					ok, err := usable(c, name, pageTreeNode[name])
+					if err != nil {
+						return 0, nil, err
+					}
+					if ok {
+						inherited[name] = pageTreeNode[name]
 					}
 				}
 

@@ -170,10 +170,15 @@ func (w *Writer) Close() (pdf.Reference, error) {
 	return 0, nil
 }
 
+var errMissingMediaBox = errors.New("page has no MediaBox")
+
 // AppendPage adds a new page to the page tree.
 //
 // This function takes ownership of the page object, and
 // sets the Parent field before encoding the page to the PDF file.
+//
+// The page must have a MediaBox: the writer constructs the parent nodes
+// itself, so there is no node the box could be inherited from.
 func (w *Writer) AppendPage(p *page.Page) error {
 	return w.AppendPageRef(w.Out.Alloc(), p)
 }
@@ -183,9 +188,15 @@ func (w *Writer) AppendPage(p *page.Page) error {
 //
 // This function takes ownership of the page object, and
 // sets the Parent field before encoding the page to the PDF file.
+//
+// The page must have a MediaBox: the writer constructs the parent nodes
+// itself, so there is no node the box could be inherited from.
 func (w *Writer) AppendPageRef(ref pdf.Reference, p *page.Page) error {
 	if w.isClosed {
 		return errors.New("page tree is closed")
+	}
+	if p.MediaBox == nil {
+		return errMissingMediaBox
 	}
 
 	node := &nodeInfo{
@@ -235,9 +246,16 @@ func (w *Writer) AppendPageRef(ref pdf.Reference, p *page.Page) error {
 // Unlike [AppendPageRef], this does not encode the page - it assumes
 // the dict is already in the correct format.  The Parent field will be
 // set automatically when the page tree is built.
+//
+// The dictionary must contain a MediaBox entry: the writer constructs the
+// parent nodes itself, so there is no node the box could be inherited
+// from.
 func (w *Writer) AppendPageDict(ref pdf.Reference, dict pdf.Dict) error {
 	if w.isClosed {
 		return errors.New("page tree is closed")
+	}
+	if dict["MediaBox"] == nil {
+		return errMissingMediaBox
 	}
 
 	node := &nodeInfo{

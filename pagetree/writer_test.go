@@ -23,6 +23,8 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
 )
@@ -92,5 +94,26 @@ func TestBalance(t *testing.T) {
 	err = walk(in.GetMeta().Catalog.Pages, 0)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAppendPageWithoutMediaBox(t *testing.T) {
+	// The page tree writer builds every parent node itself and never
+	// supplies a MediaBox, so a page without one cannot be written.
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	tree := pagetree.NewWriter(w, rm)
+
+	err := tree.AppendPage(&page.Page{Resources: &content.Resources{}})
+	if err == nil {
+		t.Error("AppendPage accepted a page without MediaBox")
+	}
+
+	err = tree.AppendPageDict(w.Alloc(), pdf.Dict{
+		"Type":      pdf.Name("Page"),
+		"Resources": pdf.Dict{},
+	})
+	if err == nil {
+		t.Error("AppendPageDict accepted a page without MediaBox")
 	}
 }

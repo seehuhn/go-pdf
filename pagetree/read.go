@@ -154,20 +154,10 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 			}
 			switch tp {
 			case "Page":
-				for _, name := range inheritable {
-					ok, err := usable(c, name, node[name])
-					if err != nil {
-						i.Err = err
-						return
-					}
-					if ok {
-						continue
-					}
-					if val, canInherit := inherited[name]; canInherit {
-						node[name] = val
-					}
+				if err := fillInherited(c, node, inherited, inheritable); err != nil {
+					i.Err = err
+					return
 				}
-				delete(node, "Parent")
 				cont := yield(ref, node)
 				if !cont {
 					return
@@ -217,6 +207,34 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 		}
 	}
 	return yield
+}
+
+// fillInherited completes a page dictionary with the inheritable attributes
+// in force from its ancestors, and removes the /Parent entry.  A page
+// without a usable MediaBox anywhere in its ancestry is given the US
+// Letter size, as in other readers.
+func fillInherited(c pdf.Cursor, node, inherited pdf.Dict, inheritable []pdf.Name) error {
+	for _, name := range inheritable {
+		ok, err := usable(c, name, node[name])
+		if err != nil {
+			return err
+		}
+		if ok {
+			continue
+		}
+		if val, canInherit := inherited[name]; canInherit {
+			node[name] = val
+		} else if name == "MediaBox" {
+			node[name] = letterBox()
+		}
+	}
+	delete(node, "Parent")
+	return nil
+}
+
+// letterBox returns the MediaBox used for a page without a usable box.
+func letterBox() pdf.Array {
+	return pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(612), pdf.Integer(792)}
 }
 
 // usable reports whether val can serve as the value of the inheritable entry
