@@ -17,6 +17,7 @@
 package pdf_test
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -104,5 +105,32 @@ func TestCopyReferenceMalformedBecomesNull(t *testing.T) {
 	}
 	if val != nil {
 		t.Errorf("resolved value = %v, want null", val)
+	}
+}
+
+// A Copier whose source is the file being updated must pass references
+// through unchanged: the objects already exist in the output file, and
+// allocating fresh copies would duplicate them in the update.
+func TestCopyReferenceSameFile(t *testing.T) {
+	f, oldRef := newBaseFile(t, pdf.V2_0, nil)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := len(f.Data)
+
+	copier := pdf.NewCopier(w, w)
+	got, err := copier.CopyReference(oldRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != oldRef {
+		t.Errorf("reference not passed through: got %v, want %v", got, oldRef)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if n := bytes.Count(f.Data[before:], []byte("/old")); n != 0 {
+		t.Errorf("source object copied into the update %d times", n)
 	}
 }

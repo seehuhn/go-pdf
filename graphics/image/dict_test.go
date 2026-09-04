@@ -1762,17 +1762,8 @@ func TestExtractDictMaskProvenance(t *testing.T) {
 
 	// force the parent's Embed method to actually run, by embedding a copy
 	// with no provenance entry of its own; the mask it shares with d2 keeps
-	// whatever provenance the fix under test does or does not give it.
-	// Data is replaced with a fresh in-memory source, since the original
-	// (a lazily-read stream) would otherwise deep-copy the whole source
-	// stream dict verbatim, including its /Mask entry, which is unrelated
-	// to what this test checks.
+	// whatever provenance the fix under test does or does not give it
 	cp := *d2
-	cp.Data = NewFlateSource(cp.Width, cp.ColorSpace, cp.BitsPerComponent,
-		func(w io.Writer) error {
-			_, err := w.Write(make([]byte, 64))
-			return err
-		})
 	rm := pdf.NewResourceManager(w)
 	if _, err := rm.Embed(&cp); err != nil {
 		t.Fatal(err)

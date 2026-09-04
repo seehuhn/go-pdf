@@ -32,14 +32,28 @@ type Copier struct {
 	trans map[Reference]Reference
 	r     Getter
 	w     *Writer
+
+	// sameFile is set when r reads the file w is appending to, so that
+	// references are already valid in the output and pass through unchanged
+	sameFile bool
 }
 
 // NewCopier creates a new Copier.
+//
+// If r reads the file which w updates (r is w itself, or the reader w was
+// opened from), references are passed through unchanged instead of being
+// copied.
 func NewCopier(w *Writer, r Getter) *Copier {
 	c := &Copier{
 		trans: make(map[Reference]Reference),
 		w:     w,
 		r:     r,
+	}
+	switch r := r.(type) {
+	case *Writer:
+		c.sameFile = r == w
+	case *Reader:
+		c.sameFile = w.base != nil && r == w.base
 	}
 	return c
 }
@@ -203,6 +217,9 @@ func (c *Copier) CopyReference(obj Reference) (Reference, error) {
 	newRef, ok := c.trans[obj]
 	if ok {
 		return newRef, nil
+	}
+	if c.sameFile {
+		return obj, nil
 	}
 	newRef = c.w.Alloc()
 	c.trans[obj] = newRef
