@@ -212,11 +212,7 @@ func (c *converter) ocOff(ocObj pdf.Object) bool {
 // contents, which may be a single stream or an array of streams.
 func (c *converter) openContent(contents pdf.Object) (io.ReadCloser, error) {
 	cur := pdf.CursorAt(c.x, nil)
-	resolved, err := cur.Resolve(contents)
-	if err != nil {
-		return nil, err
-	}
-	segments, err := page.ExtractContents(cur, resolved)
+	segments, err := page.ExtractContents(cur, contents)
 	if err != nil {
 		return nil, err
 	}

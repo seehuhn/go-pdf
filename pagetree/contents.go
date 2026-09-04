@@ -37,12 +37,7 @@ func ContentStream(r pdf.Getter, pageDict pdf.Object) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	contents, err := c.Resolve(dict["Contents"])
-	if err != nil {
-		return nil, err
-	}
-
-	segments, err := page.ExtractContents(c, contents)
+	segments, err := page.ExtractContents(c, dict["Contents"])
 	if err != nil {
 		return nil, err
 	}
