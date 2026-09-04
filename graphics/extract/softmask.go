@@ -110,7 +110,7 @@ func SoftMaskDict(c pdf.Cursor, obj pdf.Object, _ bool) (graphics.SoftClip, erro
 			return nil, err
 		}
 		if trResolved != pdf.Name("Identity") {
-			tr, err := function.Extract(c, trObj, false)
+			tr, err := pdf.DecodeOptional(c, trObj, function.Extract)
 			if err != nil {
 				return nil, err
 			}

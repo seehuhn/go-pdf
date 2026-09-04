@@ -1696,3 +1696,95 @@ func TestDictNameRejectedAt2_0(t *testing.T) {
 		t.Error("no error for a /Name at PDF 2.0")
 	}
 }
+
+// TestExtractDictMaskProvenance regresses a bug where an indirect /Mask
+// image-mask stream lost its provenance on decode, so re-embedding the
+// parent image wrote a second copy of the mask stream instead of reusing
+// the original object.
+func TestExtractDictMaskProvenance(t *testing.T) {
+	w0, f := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+
+	maskRef := w0.Alloc()
+	maskBody, err := w0.OpenStream(maskRef, pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(8),
+		"Height":           pdf.Integer(8),
+		"ImageMask":        pdf.Boolean(true),
+		"BitsPerComponent": pdf.Integer(1),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := maskBody.Write(make([]byte, 8)); err != nil {
+		t.Fatal(err)
+	}
+	if err := maskBody.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	imgRef := w0.Alloc()
+	imgBody, err := w0.OpenStream(imgRef, pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(8),
+		"Height":           pdf.Integer(8),
+		"ColorSpace":       pdf.Name("DeviceGray"),
+		"BitsPerComponent": pdf.Integer(8),
+		"Mask":             maskRef,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := imgBody.Write(make([]byte, 64)); err != nil {
+		t.Fatal(err)
+	}
+	if err := imgBody.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := bytes.Clone(f.Data)
+	w, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	d2, err := pdf.Decode(c, imgRef, ExtractDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Origin(d2.MaskImage); got == 0 {
+		t.Fatal("decoded MaskImage has no provenance")
+	}
+
+	// force the parent's Embed method to actually run, by embedding a copy
+	// with no provenance entry of its own; the mask it shares with d2 keeps
+	// whatever provenance the fix under test does or does not give it.
+	// Data is replaced with a fresh in-memory source, since the original
+	// (a lazily-read stream) would otherwise deep-copy the whole source
+	// stream dict verbatim, including its /Mask entry, which is unrelated
+	// to what this test checks.
+	cp := *d2
+	cp.Data = NewFlateSource(cp.Width, cp.ColorSpace, cp.BitsPerComponent,
+		func(w io.Writer) error {
+			_, err := w.Write(make([]byte, 64))
+			return err
+		})
+	rm := pdf.NewResourceManager(w)
+	if _, err := rm.Embed(&cp); err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := bytes.Count(f.Data[len(orig):], []byte("/ImageMask true")); n != 0 {
+		t.Errorf("mask stream written again: found %d copies in the update", n)
+	}
+}

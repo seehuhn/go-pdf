@@ -343,3 +343,95 @@ var t0Dicts = []*dict.CIDFontType0{
 		FontFile:     nil, // external font
 	},
 }
+
+// TestType0EncodingProvenance regresses a bug where a composite font's
+// indirect /Encoding CMap lost its provenance on decode, so re-embedding
+// the font wrote a second copy of the CMap stream instead of reusing the
+// original object.
+func TestType0EncodingProvenance(t *testing.T) {
+	w0, f := memfile.NewPDFWriter(t, pdf.V1_7, &pdf.WriterOptions{HumanReadable: true})
+
+	cm := &cmap.File{
+		Name:           "Test-cmap",
+		ROS:            ros,
+		CodeSpaceRange: charcode.Simple,
+		CIDSingles: []cmap.Single{
+			{Code: []byte{' '}, Value: 1},
+		},
+	}
+	rm0 := pdf.NewResourceManager(w0)
+	cmapRef, err := rm0.Embed(cm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm0.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	cidFontDict := pdf.Dict{
+		"Type":     pdf.Name("Font"),
+		"Subtype":  pdf.Name("CIDFontType0"),
+		"BaseFont": pdf.Name("Test"),
+		"CIDSystemInfo": pdf.Dict{
+			"Registry":   pdf.String(ros.Registry),
+			"Ordering":   pdf.String(ros.Ordering),
+			"Supplement": pdf.Integer(ros.Supplement),
+		},
+	}
+	cidFontRef := w0.Alloc()
+	if err := w0.Put(cidFontRef, cidFontDict); err != nil {
+		t.Fatal(err)
+	}
+
+	fontDict := pdf.Dict{
+		"Type":            pdf.Name("Font"),
+		"Subtype":         pdf.Name("Type0"),
+		"BaseFont":        pdf.Name("Test"),
+		"Encoding":        cmapRef,
+		"DescendantFonts": pdf.Array{cidFontRef},
+	}
+	fontRef := w0.Alloc()
+	if err := w0.Put(fontRef, fontDict); err != nil {
+		t.Fatal(err)
+	}
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := bytes.Clone(f.Data)
+	w, err := pdf.NewUpdater(f, int64(len(orig)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+	dictAny, err := pdf.Decode(c, fontRef, extract.Dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d2, ok := dictAny.(*dict.CIDFontType0)
+	if !ok {
+		t.Fatalf("decoded %T, want *dict.CIDFontType0", dictAny)
+	}
+	if got := w.Origin(d2.CMap); got == 0 {
+		t.Fatal("decoded CMap has no provenance")
+	}
+
+	// force the parent's Embed method to actually run, by embedding a copy
+	// with no provenance entry of its own; the CMap it shares with d2 keeps
+	// whatever provenance the fix under test does or does not give it
+	cp := *d2
+	rm := pdf.NewResourceManager(w)
+	if _, err := rm.Embed(&cp); err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := bytes.Count(f.Data[len(orig):], []byte("/Test-cmap")); n != 0 {
+		t.Errorf("CMap written again: found %d copies in the update", n)
+	}
+}

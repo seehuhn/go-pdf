@@ -312,7 +312,7 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 	switch maskObj := maskObj.(type) {
 	case *pdf.Stream: // image mask stream
-		if maskImg, err := pdf.DecodeOptional(c, maskObj, ExtractMask); err != nil {
+		if maskImg, err := pdf.DecodeOptional(c, dict["Mask"], ExtractMask); err != nil {
 			return nil, err
 		} else {
 			img.MaskImage = maskImg

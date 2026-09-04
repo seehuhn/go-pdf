@@ -76,7 +76,7 @@ func extractType6(c pdf.Cursor, stream *pdf.Stream) (*Type6, error) {
 	} else if tf == pdf.Name("Identity") {
 		h.TransferFunction = function.Identity
 	} else {
-		if F, err := pdf.Optional(function.Extract(c, tf, false)); err != nil {
+		if F, err := pdf.DecodeOptional(c, dict["TransferFunction"], function.Extract); err != nil {
 			return nil, err
 		} else if isValidTransferFunction(F) {
 			h.TransferFunction = F
