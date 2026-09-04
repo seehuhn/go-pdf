@@ -89,10 +89,9 @@ func TestSoftMaskTRProvenance(t *testing.T) {
 		t.Fatal("decoded TR function has no provenance")
 	}
 
-	// force the mask's Embed method to actually run, by embedding a copy
-	// with no provenance entry of its own; G keeps its provenance so it is
-	// not re-embedded, while TR keeps whatever provenance the fix under
-	// test does or does not give it
+	// Embedding a copy with no provenance entry of its own forces the
+	// mask's Embed method to run.  G keeps its provenance and is not
+	// re-embedded, while TR keeps whatever provenance the decoder gave it.
 	cp := *m
 	rm := pdf.NewResourceManager(w)
 	if _, err := rm.Embed(&cp); err != nil {

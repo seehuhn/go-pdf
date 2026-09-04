@@ -1760,9 +1760,9 @@ func TestExtractDictMaskProvenance(t *testing.T) {
 		t.Fatal("decoded MaskImage has no provenance")
 	}
 
-	// force the parent's Embed method to actually run, by embedding a copy
-	// with no provenance entry of its own; the mask it shares with d2 keeps
-	// whatever provenance the fix under test does or does not give it
+	// Embedding a copy with no provenance entry of its own forces the
+	// parent's Embed method to run.  The mask shared with d2 keeps whatever
+	// provenance the decoder gave it.
 	cp := *d2
 	rm := pdf.NewResourceManager(w)
 	if _, err := rm.Embed(&cp); err != nil {

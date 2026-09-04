@@ -78,9 +78,9 @@ func TestType1SpotFunctionProvenance(t *testing.T) {
 		t.Fatal("decoded SpotFunction has no provenance")
 	}
 
-	// force the halftone's Embed method to actually run, by embedding a
-	// copy with no provenance entry of its own; the function keeps
-	// whatever provenance the fix under test does or does not give it
+	// Embedding a copy with no provenance entry of its own forces the
+	// halftone's Embed method to run.  The function keeps whatever
+	// provenance the decoder gave it.
 	cp := *h1
 	rm := pdf.NewResourceManager(w)
 	if _, err := rm.Embed(&cp); err != nil {
