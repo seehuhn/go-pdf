@@ -171,7 +171,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		b.SetFillColor(quireInk)
 		b.TextSetHorizontalScaling(1)
 		b.TextSetRise(0)
-		wrapper := text.Wrap(clipWidth, a.Contents)
+		wrapper := text.WrapWith(g.breaker(), clipWidth, a.Contents)
 		yPos := inner.URy - lw - freeTextPadding - freeTextFontSize
 		lineNo := 0
 		for line := range wrapper.Lines(F, freeTextFontSize) {

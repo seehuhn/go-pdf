@@ -97,3 +97,53 @@ func TestWrapOverfull(t *testing.T) {
 		}
 	}
 }
+
+// fixedBreaker reports the same break opportunities regardless of its input.
+// It is used to test WrapWith with breakers other than WhitespaceBreaker.
+type fixedBreaker struct {
+	opps []BreakOpportunity
+}
+
+func (b fixedBreaker) Opportunities(s string) []BreakOpportunity {
+	return b.opps
+}
+
+func TestWrapWithHyphenation(t *testing.T) {
+	// "photograph" has no internal whitespace; only a custom breaker can
+	// split it, at the boundary between "photo" and "graph".
+	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 5, End: 5, Replace: "-"}}}
+
+	w := WrapWith(breaker, 0, "photograph")
+	F := font.Must(standard.Helvetica.New())
+	lines := slices.Collect(w.Lines(F, 10))
+	if len(lines) != 2 {
+		t.Fatalf("expected two lines, got %d", len(lines))
+	}
+
+	text := func(seq *font.GlyphSeq) string {
+		var s string
+		for _, g := range seq.Seq {
+			s += g.Text
+		}
+		return s
+	}
+
+	if got, want := text(lines[0]), "photo-"; got != want {
+		t.Errorf("line 0 = %q, want %q", got, want)
+	}
+	if got, want := text(lines[1]), "graph"; got != want {
+		t.Errorf("line 1 = %q, want %q", got, want)
+	}
+}
+
+func TestWrapWithOffsetMidRune(t *testing.T) {
+	// "aébc": 'é' is byte offset 1-3, so offset 2 falls inside the rune.
+	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 2, End: 2, Replace: "-"}}}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected a panic for a break offset inside a rune")
+		}
+	}()
+	WrapWith(breaker, 100, "aébc")
+}

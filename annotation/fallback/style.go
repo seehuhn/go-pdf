@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/text"
 )
 
 // The following fields are ignored when an annotation has an appearance
@@ -65,6 +66,11 @@ type Style struct {
 	// document, for example in a default appearance string, can call
 	// [Generator.ContentFont] rather than supplying an instance here.
 	NewContentFont func() (font.Layouter, error)
+
+	// LineBreaker chooses where text content, for example for FreeText
+	// annotations, may be broken into lines.  A nil value selects
+	// [text.WhitespaceBreaker].
+	LineBreaker text.LineBreaker
 }
 
 // NewStyle returns a Style which uses the default fonts.  This is the zero
@@ -112,6 +118,11 @@ type Generator struct {
 	// Use [Generator.dingbats] to read it.
 	dingbatsFont font.Layouter
 
+	// lineBreaker chooses where text content may be broken into lines; nil
+	// means text.WhitespaceBreaker.  Use [Generator.wrap] to lay out text,
+	// rather than reading this field directly.
+	lineBreaker text.LineBreaker
+
 	// resetGS holds the reset parameters which have no operator of their own,
 	// or nil for a file which cannot express them.  One dictionary is shared by
 	// every appearance stream, so the file holds a single copy.
@@ -131,6 +142,15 @@ func (g *Generator) ContentFont() font.Layouter {
 		g.contentFont = font.Must(standard.Helvetica.New())
 	}
 	return g.contentFont
+}
+
+// breaker returns the LineBreaker to use for laying out text content: the
+// Style's LineBreaker, or text.WhitespaceBreaker where that is nil.
+func (g *Generator) breaker() text.LineBreaker {
+	if g.lineBreaker != nil {
+		return g.lineBreaker
+	}
+	return text.WhitespaceBreaker{}
 }
 
 // centredBaseline returns the baseline offset which vertically centres a
@@ -193,7 +213,7 @@ var _ annotation.AppearanceGenerator = (*Generator)(nil)
 // default content font is made on first use instead and cannot fail, since it
 // is one of the standard fonts bundled with this library.
 func (s *Style) New(version pdf.Version) (*Generator, error) {
-	g := &Generator{version: version}
+	g := &Generator{version: version, lineBreaker: s.LineBreaker}
 	if s.NewContentFont != nil {
 		contentFont, err := s.NewContentFont()
 		if err != nil {
