@@ -23,6 +23,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"slices"
 
 	"seehuhn.de/go/pdf/internal/limits"
 )
@@ -84,6 +85,11 @@ type Reader struct {
 	// Both are needed to append an incremental update.
 	startXRef   int64
 	trailerSize int64
+
+	// xrefOffsets holds the header-relative offsets of the file's
+	// cross-reference sections, newest first, as visited by the Prev
+	// chain.  Read-only after construction.
+	xrefOffsets []int64
 
 	enc         *encryptInfo       // read-only after construction
 	unencrypted map[Reference]bool // read-only after construction
@@ -338,6 +344,14 @@ func (r *Reader) Close() error {
 // This implements the [Getter] interface.
 func (r *Reader) GetMeta() *MetaInfo {
 	return &r.meta
+}
+
+// XRefOffsets returns the byte offsets of the file's cross-reference
+// sections, newest first.  A hybrid-reference file's cross-reference
+// stream belongs to the table whose trailer names it and is not listed
+// separately.
+func (r *Reader) XRefOffsets() []int64 {
+	return slices.Clone(r.xrefOffsets)
 }
 
 // Get reads an indirect object from the PDF file.  If the object is not

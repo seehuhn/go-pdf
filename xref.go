@@ -72,6 +72,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 	seen := make(map[int64]bool)
 	for !seen[start] {
 		seen[start] = true
+		r.xrefOffsets = append(r.xrefOffsets, start-r.headerOffset)
 
 		s, err := r.scannerFrom(start, false)
 		if err != nil {
