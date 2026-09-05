@@ -18,6 +18,7 @@ package cff_test
 
 import (
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -75,18 +76,10 @@ func TestCFF2SimpleVariable(t *testing.T) {
 		t.Fatal(err)
 	}
 	gg := F.Layout(nil, 12, "A")
-	var gid glyph.ID
 	for _, g := range gg.Seq {
-		gid = g.GID
 		if _, ok := F.Encode(g.GID, g.Text); !ok {
 			t.Fatal("failed to encode glyph")
 		}
-	}
-
-	// the synthesized glyph name comes from the Unicode text, since the
-	// CID-keyed instance's glyph has no name of its own.
-	if name := F.GlyphName(gid); name != "A" {
-		t.Errorf("synthesized glyph name = %q, want %q", name, "A")
 	}
 
 	if err := rm.Close(); err != nil {
@@ -130,6 +123,12 @@ func TestCFF2SimpleVariable(t *testing.T) {
 	}
 	if len(back.Outlines.Glyphs) == 0 {
 		t.Fatal("re-parsed font has no glyphs")
+	}
+
+	// the synthesized glyph name comes from the Unicode text, since the
+	// CID-keyed instance's glyph has no name of its own.
+	if !slices.ContainsFunc(back.Outlines.Glyphs, func(g *sfntcff.Glyph) bool { return g.Name == "A" }) {
+		t.Errorf("re-parsed font has no glyph named %q", "A")
 	}
 }
 
@@ -215,14 +214,13 @@ func TestCFF2SimpleStatic(t *testing.T) {
 		t.Fatal(err)
 	}
 	gg := F.Layout(nil, 12, "A")
-	var gid glyph.ID
 	for _, g := range gg.Seq {
-		gid = g.GID
 		if _, ok := F.Encode(g.GID, g.Text); !ok {
 			t.Fatal("failed to encode glyph")
 		}
 	}
-	name := F.GlyphName(gid)
+	// the glyph name is synthesized from the Unicode text
+	const name = "A"
 	if err := rm.Close(); err != nil {
 		t.Fatal(err)
 	}

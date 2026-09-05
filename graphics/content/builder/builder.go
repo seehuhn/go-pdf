@@ -32,11 +32,10 @@ import (
 //
 // Builder is the only API in this package that produces validated content
 // streams.  Each emit-time check uses the builder's target PDF version and
-// content-type context: operators unknown or unavailable in the chosen
-// version are rejected, deprecated operators are rejected (callers must use
-// the modern typed helper instead, e.g. Fill rather than the "F" operator),
-// and structural constraints such as the pre-PDF-2.0 q/Q stack depth limit
-// and q/Q-in-text-object prohibition are enforced when q or Q is emitted.
+// content-type context: operators unknown, unavailable or deprecated in the
+// chosen version are rejected, and structural constraints such as the
+// pre-PDF-2.0 q/Q stack depth limit and q/Q-in-text-object prohibition are
+// enforced when q or Q is emitted.
 // The first failure becomes a sticky [Builder.Err]; subsequent emits become
 // no-ops.  The failing operator is appended to the stream once so that
 // diagnostic round-tripping still surfaces the root-cause operator rather
@@ -86,10 +85,9 @@ const (
 
 // New creates a Builder targeting the given PDF version and content-type
 // context.  The version is used to reject operators that are unknown or
-// unavailable in that version (e.g. `ri` on PDF 1.0, `gs` on pre-1.2,
-// the deprecated `F` at any version) and to enforce structural limits
-// (q/Q stack depth and q/Q-in-text-object) for pre-PDF-2.0.
-// If res is nil, the function allocates a new Resources object.
+// unavailable in that version (e.g. `ri` on PDF 1.0, `gs` on pre-1.2) and to
+// enforce structural limits (q/Q stack depth and q/Q-in-text-object) for
+// pre-PDF-2.0.  If res is nil, the function allocates a new Resources object.
 func New(ct content.Type, res *content.Resources, version pdf.Version) *Builder {
 	if res == nil {
 		res = &content.Resources{}

@@ -56,7 +56,7 @@ func main() {
 
 // linkFrame draws a labelled green frame with a pale fill, so the link says
 // what it does and is visible exactly while the zoom keeps its layer on.
-func linkFrame(w, h float64, F font.Instance, label string) *form.Form {
+func linkFrame(w, h float64, F font.Layouter, label string) *form.Form {
 	b := builder.New(content.Form, nil, pdf.V1_7)
 	b.SetFillColor(color.DeviceRGB{0.88, 1, 0.88})
 	b.Rectangle(0, 0, w, h)
@@ -71,7 +71,7 @@ func linkFrame(w, h float64, F font.Instance, label string) *form.Form {
 	b.SetFillColor(stroke)
 	b.TextBegin()
 	b.TextSetFont(F, size)
-	b.TextFirstLine(0, (h-0.7*size)/2)
+	b.TextFirstLine(0, pdf.Round((h-F.GetGeometry().CapHeight*size)/2, 2))
 	b.TextShowAligned(label, w, 0.5)
 	b.TextEnd()
 

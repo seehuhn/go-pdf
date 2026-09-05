@@ -25,7 +25,6 @@ import (
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/geom/matrix"
-	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
@@ -33,7 +32,6 @@ import (
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -43,6 +41,8 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
+	"seehuhn.de/go/pdf/font/internal/fontdesc"
+	"seehuhn.de/go/pdf/font/internal/fontgeom"
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
@@ -67,22 +67,18 @@ type OptionsComposite struct {
 // Composite represents a CFF font which can be embedded in a PDF file
 // as a composite font.
 type Composite struct {
-	*cff.Font
+	cffFont *cff.Font
 
 	// unitsPerEm caches the source sfnt.Font's UnitsPerEm so Layout can scale
 	// layouter output (which is in these units) without holding the sfnt.Font.
 	unitsPerEm uint16
 
-	Stretch  os2.Width
-	Weight   os2.Weight
-	IsSerif  bool
-	IsScript bool
-
-	Ascent    float64 // PDF glyph space units
-	Descent   float64 // PDF glyph space units
-	Leading   float64 // PDF glyph space units
-	CapHeight float64 // PDF glyph space units
-	XHeight   float64 // PDF glyph space units
+	// Descriptor describes the font as designed, in PDF glyph space units.
+	// It is filled in from the font program and may be adjusted before the
+	// font is embedded; entries which depend on the document instead of the
+	// font (FontName, IsSymbolic and MissingWidth) are ignored and filled in
+	// at embedding time.
+	Descriptor *font.Descriptor
 
 	*font.Geometry
 	layouter *sfnt.Layouter
@@ -98,7 +94,7 @@ var _ font.Layouter = (*Composite)(nil)
 // A font program need not name itself, so the name may be one derived here
 // rather than one the font gave.
 func (f *Composite) PostScriptName() string {
-	return fontname.ForCFF(f.Font)
+	return fontname.ForCFF(f.cffFont)
 }
 
 // ResourceName returns the empty string: composite CFF fonts produce a
@@ -129,33 +125,7 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
-	qv := 1000 / float64(info.UnitsPerEm)
-	ascent := math.Round(float64(info.Ascent) * qv)
-	descent := math.Round(float64(info.Descent) * qv)
-	leading := math.Round(float64(info.Ascent-info.Descent+info.LineGap) * qv)
-	capHeight := math.Round(float64(info.CapHeight) * qv)
-	xHeight := math.Round(float64(info.XHeight) * qv)
-	glyphExtents := make([]rect.Rect, len(cffFont.Glyphs))
-	for gid := range cffFont.Glyphs {
-		// GlyphBBoxPDF returns 1000-scale glyph space; convert to text space
-		b := cffFont.GlyphBBoxPDF(cffFont.FontMatrix, glyph.ID(gid))
-		glyphExtents[gid] = rect.Rect{
-			LLx: b.LLx / 1000,
-			LLy: b.LLy / 1000,
-			URx: b.URx / 1000,
-			URy: b.URy / 1000,
-		}
-	}
-	geom := &font.Geometry{
-		Ascent:             ascent / 1000,
-		Descent:            descent / 1000,
-		Leading:            leading / 1000,
-		UnderlinePosition:  pdf.Round(float64(info.UnderlinePosition)*qv/1000, 6),
-		UnderlineThickness: pdf.Round(float64(info.UnderlineThickness)*qv/1000, 6),
-
-		GlyphExtents: glyphExtents,
-		Widths:       info.WidthsPDF(),
-	}
+	geom, fontBBox := fontgeom.FromSFNT(info)
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
@@ -173,19 +143,10 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
 
 	f := &Composite{
-		Font:       cffFont,
+		cffFont:    cffFont,
 		unitsPerEm: info.UnitsPerEm,
 
-		Stretch:  info.Width,
-		Weight:   info.Weight,
-		IsSerif:  info.IsSerif,
-		IsScript: info.IsScript,
-
-		Ascent:    ascent,
-		Descent:   descent,
-		Leading:   leading,
-		CapHeight: capHeight,
-		XHeight:   xHeight,
+		Descriptor: fontdesc.FromSFNT(info, fontBBox),
 
 		Geometry: geom,
 		layouter: layouter,
@@ -249,7 +210,7 @@ func (f *Composite) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 		return c, true
 	}
 
-	width := math.Round(f.Font.GlyphWidthPDF(gid))
+	width := math.Round(f.cffFont.GlyphWidthPDF(gid))
 	c, err := f.CIDEncoder.Encode(cid, text, width)
 	return c, err == nil
 }
@@ -284,7 +245,7 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 
 // makeDict creates the PDF font dictionary for this font.
 func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
-	origOutlines := f.Font.Outlines
+	origOutlines := f.cffFont.Outlines
 	srcTag, postScriptName := subset.Split(f.PostScriptName())
 
 	// Subset the font, if needed.
@@ -304,7 +265,7 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 
 	// TagFontInfo copies, so the font information can be modified below without
 	// reaching the font this subset was made from
-	fontInfo := subset.TagFontInfo(f.Font.FontInfo, subsetTag, postScriptName)
+	fontInfo := subset.TagFontInfo(f.cffFont.FontInfo, subsetTag, postScriptName)
 
 	var subsetOutlines *cff.Outlines
 	if subsetTag != "" {
@@ -388,7 +349,7 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 			continue
 		}
 		origGID := f.gidToCID.GID(info.CID)
-		name := f.Font.Glyphs[origGID].Name
+		name := f.cffFont.Glyphs[origGID].Name
 		if name == "" {
 			name = names.FromUnicode(info.Text)
 		}
@@ -398,40 +359,16 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 		}
 	}
 
-	// StemV/StemH are in FD 0's CFF coordinate system; convert to PDF glyph
-	// space via FD 0's effective font matrix.
-	fd0Matrix := subsetOutlines.FDMatrix(0, subsetFont.FontMatrix)
-	qhStem := fd0Matrix[0] * 1000
-	qvStem := fd0Matrix[3] * 1000
-
-	italicAngle := math.Round(subsetFont.ItalicAngle*10) / 10
-
-	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, postScriptName),
-		FontFamily:   subsetFont.FamilyName,
-		FontStretch:  f.Stretch,
-		FontWeight:   f.Weight,
-		IsFixedPitch: subsetFont.IsFixedPitch,
-		IsSerif:      f.IsSerif,
-		IsSymbolic:   isSymbolic,
-		IsScript:     f.IsScript,
-		IsItalic:     italicAngle != 0,
-		ForceBold:    subsetOutlines.Private[0].ForceBold,
-		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
-		ItalicAngle:  italicAngle,
-		Ascent:       f.Ascent,
-		Descent:      f.Descent,
-		Leading:      f.Leading,
-		CapHeight:    f.CapHeight,
-		XHeight:      f.XHeight,
-		StemV:        math.Round(subsetOutlines.Private[0].StdVW * qhStem),
-		StemH:        math.Round(subsetOutlines.Private[0].StdHW * qvStem),
-	}
+	// the descriptor describes the design; only these entries depend on how
+	// the document uses the font
+	fd := *f.Descriptor
+	fd.FontName = subset.Join(subsetTag, postScriptName)
+	fd.IsSymbolic = isSymbolic
 
 	fontDict := &dict.CIDFontType0{
 		PostScriptName:  postScriptName,
 		SubsetTag:       subsetTag,
-		Descriptor:      fd,
+		Descriptor:      &fd,
 		ROS:             ros,
 		CMap:            f.CIDEncoder.CMap(ros),
 		Width:           ww,

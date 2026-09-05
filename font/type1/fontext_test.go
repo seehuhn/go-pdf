@@ -18,6 +18,7 @@ package type1_test
 
 import (
 	"maps"
+	"math"
 	"reflect"
 	"slices"
 	"strings"
@@ -26,10 +27,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
-	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/font/internal/bundled"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -205,7 +205,11 @@ func TestSubsetTagLeavesSharedDataAlone(t *testing.T) {
 // they happen to be metrically compatible with.
 func TestStandardMetricsDoNotDiscardASubset(t *testing.T) {
 	// a bare font program, the way one taken out of a PDF file arrives
-	psFont := font.Must(standard.Helvetica.New()).Font
+	psFont, _, err := bundled.Read("Helvetica")
+	if err != nil {
+		t.Fatal(err)
+	}
+	psFont.FontName = "Helvetica"
 
 	// the untagged font is metrically standard, so the program is left out
 	plain, err := type1.New(psFont, nil)
@@ -291,9 +295,10 @@ func withName(f *pstype1.Font, name string) *pstype1.Font {
 	return &other
 }
 
-// The font descriptor describes the subset which is actually embedded, so its
-// bounding box covers the glyphs the document uses rather than the whole font.
-func TestDescriptorBBoxCoversSubsetOnly(t *testing.T) {
+// The font descriptor describes the design rather than the subset which is
+// embedded, so its bounding box covers the whole font however few glyphs the
+// document uses.
+func TestDescriptorBBoxCoversWholeFont(t *testing.T) {
 	small, err := type1.New(makefont.Type1(), makefont.AFM())
 	if err != nil {
 		t.Fatal(err)
@@ -306,22 +311,22 @@ func TestDescriptorBBoxCoversSubsetOnly(t *testing.T) {
 	}
 	encodeAll(t, tall, ".H")
 
-	smallBBox := embedAlone(t, small).Descriptor.FontBBox
-	tallBBox := embedAlone(t, tall).Descriptor.FontBBox
-
-	if smallBBox.URy >= tallBBox.URy {
-		t.Errorf("a full stop reaches to %v, as high as %q at %v",
-			smallBBox.URy, "H", tallBBox.URy)
+	want := makefont.AFM().FontBBoxPDF().Rounded()
+	if got := embedAlone(t, small).Descriptor.FontBBox; got != want {
+		t.Errorf("a document showing only a full stop has FontBBox %v, want %v", got, want)
+	}
+	if got := embedAlone(t, tall).Descriptor.FontBBox; got != want {
+		t.Errorf("a document showing \".H\" has FontBBox %v, want %v", got, want)
 	}
 }
 
-// Clone copies the Instance struct wholesale and then replaces the one field
-// which carries per-document state.  A field added later is shared silently,
-// and sharing one which turns out to hold per-document state would let two
-// documents corrupt each other.  Pinning the count forces that decision to be
-// made rather than missed.
+// Clone copies the Instance struct wholesale and then replaces the fields
+// which carry per-document state: the encoder, and the descriptor a caller may
+// adjust.  A field added later is shared silently, and sharing one which turns
+// out to hold per-document state would let two documents corrupt each other.
+// Pinning the count forces that decision to be made rather than missed.
 func TestCloneConsidersEveryField(t *testing.T) {
-	const reviewed = 13
+	const reviewed = 10
 	if n := reflect.TypeFor[type1.Instance]().NumField(); n != reviewed {
 		t.Errorf("Instance has %d fields, want %d: decide whether Clone must "+
 			"give the new field a value of its own, then update this count", n, reviewed)
@@ -589,5 +594,106 @@ func TestTextContent(t *testing.T) {
 	}
 	if s.String() != text {
 		t.Fatalf("expected %q, got %q", text, s.String())
+	}
+}
+
+// TestDescriptorWithoutMetrics checks that a font embedded without AFM metrics
+// still gets the required descriptor entries.  /Ascent and /Descent are always
+// written, so leaving them unset would put a wrong value in the file, and
+// /CapHeight is required for fonts with Latin characters.
+func TestDescriptorWithoutMetrics(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	psFont := makefont.Type1()
+	F, err := type1.New(psFont, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := rm.Embed(F)
+	if err != nil {
+		t.Fatal(err)
+	}
+	F.Layout(nil, 12, "Hxg")
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	obj, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fd := obj.(*dict.Type1).Descriptor
+
+	if fd.Ascent <= 0 {
+		t.Errorf("Ascent = %g, want > 0", fd.Ascent)
+	}
+	if fd.Descent >= 0 {
+		t.Errorf("Descent = %g, want < 0", fd.Descent)
+	}
+	if math.Abs(fd.CapHeight-math.Round(psFont.CapHeightPDF())) > 0.5 {
+		t.Errorf("CapHeight = %g, want %g", fd.CapHeight, psFont.CapHeightPDF())
+	}
+	if math.Abs(fd.XHeight-math.Round(psFont.XHeightPDF())) > 0.5 {
+		t.Errorf("XHeight = %g, want %g", fd.XHeight, psFont.XHeightPDF())
+	}
+}
+
+// TestDescriptorPartialMetrics checks that entries an AFM file omits are
+// derived from the font program, for the geometry and the descriptor alike.
+// The AFM format makes Ascender, Descender, CapHeight and XHeight optional;
+// the ZapfDingbats metrics, for one, carry no ascender or descender.
+func TestDescriptorPartialMetrics(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	psFont := makefont.Type1()
+	metrics := *makefont.AFM()
+	metrics.Ascent = 0
+	metrics.Descent = 0
+	metrics.CapHeight = 0
+	metrics.XHeight = 0
+	F, err := type1.New(psFont, &metrics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := rm.Embed(F)
+	if err != nil {
+		t.Fatal(err)
+	}
+	F.Layout(nil, 12, "Hxg")
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	obj, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fd := obj.(*dict.Type1).Descriptor
+
+	bbox := metrics.FontBBoxPDF()
+	want := []struct {
+		name            string
+		descriptor, geo float64
+		want            float64
+	}{
+		{"Ascent", fd.Ascent, F.GetGeometry().Ascent * 1000, bbox.URy},
+		{"Descent", fd.Descent, F.GetGeometry().Descent * 1000, bbox.LLy},
+		{"CapHeight", fd.CapHeight, F.GetGeometry().CapHeight * 1000, psFont.CapHeightPDF()},
+		{"XHeight", fd.XHeight, F.GetGeometry().XHeight * 1000, psFont.XHeightPDF()},
+	}
+	for _, c := range want {
+		if c.want == 0 {
+			t.Fatalf("test font supplies no %s", c.name)
+		}
+		if math.Abs(c.descriptor-math.Round(c.want)) > 0.5 {
+			t.Errorf("descriptor %s = %g, want %g", c.name, c.descriptor, c.want)
+		}
+		if math.Abs(c.geo-c.want) > 1e-6 {
+			t.Errorf("geometry %s = %g, want %g", c.name, c.geo, c.want)
+		}
 	}
 }

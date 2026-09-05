@@ -36,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/text"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 
 const TestFontName = "Test17755"
@@ -55,18 +56,18 @@ func main() {
 }
 
 var (
-	fontBBox      rect.Rect
-	fontAscent    float64
-	fontDescent   float64
-	fontCapHeight float64
-	fontXHeight   float64
-	glyphWidths   float64
+	fontBBox         rect.Rect
+	fontAscent       float64
+	fontDescent      float64
+	fontCapHeight    float64
+	fontXHeight      float64
+	fontIsFixedPitch bool
+	glyphWidths      float64
 )
 
 func createFont(filename string) error {
-	F := font.Must(extended.NimbusMonoPSRegular.New())
-
-	psFont := F.Font
+	psFont := makefont.Type1()
+	srcMetrics := makefont.AFM()
 	psFont.FontInfo.FontName = TestFontName
 	psFont.CreationDate = time.Now()
 	psFont.Encoding = make([]string, 256)
@@ -94,10 +95,11 @@ func createFont(filename string) error {
 
 	fontBBox = psFont.FontBBoxPDF()
 	glyphWidths = psFont.GlyphWidthPDF("X")
-	fontAscent = F.Metrics.Ascent
-	fontDescent = F.Metrics.Descent
-	fontCapHeight = F.Metrics.CapHeight
-	fontXHeight = F.Metrics.XHeight
+	fontAscent = srcMetrics.Ascent
+	fontDescent = srcMetrics.Descent
+	fontCapHeight = srcMetrics.CapHeight
+	fontXHeight = srcMetrics.XHeight
+	fontIsFixedPitch = psFont.IsFixedPitch
 
 	opt := &pstype1.WriterOptions{
 		Format: pstype1.FormatPFB,
@@ -122,7 +124,7 @@ func createFont(filename string) error {
 		FullName:     psFont.FullName,
 		Version:      psFont.Version,
 		Notice:       psFont.Notice,
-		IsFixedPitch: true,
+		IsFixedPitch: psFont.IsFixedPitch,
 	}
 	for name, glyph := range psFont.Glyphs {
 		metrics.Glyphs[name] = &afm.GlyphInfo{
@@ -227,7 +229,7 @@ func createDocument(filename string) error {
 func makeTestFont(useEncodingDict bool) (font.Instance, error) {
 	fd := &font.Descriptor{
 		FontName:     TestFontName,
-		IsFixedPitch: true,
+		IsFixedPitch: fontIsFixedPitch,
 		IsSerif:      true,
 		IsSymbolic:   false,
 		IsAllCap:     true,

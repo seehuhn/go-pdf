@@ -106,7 +106,7 @@ func (c *sfntGlyphListCtx) Show() error {
 
 		bboxStr := ""
 		if !isBlank {
-			bboxStr = fmt.Sprintf("(%d,%d)-(%d,%d)", bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)
+			bboxStr = fmt.Sprintf("(%.6g,%.6g)-(%.6g,%.6g)", bbox.LLx, bbox.LLy, bbox.URx, bbox.URy)
 		}
 
 		fmt.Fprintf(os.Stdout, "%s%4d | %-19s | %-24s | %s\n",

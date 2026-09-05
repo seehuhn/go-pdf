@@ -17,6 +17,8 @@
 package makefont
 
 import (
+	"math"
+
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/pdf/font/pdfenc"
@@ -43,8 +45,8 @@ func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 		return nil, err
 	}
 
-	var topMin, topMax funit.Int16
-	var bottomMin, bottomMax funit.Int16
+	var topMin, topMax float64
+	var bottomMin, bottomMax float64
 	for c := 'A'; c <= 'Z'; c++ {
 		gid := cmap.Lookup(c)
 
@@ -85,7 +87,10 @@ func toCFF(info *sfnt.Font) (*sfnt.Font, error) {
 		Private: []*type1.PrivateDict{
 			{
 				BlueValues: []funit.Int16{
-					bottomMin, bottomMax, topMin, topMax,
+					funit.Int16(math.Round(bottomMin)),
+					funit.Int16(math.Round(bottomMax)),
+					funit.Int16(math.Round(topMin)),
+					funit.Int16(math.Round(topMax)),
 				},
 				BlueScale: 0.039625,
 				BlueShift: 7,

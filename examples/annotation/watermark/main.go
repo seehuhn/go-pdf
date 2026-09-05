@@ -62,9 +62,6 @@ const (
 	// the text spans this fraction of the page diagonal
 	diagonalFraction = 0.8
 
-	// approximate cap height of Helvetica-Bold, as a fraction of the font size
-	capHeight = 0.72
-
 	opacity = 0.5
 )
 
@@ -105,9 +102,8 @@ func run(inputName, text string, replace bool) error {
 	}
 	defer dst.Close()
 
-	// Watermark annotations need PDF 1.6; older documents are raised to
-	// that version through the catalog's /Version entry.
-	opt := &pdf.UpdateOptions{Version: pdf.V1_6}
+	// Watermark annotations need PDF 1.6.
+	opt := &pdf.UpdateOptions{MinimumVersion: pdf.V1_6}
 	w, err := pdf.NewUpdaterTo(src, fi.Size(), dst, opt)
 	if err != nil {
 		return err
@@ -205,6 +201,9 @@ type stamp struct {
 	// unitWidth is the width of the text at font size 1
 	unitWidth float64
 
+	// capHeight is the cap height of the font, as a fraction of the font size
+	capHeight float64
+
 	forms map[pageKey]*form.Form
 }
 
@@ -227,6 +226,7 @@ func newStamp(text string, v pdf.Version) (*stamp, error) {
 		font:      F,
 		version:   v,
 		unitWidth: unitWidth,
+		capHeight: F.GetGeometry().CapHeight,
 		forms:     make(map[pageKey]*form.Form),
 	}, nil
 }
@@ -257,8 +257,8 @@ func (s *stamp) form(box pdf.Rectangle, rotate int) *form.Form {
 	cx := (box.LLx + box.URx) / 2
 	cy := (box.LLy + box.URy) / 2
 	dx, dy := math.Cos(phi), math.Sin(phi)
-	x := cx - textWidth/2*dx + capHeight*fontSize/2*dy
-	y := cy - textWidth/2*dy - capHeight*fontSize/2*dx
+	x := cx - textWidth/2*dx + s.capHeight*fontSize/2*dy
+	y := cy - textWidth/2*dy - s.capHeight*fontSize/2*dx
 
 	// text matrix: rotation by phi, then translation to the baseline start
 	tm := matrix.Matrix{

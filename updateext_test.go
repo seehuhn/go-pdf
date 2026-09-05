@@ -173,7 +173,7 @@ func TestUpdaterRejectsWrongPassword(t *testing.T) {
 
 func TestUpdaterVersionIsMinimum(t *testing.T) {
 	f, _ := newBaseFile(t, pdf.V1_4, nil)
-	w, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{Version: pdf.V1_3})
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{MinimumVersion: pdf.V1_3})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -814,7 +814,7 @@ func TestUpdateToMatchesInPlace(t *testing.T) {
 func TestUpdateVersionRaised(t *testing.T) {
 	f, _ := newBaseFile(t, pdf.V1_4, nil)
 	n := len(f.Data)
-	w, err := pdf.NewUpdater(f, int64(n), &pdf.UpdateOptions{Version: pdf.V1_7})
+	w, err := pdf.NewUpdater(f, int64(n), &pdf.UpdateOptions{MinimumVersion: pdf.V1_7})
 	if err != nil {
 		t.Fatal(err)
 	}

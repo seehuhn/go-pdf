@@ -133,6 +133,13 @@ func (g *Generator) ContentFont() font.Layouter {
 	return g.contentFont
 }
 
+// centredBaseline returns the baseline offset which vertically centres a
+// single line of capital-height text in a box of the given height.
+// The caller rounds the coordinate it derives from this.
+func centredBaseline(F font.Layouter, height, size float64) float64 {
+	return height/2 - F.GetGeometry().CapHeight*size/2
+}
+
 // icons returns the font used for the symbols inside text annotation icons.
 //
 // Most documents have no annotation which needs it, so it is made on first use

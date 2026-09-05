@@ -28,9 +28,10 @@ import (
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphLists(t *testing.T) {
 	for _, G := range All {
-		F := font.Must(G.New())
-		psFont := F.Font
-		metrics := F.Metrics
+		psFont, metrics, err := G.data()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		glyphNames1 := psFont.GlyphList()
 		glyphNames2 := metrics.GlyphList()
@@ -44,9 +45,10 @@ func TestGlyphLists(t *testing.T) {
 // fonts are consistent between the .pfb and the .afm files.
 func TestGlyphWidths(t *testing.T) {
 	for _, G := range All {
-		F := font.Must(G.New())
-		psFont := F.Font
-		metrics := F.Metrics
+		psFont, metrics, err := G.data()
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		for name, g := range psFont.Glyphs {
 			w1 := g.WidthX
@@ -63,9 +65,10 @@ func TestGlyphWidths(t *testing.T) {
 // metrics file if and only if they are blank in the .pfb file.
 func TestBlankGlyphs(t *testing.T) {
 	for _, G := range All {
-		F := font.Must(G.New())
-		psFont := F.Font
-		metrics := F.Metrics
+		psFont, metrics, err := G.data()
+		if err != nil {
+			t.Fatal(err)
+		}
 		for name, g := range psFont.Glyphs {
 			isBlank := g.Outline == nil || len(g.Outline.Cmds) == 0
 			claimedBlank := metrics.Glyphs[name].BBox.IsZero()
@@ -160,12 +163,6 @@ func TestNewSharesFontData(t *testing.T) {
 	first := font.Must(Helvetica.New())
 	second := font.Must(Helvetica.New())
 
-	if first.Font != second.Font {
-		t.Error("the font programs are not shared")
-	}
-	if first.Metrics != second.Metrics {
-		t.Error("the metrics are not shared")
-	}
 	if first.Geometry != second.Geometry {
 		t.Error("the geometry is not shared")
 	}
@@ -176,13 +173,16 @@ func TestNewSharesFontData(t *testing.T) {
 // a pair naming a glyph the font no longer has describes nothing.
 func TestKernMatchesGlyphs(t *testing.T) {
 	for _, f := range All {
-		F := font.Must(f.New())
-		for _, k := range F.Metrics.Kern {
-			if _, ok := F.Metrics.Glyphs[k.Left]; !ok {
+		_, metrics, err := f.data()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, k := range metrics.Kern {
+			if _, ok := metrics.Glyphs[k.Left]; !ok {
 				t.Errorf("%s: kern pair for missing glyph %q", f, k.Left)
 				break
 			}
-			if _, ok := F.Metrics.Glyphs[k.Right]; !ok {
+			if _, ok := metrics.Glyphs[k.Right]; !ok {
 				t.Errorf("%s: kern pair for missing glyph %q", f, k.Right)
 				break
 			}

@@ -42,9 +42,9 @@ seehuhn.de/go/icc v0.7.5-0.20260828074917-6f4ceb03c75b h1:DlbHWYzS2JV9DPCybnCanZ
 seehuhn.de/go/icc v0.7.5-0.20260828074917-6f4ceb03c75b/go.mod h1:6p6oT2CHTrKhFlYwiNKoaK+VQrWFNJ6yLPNsff3IVLI=
 seehuhn.de/go/membudget v0.7.4 h1:G8f921Bi28xfPkuf3Kr425qE6P+NDP/i1jkVbcFCEa8=
 seehuhn.de/go/membudget v0.7.4/go.mod h1:iDiUmeAojPjk77vwdxBBBEF7bFuwz/ggMjEuACvU8UQ=
-seehuhn.de/go/postscript v0.7.5-0.20260806200436-89e22957abb9 h1:MYD4ypSlEc8riJDeS/v464aF0mf4I6RLVeWIaJpGvy8=
-seehuhn.de/go/postscript v0.7.5-0.20260806200436-89e22957abb9/go.mod h1:wkQ9t2CSEw2KN2HH7FcFtFw+Fh7rs3WbQ0T4TcuCkOU=
-seehuhn.de/go/sfnt v0.7.5-0.20260806215210-8fa8e1886588 h1:1SO/4/WveyAed1GLkQqsTLyUDL8jnWnrKrM5tC31NZk=
-seehuhn.de/go/sfnt v0.7.5-0.20260806215210-8fa8e1886588/go.mod h1:7vXX+PaAB8l0DFeBUyTLFrowJk/vta7k7fNyv/yH3bk=
+seehuhn.de/go/postscript v0.7.5-0.20260904181340-36fd7c36bd3e h1:PtsiV+lHThz7cY56YyloQ+Iyo5dzSaLAmkSTR7sU2AQ=
+seehuhn.de/go/postscript v0.7.5-0.20260904181340-36fd7c36bd3e/go.mod h1:wkQ9t2CSEw2KN2HH7FcFtFw+Fh7rs3WbQ0T4TcuCkOU=
+seehuhn.de/go/sfnt v0.7.5-0.20260904183306-3d546dabb625 h1:l95bJzksRrFxqsLaYVwsxz8C4JmF8Q+T68aLUWWcEt0=
+seehuhn.de/go/sfnt v0.7.5-0.20260904183306-3d546dabb625/go.mod h1:/w+1JjxnMbeg3Jd+j1EtrzjI+DZaIpor1t8rZyzDLHs=
 seehuhn.de/go/xmp v0.7.4 h1:kmQHmR7Lho/cbrXQ0XKDFVk5MjIfM8yYRtea/d6WFhU=
 seehuhn.de/go/xmp v0.7.4/go.mod h1:Exwho4lMhI9+UbeUqcf0y5y7bDj5jMuXNbIyOLwjAmc=

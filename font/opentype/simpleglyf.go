@@ -21,8 +21,6 @@ import (
 	"math"
 	"slices"
 
-	"seehuhn.de/go/geom/rect"
-	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
@@ -37,6 +35,8 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
+	"seehuhn.de/go/pdf/font/internal/fontdesc"
+	"seehuhn.de/go/pdf/font/internal/fontgeom"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/fontname"
@@ -45,7 +45,14 @@ import (
 // SimpleGlyf represents a simple OpenType font with glyf outlines.
 // This implements the font.Layouter interface.
 type SimpleGlyf struct {
-	*sfnt.Font
+	info *sfnt.Font
+
+	// Descriptor describes the font as designed, in PDF glyph space units.
+	// It is filled in from the font program and may be adjusted before the
+	// font is embedded; entries which depend on the document instead of the
+	// font (FontName, IsSymbolic and MissingWidth) are ignored and filled in
+	// at embedding time.
+	Descriptor *font.Descriptor
 
 	*font.Geometry
 	layouter *sfnt.Layouter
@@ -66,7 +73,7 @@ var _ font.Layouter = (*SimpleGlyf)(nil)
 // A font program need not name itself, so the name may be one derived here
 // rather than one the font gave.
 func (f *SimpleGlyf) PostScriptName() string {
-	return fontname.ForSFNT(f.Font)
+	return fontname.ForSFNT(f.info)
 }
 
 // ResourceName returns the preferred resource-dictionary key for this font.
@@ -81,16 +88,8 @@ func newSimpleGlyf(info *sfnt.Font, opt *OptionsSimple) (*SimpleGlyf, error) {
 		return nil, errors.New("no glyf outlines in font")
 	}
 
-	geometry := &font.Geometry{
-		GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
-		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-		Leading:            float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
-	}
+	geometry, fontBBox := fontgeom.FromSFNT(info)
+	descriptor := fontdesc.FromSFNT(info, fontBBox)
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
@@ -98,9 +97,11 @@ func newSimpleGlyf(info *sfnt.Font, opt *OptionsSimple) (*SimpleGlyf, error) {
 	}
 
 	f := &SimpleGlyf{
-		Font:     info,
+		info:     info,
 		Geometry: geometry,
-		layouter: layouter,
+
+		Descriptor: descriptor,
+		layouter:   layouter,
 	}
 
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
@@ -149,8 +150,8 @@ func (f *SimpleGlyf) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 		return charcode.Code(c), true
 	}
 
-	width := math.Round(f.Font.GlyphWidthPDF(gid))
-	c, err := f.Simple.Encode(gid, f.Font.GlyphName(gid), text, width)
+	width := math.Round(f.info.GlyphWidthPDF(gid))
+	c, err := f.Simple.Encode(gid, f.info.GlyphName(gid), text, width)
 	return charcode.Code(c), err == nil
 }
 
@@ -161,7 +162,7 @@ func (f *SimpleGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.
 	}
 
 	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
-	q := ptSize / float64(f.Font.UnitsPerEm)
+	q := ptSize / float64(f.info.UnitsPerEm)
 
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
@@ -219,7 +220,7 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 	}
 
 	// subset the font
-	origFont := sfntglyphs.StripForEmbedding(f.Font)
+	origFont := sfntglyphs.StripForEmbedding(f.info)
 
 	glyphs := f.Simple.Glyphs()
 	srcTag, postScriptName := subset.Split(fontname.ForSFNT(origFont))
@@ -315,30 +316,12 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 		widths[code] = info.Width
 	}
 
-	qv := 1000 / float64(subsetFont.UnitsPerEm)
-	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, postScriptName),
-		FontFamily:   subsetFont.FamilyName,
-		FontStretch:  subsetFont.Width,
-		FontWeight:   subsetFont.Weight,
-		IsFixedPitch: subsetFont.IsFixedPitch(),
-		IsSerif:      subsetFont.IsSerif,
-		IsSymbolic:   isSymbolic,
-		IsScript:     subsetFont.IsScript,
-		IsItalic:     subsetFont.IsItalic,
-		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
-		ItalicAngle:  subsetFont.ItalicAngle,
-		Ascent:       math.Round(float64(subsetFont.Ascent) * qv),
-		Descent:      math.Round(float64(subsetFont.Descent) * qv),
-		Leading:      math.Round(float64(subsetFont.Ascent-subsetFont.Descent+subsetFont.LineGap) * qv),
-		CapHeight:    math.Round(float64(subsetFont.CapHeight) * qv),
-		XHeight:      math.Round(float64(subsetFont.XHeight) * qv),
-		StemV:        0, // not specified
-		StemH:        0, // not specified
-		AvgWidth:     0, // not specified
-		MaxWidth:     0, // not specified
-		MissingWidth: f.Simple.DefaultWidth(),
-	}
+	// the descriptor describes the design; only these entries depend on how
+	// the document uses the font
+	fd := *f.Descriptor
+	fd.FontName = subset.Join(subsetTag, postScriptName)
+	fd.IsSymbolic = isSymbolic
+	fd.MissingWidth = f.Simple.DefaultWidth()
 
 	// the embedded program names itself the same as BaseFont and the
 	// descriptor's FontName, which for a subset carry the tag
@@ -348,7 +331,7 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Name:           f.Name,
-		Descriptor:     fd,
+		Descriptor:     &fd,
 		Encoding:       dictEnc,
 		Width:          widths,
 		ToUnicode:      f.Simple.ToUnicode(),
@@ -356,17 +339,4 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 	}
 
 	return fontDict, nil
-}
-
-func scaleBoxesGlyf(bboxes []funit.Rect16, unitsPerEm uint16) []rect.Rect {
-	res := make([]rect.Rect, len(bboxes))
-	for i, b := range bboxes {
-		res[i] = rect.Rect{
-			LLx: float64(b.LLx) / float64(unitsPerEm),
-			LLy: float64(b.LLy) / float64(unitsPerEm),
-			URx: float64(b.URx) / float64(unitsPerEm),
-			URy: float64(b.URy) / float64(unitsPerEm),
-		}
-	}
-	return res
 }

@@ -413,10 +413,11 @@ func (g *Generator) drawDingbat(b *builder.Builder, width, height float64, marke
 		return
 	}
 	size := min(width, height) * 0.62
+	F := g.dingbats()
 	b.TextBegin()
-	b.TextSetFont(g.dingbats(), size)
+	b.TextSetFont(F, size)
 	b.SetFillColor(quireInk)
-	b.TextFirstLine(0, height/2-size*0.33)
+	b.TextFirstLine(0, pdf.Round(centredBaseline(F, height, size), 2))
 	b.TextShowAligned(glyph, width, 0.5)
 	b.TextEnd()
 }
@@ -442,10 +443,11 @@ func (g *Generator) drawPushButton(w *annotation.Widget) (*form.Form, error) {
 
 	if w.Style != nil && w.Style.Caption != "" {
 		size := captionSize(height)
+		F := g.ContentFont()
 		b.TextBegin()
-		b.TextSetFont(g.ContentFont(), size)
+		b.TextSetFont(F, size)
 		b.SetFillColor(quireInk)
-		b.TextFirstLine(0, height/2-size*0.33)
+		b.TextFirstLine(0, pdf.Round(centredBaseline(F, height, size), 2))
 		b.TextShowAligned(w.Style.Caption, width, 0.5)
 		b.TextEnd()
 	}
@@ -487,6 +489,7 @@ func (g *Generator) drawSingleLine(b *builder.Builder, width, height, lw, pad fl
 	}
 	left := lw + pad
 	contentWidth := width - 2*(lw+pad)
+	F := g.ContentFont()
 
 	b.PushGraphicsState()
 	b.Rectangle(left, lw, contentWidth, height-2*lw)
@@ -494,9 +497,9 @@ func (g *Generator) drawSingleLine(b *builder.Builder, width, height, lw, pad fl
 	b.EndPath()
 
 	b.TextBegin()
-	b.TextSetFont(g.ContentFont(), size)
+	b.TextSetFont(F, size)
 	b.SetFillColor(col)
-	b.TextFirstLine(left, height/2-size*0.33)
+	b.TextFirstLine(left, pdf.Round(centredBaseline(F, height, size), 2))
 	b.TextShowAligned(text, contentWidth, quadFraction(fld.Align))
 	b.TextEnd()
 
@@ -583,9 +586,10 @@ func (g *Generator) drawComb(b *builder.Builder, width, height, lw float64, fld 
 	if size == 0 {
 		size = autoSize(height - 2*lw)
 	}
-	baseline := pdf.Round(height/2-size*0.33, 2)
+	F := g.ContentFont()
+	baseline := pdf.Round(centredBaseline(F, height, size), 2)
 	b.TextBegin()
-	b.TextSetFont(g.ContentFont(), size)
+	b.TextSetFont(F, size)
 	b.SetFillColor(col)
 	prev := 0.0
 	for i := range k {
@@ -651,10 +655,11 @@ func (g *Generator) drawCombo(b *builder.Builder, width, height, lw, pad float64
 			size = autoSize(height - 2*lw)
 		}
 		left := lw + pad
+		F := g.ContentFont()
 		b.TextBegin()
-		b.TextSetFont(g.ContentFont(), size)
+		b.TextSetFont(F, size)
 		b.SetFillColor(col)
-		b.TextFirstLine(left, height/2-size*0.33)
+		b.TextFirstLine(left, pdf.Round(centredBaseline(F, height, size), 2))
 		b.TextShowAligned(fld.Value, divX-left-pad, quadFraction(fld.Align))
 		b.TextEnd()
 	}
@@ -667,10 +672,8 @@ func (g *Generator) drawListBox(b *builder.Builder, width, height, lw, pad float
 	if size == 0 {
 		size = 11
 	}
-	rowH := pdf.Round(g.ContentFont().GetGeometry().Leading*size, 2)
-	if rowH <= 0 {
-		rowH = size * 1.3
-	}
+	F := g.ContentFont()
+	rowH := pdf.Round(F.GetGeometry().Leading*size, 2)
 	left := lw + pad
 
 	selected := map[int]bool{}
@@ -699,9 +702,9 @@ func (g *Generator) drawListBox(b *builder.Builder, width, height, lw, pad float
 			b.Fill()
 		}
 		b.TextBegin()
-		b.TextSetFont(g.ContentFont(), size)
+		b.TextSetFont(F, size)
 		b.SetFillColor(col)
-		b.TextFirstLine(left, rowBottom+(rowH-size)/2+size*0.2)
+		b.TextFirstLine(left, pdf.Round(rowBottom+centredBaseline(F, rowH, size), 2))
 		b.TextShow(fld.Options[i])
 		b.TextEnd()
 	}

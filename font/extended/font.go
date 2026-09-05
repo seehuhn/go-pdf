@@ -78,7 +78,7 @@ func (f Font) read() (*type1.Instance, error) {
 		return nil, err
 	}
 
-	res.IsSerif = isSerif[f]
+	res.Descriptor.IsSerif = isSerif[f]
 
 	return res, nil
 }

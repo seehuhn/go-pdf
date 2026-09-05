@@ -19,10 +19,12 @@ package main
 import (
 	"bytes"
 	"go/format"
+	"math"
 	"os"
 	"text/template"
 
 	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf/font/standard"
 )
@@ -80,28 +82,32 @@ func getFontData(data Data, f standard.Font) error {
 	if err != nil {
 		return err
 	}
-	family := F.Font.FamilyName
+	fd := F.Descriptor
+	family := fd.FontFamily
 
 	var weight string
-	switch F.Font.Weight {
-	case "Regular":
+	switch fd.FontWeight {
+	case os2.WeightNormal:
 		weight = "os2.WeightNormal"
-	case "Bold":
+	case os2.WeightBold:
 		weight = "os2.WeightBold"
 	default:
 		panic("unreachable")
 	}
 
-	bbox := F.Font.FontBBoxPDF()
+	bbox := fd.FontBBox
 
+	// the AFM widths are integers, which the round trip through text space
+	// units recovers exactly
 	widths := make(map[string]float64)
-	for name, info := range F.Metrics.Glyphs {
-		widths[name] = info.WidthX
+	for gid, name := range F.GlyphNames {
+		widths[name] = math.Round(F.Widths[gid] * 1000)
 	}
 
 	isSymbolic := false
 	encoding := "standardEncoding"
-	switch F.FontName {
+	fontName := F.PostScriptName()
+	switch fontName {
 	case "Symbol":
 		encoding = "symbolEncoding"
 		isSymbolic = true
@@ -110,20 +116,20 @@ func getFontData(data Data, f standard.Font) error {
 		isSymbolic = true
 	}
 
-	data[F.FontName] = &fontMetrics{
+	data[fontName] = &fontMetrics{
 		FontFamily:   family,
 		FontWeight:   weight,
-		IsFixedPitch: F.Font.IsFixedPitch,
-		IsSerif:      F.IsSerif,
+		IsFixedPitch: fd.IsFixedPitch,
+		IsSerif:      fd.IsSerif,
 		IsSymbolic:   isSymbolic,
 		FontBBox:     bbox,
-		ItalicAngle:  F.Font.ItalicAngle,
-		Ascent:       F.Metrics.Ascent,
-		Descent:      F.Metrics.Descent,
-		CapHeight:    F.Metrics.CapHeight,
-		XHeight:      F.Metrics.XHeight,
-		StemV:        F.Font.Private.StdVW,
-		StemH:        F.Font.Private.StdHW,
+		ItalicAngle:  fd.ItalicAngle,
+		Ascent:       fd.Ascent,
+		Descent:      fd.Descent,
+		CapHeight:    fd.CapHeight,
+		XHeight:      fd.XHeight,
+		StemV:        fd.StemV,
+		StemH:        fd.StemH,
 
 		Widths: widths,
 

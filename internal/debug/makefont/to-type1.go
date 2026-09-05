@@ -17,8 +17,9 @@
 package makefont
 
 import (
+	"math"
+
 	"seehuhn.de/go/geom/path"
-	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/psenc"
@@ -82,8 +83,8 @@ func toType1(info *sfnt.Font) (*type1.Font, error) {
 		panic("unreachable")
 	}
 
-	var topMin, topMax funit.Int16
-	var bottomMin, bottomMax funit.Int16
+	var topMin, topMax float64
+	var bottomMin, bottomMax float64
 	for c := 'A'; c <= 'Z'; c++ {
 		gid := cmap.Lookup(c)
 
@@ -110,7 +111,10 @@ func toType1(info *sfnt.Font) (*type1.Font, error) {
 
 	Private := &type1.PrivateDict{
 		BlueValues: []funit.Int16{
-			bottomMin, bottomMax, topMin, topMax,
+			funit.Int16(math.Round(bottomMin)),
+			funit.Int16(math.Round(bottomMax)),
+			funit.Int16(math.Round(topMin)),
+			funit.Int16(math.Round(topMax)),
 		},
 	}
 
@@ -138,16 +142,9 @@ func toAFM(info *sfnt.Font) (*afm.Metrics, error) {
 	for i := range n {
 		gid := glyph.ID(i)
 		name := info.GlyphName(gid)
-		bbox := info.GlyphBBox(gid)
-		bboxAFM := rect.Rect{
-			LLx: float64(bbox.LLx) * q,
-			LLy: float64(bbox.LLy) * q,
-			URx: float64(bbox.URx) * q,
-			URy: float64(bbox.URy) * q,
-		}
 		newGlyphs[name] = &afm.GlyphInfo{
 			WidthX: info.GlyphWidthPDF(gid),
-			BBox:   bboxAFM,
+			BBox:   info.Outlines.GlyphBBoxPDF(info.FontMatrix, gid),
 			// TODO(voss): ligatures
 		}
 	}

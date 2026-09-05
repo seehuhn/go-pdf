@@ -59,9 +59,9 @@ func TestSerifMatchesStandard(t *testing.T) {
 	for _, f := range All {
 		ext := font.Must(f.New())
 		std := font.Must(equivalent[f].New())
-		if ext.IsSerif != std.IsSerif {
+		if ext.Descriptor.IsSerif != std.Descriptor.IsSerif {
 			t.Errorf("%s has IsSerif=%v, but %s has %v",
-				fontName[f], ext.IsSerif, equivalent[f], std.IsSerif)
+				fontName[f], ext.Descriptor.IsSerif, equivalent[f], std.Descriptor.IsSerif)
 		}
 	}
 }
@@ -94,12 +94,6 @@ func TestNewSharesFontData(t *testing.T) {
 	first := font.Must(NimbusRomanRegular.New())
 	second := font.Must(NimbusRomanRegular.New())
 
-	if first.Font != second.Font {
-		t.Error("the font programs are not shared")
-	}
-	if first.Metrics != second.Metrics {
-		t.Error("the metrics are not shared")
-	}
 	if first.Geometry != second.Geometry {
 		t.Error("the geometry is not shared")
 	}

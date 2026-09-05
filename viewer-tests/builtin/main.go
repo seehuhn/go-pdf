@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/stdmtx"
 )
 
 func main() {
@@ -160,13 +161,14 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 	colWidth := (f.textWidth + 32) / 4
 
 	fnt := font.Must(G.New())
+	fntGeom := fnt.GetGeometry()
 
-	afm := fnt.Metrics
-	glyphNames := afm.GlyphList()
+	glyphNames := fnt.GlyphNames
 	nGlyph := len(glyphNames)
 
+	// the built-in encoding of the standard font
 	glyphCode := make(map[string]int)
-	for i, name := range afm.Encoding {
+	for i, name := range stdmtx.Metrics[string(G)].Encoding {
 		if name != ".notdef" {
 			glyphCode[name] = i
 		}
@@ -189,7 +191,7 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 			nRows = rowsNeeded
 		}
 
-		yTop := f.margin + f.textHeight - f.used - afm.Ascent*fontSize/1000
+		yTop := f.margin + f.textHeight - f.used - fntGeom.Ascent*fontSize
 
 		// First draw the rectangles for the glyph extents onto the background.
 		tmpGlyph := curGlyph
@@ -203,15 +205,15 @@ func (f *fontTables) MakeColumns(G standard.Font) error {
 				}
 				y := yTop - baseLineSkip*float64(i)
 
-				gi := afm.Glyphs[glyphNames[tmpGlyph]]
-				ext := gi.BBox
+				// the geometry is in text space units
+				ext := fntGeom.GlyphExtents[tmpGlyph]
 				if !ext.IsZero() {
-					w := gi.WidthX * fontSize / 1000
+					w := fntGeom.Widths[tmpGlyph] * fontSize
 					page.Rectangle(
-						x+32-w/2+ext.LLx*fontSize/1000,
-						y+ext.LLy*fontSize/1000,
-						(ext.URx-ext.LLx)*fontSize/1000,
-						(ext.URy-ext.LLy)*fontSize/1000)
+						x+32-w/2+ext.LLx*fontSize,
+						y+ext.LLy*fontSize,
+						(ext.URx-ext.LLx)*fontSize,
+						(ext.URy-ext.LLy)*fontSize)
 				}
 
 				tmpGlyph++

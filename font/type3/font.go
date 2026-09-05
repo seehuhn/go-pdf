@@ -29,12 +29,15 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/rect"
+	pstype1 "seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/pdf/font/internal/fontgeom"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics/content"
 )
@@ -335,18 +338,40 @@ func (f *Font) New() (font.Layouter, error) {
 		}
 		ww[i] = rawWidths[i] * qh
 	}
+	// the font need not set the cap height and x-height, so fall back to
+	// measuring the glyphs; anything still missing is estimated
+	capHeight := f.CapHeight * qv
+	xHeight := f.XHeight * qv
+	if capHeight <= 0 || xHeight <= 0 {
+		byName := make(map[string]int, len(f.Glyphs))
+		for i, g := range f.Glyphs {
+			if g.Name != "" {
+				byName[g.Name] = i
+			}
+		}
+		if capHeight <= 0 {
+			capHeight = measureHeight(byName, ee, pstype1.CapHeightChars)
+		}
+		if xHeight <= 0 {
+			xHeight = measureHeight(byName, ee, pstype1.XHeightChars)
+		}
+	}
 	geom := &font.Geometry{
 		Ascent:             f.Ascent * qv,
 		Descent:            f.Descent * qv,
 		Leading:            f.Leading * qv,
+		CapHeight:          capHeight,
+		XHeight:            xHeight,
 		UnderlinePosition:  pdf.Round(f.UnderlinePosition*qv, 6),
 		UnderlineThickness: pdf.Round(f.UnderlineThickness*qv, 6),
 		GlyphExtents:       ee,
 		Widths:             ww,
 	}
+	fontgeom.FillHeights(geom)
 
-	// Initialize encoding state - Type3 fonts are always simple fonts
-	notdefWidth := math.Round(ww[0] * 1000)
+	// Type 3 fonts are always simple fonts.  The encoder records widths in
+	// the units of the Widths array, which for Type 3 fonts is glyph space.
+	notdefWidth := math.Round(rawWidths[0])
 	simple := simpleenc.NewSimple(
 		notdefWidth,
 		f.PostScriptName,
@@ -510,4 +535,21 @@ func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 	}
 
 	return d, nil
+}
+
+// measureHeight returns the height above the baseline of the first of the
+// given characters the font has a non-blank glyph for, in text space units.
+// It is used to derive a cap height or x-height for fonts which set neither;
+// see [pstype1.CapHeightChars].  The byName map indexes extents by glyph name.
+func measureHeight(byName map[string]int, extents []rect.Rect, chars string) float64 {
+	for _, r := range chars {
+		i, ok := byName[string(r)]
+		if !ok {
+			continue
+		}
+		if h := extents[i].URy; h > 0 { // the test also rejects NaN
+			return h
+		}
+	}
+	return 0
 }

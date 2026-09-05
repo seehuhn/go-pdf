@@ -20,6 +20,7 @@ import (
 	"math"
 	"testing"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/internal/stdmtx"
@@ -39,9 +40,9 @@ func TestGeometry(t *testing.T) {
 
 		genFontBBox := mtx.FontBBox
 
-		for glyphName := range F.Font.Glyphs {
+		for gid, glyphName := range F.GlyphNames {
 			genWidth := mtx.Width[glyphName]
-			actualWidth := F.Font.GlyphWidthPDF(glyphName)
+			actualWidth := math.Round(F.Widths[gid] * 1000)
 
 			// Check that we are not off by a factor of 1000 (e.g., using text
 			// space units instead of glyph space units).
@@ -54,7 +55,14 @@ func TestGeometry(t *testing.T) {
 				t.Errorf("%s:%s: width mismatch: %f vs %f", f, glyphName, actualWidth, genWidth)
 			}
 
-			actualGlyphBBox := F.GlyphBBoxPDF(glyphName)
+			// the extents are in text space; the glyph coordinates are integers
+			e := F.GlyphExtents[gid]
+			actualGlyphBBox := rect.Rect{
+				LLx: math.Round(e.LLx * 1000),
+				LLy: math.Round(e.LLy * 1000),
+				URx: math.Round(e.URx * 1000),
+				URy: math.Round(e.URy * 1000),
+			}
 			if !genFontBBox.Covers(actualGlyphBBox) {
 				t.Errorf("%s:%s: glyph bbox %v not covered by font bbox %v", f, glyphName,
 					actualGlyphBBox, genFontBBox)

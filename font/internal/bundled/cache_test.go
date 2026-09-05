@@ -55,12 +55,6 @@ func TestGetSharesFontData(t *testing.T) {
 	if first == second {
 		t.Fatal("two callers got the same instance")
 	}
-	if first.Font != second.Font {
-		t.Error("the font programs are not shared")
-	}
-	if first.Metrics != second.Metrics {
-		t.Error("the metrics are not shared")
-	}
 	if first.Geometry != second.Geometry {
 		t.Error("the geometry is not shared")
 	}

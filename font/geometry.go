@@ -24,10 +24,16 @@ import (
 
 // Geometry collects the various dimensions connected to a font and to
 // the individual glyphs. All dimensions are in text space units.
+//
+// Leading, CapHeight and XHeight are always positive.  Fonts which report
+// none, such as Type 1 fonts embedded without metrics, have them measured
+// from the glyphs where possible and estimated otherwise.
 type Geometry struct {
 	Ascent             float64 // text space units
 	Descent            float64 // negative, text space units
-	Leading            float64 // text space units
+	Leading            float64 // text space units, always positive
+	CapHeight          float64 // text space units, always positive
+	XHeight            float64 // text space units, always positive
 	UnderlinePosition  float64 // text space units
 	UnderlineThickness float64 // text space units
 
@@ -38,14 +44,6 @@ type Geometry struct {
 
 // GetGeometry returns the geometry of a font.
 func (g *Geometry) GetGeometry() *Geometry {
-	if g.Leading == 0 {
-		x := 1.0
-		if g.Ascent != 0 || g.Descent != 0 {
-			g.Leading = g.Ascent - g.Descent
-		}
-		g.Leading = 1.2 * x
-	}
-
 	return g
 }
 

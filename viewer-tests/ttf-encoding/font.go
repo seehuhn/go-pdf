@@ -270,10 +270,10 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 
 	bbox := newTTF.FontBBox()
 	pdfBBox := &pdf.Rectangle{
-		LLx: bbox.LLx.AsFloat(q),
-		LLy: bbox.LLy.AsFloat(q),
-		URx: bbox.URx.AsFloat(q),
-		URy: bbox.URy.AsFloat(q),
+		LLx: bbox.LLx * q,
+		LLy: bbox.LLy * q,
+		URx: bbox.URx * q,
+		URy: bbox.URy * q,
 	}
 
 	// Since we are not sure which glyphs are going to be shown,

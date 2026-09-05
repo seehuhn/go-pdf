@@ -27,10 +27,8 @@
 // All construction-time validation lives in the
 // [seehuhn.de/go/pdf/graphics/content/builder.Builder] type:
 //
-//   - operators unknown or unavailable in the chosen PDF version are
-//     rejected at emit time;
-//   - deprecated operators (e.g. F) are rejected — callers must use the
-//     modern typed helper (Fill);
+//   - operators unknown, unavailable or deprecated in the chosen PDF
+//     version are rejected at emit time;
 //   - structural rules (q/Q stack depth, q/Q-in-text-object for pre-2.0)
 //     are enforced at the offending operator;
 //   - operators that fail [State.ApplyOperator] (improper nesting, wrong

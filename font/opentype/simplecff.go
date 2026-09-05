@@ -34,6 +34,8 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
+	"seehuhn.de/go/pdf/font/internal/fontdesc"
+	"seehuhn.de/go/pdf/font/internal/fontgeom"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/fontname"
@@ -42,7 +44,14 @@ import (
 // SimpleCFF represents a simple OpenType font with CFF outlines.
 // This implements the font.Layouter interface.
 type SimpleCFF struct {
-	*sfnt.Font
+	info *sfnt.Font
+
+	// Descriptor describes the font as designed, in PDF glyph space units.
+	// It is filled in from the font program and may be adjusted before the
+	// font is embedded; entries which depend on the document instead of the
+	// font (FontName, IsSymbolic and MissingWidth) are ignored and filled in
+	// at embedding time.
+	Descriptor *font.Descriptor
 
 	*font.Geometry
 	layouter *sfnt.Layouter
@@ -63,7 +72,7 @@ var _ font.Layouter = (*SimpleCFF)(nil)
 // A font program need not name itself, so the name may be one derived here
 // rather than one the font gave.
 func (f *SimpleCFF) PostScriptName() string {
-	return fontname.ForSFNT(f.Font)
+	return fontname.ForSFNT(f.info)
 }
 
 // ResourceName returns the preferred resource-dictionary key for this font.
@@ -78,22 +87,8 @@ func newSimpleCFF(info *sfnt.Font, opt *OptionsSimple) (*SimpleCFF, error) {
 		return nil, errors.New("no CFF outlines in font")
 	}
 
-	glyphExtents := info.GlyphBBoxesPDF()
-	for i := range glyphExtents {
-		glyphExtents[i].Scale(1.0 / 1000)
-	}
-
-	q := 1 / float64(info.UnitsPerEm)
-	geometry := &font.Geometry{
-		GlyphExtents: glyphExtents,
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) * q,
-		Descent:            float64(info.Descent) * q,
-		Leading:            float64(info.Ascent-info.Descent+info.LineGap) * q,
-		UnderlinePosition:  float64(info.UnderlinePosition) * q,
-		UnderlineThickness: float64(info.UnderlineThickness) * q,
-	}
+	geometry, fontBBox := fontgeom.FromSFNT(info)
+	descriptor := fontdesc.FromSFNT(info, fontBBox)
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
@@ -101,9 +96,11 @@ func newSimpleCFF(info *sfnt.Font, opt *OptionsSimple) (*SimpleCFF, error) {
 	}
 
 	f := &SimpleCFF{
-		Font:     info,
+		info:     info,
 		Geometry: geometry,
-		layouter: layouter,
+
+		Descriptor: descriptor,
+		layouter:   layouter,
 	}
 
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
@@ -152,8 +149,8 @@ func (f *SimpleCFF) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 		return charcode.Code(c), true
 	}
 
-	width := math.Round(f.Font.GlyphWidthPDF(gid))
-	c, err := f.Simple.Encode(gid, f.Font.GlyphName(gid), text, width)
+	width := math.Round(f.info.GlyphWidthPDF(gid))
+	c, err := f.Simple.Encode(gid, f.info.GlyphName(gid), text, width)
 	return charcode.Code(c), err == nil
 }
 
@@ -164,7 +161,7 @@ func (f *SimpleCFF) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 	}
 
 	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
-	q := ptSize / float64(f.Font.UnitsPerEm)
+	q := ptSize / float64(f.info.UnitsPerEm)
 
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
@@ -214,7 +211,7 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	}
 
 	// get the CFF font data
-	cffFont := f.Font.AsCFF()
+	cffFont := f.info.AsCFF()
 	if cffFont == nil {
 		return nil, errors.New("no CFF outlines in font")
 	}
@@ -269,45 +266,18 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 		widths[code] = info.Width
 	}
 
-	// Ascent, Descent, etc. come from the OpenType OS/2/hhea tables and are
-	// measured in UnitsPerEm.  PDF descriptor entries use 1/1000 em.
-	qv := 1000 / float64(f.Font.UnitsPerEm)
-
-	// StemV/StemH come from the CFF Private dict in CFF coordinates; the
-	// per-FD matrix (if any) has already been composed into subsetCFF.FontMatrix
-	// above.
-	qhStem := subsetCFF.FontMatrix[0] * 1000
-	qvStem := subsetCFF.FontMatrix[3] * 1000
-
-	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, postScriptName),
-		FontFamily:   subsetCFF.FamilyName,
-		FontStretch:  f.Font.Width,
-		FontWeight:   f.Font.Weight,
-		IsFixedPitch: f.Font.IsFixedPitch(),
-		IsSerif:      f.Font.IsSerif,
-		IsSymbolic:   isSymbolic,
-		IsScript:     f.Font.IsScript,
-		IsItalic:     f.Font.IsItalic,
-		FontBBox:     subsetCFF.FontBBoxPDF().Rounded(),
-		ItalicAngle:  subsetCFF.ItalicAngle,
-		Ascent:       math.Round(float64(f.Font.Ascent) * qv),
-		Descent:      math.Round(float64(f.Font.Descent) * qv),
-		Leading:      math.Round(float64(f.Font.Ascent-f.Font.Descent+f.Font.LineGap) * qv),
-		CapHeight:    math.Round(float64(f.Font.CapHeight) * qv),
-		XHeight:      math.Round(float64(f.Font.XHeight) * qv),
-		StemV:        math.Round(subsetCFF.Private[0].StdVW * qhStem),
-		StemH:        math.Round(subsetCFF.Private[0].StdHW * qvStem),
-		AvgWidth:     0, // not specified
-		MaxWidth:     0, // not specified
-		MissingWidth: f.Simple.DefaultWidth(),
-	}
+	// the descriptor describes the design; only these entries depend on how
+	// the document uses the font
+	fd := *f.Descriptor
+	fd.FontName = subset.Join(subsetTag, postScriptName)
+	fd.IsSymbolic = isSymbolic
+	fd.MissingWidth = f.Simple.DefaultWidth()
 
 	fontDict := &dict.Type1{
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Name:           f.Name,
-		Descriptor:     fd,
+		Descriptor:     &fd,
 		Encoding:       f.Simple.Encoding(),
 		Width:          widths,
 		ToUnicode:      f.Simple.ToUnicode(),

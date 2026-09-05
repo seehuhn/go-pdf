@@ -36,6 +36,8 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
+	"seehuhn.de/go/pdf/font/internal/fontdesc"
+	"seehuhn.de/go/pdf/font/internal/fontgeom"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/fontname"
@@ -44,7 +46,14 @@ import (
 // CompositeGlyf represents a composite OpenType font with glyf outlines.
 // This implements the font.Layouter interface.
 type CompositeGlyf struct {
-	*sfnt.Font
+	info *sfnt.Font
+
+	// Descriptor describes the font as designed, in PDF glyph space units.
+	// It is filled in from the font program and may be adjusted before the
+	// font is embedded; entries which depend on the document instead of the
+	// font (FontName, IsSymbolic and MissingWidth) are ignored and filled in
+	// at embedding time.
+	Descriptor *font.Descriptor
 
 	*font.Geometry
 	layouter *sfnt.Layouter
@@ -60,7 +69,7 @@ var _ font.Layouter = (*CompositeGlyf)(nil)
 // A font program need not name itself, so the name may be one derived here
 // rather than one the font gave.
 func (f *CompositeGlyf) PostScriptName() string {
-	return fontname.ForSFNT(f.Font)
+	return fontname.ForSFNT(f.info)
 }
 
 // ResourceName returns the empty string: composite OpenType/glyf fonts
@@ -76,16 +85,8 @@ func newCompositeGlyf(info *sfnt.Font, opt *OptionsComposite) (*CompositeGlyf, e
 		return nil, errors.New("no glyf outlines in font")
 	}
 
-	geometry := &font.Geometry{
-		GlyphExtents: scaleBoxesGlyf(info.GlyphBBoxes(), info.UnitsPerEm),
-		Widths:       info.WidthsPDF(),
-
-		Ascent:             float64(info.Ascent) / float64(info.UnitsPerEm),
-		Descent:            float64(info.Descent) / float64(info.UnitsPerEm),
-		Leading:            float64(info.Ascent-info.Descent+info.LineGap) / float64(info.UnitsPerEm),
-		UnderlinePosition:  float64(info.UnderlinePosition) / float64(info.UnitsPerEm),
-		UnderlineThickness: float64(info.UnderlineThickness) / float64(info.UnitsPerEm),
-	}
+	geometry, fontBBox := fontgeom.FromSFNT(info)
+	descriptor := fontdesc.FromSFNT(info, fontBBox)
 
 	layouter, err := info.NewLayouter(opt.Language, opt.GsubFeatures, opt.GposFeatures)
 	if err != nil {
@@ -104,8 +105,10 @@ func newCompositeGlyf(info *sfnt.Font, opt *OptionsComposite) (*CompositeGlyf, e
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
 
 	f := &CompositeGlyf{
-		Font:       info,
-		Geometry:   geometry,
+		info:     info,
+		Geometry: geometry,
+
+		Descriptor: descriptor,
 		layouter:   layouter,
 		gidToCID:   makeGIDToCID(),
 		CIDEncoder: makeEncoder(notdefWidth, opt.WritingMode),
@@ -153,7 +156,7 @@ func (f *CompositeGlyf) Encode(gid glyph.ID, text string) (charcode.Code, bool) 
 		return c, true
 	}
 
-	width := math.Round(f.Font.GlyphWidthPDF(gid))
+	width := math.Round(f.info.GlyphWidthPDF(gid))
 	c, err := f.CIDEncoder.Encode(cid, text, width)
 	return c, err == nil
 }
@@ -165,7 +168,7 @@ func (f *CompositeGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *fo
 	}
 
 	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
-	q := ptSize / float64(f.Font.UnitsPerEm)
+	q := ptSize / float64(f.info.UnitsPerEm)
 
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
@@ -188,7 +191,7 @@ func (f *CompositeGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *fo
 
 // makeDict creates the PDF font dictionary for this font.
 func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
-	origFont := f.Font
+	origFont := f.info
 	srcTag, postScriptName := subset.Split(fontname.ForSFNT(origFont))
 
 	origFont = sfntglyphs.StripForEmbedding(origFont)
@@ -244,7 +247,7 @@ func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
 			continue
 		}
 		origGID := f.gidToCID.GID(info.CID)
-		name := f.Font.GlyphName(origGID)
+		name := f.info.GlyphName(origGID)
 		if name == "" {
 			name = names.FromUnicode(info.Text)
 		}
@@ -261,33 +264,11 @@ func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
 		return nil, err
 	}
 
-	qv := 1000 / float64(subsetFont.UnitsPerEm)
-	ascent := math.Round(float64(subsetFont.Ascent) * qv)
-	descent := math.Round(float64(subsetFont.Descent) * qv)
-	leading := math.Round(float64(subsetFont.Ascent-subsetFont.Descent+subsetFont.LineGap) * qv)
-	capHeight := math.Round(float64(subsetFont.CapHeight) * qv)
-	xHeight := math.Round(float64(subsetFont.XHeight) * qv)
-
-	italicAngle := pdf.Round(subsetFont.ItalicAngle, 1)
-
-	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, postScriptName),
-		FontFamily:   subsetFont.FamilyName,
-		FontStretch:  subsetFont.Width,
-		FontWeight:   subsetFont.Weight,
-		IsFixedPitch: subsetFont.IsFixedPitch(),
-		IsSerif:      subsetFont.IsSerif,
-		IsSymbolic:   isSymbolic,
-		IsScript:     subsetFont.IsScript,
-		IsItalic:     subsetFont.IsItalic,
-		FontBBox:     subsetFont.FontBBoxPDF().Rounded(),
-		ItalicAngle:  italicAngle,
-		Ascent:       ascent,
-		Descent:      descent,
-		Leading:      leading,
-		CapHeight:    capHeight,
-		XHeight:      xHeight,
-	}
+	// the descriptor describes the design; only these entries depend on how
+	// the document uses the font
+	fd := *f.Descriptor
+	fd.FontName = subset.Join(subsetTag, postScriptName)
+	fd.IsSymbolic = isSymbolic
 
 	// the embedded program names itself the same as BaseFont and the
 	// descriptor's FontName, which for a subset carry the tag
@@ -296,7 +277,7 @@ func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
 	fontDict := &dict.CIDFontType2{
 		PostScriptName:  postScriptName,
 		SubsetTag:       subsetTag,
-		Descriptor:      fd,
+		Descriptor:      &fd,
 		ROS:             ros,
 		CMap:            f.CIDEncoder.CMap(ros),
 		Width:           ww,

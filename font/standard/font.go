@@ -21,6 +21,8 @@ import (
 	"slices"
 	"strings"
 
+	pstype1 "seehuhn.de/go/postscript/type1"
+
 	"seehuhn.de/go/pdf/font/internal/bundled"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/type1"
@@ -79,11 +81,29 @@ var shared = bundled.New(allStandardFonts, Font.read)
 
 // read builds a font instance from the bundled font data.
 func (f Font) read() (*type1.Instance, error) {
+	psFont, metrics, err := f.data()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := type1.New(psFont, metrics)
+	if err != nil {
+		return nil, err
+	}
+
+	res.Descriptor.IsSerif = isSerif[f]
+
+	return res, nil
+}
+
+// data reads the font program and metrics from the bundled font data,
+// restricted to the character set the specification guarantees.
+func (f Font) data() (*pstype1.Font, *afm.Metrics, error) {
 	name := string(f)
 
 	psFont, metrics, err := bundled.Read(name)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// fix up the fonts
@@ -97,14 +117,7 @@ func (f Font) read() (*type1.Instance, error) {
 
 	bundled.FixUpMetrics(metrics)
 
-	res, err := type1.New(psFont, metrics)
-	if err != nil {
-		return nil, err
-	}
-
-	res.IsSerif = isSerif[f]
-
-	return res, nil
+	return psFont, metrics, nil
 }
 
 // isSerif records the fonts with serifs, for the descriptor flag of the same

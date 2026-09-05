@@ -115,21 +115,22 @@ func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) 
 		availW := w - 2*textPadX
 		availH := h - 2*innerPadY - 2*lw
 		fontSize := availW / textW
-		geom := g.ContentFont().GetGeometry()
-		textH := (geom.Ascent - geom.Descent) * fontSize
-		if textH > availH*0.8 {
-			fontSize = availH * 0.8 / (geom.Ascent - geom.Descent)
+
+		// the label is set in capitals, so its visual height is the cap
+		// height; keep that within the available height
+		F := g.ContentFont()
+		capHeight := F.GetGeometry().CapHeight
+		if capHeight*fontSize > availH*0.62 {
+			fontSize = availH * 0.62 / capHeight
 		}
 		if fontSize < 1 {
 			fontSize = 1
 		}
 
-		// center text, shifted slightly below geometric center
-		drop := fontSize * 0.08
 		b.TextBegin()
-		b.TextSetFont(g.ContentFont(), fontSize)
+		b.TextSetFont(F, fontSize)
 		b.TextSetHorizontalScaling(1)
-		ty := cy - (geom.Ascent+geom.Descent)*fontSize/2 - drop
+		ty := pdf.Round(rect.LLy+centredBaseline(F, h, fontSize), 2)
 		b.TextFirstLine(rect.LLx+textPadX, ty)
 		b.TextShowAligned(label, availW, 0.5)
 		b.TextEnd()

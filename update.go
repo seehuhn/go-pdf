@@ -35,14 +35,14 @@ type UpdateOptions struct {
 	// is always tried first.
 	Password string
 
-	// Version, if non-zero, is the minimum version of the updated document.
+	// MinimumVersion, if non-zero, is the minimum version of the updated document.
 	// If the original's version is lower, the document is raised to this
 	// version by writing the catalog /Version entry; otherwise the option
-	// has no effect.  Only objects written by the update are checked
-	// against the raised version; the caller is responsible for the
-	// original content still conforming.  The catalog is copied before the
-	// version is raised.
-	Version Version
+	// has no effect.
+	//
+	// It is the caller's responsibility to ensure that the original document
+	// is compatible with the resulting version.
+	MinimumVersion Version
 
 	// HumanReadable requests pretty printing and disables object streams
 	// and cross-reference streams.
@@ -113,7 +113,7 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 		return nil, err
 	}
 
-	v := max(base.meta.Version, opt.Version)
+	v := max(base.meta.Version, opt.MinimumVersion)
 
 	// the highest object number in use, whether listed by /Size or not
 	next := base.trailerSize
@@ -134,10 +134,10 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	meta := base.meta
 	meta.Version = v
 	meta.Trailer = base.meta.Trailer.Clone()
-	if opt.Version > base.meta.Version {
+	if opt.MinimumVersion > base.meta.Version {
 		// decoded values are immutable; raise the version on a copy
 		cat := *base.meta.Catalog
-		cat.Version = opt.Version
+		cat.Version = opt.MinimumVersion
 		meta.Catalog = &cat
 	}
 

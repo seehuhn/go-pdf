@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt/glyph"
-	"seehuhn.de/go/sfnt/os2"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
@@ -36,6 +35,8 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
+	"seehuhn.de/go/pdf/font/internal/fontdesc"
+	"seehuhn.de/go/pdf/font/internal/fontgeom"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/fontname"
@@ -45,22 +46,23 @@ import (
 //
 // Use [New] to create new font instances.
 type Instance struct {
-	// Font is the font data to embed.  This must not be nil.
-	*type1.Font
-
-	// Metrics (optional) provides additional information which helps
-	// with using the font for typesetting text.  This includes information
-	// about kerning and ligatures.
-	*afm.Metrics
+	// psFont is the font program to embed, and metrics (optional) the
+	// matching AFM metrics, which add kerning and ligatures.  Everything
+	// below is derived from the two, so neither may change once the
+	// instance exists.
+	psFont  *type1.Font
+	metrics *afm.Metrics
 
 	// GlyphNames establishes the assignment between GIDs and glyph
 	// names.  The slice starts with ".notdef".
 	GlyphNames []string
 
-	IsSerif    bool
-	IsScript   bool
-	IsAllCap   bool
-	IsSmallCap bool
+	// Descriptor describes the font as designed, in PDF glyph space units.
+	// It is filled in from the font program and metrics and may be adjusted
+	// before the font is embedded; entries which depend on the document
+	// instead of the font (FontName, IsSymbolic and MissingWidth) are
+	// ignored and filled in at embedding time.
+	Descriptor *font.Descriptor
 
 	*font.Geometry
 
@@ -101,6 +103,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	geometry := &font.Geometry{}
 	widths := make([]float64, len(glyphNames))
 	extents := make([]rect.Rect, len(glyphNames))
+	var fontBBox rect.Rect
 	for i, name := range glyphNames {
 		// Use metrics for width if available, to match GlyphWidthPDF behavior
 		if metrics != nil {
@@ -110,6 +113,13 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 		}
 		// GlyphBBoxPDF returns 1000-scale glyph space; convert to text space
 		b := psFont.GlyphBBoxPDF(name)
+		if !b.IsZero() {
+			if fontBBox.IsZero() {
+				fontBBox = b
+			} else {
+				fontBBox.Extend(b)
+			}
+		}
 		extents[i] = rect.Rect{
 			LLx: b.LLx / 1000,
 			LLy: b.LLy / 1000,
@@ -117,18 +127,20 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 			URy: b.URy / 1000,
 		}
 	}
-	geometry.UnderlinePosition = float64(psFont.FontInfo.UnderlinePosition) * psFont.FontMatrix[3]
-	geometry.UnderlineThickness = float64(psFont.FontInfo.UnderlineThickness) * psFont.FontMatrix[3]
+	geometry.UnderlinePosition = pdf.Round(float64(psFont.FontInfo.UnderlinePosition)*psFont.FontMatrix[3], 6)
+	geometry.UnderlineThickness = pdf.Round(float64(psFont.FontInfo.UnderlineThickness)*psFont.FontMatrix[3], 6)
 	geometry.Widths = widths
 	geometry.GlyphExtents = extents
-	if metrics != nil {
-		geometry.Ascent = metrics.Ascent / 1000
-		geometry.Descent = metrics.Descent / 1000
-	} else {
-		bbox := psFont.FontBBoxPDF()
-		geometry.Ascent = bbox.URy / 1000
-		geometry.Descent = bbox.LLy / 1000
-	}
+	// The geometry keeps the heights unrounded, where the descriptor rounds
+	// them to whole glyph space units.  Nothing records a leading, and heights
+	// the glyphs cannot supply are estimated.
+	descriptor := fontdesc.FromType1(psFont, metrics, fontBBox)
+	ascent, descent, capHeight, xHeight := fontdesc.Type1Heights(psFont, metrics, fontBBox)
+	geometry.Ascent = ascent / 1000
+	geometry.Descent = descent / 1000
+	geometry.CapHeight = capHeight / 1000
+	geometry.XHeight = xHeight / 1000
+	fontgeom.FillHeights(geometry)
 
 	nameGid := make(map[string]glyph.ID, len(glyphNames))
 	for i, name := range glyphNames {
@@ -187,9 +199,10 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	}
 
 	return &Instance{
-		Font:       psFont,
-		Metrics:    metrics,
+		psFont:     psFont,
+		metrics:    metrics,
 		GlyphNames: glyphNames,
+		Descriptor: descriptor,
 		Geometry:   geometry,
 		lig:        lig,
 		kern:       kern,
@@ -217,11 +230,12 @@ func newEncoder(fontName string, notdefWidth float64) *simpleenc.Simple {
 // font program, the metrics, and the widths, extents and glyph tables derived
 // from them — is read-only and is shared with the clone rather than built
 // again.  A caller which needs the same font in several documents can therefore
-// build it once and clone it for each, provided it treats the shared data as
-// read-only: a change to [Instance.Font] or [Instance.Metrics] reaches every
-// clone.
+// build it once and clone it for each.  The descriptor is copied, so that each
+// clone can be adjusted on its own.
 func (f *Instance) Clone() *Instance {
 	other := *f
+	descriptor := *f.Descriptor
+	other.Descriptor = &descriptor
 	other.Simple = newEncoder(f.PostScriptName(), f.Widths[0])
 	return &other
 }
@@ -251,7 +265,7 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 // cannot be written.  The metrics are not consulted: they come from a separate
 // file and may name the font differently.
 func (f *Instance) PostScriptName() string {
-	return fontname.ForType1(f.Font)
+	return fontname.ForType1(f.psFont)
 }
 
 // FontInfo returns information about the font file.
@@ -319,11 +333,10 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 
 // GlyphWidthPDF returns the width of the given glyph in PDF glyph space units.
 func (f *Instance) GlyphWidthPDF(glyphName string) float64 {
-	if f.Metrics != nil {
-		return f.Metrics.GlyphWidthPDF(glyphName)
-	} else {
-		return f.Font.GlyphWidthPDF(glyphName)
+	if f.metrics != nil {
+		return f.metrics.GlyphWidthPDF(glyphName)
 	}
+	return f.psFont.GlyphWidthPDF(glyphName)
 }
 
 // Embed adds the font to a PDF file.
@@ -347,8 +360,7 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
-	fontData := f.Font
-	metricsData := f.Metrics
+	fontData := f.psFont
 
 	// The dictionary describes the program it carries, so both the name and the
 	// glyph count come from the font data: the glyph IDs a subset is made of
@@ -377,7 +389,6 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 	fontSubset := clone(fontData)
 	fontSubset.FontInfo = subset.TagFontInfo(fontData.FontInfo, subsetTag, postScriptName)
 
-	metricsSubset := metricsData
 	if subsetTag != "" {
 		fontSubset.Outlines = clone(fontData.Outlines)
 		fontSubset.Glyphs = make(map[string]*type1.Glyph)
@@ -388,50 +399,19 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 			}
 		}
 		fontSubset.Encoding = psenc.StandardEncoding[:]
-
-		if metricsData != nil {
-			metricsSubset = clone(metricsData)
-			metricsSubset.Glyphs = make(map[string]*afm.GlyphInfo)
-			for _, gid := range glyphs {
-				glyphName := f.GlyphNames[gid]
-				if g, ok := metricsData.Glyphs[glyphName]; ok {
-					metricsSubset.Glyphs[glyphName] = g
-				}
-			}
-			metricsSubset.Encoding = psenc.StandardEncoding[:]
-		}
 	}
 
-	fd := &font.Descriptor{
-		FontName:     subset.Join(subsetTag, postScriptName),
-		FontFamily:   fontSubset.FamilyName,
-		FontWeight:   os2.WeightFromString(fontSubset.Weight),
-		IsFixedPitch: fontSubset.IsFixedPitch,
-		IsSerif:      f.IsSerif,
-		IsSymbolic:   f.Simple.IsSymbolic(),
-		IsItalic:     fontSubset.ItalicAngle != 0,
-		ForceBold:    fontSubset.Private.ForceBold,
-		FontBBox:     fontSubset.FontBBoxPDF().Rounded(),
-		ItalicAngle:  fontSubset.ItalicAngle,
-		StemV:        fontSubset.Private.StdVW,
-		StemH:        fontSubset.Private.StdHW,
-	}
+	// the descriptor describes the design; only these entries depend on how
+	// the document uses the font
+	fd := *f.Descriptor
+	fd.FontName = subset.Join(subsetTag, postScriptName)
+	fd.IsSymbolic = f.Simple.IsSymbolic()
+	fd.MissingWidth = f.Simple.DefaultWidth()
 
-	// the metrics describe the same font more precisely, where they are known
-	if metricsSubset != nil {
-		fd.FontBBox = metricsSubset.FontBBoxPDF().Rounded()
-		fd.CapHeight = math.Round(metricsSubset.CapHeight)
-		fd.XHeight = math.Round(metricsSubset.XHeight)
-		fd.Ascent = math.Round(metricsSubset.Ascent)
-		fd.Descent = math.Round(metricsSubset.Descent)
-		fd.IsItalic = metricsSubset.ItalicAngle != 0
-		fd.ItalicAngle = metricsSubset.ItalicAngle
-		fd.IsFixedPitch = metricsSubset.IsFixedPitch
-	}
 	dict := &dict.Type1{
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
-		Descriptor:     fd,
+		Descriptor:     &fd,
 		Encoding:       f.Simple.Encoding(),
 		ToUnicode:      f.Simple.ToUnicode(),
 		Name:           f.Name,

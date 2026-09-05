@@ -57,6 +57,10 @@ type Descriptor struct {
 	IsSmallCap bool
 	ForceBold  bool
 
+	// The metrics below describe the font's design.  Where only a subset of a
+	// font is embedded, they still cover the whole font, so that they do not
+	// depend on which glyphs a document happens to use.
+
 	FontBBox     rect.Rect // required, except for Type 3 fonts
 	ItalicAngle  float64   // required; degrees counterclockwise from vertical
 	Ascent       float64   // required, except for Type 3 fonts
