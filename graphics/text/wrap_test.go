@@ -136,6 +136,67 @@ func TestWrapWithHyphenation(t *testing.T) {
 	}
 }
 
+func TestWrapRanges(t *testing.T) {
+	w := Wrap(0, "a\nb")
+	F := font.Must(standard.Helvetica.New())
+	ranges := slices.Collect(w.Ranges(F, 10))
+
+	want := []LineRange{
+		{Start: 0, End: 1},
+		{Start: 2, End: 3},
+	}
+	if d := cmp.Diff(want, ranges); d != "" {
+		t.Errorf("Ranges() mismatch (-want +got):\n%s", d)
+	}
+}
+
+func TestWrapRangesWords(t *testing.T) {
+	// width chosen so that "a b c" (Helvetica 10pt) breaks after "b".
+	F := font.Must(standard.Helvetica.New())
+	width := F.Layout(nil, 10, "a b").TotalWidth() + 1
+	w := Wrap(width, "a b c")
+	ranges := slices.Collect(w.Ranges(F, 10))
+
+	want := []LineRange{
+		{Start: 0, End: 3}, // "a b"
+		{Start: 4, End: 5}, // "c"
+	}
+	if d := cmp.Diff(want, ranges); d != "" {
+		t.Errorf("Ranges() mismatch (-want +got):\n%s", d)
+	}
+}
+
+func TestWrapRangesHyphenation(t *testing.T) {
+	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 5, End: 5, Replace: "-"}}}
+
+	w := WrapWith(breaker, 0, "photograph")
+	F := font.Must(standard.Helvetica.New())
+	ranges := slices.Collect(w.Ranges(F, 10))
+
+	want := []LineRange{
+		{Start: 0, End: 5, Hyphen: true},   // "photo"
+		{Start: 5, End: 10, Hyphen: false}, // "graph"
+	}
+	if d := cmp.Diff(want, ranges); d != "" {
+		t.Errorf("Ranges() mismatch (-want +got):\n%s", d)
+	}
+}
+
+func TestWrapRangesEmptyParagraph(t *testing.T) {
+	w := Wrap(1000, "a b\n\nc d")
+	F := font.Must(standard.Helvetica.New())
+	ranges := slices.Collect(w.Ranges(F, 10))
+
+	want := []LineRange{
+		{Start: 0, End: 3}, // "a b"
+		{Start: 4, End: 4}, // empty line between the two newlines
+		{Start: 5, End: 8}, // "c d"
+	}
+	if d := cmp.Diff(want, ranges); d != "" {
+		t.Errorf("Ranges() mismatch (-want +got):\n%s", d)
+	}
+}
+
 func TestWrapWithOffsetMidRune(t *testing.T) {
 	// "aébc": 'é' is byte offset 1-3, so offset 2 falls inside the rune.
 	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 2, End: 2, Replace: "-"}}}
