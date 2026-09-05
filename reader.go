@@ -86,9 +86,9 @@ type Reader struct {
 	startXRef   int64
 	trailerSize int64
 
-	// xrefOffsets holds the header-relative offsets of the file's
-	// cross-reference sections, newest first, as visited by the Prev
-	// chain.  Read-only after construction.
+	// xrefOffsets holds the offsets of the file's cross-reference
+	// sections, newest first, as visited by the Prev chain.  Read-only
+	// after construction.
 	xrefOffsets []int64
 
 	enc         *encryptInfo       // read-only after construction
@@ -347,7 +347,10 @@ func (r *Reader) GetMeta() *MetaInfo {
 }
 
 // XRefOffsets returns the byte offsets of the file's cross-reference
-// sections, newest first.  A hybrid-reference file's cross-reference
+// sections, newest first.  Offsets count from the start of the data, so
+// they are comparable with file lengths; in a file with bytes before the
+// %PDF- header they exceed the values written after startxref and Prev
+// by that header offset.  A hybrid-reference file's cross-reference
 // stream belongs to the table whose trailer names it and is not listed
 // separately.
 func (r *Reader) XRefOffsets() []int64 {
