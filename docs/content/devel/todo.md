@@ -27,6 +27,15 @@ weight = 100
 
 ## General
 
+- Decide whether to register the developer prefix `Quir` in the PDF Names
+  list (https://github.com/adobe/pdf-names-list).  The tests use trailer
+  keys such as `Quir:E`, and macQuire's markup mode writes a page-piece
+  entry under `Quir:Markup`.  Annex E requires the prefix of a
+  second-class name to be registered; registration is a GitHub issue
+  which asks for an organisation name and postal address, and the
+  resulting public list carries name, email, and organisation.  The
+  prefix was free as of 2026-09-05.
+
 - Add equality methods for `measure.Measure` implementations and
   `measure.PtData`, then include those fields in
   `graphics/form.Form.Equal` (they are currently ignored there).
