@@ -36,8 +36,8 @@ golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 seehuhn.de/go/dag v1.0.0 h1:qlqylIiZvRbwxv3m2Z974iaa4pC79NGF72AXLv/HXV4=
 seehuhn.de/go/dag v1.0.0/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
-seehuhn.de/go/geom v0.7.5-0.20260817173237-f200797cc36c h1:RxRsbYbR4090dBPtgmqNrMkJhJRf/gFkWOFOedI1lhU=
-seehuhn.de/go/geom v0.7.5-0.20260817173237-f200797cc36c/go.mod h1:0diHpKsEzgxI6SC1YY7525/TXIkXj0W2EjBvDXXN+Vc=
+seehuhn.de/go/geom v0.7.5-0.20260830195243-64cdc9580785 h1:ixsM2+Ulnqcvf9hcM3SbheBV65AxcpRFpIaipAcXDDI=
+seehuhn.de/go/geom v0.7.5-0.20260830195243-64cdc9580785/go.mod h1:0diHpKsEzgxI6SC1YY7525/TXIkXj0W2EjBvDXXN+Vc=
 seehuhn.de/go/icc v0.7.5-0.20260828074917-6f4ceb03c75b h1:DlbHWYzS2JV9DPCybnCanZy/DxMiSajhZPt+/DUdbgE=
 seehuhn.de/go/icc v0.7.5-0.20260828074917-6f4ceb03c75b/go.mod h1:6p6oT2CHTrKhFlYwiNKoaK+VQrWFNJ6yLPNsff3IVLI=
 seehuhn.de/go/membudget v0.7.4 h1:G8f921Bi28xfPkuf3Kr425qE6P+NDP/i1jkVbcFCEa8=
@@ -46,5 +46,5 @@ seehuhn.de/go/postscript v0.7.5-0.20260904181340-36fd7c36bd3e h1:PtsiV+lHThz7cY5
 seehuhn.de/go/postscript v0.7.5-0.20260904181340-36fd7c36bd3e/go.mod h1:wkQ9t2CSEw2KN2HH7FcFtFw+Fh7rs3WbQ0T4TcuCkOU=
 seehuhn.de/go/sfnt v0.7.5-0.20260904183306-3d546dabb625 h1:l95bJzksRrFxqsLaYVwsxz8C4JmF8Q+T68aLUWWcEt0=
 seehuhn.de/go/sfnt v0.7.5-0.20260904183306-3d546dabb625/go.mod h1:/w+1JjxnMbeg3Jd+j1EtrzjI+DZaIpor1t8rZyzDLHs=
-seehuhn.de/go/xmp v0.7.4 h1:kmQHmR7Lho/cbrXQ0XKDFVk5MjIfM8yYRtea/d6WFhU=
-seehuhn.de/go/xmp v0.7.4/go.mod h1:Exwho4lMhI9+UbeUqcf0y5y7bDj5jMuXNbIyOLwjAmc=
+seehuhn.de/go/xmp v0.7.5-0.20260823224643-f3e678ef3cae h1:M5p0o8Mh0S9glsjdu6RIF2wrEluDAscRTo1ywhNnYd8=
+seehuhn.de/go/xmp v0.7.5-0.20260823224643-f3e678ef3cae/go.mod h1:Exwho4lMhI9+UbeUqcf0y5y7bDj5jMuXNbIyOLwjAmc=
