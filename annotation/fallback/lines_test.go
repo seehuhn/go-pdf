@@ -66,7 +66,11 @@ func (fixedHyphenBreaker) Opportunities(s string) []gtext.BreakOpportunity {
 func TestStyleLinesHyphen(t *testing.T) {
 	s := &Style{LineBreaker: fixedHyphenBreaker{}}
 
-	got, err := s.Lines("photograph", 0)
+	// choose a width just wide enough for "photo-"
+	F := font.Must(standard.Helvetica.New())
+	width := F.Layout(nil, freeTextFontSize, "photo-").TotalWidth() + 1
+
+	got, err := s.Lines("photograph", width)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -113,8 +113,10 @@ func TestWrapWithHyphenation(t *testing.T) {
 	// split it, at the boundary between "photo" and "graph".
 	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 5, End: 5, Replace: "-"}}}
 
-	w := WrapWith(breaker, 0, "photograph")
 	F := font.Must(standard.Helvetica.New())
+	// choose a width just wide enough for "photo-", including the hyphen
+	width := F.Layout(nil, 10, "photo-").TotalWidth() + 1
+	w := WrapWith(breaker, width, "photograph")
 	lines := slices.Collect(w.Lines(F, 10))
 	if len(lines) != 2 {
 		t.Fatalf("expected two lines, got %d", len(lines))
@@ -169,8 +171,10 @@ func TestWrapRangesWords(t *testing.T) {
 func TestWrapRangesHyphenation(t *testing.T) {
 	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 5, End: 5, Replace: "-"}}}
 
-	w := WrapWith(breaker, 0, "photograph")
 	F := font.Must(standard.Helvetica.New())
+	// choose a width just wide enough for "photo-", including the hyphen
+	width := F.Layout(nil, 10, "photo-").TotalWidth() + 1
+	w := WrapWith(breaker, width, "photograph")
 	ranges := slices.Collect(w.Ranges(F, 10))
 
 	want := []LineRange{
@@ -179,6 +183,31 @@ func TestWrapRangesHyphenation(t *testing.T) {
 	}
 	if d := cmp.Diff(want, ranges); d != "" {
 		t.Errorf("Ranges() mismatch (-want +got):\n%s", d)
+	}
+}
+
+// A break candidate that only fits without its Replace text is not a valid
+// break: the review's reported defect had "photograph" break as "photo-"
+// even though the hyphen made that line wider than the wrap width.
+func TestWrapWithHyphenationTooNarrowForHyphen(t *testing.T) {
+	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 5, End: 5, Replace: "-"}}}
+	F := font.Must(standard.Helvetica.New())
+
+	// wide enough for "photo" alone, but not for "photo-"
+	width := F.Layout(nil, 10, "photo").TotalWidth() + 0.5
+
+	w := WrapWith(breaker, width, "photograph")
+	lines := slices.Collect(w.Lines(F, 10))
+	if len(lines) != 1 {
+		t.Fatalf("expected one (overlong) line, got %d", len(lines))
+	}
+
+	var got string
+	for _, g := range lines[0].Seq {
+		got += g.Text
+	}
+	if want := "photograph"; got != want {
+		t.Errorf("line = %q, want %q", got, want)
 	}
 }
 
@@ -207,4 +236,34 @@ func TestWrapWithOffsetMidRune(t *testing.T) {
 		}
 	}()
 	WrapWith(breaker, 100, "aébc")
+}
+
+func TestWrapWithOutOfOrderOpportunities(t *testing.T) {
+	// the second opportunity starts before the first one ends
+	breaker := fixedBreaker{opps: []BreakOpportunity{
+		{Start: 4, End: 4},
+		{Start: 2, End: 2},
+	}}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected a panic for out-of-order break opportunities")
+		}
+	}()
+	WrapWith(breaker, 100, "abcdef")
+}
+
+func TestWrapWithOverlappingOpportunities(t *testing.T) {
+	// the second opportunity starts before the first one ends
+	breaker := fixedBreaker{opps: []BreakOpportunity{
+		{Start: 2, End: 4},
+		{Start: 3, End: 5},
+	}}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected a panic for overlapping break opportunities")
+		}
+	}()
+	WrapWith(breaker, 100, "abcdef")
 }
