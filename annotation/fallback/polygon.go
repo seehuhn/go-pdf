@@ -32,7 +32,17 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := a.Color
 
+	verts := polygonVertices(a)
+
 	bbox := a.Rect
+	if bbox.IsZero() && len(verts) >= 3 {
+		// a file which leaves Rect out still says where the polygon is, in
+		// its vertices; without a rectangle the appearance would have no
+		// bounding box and could not be written back out
+		bbox = polygonPathBBox(verts, lw)
+		bbox.IRound(2)
+		a.Rect = bbox
+	}
 
 	if m := min(bbox.Dx(), bbox.Dy()); lw > m/2 {
 		lw = m / 2
@@ -77,7 +87,6 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 
 	drawn := false
 	if isCloudy {
-		verts := polygonVertices(a)
 		if len(verts) >= 3 {
 			cloudBBox := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
 			bbox = pdf.Rectangle{
@@ -104,6 +113,26 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	}
 
 	return harvest(b, bbox)
+}
+
+// polygonPathBBox is the rectangle bounding a polygon's vertices, widened by
+// half the border width so the stroke falls inside it.
+func polygonPathBBox(verts []vec.Vec2, lw float64) pdf.Rectangle {
+	r := pdf.Rectangle{
+		LLx: verts[0].X, LLy: verts[0].Y,
+		URx: verts[0].X, URy: verts[0].Y,
+	}
+	for _, v := range verts[1:] {
+		r.LLx = min(r.LLx, v.X)
+		r.LLy = min(r.LLy, v.Y)
+		r.URx = max(r.URx, v.X)
+		r.URy = max(r.URy, v.Y)
+	}
+	r.LLx -= lw / 2
+	r.LLy -= lw / 2
+	r.URx += lw / 2
+	r.URy += lw / 2
+	return r
 }
 
 // polygonVertices extracts the vertex list from a polygon annotation.
