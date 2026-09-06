@@ -58,10 +58,10 @@ func TestGetQuadPointsSimple(t *testing.T) {
 	}
 
 	expected := []vec.Vec2{
-		{X: 101, Y: 98},  // bottom-left
-		{X: 105, Y: 98},  // bottom-right
-		{X: 105, Y: 108}, // top-right
-		{X: 101, Y: 108}, // top-left
+		{X: 101, Y: 108}, // upper-left
+		{X: 105, Y: 108}, // upper-right
+		{X: 101, Y: 98},  // lower-left
+		{X: 105, Y: 98},  // lower-right
 	}
 	if len(corners) != len(expected) {
 		t.Fatalf("expected %d points, got %d", len(expected), len(corners))
@@ -95,7 +95,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 				return b.TextLayout(nil, "A A")
 			},
 			expected: []vec.Vec2{
-				{X: 1, Y: -2}, {X: 12.5, Y: -2}, {X: 12.5, Y: 8}, {X: 1, Y: 8},
+				{X: 1, Y: 8}, {X: 12.5, Y: 8}, {X: 1, Y: -2}, {X: 12.5, Y: -2},
 			},
 		},
 		{
@@ -107,7 +107,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 			},
 			// box translated by (20, 30)
 			expected: []vec.Vec2{
-				{X: 21, Y: 28}, {X: 32.5, Y: 28}, {X: 32.5, Y: 38}, {X: 21, Y: 38},
+				{X: 21, Y: 38}, {X: 32.5, Y: 38}, {X: 21, Y: 28}, {X: 32.5, Y: 28},
 			},
 		},
 		{
@@ -119,7 +119,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 			},
 			// box scaled by (1.5, 1.2)
 			expected: []vec.Vec2{
-				{X: 1.5, Y: -2.4}, {X: 18.75, Y: -2.4}, {X: 18.75, Y: 9.6}, {X: 1.5, Y: 9.6},
+				{X: 1.5, Y: 9.6}, {X: 18.75, Y: 9.6}, {X: 1.5, Y: -2.4}, {X: 18.75, Y: -2.4},
 			},
 		},
 		{
@@ -131,7 +131,7 @@ func TestTextGetQuadPointsComprehensive(t *testing.T) {
 			},
 			// rise 5 lifts the glyph-box top to URy*size + rise = 6 + 5 = 11
 			expected: []vec.Vec2{
-				{X: 1, Y: -2}, {X: 12.5, Y: -2}, {X: 12.5, Y: 11}, {X: 1, Y: 11},
+				{X: 1, Y: 11}, {X: 12.5, Y: 11}, {X: 1, Y: -2}, {X: 12.5, Y: -2},
 			},
 		},
 	}

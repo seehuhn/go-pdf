@@ -161,10 +161,10 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 		},
 		Type: annotation.TextMarkupTypeStrikeOut,
 		QuadPoints: []vec.Vec2{
+			{X: 150, Y: 612},
+			{X: 195, Y: 612},
 			{X: 150, Y: 600},
 			{X: 195, Y: 600},
-			{X: 195, Y: 612},
-			{X: 150, Y: 612},
 		},
 	}
 
@@ -238,8 +238,8 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Type: annotation.TextMarkupTypeHighlight,
 		QuadPoints: []vec.Vec2{
+			{X: 72, Y: y}, {X: 300, Y: y},
 			{X: 72, Y: y - 12}, {X: 300, Y: y - 12},
-			{X: 300, Y: y}, {X: 72, Y: y},
 		},
 	}
 	p.Page.AddAnnots(hl)
@@ -259,8 +259,8 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Type: annotation.TextMarkupTypeUnderline,
 		QuadPoints: []vec.Vec2{
+			{X: 72, Y: y}, {X: 250, Y: y},
 			{X: 72, Y: y - 12}, {X: 250, Y: y - 12},
-			{X: 250, Y: y}, {X: 72, Y: y},
 		},
 	}
 	p.Page.AddAnnots(ul)
@@ -280,8 +280,8 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 		},
 		Type: annotation.TextMarkupTypeSquiggly,
 		QuadPoints: []vec.Vec2{
+			{X: 72, Y: y}, {X: 220, Y: y},
 			{X: 72, Y: y - 12}, {X: 220, Y: y - 12},
-			{X: 220, Y: y}, {X: 72, Y: y},
 		},
 	}
 	p.Page.AddAnnots(sq)

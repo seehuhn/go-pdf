@@ -60,8 +60,10 @@ type TextMarkup struct {
 	// comprise the region where the text markup should be applied. Each
 	// quadrilateral encompasses a word or group of contiguous words in the text
 	// underlying the annotation. Each quadrilateral is represented by 4 Vec2
-	// points, giving the corners in counter-clockwise order, starting at the
-	// bottom-left.
+	// points, giving the corners in the order upper-left, upper-right,
+	// lower-left, lower-right, relative to the text: the first two points
+	// span the top edge, the last two the bottom edge.  This is the order
+	// PDF viewers expect.
 	QuadPoints []vec.Vec2
 }
 

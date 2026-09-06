@@ -112,12 +112,14 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		}
 		b.SetExtGState(gs)
 		b.SetFillColor(col)
+		// corners come as upper-left, upper-right, lower-left, lower-right,
+		// so the outline visits the lower two in reverse
 		for i := range numQuads {
 			q := a.QuadPoints[i*4 : i*4+4]
 			b.MoveTo(q[0].X, q[0].Y)
 			b.LineTo(q[1].X, q[1].Y)
-			b.LineTo(q[2].X, q[2].Y)
 			b.LineTo(q[3].X, q[3].Y)
+			b.LineTo(q[2].X, q[2].Y)
 			b.ClosePath()
 			b.Fill()
 		}
@@ -125,12 +127,13 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 	case annotation.TextMarkupTypeUnderline:
 		b.SetLineWidth(lw)
 		b.SetStrokeColor(col)
-		// shift inward by lw/2 so the stroke fits inside the quad
+		// along the bottom edge, shifted inward by lw/2 so the stroke fits
+		// inside the quad
 		for i := range numQuads {
 			q := a.QuadPoints[i*4 : i*4+4]
-			off := inwardOffset(q[0], q[3], lw/2)
-			b.MoveTo(pdf.Round(q[0].X+off.X, 2), pdf.Round(q[0].Y+off.Y, 2))
-			b.LineTo(pdf.Round(q[1].X+off.X, 2), pdf.Round(q[1].Y+off.Y, 2))
+			off := inwardOffset(q[2], q[0], lw/2)
+			b.MoveTo(pdf.Round(q[2].X+off.X, 2), pdf.Round(q[2].Y+off.Y, 2))
+			b.LineTo(pdf.Round(q[3].X+off.X, 2), pdf.Round(q[3].Y+off.Y, 2))
 			b.Stroke()
 		}
 
@@ -139,8 +142,8 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		b.SetStrokeColor(col)
 		for i := range numQuads {
 			q := a.QuadPoints[i*4 : i*4+4]
-			p0 := q[0].Add(q[3].Sub(q[0]).Mul(strikeOutHeight))
-			p1 := q[1].Add(q[2].Sub(q[1]).Mul(strikeOutHeight))
+			p0 := q[2].Add(q[0].Sub(q[2]).Mul(strikeOutHeight))
+			p1 := q[3].Add(q[1].Sub(q[3]).Mul(strikeOutHeight))
 			b.MoveTo(pdf.Round(p0.X, 2), pdf.Round(p0.Y, 2))
 			b.LineTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
 			b.Stroke()
@@ -155,7 +158,7 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		halfPeriod := squigglyBaseHalfPeriod * bw
 		for i := range numQuads {
 			q := a.QuadPoints[i*4 : i*4+4]
-			drawSquigglyLine(b, q[0], q[1], amplitude, halfPeriod)
+			drawSquigglyLine(b, q[2], q[3], amplitude, halfPeriod)
 		}
 	}
 
@@ -171,7 +174,7 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 const strikeOutHeight = 0.42
 
 // inwardOffset returns a vector of the given length pointing from outer
-// toward inner (e.g. from bottom-left toward top-left of a quad).
+// toward inner (e.g. from lower-left toward upper-left of a quad).
 func inwardOffset(outer, inner vec.Vec2, dist float64) vec.Vec2 {
 	return inner.Sub(outer).Normalize().Mul(dist)
 }

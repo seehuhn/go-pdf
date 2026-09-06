@@ -61,8 +61,9 @@ type Link struct {
 	// QuadPoints (optional) specifies the coordinates of quadrilaterals that
 	// comprise the region where the link should be activated. Each
 	// quadrilateral is represented by 4 Vec2 points, giving the corners in
-	// counter-clockwise order, starting at the bottom-left.  If QuadPoints is
-	// absent, Common.Rect is used instead.
+	// the order upper-left, upper-right, lower-left, lower-right, as for
+	// [TextMarkup.QuadPoints].  If QuadPoints is absent, Common.Rect is used
+	// instead.
 	//
 	// All points must be contained within Common.Rect.
 	//
