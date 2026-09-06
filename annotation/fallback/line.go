@@ -23,6 +23,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -63,19 +64,10 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 	x1, y1 := a.Coords[0], a.Coords[1]
 	x2, y2 := a.Coords[2], a.Coords[3]
 
-	// start with basic line bounds
-	bbox := pdf.Rectangle{
-		LLx: min(x1, x2),
-		LLy: min(y1, y2),
-		URx: max(x1, x2),
-		URy: max(y1, y2),
-	}
-
-	// expand for line width
-	bbox.LLx -= lw / 2
-	bbox.LLy -= lw / 2
-	bbox.URx += lw / 2
-	bbox.URy += lw / 2
+	// the line itself; it has two points, so it carries caps and no join
+	segment := []vec.Vec2{{X: x1, Y: y1}, {X: x2, Y: y2}}
+	bbox, _ := strokeBounds([][]vec.Vec2{segment}, false, lw,
+		graphics.LineJoinMiter, defaultMiterLimit)
 
 	// expand for line endings
 	le0 := normalizeLE(a.LineEndingStyle[0])

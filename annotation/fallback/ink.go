@@ -100,31 +100,14 @@ func hasInkPoints(paths [][]vec.Vec2) bool {
 	return false
 }
 
-// inkBBox returns the tight bounding box of all points across every sub-path,
-// inflated by lw/2 to cover the stroke. Empty sub-paths are skipped.
+// inkBBox returns the bounding box of the stroke drawn along every sub-path.
+// The joins are round, so no vertex reaches further than half the line width.
+// Empty sub-paths are skipped.
 func inkBBox(paths [][]vec.Vec2, lw float64) pdf.Rectangle {
-	var bbox pdf.Rectangle
-	seeded := false
-	for _, pts := range paths {
-		for _, p := range pts {
-			if !seeded {
-				bbox = pdf.Rectangle{LLx: p.X, LLy: p.Y, URx: p.X, URy: p.Y}
-				seeded = true
-				continue
-			}
-			bbox.LLx = min(bbox.LLx, p.X)
-			bbox.LLy = min(bbox.LLy, p.Y)
-			bbox.URx = max(bbox.URx, p.X)
-			bbox.URy = max(bbox.URy, p.Y)
-		}
-	}
-	if !seeded {
+	bbox, ok := strokeBounds(paths, false, lw, graphics.LineJoinRound, defaultMiterLimit)
+	if !ok {
 		return pdf.Rectangle{}
 	}
-	bbox.LLx -= lw / 2
-	bbox.LLy -= lw / 2
-	bbox.URx += lw / 2
-	bbox.URy += lw / 2
 	bbox.IRound(2)
 	return bbox
 }

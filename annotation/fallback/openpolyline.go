@@ -20,6 +20,7 @@ import (
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 )
@@ -76,29 +77,14 @@ func drawOpenPolyline(b *builder.Builder, points []vec.Vec2, startLE, endLE anno
 }
 
 // openPolylineBBox computes a bounding box for an open polyline with the
-// given line width and optional line endings.
+// given line width and optional line endings.  The path is stroked with the
+// default miter joins, so a sharp corner reaches beyond the line width.
 func openPolylineBBox(points []vec.Vec2, lw float64, startLE, endLE annotation.LineEndingStyle) pdf.Rectangle {
-	if len(points) == 0 {
+	bbox, ok := strokeBounds([][]vec.Vec2{points}, false, lw,
+		graphics.LineJoinMiter, defaultMiterLimit)
+	if !ok {
 		return pdf.Rectangle{}
 	}
-
-	// tight bbox from all points, expanded by lw/2
-	bbox := pdf.Rectangle{
-		LLx: points[0].X,
-		LLy: points[0].Y,
-		URx: points[0].X,
-		URy: points[0].Y,
-	}
-	for _, p := range points[1:] {
-		bbox.LLx = min(bbox.LLx, p.X)
-		bbox.LLy = min(bbox.LLy, p.Y)
-		bbox.URx = max(bbox.URx, p.X)
-		bbox.URy = max(bbox.URy, p.Y)
-	}
-	bbox.LLx -= lw / 2
-	bbox.LLy -= lw / 2
-	bbox.URx += lw / 2
-	bbox.URy += lw / 2
 
 	n := len(points)
 

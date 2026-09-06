@@ -35,16 +35,19 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	verts := polygonVertices(a)
 
 	bbox := a.Rect
-	if bbox.IsZero() && len(verts) >= 3 {
+	derived := false
+	if bbox.IsZero() && len(verts) >= 2 {
 		// a file which leaves Rect out still says where the polygon is, in
 		// its vertices; without a rectangle the appearance would have no
 		// bounding box and could not be written back out
 		bbox = polygonPathBBox(verts, lw)
-		bbox.IRound(2)
 		a.Rect = bbox
+		derived = true
 	}
 
-	if m := min(bbox.Dx(), bbox.Dy()); lw > m/2 {
+	// a rectangle the file supplied has to hold the border, which a thin one
+	// may be too small for; one derived from the path already fits it
+	if m := min(bbox.Dx(), bbox.Dy()); !derived && lw > m/2 {
 		lw = m / 2
 	}
 
@@ -115,23 +118,16 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	return harvest(b, bbox)
 }
 
-// polygonPathBBox is the rectangle bounding a polygon's vertices, widened by
-// half the border width so the stroke falls inside it.
+// polygonPathBBox is the rectangle bounding the stroke drawn along a
+// polygon's vertices.  The path is closed, so every vertex carries a miter
+// join, and a sharp corner reaches beyond the border width.
 func polygonPathBBox(verts []vec.Vec2, lw float64) pdf.Rectangle {
-	r := pdf.Rectangle{
-		LLx: verts[0].X, LLy: verts[0].Y,
-		URx: verts[0].X, URy: verts[0].Y,
+	r, ok := strokeBounds([][]vec.Vec2{verts}, true, lw,
+		graphics.LineJoinMiter, defaultMiterLimit)
+	if !ok {
+		return pdf.Rectangle{}
 	}
-	for _, v := range verts[1:] {
-		r.LLx = min(r.LLx, v.X)
-		r.LLy = min(r.LLy, v.Y)
-		r.URx = max(r.URx, v.X)
-		r.URy = max(r.URy, v.Y)
-	}
-	r.LLx -= lw / 2
-	r.LLy -= lw / 2
-	r.URx += lw / 2
-	r.URy += lw / 2
+	r.IRound(2)
 	return r
 }
 
