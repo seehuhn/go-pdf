@@ -129,8 +129,8 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		for i := range numQuads {
 			q := a.QuadPoints[i*4 : i*4+4]
 			off := inwardOffset(q[0], q[3], lw/2)
-			b.MoveTo(q[0].X+off.X, q[0].Y+off.Y)
-			b.LineTo(q[1].X+off.X, q[1].Y+off.Y)
+			b.MoveTo(pdf.Round(q[0].X+off.X, 2), pdf.Round(q[0].Y+off.Y, 2))
+			b.LineTo(pdf.Round(q[1].X+off.X, 2), pdf.Round(q[1].Y+off.Y, 2))
 			b.Stroke()
 		}
 
@@ -139,12 +139,10 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		b.SetStrokeColor(col)
 		for i := range numQuads {
 			q := a.QuadPoints[i*4 : i*4+4]
-			mx0 := (q[0].X + q[3].X) / 2
-			my0 := (q[0].Y + q[3].Y) / 2
-			mx1 := (q[1].X + q[2].X) / 2
-			my1 := (q[1].Y + q[2].Y) / 2
-			b.MoveTo(mx0, my0)
-			b.LineTo(mx1, my1)
+			p0 := q[0].Add(q[3].Sub(q[0]).Mul(strikeOutHeight))
+			p1 := q[1].Add(q[2].Sub(q[1]).Mul(strikeOutHeight))
+			b.MoveTo(pdf.Round(p0.X, 2), pdf.Round(p0.Y, 2))
+			b.LineTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
 			b.Stroke()
 		}
 
@@ -163,6 +161,14 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 
 	return harvest(b, bbox)
 }
+
+// strikeOutHeight is where the strike-out line crosses a quad, as a
+// fraction of the way from its bottom edge to its top edge.  A quad
+// spans the text's descent to its ascent, and with typical font metrics
+// (ascent about 0.9 em, descent about 0.2 em, x-height about 0.5 em)
+// the middle of the lower-case letters lies here; the quad's own middle
+// would cut through the upper part of the x-height.
+const strikeOutHeight = 0.42
 
 // inwardOffset returns a vector of the given length pointing from outer
 // toward inner (e.g. from bottom-left toward top-left of a quad).
