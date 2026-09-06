@@ -46,6 +46,10 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	be := a.BorderEffect
 	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
 
+	// the annotation's own default appearance says what colour its text is
+	// drawn in; the generator's ink stands in where it names none
+	_, textCol := parseDA(a.DefaultAppearance)
+
 	inner := applyMargins(a.Rect, a.Margin)
 
 	outer := inner
@@ -168,7 +172,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 
 		b.TextBegin()
 		b.TextSetFont(F, freeTextFontSize)
-		b.SetFillColor(quireInk)
+		b.SetFillColor(textCol)
 		b.TextSetHorizontalScaling(1)
 		b.TextSetRise(0)
 		wrapper := text.WrapWith(g.breaker(), clipWidth, a.Contents)
@@ -218,9 +222,8 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 
 	// set DA to match the font/size/color used in the appearance stream
 	fontName := b.FontName(g.ContentFont())
-	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf %g %g %g rg",
-		fontName, freeTextFontSize,
-		quireInk[0], quireInk[1], quireInk[2])
+	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf %s",
+		fontName, freeTextFontSize, daColorOperator(textCol))
 
 	return harvest(b, outer)
 }

@@ -17,6 +17,7 @@
 package fallback
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -794,4 +795,21 @@ func daFloat(s string) (float64, bool) {
 		return 0, false
 	}
 	return v, true
+}
+
+// daColorOperator formats a colour as the colour-setting operator of a
+// default-appearance string.  A colour outside the three device spaces a
+// default appearance can name is written as the default ink instead, since a
+// /DA string has no way to say more.
+func daColorOperator(col color.Color) string {
+	switch c := col.(type) {
+	case color.DeviceGray:
+		return fmt.Sprintf("%g g", float64(c))
+	case color.DeviceRGB:
+		return fmt.Sprintf("%g %g %g rg", c[0], c[1], c[2])
+	case color.DeviceCMYK:
+		return fmt.Sprintf("%g %g %g %g k", c[0], c[1], c[2], c[3])
+	default:
+		return fmt.Sprintf("%g %g %g rg", quireInk[0], quireInk[1], quireInk[2])
+	}
 }
