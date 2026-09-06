@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
@@ -85,5 +86,43 @@ func TestFreeTextTextColor(t *testing.T) {
 					a.DefaultAppearance, c.want)
 			}
 		})
+	}
+}
+
+// TestFreeTextCalloutMargin checks that a callout reaching beyond the text
+// box grows Rect and records the box as non-negative insets from the new
+// Rect, in the order left, bottom, right, top, so that applying them gives
+// the text box back.
+func TestFreeTextCalloutMargin(t *testing.T) {
+	box := pdf.Rectangle{LLx: 50, LLy: 50, URx: 200, URy: 110}
+	a := &annotation.FreeText{
+		Common: annotation.Common{
+			Rect:     box,
+			Contents: "hello",
+		},
+		Markup: annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+		// the line starts to the right of and above the box
+		CalloutLine: []vec.Vec2{{X: 320, Y: 220}, {X: 200, Y: 110}},
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(a.Margin) != 4 {
+		t.Fatalf("got Margin %v, want four insets", a.Margin)
+	}
+	for i, m := range a.Margin {
+		if m < 0 {
+			t.Errorf("Margin[%d] = %g, want a non-negative inset", i, m)
+		}
+	}
+	if a.Margin[2] <= 0 || a.Margin[3] <= 0 {
+		t.Errorf("Margin = %v, want positive right and top insets for a callout beyond those edges", a.Margin)
+	}
+	inner := applyMargins(a.Rect, a.Margin)
+	if !inner.NearlyEqual(&box, 0.01) {
+		t.Errorf("applying Margin to Rect gives %v, want the text box %v", inner, box)
 	}
 }

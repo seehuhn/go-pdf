@@ -212,11 +212,12 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	if inner.NearlyEqual(&outer, 0.01) {
 		a.Margin = nil
 	} else {
+		// insets from the outer rectangle: left, bottom, right, top
 		a.Margin = []float64{
 			pdf.Round(inner.LLx-outer.LLx, 4),
 			pdf.Round(inner.LLy-outer.LLy, 4),
-			pdf.Round(inner.URx-outer.URx, 4),
-			pdf.Round(inner.URy-outer.URy, 4),
+			pdf.Round(outer.URx-inner.URx, 4),
+			pdf.Round(outer.URy-inner.URy, 4),
 		}
 	}
 
