@@ -17,6 +17,7 @@
 package fallback
 
 import (
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -24,6 +25,10 @@ import (
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 )
+
+// pilcrowSize is the font size, in points, of the paragraph symbol drawn
+// under a caret whose Symbol is P.
+const pilcrowSize = 10.0
 
 func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) {
 	col := a.Color
@@ -37,18 +42,22 @@ func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) 
 
 	inner := applyMargins(a.Rect, a.Margin)
 
-	// when Sy=P, expand Rect and Margin downward to make room for the pilcrow
+	// when Sy=P, expand Rect and Margin downward and sideways to make room
+	// for the pilcrow, which is wider than a narrow caret box
 	if a.Symbol == "P" {
-		fontSize := inner.Dx() * 0.6
-		if fontSize < 3 {
-			fontSize = 3
-		}
-		extra := fontSize * 0.85
-		a.Rect.LLy -= extra
+		// the pilcrow's baseline sits 0.8 of its size below the caret and
+		// its stems reach a further 0.3 of its size down
+		extraY := pilcrowSize * 1.1
+		extraX := pilcrowSize * 0.4
+		a.Rect.LLy -= extraY
+		a.Rect.LLx -= extraX
+		a.Rect.URx += extraX
 		if len(a.Margin) == 4 {
-			a.Margin = []float64{a.Margin[0], a.Margin[1] + extra, a.Margin[2], a.Margin[3]}
+			a.Margin = []float64{
+				a.Margin[0] + extraX, a.Margin[1] + extraY, a.Margin[2] + extraX, a.Margin[3],
+			}
 		} else {
-			a.Margin = []float64{0, extra, 0, 0}
+			a.Margin = []float64{extraX, extraY, extraX, 0}
 		}
 	}
 
@@ -65,41 +74,76 @@ func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) 
 		b.SetExtGState(gs)
 	}
 
-	x0 := inner.LLx
-	y0 := inner.LLy
-	w := inner.Dx()
-	h := inner.Dy()
+	// The caret is the proofreader's insertion mark drawn with a pen: two
+	// strokes that leave the top of the mark together, run down the neck
+	// leaning apart a little, and curve out into the feet.  Its width and
+	// height follow the box, the line width does not: it is the border
+	// width, as for any drawn markup, so the mark keeps the same weight
+	// at every size.  A width of 0 leaves the mark undrawn, as it does
+	// the border of any other annotation.  The strokes stay inside the
+	// box by half their width, caps included.
+	lw := annotation.EffectiveBorderWidth(a)
+	if m := min(inner.Dx(), inner.Dy()); lw > m/2 {
+		lw = m / 2
+	}
+	box := inner
+	box.LLx += lw / 2
+	box.LLy += lw / 2
+	box.URx -= lw / 2
+	box.URy -= lw / 2
+	x := (box.LLx + box.URx) / 2
+	w := box.Dx()
+	h := box.Dy()
 
-	// filled caret: flat base with straight sides curving to a narrow tip
-	b.SetFillColor(col)
-	b.MoveTo(x0, y0)
-	b.LineTo(x0+w, y0)
-	b.LineTo(x0+w, y0+0.1*h)
-	b.CurveTo(
-		x0+0.52*w, y0+0.1*h,
-		x0+0.52*w, y0+0.1*h,
-		x0+0.52*w, y0+h,
+	// The neck takes the upper neckFraction of the height, the feet the
+	// rest.  The neck leans out by lean of the half width.  The foot's
+	// curve keeps the neck's direction for the first hold of the foot's
+	// height and settles into the foot's own direction only within the
+	// last turn of the half width.
+	const (
+		neckFraction = 0.65
+		lean         = 0.1
+		hold         = 0.4
+		turn         = 0.3
 	)
-	b.LineTo(x0+0.48*w, y0+h)
-	b.CurveTo(
-		x0+0.48*w, y0+0.1*h,
-		x0+0.48*w, y0+0.1*h,
-		x0, y0+0.1*h,
-	)
-	b.ClosePath()
-	b.Fill()
+	neckH := h * neckFraction
+	footH := h - neckH
+	yb := box.LLy
+	yt := box.URy
+	yj := yb + footH
 
-	// pilcrow below the caret base
-	if a.Symbol == "P" {
-		fontSize := w * 0.6
-		if fontSize < 3 {
-			fontSize = 3
+	if lw > 0 {
+		rnd := func(v float64) float64 { return pdf.Round(v, 2) }
+		b.SetStrokeColor(col)
+		b.SetLineWidth(lw)
+		b.SetLineCap(graphics.LineCapRound)
+		b.SetLineJoin(graphics.LineJoinRound)
+		for _, s := range []float64{-1, 1} {
+			nx := x + s*w/2*lean
+			// the neck's direction, continued into the first control point
+			dx := (nx - x) / neckH
+			b.MoveTo(rnd(x), rnd(yt))
+			b.LineTo(rnd(nx), rnd(yj))
+			b.CurveTo(
+				rnd(nx+dx*footH*hold), rnd(yj-footH*hold),
+				rnd(x+s*w/2*(1-turn)), rnd(yb+footH*turn*0.6),
+				rnd(x+s*w/2), rnd(yb),
+			)
 		}
+		b.Stroke()
+	}
+
+	y0 := yb
+
+	// pilcrow below the caret base, at a fixed size: it is a symbol to be
+	// read, not part of the mark's geometry, so it does not follow the box
+	if a.Symbol == "P" {
 		cx := (inner.LLx + inner.URx) / 2
+		b.SetFillColor(col)
 		b.TextBegin()
-		b.TextSetFont(g.icons(), fontSize)
+		b.TextSetFont(g.icons(), pilcrowSize)
 		b.TextSetHorizontalScaling(1)
-		b.TextFirstLine(cx-fontSize*0.25, y0-fontSize*0.85)
+		b.TextFirstLine(pdf.Round(cx-pilcrowSize*0.3, 2), pdf.Round(y0-pilcrowSize*0.8, 2))
 		b.TextShow("\u00B6")
 		b.TextEnd()
 	}

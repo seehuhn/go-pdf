@@ -185,8 +185,12 @@ const (
 	squigglyBaseHalfPeriod = 2.0
 )
 
-// drawSquigglyLine draws a wavy line from p0 to p1 using alternating
-// cubic Bezier arcs.
+// drawSquigglyLine draws a wavy line along the segment from p0 to p1.
+// The wave is a cosine of the given amplitude about the segment,
+// starting a little past its trough on the way up, so it neither begins
+// flat nor cuts across the segment at once.  Each stretch between
+// consecutive extremes is one cubic Bezier, as are the partial stretches
+// at either end.
 func drawSquigglyLine(b *builder.Builder, p0, p1 vec.Vec2, amplitude, halfPeriod float64) {
 	d := p1.Sub(p0)
 	length := d.Length()
@@ -201,25 +205,41 @@ func drawSquigglyLine(b *builder.Builder, p0, p1 vec.Vec2, amplitude, halfPeriod
 	nSteps := max(int(math.Round(length/halfPeriod)), 1)
 	step := length / float64(nSteps)
 
-	// cubic Bezier control point factor for a smooth bump
-	const k = 4.0 / 3.0
+	// phase along the wave, in units of half periods, at distance t
+	const startPhase = 1.0 / 6
+	phase := func(t float64) float64 {
+		return startPhase + t/step
+	}
+	// signed offset from the segment and its derivative with respect to t
+	offset := func(t float64) float64 {
+		return -amplitude * math.Cos(math.Pi*phase(t))
+	}
+	slope := func(t float64) float64 {
+		return amplitude * math.Sin(math.Pi*phase(t)) * math.Pi / step
+	}
+	point := func(t, off float64) (float64, float64) {
+		return pdf.Round(p0.X+t*u.X+off*n.X, 2), pdf.Round(p0.Y+t*u.Y+off*n.Y, 2)
+	}
 
-	b.MoveTo(pdf.Round(p0.X, 2), pdf.Round(p0.Y, 2))
-	sign := 1.0
-	for i := range nSteps {
-		t0 := float64(i) * step
-		t1 := t0 + step
-		ex := pdf.Round(p0.X+t1*u.X, 2)
-		ey := pdf.Round(p0.Y+t1*u.Y, 2)
+	// segment boundaries: the start, each extreme, and the end
+	ts := []float64{0}
+	for k := 1; k <= nSteps; k++ {
+		t := (float64(k) - startPhase) * step
+		if t < length-0.01 {
+			ts = append(ts, t)
+		}
+	}
+	ts = append(ts, length)
 
-		off := sign * amplitude * k
-		cp1x := pdf.Round(p0.X+(t0+step/3)*u.X+off*n.X, 2)
-		cp1y := pdf.Round(p0.Y+(t0+step/3)*u.Y+off*n.Y, 2)
-		cp2x := pdf.Round(p0.X+(t0+2*step/3)*u.X+off*n.X, 2)
-		cp2y := pdf.Round(p0.Y+(t0+2*step/3)*u.Y+off*n.Y, 2)
-
+	b.MoveTo(point(0, offset(0)))
+	for i := 1; i < len(ts); i++ {
+		ta, tb := ts[i-1], ts[i]
+		h := (tb - ta) / 3
+		// cubic Hermite interpolation of the wave between the boundaries
+		cp1x, cp1y := point(ta+h, offset(ta)+h*slope(ta))
+		cp2x, cp2y := point(tb-h, offset(tb)-h*slope(tb))
+		ex, ey := point(tb, offset(tb))
 		b.CurveTo(cp1x, cp1y, cp2x, cp2y, ex, ey)
-		sign = -sign
 	}
 	b.Stroke()
 }

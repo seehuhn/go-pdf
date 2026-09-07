@@ -18,7 +18,9 @@ package fallback
 
 import (
 	"io"
+	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -56,6 +58,9 @@ func borderCases() map[string][2]annotation.Annotation {
 		}),
 		"Circle": build(func(b *annotation.Border) annotation.Annotation {
 			return &annotation.Circle{Common: common(b)}
+		}),
+		"Caret": build(func(b *annotation.Border) annotation.Annotation {
+			return &annotation.Caret{Common: common(b)}
 		}),
 		"Polygon": build(func(b *annotation.Border) annotation.Annotation {
 			return &annotation.Polygon{Common: common(b), Vertices: verts}
@@ -155,6 +160,41 @@ func TestNoBorderDrawsNoStroke(t *testing.T) {
 				t.Error("an annotation with a border of width 1 stroked nothing")
 			}
 		})
+	}
+}
+
+// TestCaretThinBox checks that a caret whose box is no taller than its
+// border width still gets a well-formed appearance: the stroke width is
+// clamped to the box, so no coordinate degenerates.
+func TestCaretThinBox(t *testing.T) {
+	for _, h := range []float64{0, 0.5, 1} {
+		a := &annotation.Caret{Common: annotation.Common{
+			Rect:   pdf.Rectangle{LLx: 10, LLy: 10, URx: 20, URy: 10 + h},
+			Border: &annotation.Border{Width: 1},
+			Color:  color.DeviceRGB{1, 0, 0},
+		}}
+		s := newGen(t, pdf.V2_0)
+		if err := s.AddAppearance(a); err != nil {
+			t.Fatal(err)
+		}
+		ap := annotation.Resolve(a.GetCommon(), appearance.Normal)
+		if ap == nil || ap.Content == nil {
+			t.Fatalf("height %g: no appearance", h)
+		}
+		r, err := ap.Content.RawBytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(r)
+		r.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for tok := range strings.FieldsSeq(string(data)) {
+			if v, err := strconv.ParseFloat(tok, 64); err == nil && (math.IsNaN(v) || math.IsInf(v, 0)) {
+				t.Errorf("height %g: content stream contains %q", h, tok)
+			}
+		}
 	}
 }
 
