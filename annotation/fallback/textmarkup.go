@@ -46,25 +46,13 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		return harvest(b, a.Rect)
 	}
 
-	bw := annotation.EffectiveBorderWidth(a)
-
-	// line width for stroke-based types
+	// line width for the stroked types; a highlight is a fill and uses none
 	var lw float64
 	switch a.Type {
-	case annotation.TextMarkupTypeHighlight:
-		lw = 0
 	case annotation.TextMarkupTypeSquiggly:
-		lw = 0.7 * bw
-	default: // Underline, StrikeOut
-		lw = bw
-	}
-
-	// a highlight is a fill and has no border, but the other types draw the
-	// border itself, so a width of 0 leaves them with nothing to draw
-	if lw <= 0 && a.Type != annotation.TextMarkupTypeHighlight {
-		b := builder.New(content.Form, nil, g.version)
-		g.reset(b)
-		return harvest(b, a.Rect)
+		lw = squigglyLineWidth
+	case annotation.TextMarkupTypeUnderline, annotation.TextMarkupTypeStrikeOut:
+		lw = textMarkupLineWidth
 	}
 
 	// bounding box from all quad points
@@ -79,7 +67,7 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 	}
 	var expand float64
 	if a.Type == annotation.TextMarkupTypeSquiggly {
-		expand = lw/2 + squigglyBaseAmplitude*bw
+		expand = lw/2 + squigglyAmplitude
 	}
 	bbox.LLx -= expand
 	bbox.LLy -= expand
@@ -154,16 +142,27 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		b.SetStrokeColor(col)
 		b.SetLineCap(graphics.LineCapRound)
 		b.SetLineJoin(graphics.LineJoinRound)
-		amplitude := squigglyBaseAmplitude * bw
-		halfPeriod := squigglyBaseHalfPeriod * bw
 		for i := range numQuads {
 			q := a.QuadPoints[i*4 : i*4+4]
-			drawSquigglyLine(b, q[2], q[3], amplitude, halfPeriod)
+			drawSquigglyLine(b, q[2], q[3], squigglyAmplitude, squigglyHalfPeriod)
 		}
 	}
 
 	return harvest(b, bbox)
 }
+
+// The widths the stroked text markup types are drawn with, and the shape of
+// the squiggly underline's wave, in user space units.  A text markup
+// annotation has no entry which sets these: its dictionary holds only the
+// markup type and the quadrilaterals it covers, and Border describes the
+// rectangle drawn around an annotation rather than the markup inside it.
+const (
+	textMarkupLineWidth = 1.0
+	squigglyLineWidth   = 0.7
+
+	squigglyAmplitude  = 1.0
+	squigglyHalfPeriod = 2.0
+)
 
 // strikeOutHeight is where the strike-out line crosses a quad, as a
 // fraction of the way from its bottom edge to its top edge.  A quad
@@ -178,12 +177,6 @@ const strikeOutHeight = 0.42
 func inwardOffset(outer, inner vec.Vec2, dist float64) vec.Vec2 {
 	return inner.Sub(outer).Normalize().Mul(dist)
 }
-
-// base squiggly parameters at border width 1
-const (
-	squigglyBaseAmplitude  = 1.0
-	squigglyBaseHalfPeriod = 2.0
-)
 
 // drawSquigglyLine draws a wavy line along the segment from p0 to p1.
 // The wave is a cosine of the given amplitude about the segment,

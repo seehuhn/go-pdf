@@ -87,51 +87,24 @@ func createDocument(filename string) error {
 	w.yPos -= 36.0
 
 	// test cases
-
-	err = w.addRow(annotation.TextMarkupTypeHighlight,
-		color.DeviceRGB{1, 1, 0}, "yellow highlight")
-	if err != nil {
-		return err
+	rows := []struct {
+		markupType annotation.TextMarkupType
+		col        color.Color
+		desc       string
+		draw       func(x, y float64, text string) []vec.Vec2
+	}{
+		{annotation.TextMarkupTypeHighlight, color.DeviceRGB{1, 1, 0}, "yellow highlight", w.drawText},
+		{annotation.TextMarkupTypeHighlight, color.DeviceRGB{0.6, 0.8, 1}, "blue highlight (rainbow text)", w.drawRainbowText},
+		{annotation.TextMarkupTypeUnderline, color.Red, "red underline", w.drawText},
+		{annotation.TextMarkupTypeStrikeOut, color.Blue, "blue strikeout", w.drawText},
+		{annotation.TextMarkupTypeSquiggly, color.DeviceRGB{0, 0.6, 0}, "green squiggly", w.drawText},
+		{annotation.TextMarkupTypeHighlight, nil, "nil color (invisible?)", w.drawText},
 	}
-	err = w.addRainbowRow(annotation.TextMarkupTypeHighlight,
-		color.DeviceRGB{0.6, 0.8, 1}, "blue highlight (rainbow text)")
-	if err != nil {
-		return err
-	}
-	err = w.addRow(annotation.TextMarkupTypeUnderline,
-		color.Red, "red underline")
-	if err != nil {
-		return err
-	}
-	err = w.addRowWithBorder(annotation.TextMarkupTypeUnderline,
-		color.Red, 2, "2pt red underline")
-	if err != nil {
-		return err
-	}
-	err = w.addRow(annotation.TextMarkupTypeStrikeOut,
-		color.Blue, "blue strikeout")
-	if err != nil {
-		return err
-	}
-	err = w.addRowWithBorder(annotation.TextMarkupTypeStrikeOut,
-		color.Blue, 2, "2pt blue strikeout")
-	if err != nil {
-		return err
-	}
-	err = w.addRow(annotation.TextMarkupTypeSquiggly,
-		color.DeviceRGB{0, 0.6, 0}, "green squiggly")
-	if err != nil {
-		return err
-	}
-	err = w.addRowWithBorder(annotation.TextMarkupTypeSquiggly,
-		color.DeviceRGB{0, 0.6, 0}, 2, "2pt green squiggly")
-	if err != nil {
-		return err
-	}
-	err = w.addRow(annotation.TextMarkupTypeHighlight,
-		nil, "nil color (invisible?)")
-	if err != nil {
-		return err
+	for _, row := range rows {
+		err = w.addRow(row.markupType, row.col, row.desc, row.draw)
+		if err != nil {
+			return err
+		}
 	}
 	err = w.addMultiQuadRow()
 	if err != nil {
@@ -153,56 +126,47 @@ func (w *writer) addAnnotation(a annotation.Annotation) {
 	w.page.Page.AddAnnots(a)
 }
 
-// addRowWithBorder is like addRow but sets Border.Width on both annotations.
-func (w *writer) addRowWithBorder(markupType annotation.TextMarkupType, col color.Color, borderWidth float64, desc string) error {
+// label draws the description of a test row above its left column.
+func (w *writer) label(desc string) {
 	b := w.b
-	text := "The quick brown fox"
-
 	b.TextBegin()
 	b.TextSetFont(w.font, 8)
 	b.SetFillColor(color.DeviceGray(0.4))
 	b.TextSetMatrix(matrix.Translate(leftColStart, w.yPos+14))
 	b.TextShow(desc)
 	b.TextEnd()
+}
 
-	qq := w.drawText(leftColStart+20, w.yPos, text)
-	left := &annotation.TextMarkup{
+// newMarkup returns a text markup annotation covering the quads qq, with
+// Rect the bounding box of the quads plus a small margin.
+func newMarkup(markupType annotation.TextMarkupType, col color.Color, qq []vec.Vec2) *annotation.TextMarkup {
+	a := &annotation.TextMarkup{
 		Common: annotation.Common{
-			Flags:  annotation.FlagPrint,
-			Color:  col,
-			Border: &annotation.Border{Width: borderWidth, SingleUse: true},
+			Flags: annotation.FlagPrint,
+			Color: col,
 		},
 		Type:       markupType,
 		QuadPoints: qq,
 	}
 	for _, p := range qq {
-		left.Common.Rect.ExtendVec(p)
+		a.Rect.ExtendVec(p)
 	}
-	left.Common.Rect.LLx -= borderWidth
-	left.Common.Rect.LLy -= borderWidth
-	left.Common.Rect.URx += borderWidth
-	left.Common.Rect.URy += borderWidth
-	left.Common.Rect.IRound(1)
-	w.addAnnotation(left)
+	a.Rect.LLx -= 2
+	a.Rect.LLy -= 2
+	a.Rect.URx += 2
+	a.Rect.URy += 2
+	a.Rect.IRound(1)
+	return a
+}
 
-	qq = w.drawText(rightColStart+20, w.yPos, text)
-	right := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags:  annotation.FlagPrint,
-			Color:  col,
-			Border: &annotation.Border{Width: borderWidth, SingleUse: true},
-		},
-		Type:       markupType,
-		QuadPoints: qq,
-	}
-	for _, p := range qq {
-		right.Common.Rect.ExtendVec(p)
-	}
-	right.Common.Rect.LLx -= borderWidth
-	right.Common.Rect.LLy -= borderWidth
-	right.Common.Rect.URx += borderWidth
-	right.Common.Rect.URy += borderWidth
-	right.Common.Rect.IRound(1)
+// addPair adds the same markup to both columns: on the left without an
+// appearance stream, for the viewer to draw, and on the right with the
+// Quire fallback appearance.  The two quad slices come from the text drawn
+// in each column.
+func (w *writer) addPair(markupType annotation.TextMarkupType, col color.Color, qqLeft, qqRight []vec.Vec2) error {
+	w.addAnnotation(newMarkup(markupType, col, qqLeft))
+
+	right := newMarkup(markupType, col, qqRight)
 	err := w.style.AddAppearance(right)
 	if err != nil {
 		return err
@@ -213,189 +177,23 @@ func (w *writer) addRowWithBorder(markupType annotation.TextMarkupType, col colo
 	return nil
 }
 
-// addRow adds a test row with left (viewer) and right (Quire) text markup.
-func (w *writer) addRow(markupType annotation.TextMarkupType, col color.Color, desc string) error {
-	b := w.b
+// addRow adds a test row with the same text in both columns, drawn by draw.
+func (w *writer) addRow(markupType annotation.TextMarkupType, col color.Color, desc string, draw func(x, y float64, text string) []vec.Vec2) error {
 	text := "The quick brown fox"
-
-	// draw description label
-	b.TextBegin()
-	b.TextSetFont(w.font, 8)
-	b.SetFillColor(color.DeviceGray(0.4))
-	b.TextSetMatrix(matrix.Translate(leftColStart, w.yPos+14))
-	b.TextShow(desc)
-	b.TextEnd()
-
-	// left column: text + annotation without appearance
-	qq := w.drawText(leftColStart+20, w.yPos, text)
-	left := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags: annotation.FlagPrint,
-			Color: col,
-		},
-		Type:       markupType,
-		QuadPoints: qq,
-	}
-	for _, p := range qq {
-		left.Common.Rect.ExtendVec(p)
-	}
-	left.Common.Rect.LLx -= 2
-	left.Common.Rect.LLy -= 2
-	left.Common.Rect.URx += 2
-	left.Common.Rect.URy += 2
-	left.Common.Rect.IRound(1)
-	w.addAnnotation(left)
-
-	// right column: text + annotation with Quire appearance
-	qq = w.drawText(rightColStart+20, w.yPos, text)
-	right := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags: annotation.FlagPrint,
-			Color: col,
-		},
-		Type:       markupType,
-		QuadPoints: qq,
-	}
-	for _, p := range qq {
-		right.Common.Rect.ExtendVec(p)
-	}
-	right.Common.Rect.LLx -= 2
-	right.Common.Rect.LLy -= 2
-	right.Common.Rect.URx += 2
-	right.Common.Rect.URy += 2
-	right.Common.Rect.IRound(1)
-	err := w.style.AddAppearance(right)
-	if err != nil {
-		return err
-	}
-	w.addAnnotation(right)
-
-	w.yPos -= 36.0
-	return nil
+	w.label(desc)
+	qqL := draw(leftColStart+20, w.yPos, text)
+	qqR := draw(rightColStart+20, w.yPos, text)
+	return w.addPair(markupType, col, qqL, qqR)
 }
 
 // addMultiQuadRow adds a test row with two separate quads (one per word).
 func (w *writer) addMultiQuadRow() error {
-	b := w.b
-	col := color.DeviceRGB{1, 1, 0}
-	desc := "yellow highlight, two quads"
-
-	b.TextBegin()
-	b.TextSetFont(w.font, 8)
-	b.SetFillColor(color.DeviceGray(0.4))
-	b.TextSetMatrix(matrix.Translate(leftColStart, w.yPos+14))
-	b.TextShow(desc)
-	b.TextEnd()
-
-	// left column
-	qq1L := w.drawText(leftColStart+20, w.yPos, "Hello")
-	qq2L := w.drawText(leftColStart+20+60, w.yPos, "World")
-	qqL := append(qq1L, qq2L...)
-	left := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags: annotation.FlagPrint,
-			Color: col,
-		},
-		Type:       annotation.TextMarkupTypeHighlight,
-		QuadPoints: qqL,
-	}
-	for _, p := range qqL {
-		left.Common.Rect.ExtendVec(p)
-	}
-	left.Common.Rect.LLx -= 2
-	left.Common.Rect.LLy -= 2
-	left.Common.Rect.URx += 2
-	left.Common.Rect.URy += 2
-	left.Common.Rect.IRound(1)
-	w.addAnnotation(left)
-
-	// right column
-	qq1R := w.drawText(rightColStart+20, w.yPos, "Hello")
-	qq2R := w.drawText(rightColStart+20+60, w.yPos, "World")
-	qqR := append(qq1R, qq2R...)
-	right := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags: annotation.FlagPrint,
-			Color: col,
-		},
-		Type:       annotation.TextMarkupTypeHighlight,
-		QuadPoints: qqR,
-	}
-	for _, p := range qqR {
-		right.Common.Rect.ExtendVec(p)
-	}
-	right.Common.Rect.LLx -= 2
-	right.Common.Rect.LLy -= 2
-	right.Common.Rect.URx += 2
-	right.Common.Rect.URy += 2
-	right.Common.Rect.IRound(1)
-	err := w.style.AddAppearance(right)
-	if err != nil {
-		return err
-	}
-	w.addAnnotation(right)
-
-	w.yPos -= 36.0
-	return nil
-}
-
-// addRainbowRow is like addRow but draws the text in rainbow colors.
-func (w *writer) addRainbowRow(markupType annotation.TextMarkupType, col color.Color, desc string) error {
-	b := w.b
-
-	b.TextBegin()
-	b.TextSetFont(w.font, 8)
-	b.SetFillColor(color.DeviceGray(0.4))
-	b.TextSetMatrix(matrix.Translate(leftColStart, w.yPos+14))
-	b.TextShow(desc)
-	b.TextEnd()
-
-	text := "The quick brown fox"
-
-	qq := w.drawRainbowText(leftColStart+20, w.yPos, text)
-	left := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags: annotation.FlagPrint,
-			Color: col,
-		},
-		Type:       markupType,
-		QuadPoints: qq,
-	}
-	for _, p := range qq {
-		left.Common.Rect.ExtendVec(p)
-	}
-	left.Common.Rect.LLx -= 2
-	left.Common.Rect.LLy -= 2
-	left.Common.Rect.URx += 2
-	left.Common.Rect.URy += 2
-	left.Common.Rect.IRound(1)
-	w.addAnnotation(left)
-
-	qq = w.drawRainbowText(rightColStart+20, w.yPos, text)
-	right := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags: annotation.FlagPrint,
-			Color: col,
-		},
-		Type:       markupType,
-		QuadPoints: qq,
-	}
-	for _, p := range qq {
-		right.Common.Rect.ExtendVec(p)
-	}
-	right.Common.Rect.LLx -= 2
-	right.Common.Rect.LLy -= 2
-	right.Common.Rect.URx += 2
-	right.Common.Rect.URy += 2
-	right.Common.Rect.IRound(1)
-	err := w.style.AddAppearance(right)
-	if err != nil {
-		return err
-	}
-	w.addAnnotation(right)
-
-	w.yPos -= 36.0
-	return nil
+	w.label("yellow highlight, two quads")
+	qqL := w.drawText(leftColStart+20, w.yPos, "Hello")
+	qqL = append(qqL, w.drawText(leftColStart+20+60, w.yPos, "World")...)
+	qqR := w.drawText(rightColStart+20, w.yPos, "Hello")
+	qqR = append(qqR, w.drawText(rightColStart+20+60, w.yPos, "World")...)
+	return w.addPair(annotation.TextMarkupTypeHighlight, color.DeviceRGB{1, 1, 0}, qqL, qqR)
 }
 
 var rainbow = []color.Color{
@@ -420,10 +218,15 @@ func (w *writer) drawRainbowText(x, y float64, text string) []vec.Vec2 {
 	glyphs := b.TextLayout(nil, text)
 	qq := b.TextGetQuadPoints(glyphs, 0)
 
-	// draw character by character with cycling colors
-	for i, ch := range text {
+	// Draw the glyphs of that layout one at a time, with cycling colours.
+	// Laying each glyph out on its own instead would drop the kerning
+	// between them, and the text would no longer match the quad points.
+	one := &font.GlyphSeq{Skip: glyphs.Skip}
+	for i := range glyphs.Seq {
 		b.SetFillColor(rainbow[i%len(rainbow)])
-		b.TextShow(string(ch))
+		one.Seq = glyphs.Seq[i : i+1]
+		b.TextShowGlyphs(one)
+		one.Skip = 0
 	}
 	b.TextEnd()
 	return qq

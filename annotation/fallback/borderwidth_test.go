@@ -17,6 +17,7 @@
 package fallback
 
 import (
+	"bytes"
 	"io"
 	"math"
 	"slices"
@@ -36,7 +37,6 @@ import (
 // border and one asking for a border of width 1.
 func borderCases() map[string][2]annotation.Annotation {
 	rect := pdf.Rectangle{LLx: 10, LLy: 10, URx: 190, URy: 90}
-	quads := []vec.Vec2{{X: 10, Y: 90}, {X: 190, Y: 90}, {X: 10, Y: 10}, {X: 190, Y: 10}}
 	verts := []float64{10, 10, 190, 10, 100, 90}
 	ink := [][]vec.Vec2{{{X: 10, Y: 10}, {X: 100, Y: 50}, {X: 190, Y: 90}}}
 	col := color.DeviceRGB{1, 0, 0}
@@ -80,34 +80,19 @@ func borderCases() map[string][2]annotation.Annotation {
 				DefaultAppearance: "/Helv 12 Tf 0 g",
 			}
 		}),
-		"Underline": build(func(b *annotation.Border) annotation.Annotation {
-			return &annotation.TextMarkup{
-				Common: common(b), Type: annotation.TextMarkupTypeUnderline, QuadPoints: quads,
-			}
-		}),
-		"StrikeOut": build(func(b *annotation.Border) annotation.Annotation {
-			return &annotation.TextMarkup{
-				Common: common(b), Type: annotation.TextMarkupTypeStrikeOut, QuadPoints: quads,
-			}
-		}),
-		"Squiggly": build(func(b *annotation.Border) annotation.Annotation {
-			return &annotation.TextMarkup{
-				Common: common(b), Type: annotation.TextMarkupTypeSquiggly, QuadPoints: quads,
-			}
-		}),
 	}
 }
 
 // strokeOps are the path-painting operators which stroke (§8.5.3.2).
 var strokeOps = []string{"S", "s", "B", "B*", "b", "b*"}
 
-// countStrokes returns how many stroking operators the annotation's normal
-// appearance uses.
-func countStrokes(t *testing.T, a annotation.Annotation) int {
+// appearanceStream returns the content of the annotation's normal appearance,
+// or nil if it has none.
+func appearanceStream(t *testing.T, a annotation.Annotation) []byte {
 	t.Helper()
 	ap := annotation.Resolve(a.GetCommon(), appearance.Normal)
 	if ap == nil || ap.Content == nil {
-		return 0
+		return nil
 	}
 	r, err := ap.Content.RawBytes()
 	if err != nil {
@@ -118,8 +103,15 @@ func countStrokes(t *testing.T, a annotation.Annotation) int {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return data
+}
+
+// countStrokes returns how many stroking operators the annotation's normal
+// appearance uses.
+func countStrokes(t *testing.T, a annotation.Annotation) int {
+	t.Helper()
 	n := 0
-	for tok := range strings.FieldsSeq(string(data)) {
+	for tok := range strings.FieldsSeq(string(appearanceStream(t, a))) {
 		if slices.Contains(strokeOps, tok) {
 			n++
 		}
@@ -251,21 +243,8 @@ func TestBorderDashReachesAppearance(t *testing.T) {
 // dash pattern, i.e. whether it contains a "d" operator with a non-empty array.
 func usesDash(t *testing.T, a annotation.Annotation) bool {
 	t.Helper()
-	ap := annotation.Resolve(a.GetCommon(), appearance.Normal)
-	if ap == nil || ap.Content == nil {
-		return false
-	}
-	r, err := ap.Content.RawBytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-	data, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatal(err)
-	}
 	// "[] 0 d" resets the dash pattern; anything else sets one
-	for op := range strings.SplitSeq(string(data), "\n") {
+	for op := range strings.SplitSeq(string(appearanceStream(t, a)), "\n") {
 		f := strings.Fields(op)
 		if len(f) >= 3 && f[len(f)-1] == "d" && f[0] != "[]" {
 			return true
@@ -274,27 +253,60 @@ func usesDash(t *testing.T, a annotation.Annotation) bool {
 	return false
 }
 
-// TestHighlightIgnoresBorderWidth checks that a highlight, which is a fill and
-// has no border, is drawn whether or not a border is asked for.
-func TestHighlightIgnoresBorderWidth(t *testing.T) {
+// paints reports whether a content stream fills or strokes anything.
+func paints(data []byte) bool {
+	for tok := range strings.FieldsSeq(string(data)) {
+		if tok == "f" || slices.Contains(strokeOps, tok) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestTextMarkupIgnoresBorderWidth checks that the appearance of a text markup
+// annotation does not depend on the border asked for.  The annotation
+// dictionary has no entry which sets the width of an underline, strike-out or
+// squiggly, so each is drawn at a fixed width, and Border, which describes the
+// rectangle around an annotation, changes nothing.
+func TestTextMarkupIgnoresBorderWidth(t *testing.T) {
 	quads := []vec.Vec2{{X: 10, Y: 90}, {X: 190, Y: 90}, {X: 10, Y: 10}, {X: 190, Y: 10}}
-	for _, border := range []*annotation.Border{nil, {Width: 1}} {
-		a := &annotation.TextMarkup{
-			Common: annotation.Common{
-				Rect:   pdf.Rectangle{LLx: 10, LLy: 10, URx: 190, URy: 90},
-				Border: border,
-				Color:  color.DeviceRGB{1, 1, 0},
-			},
-			Type:       annotation.TextMarkupTypeHighlight,
-			QuadPoints: quads,
-		}
-		s := newGen(t, pdf.V2_0)
-		if err := s.AddAppearance(a); err != nil {
-			t.Fatal(err)
-		}
-		ap := annotation.Resolve(a.GetCommon(), appearance.Normal)
-		if ap == nil || ap.Content == nil {
-			t.Errorf("border %v: the highlight drew nothing", border)
-		}
+	borders := []*annotation.Border{nil, {Width: 1}, {Width: 5}}
+	types := []annotation.TextMarkupType{
+		annotation.TextMarkupTypeHighlight,
+		annotation.TextMarkupTypeUnderline,
+		annotation.TextMarkupTypeStrikeOut,
+		annotation.TextMarkupTypeSquiggly,
+	}
+
+	for _, markupType := range types {
+		t.Run(string(markupType), func(t *testing.T) {
+			var want []byte
+			for _, border := range borders {
+				a := &annotation.TextMarkup{
+					Common: annotation.Common{
+						Rect:   pdf.Rectangle{LLx: 10, LLy: 10, URx: 190, URy: 90},
+						Border: border,
+						Color:  color.DeviceRGB{1, 1, 0},
+					},
+					Type:       markupType,
+					QuadPoints: quads,
+				}
+				s := newGen(t, pdf.V2_0)
+				if err := s.AddAppearance(a); err != nil {
+					t.Fatal(err)
+				}
+
+				got := appearanceStream(t, a)
+				if !paints(got) {
+					t.Fatalf("border %v: the markup drew nothing", border)
+				}
+				if want == nil {
+					want = got
+				} else if !bytes.Equal(got, want) {
+					t.Errorf("border %v changed the appearance:\n%s\nwant:\n%s",
+						border, got, want)
+				}
+			}
+		})
 	}
 }
