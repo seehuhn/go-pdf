@@ -30,7 +30,7 @@ import (
 func (g *Generator) addInkAppearance(a *annotation.Ink) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
-	col := a.Color
+	col := paint(a.Color)
 
 	if col == nil || lw <= 0 || !hasInkPoints(a.InkList) {
 		return &form.Form{

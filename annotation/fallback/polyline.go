@@ -29,7 +29,7 @@ import (
 func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
-	col := a.Color
+	col := paint(a.Color)
 
 	if col == nil || lw <= 0 {
 		return &form.Form{
@@ -73,7 +73,7 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 		b.SetLineDash(dashPattern, 0)
 	}
 
-	drawOpenPolyline(b, points, startLE, endLE, a.FillColor)
+	drawOpenPolyline(b, points, startLE, endLE, paint(a.FillColor))
 
 	return harvest(b, bbox)
 }

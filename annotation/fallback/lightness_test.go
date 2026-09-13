@@ -161,3 +161,39 @@ func TestLightnessIsMonotonic(t *testing.T) {
 		t.Errorf("lighter gave (%g, %g, %g)", rl, gl, bl)
 	}
 }
+
+// TestLightness checks that the lightness of a device colour is the L* of
+// its Lab representation, whatever space it is given in.
+func TestLightness(t *testing.T) {
+	cases := []struct {
+		col  color.Color
+		want float64
+	}{
+		{color.DeviceGray(0), 0},
+		{color.DeviceGray(1), 100},
+		{color.DeviceRGB{0, 0, 0}, 0},
+		{color.DeviceRGB{1, 1, 1}, 100},
+		{color.DeviceCMYK{0, 0, 0, 1}, 0},
+		{color.DeviceCMYK{0, 0, 0, 0}, 100},
+	}
+	for _, tc := range cases {
+		if got := lightness(tc.col); math.Abs(got-tc.want) > 0.5 {
+			t.Errorf("lightness(%v) = %g, want %g", tc.col, got, tc.want)
+		}
+	}
+
+	// a mid grey lies between, and the same grey reads the same in every space
+	gray := lightness(color.DeviceGray(0.5))
+	if !(gray > 40 && gray < 60) {
+		t.Errorf("lightness(gray 0.5) = %g, want about 50", gray)
+	}
+	rgb := lightness(color.DeviceRGB{0.5, 0.5, 0.5})
+	if math.Abs(rgb-gray) > 0.5 {
+		t.Errorf("lightness of the same grey differs between spaces: %g vs %g", rgb, gray)
+	}
+
+	// a colour outside the device spaces counts as light
+	if got := lightness(color.SRGB(0, 0, 0)); got != 100 {
+		t.Errorf("lightness(sRGB black) = %g, want 100", got)
+	}
+}

@@ -32,7 +32,7 @@ func TestExtract(t *testing.T) {
 		want color.Color
 	}{
 		{"nil", nil, nil},
-		{"empty", pdf.Array{}, nil},
+		{"empty", pdf.Array{}, Transparent},
 		{"gray", pdf.Array{pdf.Number(0.5)}, color.DeviceGray(0.5)},
 		{"rgb", pdf.Array{pdf.Number(0), pdf.Number(0.5), pdf.Number(1)}, color.DeviceRGB{0, 0.5, 1}},
 		{"cmyk", pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(0), pdf.Number(1)}, color.DeviceCMYK{0, 0, 0, 1}},
@@ -104,8 +104,8 @@ func TestExtractRGB(t *testing.T) {
 	if c, err := ExtractRGB(pdf.NewCursor(mock.Getter), nil); err != nil || c != nil {
 		t.Errorf("ExtractRGB(nil) = %v, %v; want nil, nil", c, err)
 	}
-	if c, err := ExtractRGB(pdf.NewCursor(mock.Getter), pdf.Array{}); err != nil || c != nil {
-		t.Errorf("ExtractRGB(empty) = %v, %v; want nil, nil", c, err)
+	if c, err := ExtractRGB(pdf.NewCursor(mock.Getter), pdf.Array{}); err != nil || c != Transparent {
+		t.Errorf("ExtractRGB(empty) = %v, %v; want Transparent, nil", c, err)
 	}
 	if _, err := ExtractRGB(pdf.NewCursor(mock.Getter), pdf.Array{pdf.Number(1)}); err == nil {
 		t.Error("expected error for 1-element RGB array")
@@ -119,6 +119,7 @@ func TestEncode(t *testing.T) {
 		want pdf.Array
 	}{
 		{"nil", nil, nil},
+		{"transparent", Transparent, pdf.Array{}},
 		{"gray", color.DeviceGray(0.5), pdf.Array{pdf.Number(0.5)}},
 		{"rgb", color.DeviceRGB{0, 0.5, 1}, pdf.Array{pdf.Number(0), pdf.Number(0.5), pdf.Number(1)}},
 		{"cmyk", color.DeviceCMYK{0, 0, 0, 1}, pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(0), pdf.Number(1)}},
@@ -147,6 +148,9 @@ func TestEncodeRGB(t *testing.T) {
 
 	if a, err := EncodeRGB(nil); err != nil || a != nil {
 		t.Errorf("EncodeRGB(nil) = %v, %v; want nil, nil", a, err)
+	}
+	if a, err := EncodeRGB(Transparent); err != nil || a == nil || len(a) != 0 {
+		t.Errorf("EncodeRGB(Transparent) = %v, %v; want [], nil", a, err)
 	}
 	// a non-RGB colour must be rejected
 	if _, err := EncodeRGB(color.DeviceGray(0.5)); err == nil {

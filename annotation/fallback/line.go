@@ -161,7 +161,7 @@ func drawSimpleLineBuilder(b *builder.Builder, a *annotation.Line) {
 	}
 	le0 := normalizeLE(a.LineEndingStyle[0])
 	le1 := normalizeLE(a.LineEndingStyle[1])
-	drawOpenPolyline(b, points, le0, le1, a.FillColor)
+	drawOpenPolyline(b, points, le0, le1, paint(a.FillColor))
 }
 
 // drawLineWithLeaderLinesBuilder draws a line with leader lines (dimension line style)
@@ -225,7 +225,7 @@ func drawLineWithLeaderLinesBuilder(b *builder.Builder, a *annotation.Line) {
 		info := lineEndingInfo{
 			At:        vec.Vec2{X: shiftedStartX, Y: shiftedStartY},
 			Dir:       vec.Vec2{X: shiftedStartX - shiftedEndX, Y: shiftedStartY - shiftedEndY},
-			FillColor: a.FillColor,
+			FillColor: paint(a.FillColor),
 			IsStart:   true,
 		}
 		drawLineEndingBuilder(b, a.LineEndingStyle[0], info)
@@ -238,7 +238,7 @@ func drawLineWithLeaderLinesBuilder(b *builder.Builder, a *annotation.Line) {
 		info := lineEndingInfo{
 			At:        vec.Vec2{X: shiftedEndX, Y: shiftedEndY},
 			Dir:       vec.Vec2{X: shiftedEndX - shiftedStartX, Y: shiftedEndY - shiftedStartY},
-			FillColor: a.FillColor,
+			FillColor: paint(a.FillColor),
 			IsStart:   false,
 		}
 		drawLineEndingBuilder(b, a.LineEndingStyle[1], info)

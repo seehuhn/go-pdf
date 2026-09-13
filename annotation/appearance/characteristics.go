@@ -37,11 +37,13 @@ type Characteristics struct {
 	Rotation int
 
 	// BorderColor (optional) is the colour of the annotation's border. The
-	// color must use the DeviceGray, DeviceRGB or DeviceCMYK colour space.
+	// color must use the DeviceGray, DeviceRGB or DeviceCMYK colour space,
+	// or be [colorenc.Transparent].
 	BorderColor color.Color
 
 	// BackgroundColor (optional) is the colour of the annotation's background.
-	// The color must use the DeviceGray, DeviceRGB or DeviceCMYK colour space.
+	// The color must use the DeviceGray, DeviceRGB or DeviceCMYK colour space,
+	// or be [colorenc.Transparent].
 	BackgroundColor color.Color
 
 	// Caption is the annotation's normal caption, displayed when it is not

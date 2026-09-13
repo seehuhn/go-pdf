@@ -76,6 +76,7 @@ type PolyLine struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
+	//  - [colorenc.Transparent], which asks for no colour at all
 	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color

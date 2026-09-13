@@ -19,6 +19,7 @@ package fallback
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -37,7 +38,7 @@ func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 
 	bbox := a.Rect
 
-	if borderWidth <= 0 || col == nil {
+	if borderWidth <= 0 || col == colorenc.Transparent {
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},

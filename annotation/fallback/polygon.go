@@ -30,7 +30,7 @@ import (
 func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
-	col := a.Color
+	col := paint(a.Color)
 
 	verts := polygonVertices(a)
 
@@ -55,7 +55,7 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
 
 	hasOutline := col != nil && lw > 0
-	hasFill := a.FillColor != nil
+	hasFill := paint(a.FillColor) != nil
 	if !(hasOutline || hasFill) {
 		return &form.Form{
 			Content: nil,

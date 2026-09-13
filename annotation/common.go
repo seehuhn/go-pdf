@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/oc"
@@ -48,6 +49,7 @@ type Common struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
+	//  - [colorenc.Transparent], which asks for no colour at all
 	//
 	// The effect of a nil Color value depends on the annotation type.
 	//
@@ -274,20 +276,9 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 		if err := pdf.CheckVersion(w, "annotation C entry", pdf.V1_1); err != nil {
 			return err
 		}
-		s := c.Color.ColorSpace()
-		var x []float64
-		if s != nil {
-			fam := s.Family()
-			switch fam {
-			case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
-				x, _ = color.Values(c.Color)
-			default:
-				return fmt.Errorf("unexpected color space %s", fam)
-			}
-		}
-		colorArray := make(pdf.Array, len(x))
-		for i, v := range x {
-			colorArray[i] = pdf.Number(v)
+		colorArray, err := colorenc.Encode(c.Color)
+		if err != nil {
+			return err
 		}
 		dict["C"] = colorArray
 	}

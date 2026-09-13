@@ -25,7 +25,6 @@ import (
 	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
 	"seehuhn.de/go/sfnt/cff"
@@ -369,7 +368,7 @@ func makeTestFont() (font.Instance, error) {
 		Glyphs: glyphs,
 		Private: []*type1.PrivateDict{
 			{
-				BlueValues: []funit.Int16{-10, 0, 290, 300},
+				BlueValues: []float64{-10, 0, 290, 300},
 				BlueScale:  0.039625,
 				BlueShift:  7,
 				BlueFuzz:   1,

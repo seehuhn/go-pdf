@@ -30,7 +30,7 @@ import (
 )
 
 func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, error) {
-	col := a.Color
+	col := paint(a.Color)
 
 	if len(a.QuadPoints) < 4 {
 		return &form.Form{

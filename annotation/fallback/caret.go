@@ -31,7 +31,7 @@ import (
 const pilcrowSize = 10.0
 
 func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) {
-	col := a.Color
+	col := paint(a.Color)
 	if col == nil {
 		return &form.Form{
 			Content: nil,

@@ -22,7 +22,6 @@ import (
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
-	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/postscript/type1/names"
@@ -67,7 +66,7 @@ type Instance struct {
 	*font.Geometry
 
 	lig  map[glyph.Pair]glyph.ID
-	kern map[glyph.Pair]funit.Int16
+	kern map[glyph.Pair]float64
 	cmap map[rune]glyph.ID
 
 	*simpleenc.Simple
@@ -153,7 +152,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	// otherwise resolve to glyph ID 0 and quietly attach the ligature or the
 	// kern to ".notdef".
 	lig := make(map[glyph.Pair]glyph.ID)
-	kern := make(map[glyph.Pair]funit.Int16)
+	kern := make(map[glyph.Pair]float64)
 	if metrics != nil {
 		for left, name := range glyphNames {
 			gi := metrics.Glyphs[name]
@@ -322,7 +321,7 @@ func (f *Instance) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.Gl
 		g := seq.Seq[i]
 		if i > base {
 			if adj, ok := f.kern[glyph.Pair{Left: prev, Right: g.GID}]; ok {
-				seq.Seq[i-1].Advance += float64(adj) * ptSize / 1000
+				seq.Seq[i-1].Advance += adj * ptSize / 1000
 			}
 		}
 		prev = g.GID

@@ -44,7 +44,7 @@ func (g *Generator) addFileAttachmentAppearance(a *annotation.FileAttachment) (*
 	}
 	a.Flags |= annotation.FlagNoZoom | annotation.FlagNoRotate
 
-	col := a.Color
+	col := paint(a.Color)
 	if col == nil {
 		col = quireInk2
 	}

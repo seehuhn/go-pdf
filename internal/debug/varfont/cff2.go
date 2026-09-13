@@ -147,7 +147,7 @@ func CFF2() *sfnt.Font {
 		},
 		AdvanceMap: &variation.DeltaSetIndexMap{Map: []uint32{0, 1, 0, 0, 0, 0}},
 	}
-	f.VariationsPostScriptName = "QuireMiniCFF2Var-"
+	f.VariationsPostScriptName = "QuireMiniCFF2Var"
 
 	return f
 }

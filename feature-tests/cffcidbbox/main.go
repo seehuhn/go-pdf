@@ -24,7 +24,6 @@ import (
 	"seehuhn.de/go/geom/matrix"
 
 	"seehuhn.de/go/postscript/cid"
-	"seehuhn.de/go/postscript/funit"
 	"seehuhn.de/go/postscript/type1"
 
 	sfntcff "seehuhn.de/go/sfnt/cff"
@@ -219,9 +218,9 @@ func makeTestFonts() (*testFonts, error) {
 		newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))
 	}
 
-	blueValues := make([]funit.Int16, len(private1.BlueValues))
+	blueValues := make([]float64, len(private1.BlueValues))
 	for i, v := range private1.BlueValues {
-		blueValues[i] = funit.Int16(math.Round(float64(v) * qy))
+		blueValues[i] = math.Round(v * qy)
 	}
 	private1.BlueValues = blueValues
 
@@ -240,9 +239,9 @@ func makeTestFonts() (*testFonts, error) {
 		newGlyphs = append(newGlyphs, rescaleGlyph(origOutlines.Glyphs[gid], qx, qy))
 	}
 
-	blueValues = make([]funit.Int16, len(private2.BlueValues))
+	blueValues = make([]float64, len(private2.BlueValues))
 	for i, v := range private2.BlueValues {
-		blueValues[i] = funit.Int16(math.Round(float64(v) * qy))
+		blueValues[i] = math.Round(v * qy)
 	}
 
 	// construct the new CFF font

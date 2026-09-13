@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -42,7 +43,7 @@ func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) 
 	rect := a.Rect
 	w := rect.Dx()
 	h := rect.Dy()
-	if w <= 0 || h <= 0 {
+	if w <= 0 || h <= 0 || col == colorenc.Transparent {
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},

@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/annotation/fallback"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
@@ -141,11 +142,11 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	// test with transparent color (no appearance stream)
+	// test with an empty /C array, the spec's "no colour; transparent"
 	text = &annotation.Text{
 		Common: annotation.Common{
 			Contents: "Transparent background",
-			Color:    nil,
+			Color:    colorenc.Transparent,
 			Border:   annotation.PDFDefaultBorder,
 			Flags:    annotation.FlagPrint,
 		},
@@ -154,7 +155,7 @@ func createDocument(filename string) error {
 		},
 		Icon: annotation.TextIconNote,
 	}
-	err = w.addAnnotationPair(text, "Common.Color = transparent")
+	err = w.addAnnotationPair(text, "Common.Color = Transparent")
 	if err != nil {
 		return err
 	}

@@ -58,7 +58,7 @@ func makeCFFAsymmetric() font.Layouter {
 func makeCFFFont(fontMatrix matrix.Matrix) font.Layouter {
 	hScale := 1.0 / 1000.0 / fontMatrix[0]
 	vScale := 1.0 / 1000.0 / fontMatrix[3]
-	sI10 := funit.Int16(math.Round(10 * vScale))
+	s10 := math.Round(10 * vScale)
 	outlines := &cff.Outlines{
 		Glyphs: []*cff.Glyph{
 			createCFFEmptyGlyph(".notdef", NotdefWidth, fontMatrix),
@@ -67,7 +67,7 @@ func makeCFFFont(fontMatrix matrix.Matrix) font.Layouter {
 		},
 		Private: []*type1.PrivateDict{
 			{
-				BlueValues: []funit.Int16{-1 * sI10, 0, 99 * sI10, 10 * sI10},
+				BlueValues: []float64{-s10, 0, 99 * s10, 100 * s10},
 				BlueScale:  0.039625,
 				BlueShift:  7,
 				BlueFuzz:   1,

@@ -63,8 +63,9 @@ type Square struct {
 	//  - colors in the [color.DeviceGray] color space
 	//  - colors in the [color.DeviceRGB] color space
 	//  - colors in the [color.DeviceCMYK] color space
+	//  - [colorenc.Transparent], which asks for no colour at all
 	//
-	// If this is nil, the rectangle is not filled.
+	// If this is nil or [colorenc.Transparent], the rectangle is not filled.
 	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color

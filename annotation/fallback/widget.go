@@ -302,18 +302,29 @@ func (g *Generator) drawChromeField(w *annotation.Widget) (*form.Form, error) {
 	return g.finishForm(b, width, height, m)
 }
 
+// chromeColors returns the background and border colours a widget's
+// appearance characteristics ask for, nil where an entry is absent or asks
+// for no colour.
+func chromeColors(w *annotation.Widget) (bg, bc color.Color) {
+	mk := w.Style
+	if mk == nil {
+		return nil, nil
+	}
+	return paint(mk.BackgroundColor), paint(mk.BorderColor)
+}
+
 // drawChrome fills the background and strokes the border of a rectangular field
 // according to the widget's Style and border-style entries.
 func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget) {
-	mk := w.Style
-	if mk != nil && mk.BackgroundColor != nil {
-		b.SetFillColor(mk.BackgroundColor)
+	bg, bc := chromeColors(w)
+	if bg != nil {
+		b.SetFillColor(bg)
 		b.Rectangle(0, 0, width, height)
 		b.Fill()
 	}
 
 	lw := annotation.EffectiveBorderWidth(w)
-	if mk == nil || mk.BorderColor == nil || lw <= 0 {
+	if bc == nil || lw <= 0 {
 		return
 	}
 
@@ -321,7 +332,7 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 	switch style {
 	case "U": // underline: a single rule along the bottom edge
 		b.SetLineWidth(lw)
-		b.SetStrokeColor(mk.BorderColor)
+		b.SetStrokeColor(bc)
 		b.MoveTo(0, lw/2)
 		b.LineTo(width, lw/2)
 		b.Stroke()
@@ -336,12 +347,12 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 		inner := pdf.Rectangle{LLx: lw, LLy: lw, URx: width - lw, URy: height - lw}
 		drawBevelBands(b, inner, lw, topLeft, bottomRight)
 		b.SetLineWidth(lw)
-		b.SetStrokeColor(mk.BorderColor)
+		b.SetStrokeColor(bc)
 		b.Rectangle(lw/2, lw/2, width-lw, height-lw)
 		b.Stroke()
 	default: // "S" solid, "D" dashed
 		b.SetLineWidth(lw)
-		b.SetStrokeColor(mk.BorderColor)
+		b.SetStrokeColor(bc)
 		if style == "D" {
 			dash := []float64{3}
 			if w.BorderStyle != nil && len(w.BorderStyle.DashArray) > 0 {
@@ -386,19 +397,19 @@ func (g *Generator) drawToggle(w *annotation.Widget, fld *widgetField, on bool) 
 
 // drawCircleChrome fills and strokes a circular field background and border.
 func drawCircleChrome(b *builder.Builder, width, height float64, w *annotation.Widget) {
-	mk := w.Style
+	bg, bc := chromeColors(w)
 	cx, cy := width/2, height/2
 	outer := min(width, height) / 2
 	lw := annotation.EffectiveBorderWidth(w)
 
-	if mk != nil && mk.BackgroundColor != nil {
-		b.SetFillColor(mk.BackgroundColor)
+	if bg != nil {
+		b.SetFillColor(bg)
 		b.Circle(cx, cy, outer)
 		b.Fill()
 	}
-	if mk != nil && mk.BorderColor != nil && lw > 0 {
+	if bc != nil && lw > 0 {
 		b.SetLineWidth(lw)
-		b.SetStrokeColor(mk.BorderColor)
+		b.SetStrokeColor(bc)
 		b.Circle(cx, cy, outer-lw/2)
 		b.Stroke()
 	}

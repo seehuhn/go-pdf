@@ -103,3 +103,22 @@ func labToCMYK(L, A, B float64) (c, m, y, k float64) {
 	}
 	return c, m, y, color.ClipComponent(k, 0, 1)
 }
+
+// lightness returns the L* of a device colour.  A colour in any other space
+// counts as fully light; none can be written to an annotation's colour
+// entries anyway.
+func lightness(col color.Color) float64 {
+	components, _ := color.Values(col)
+	switch col.ColorSpace().Family() {
+	case color.FamilyDeviceGray:
+		return grayToL(components[0])
+	case color.FamilyDeviceRGB:
+		L, _, _ := rgbToLab(components[0], components[1], components[2])
+		return L
+	case color.FamilyDeviceCMYK:
+		L, _, _ := cmykToLab(components[0], components[1], components[2], components[3])
+		return L
+	default:
+		return 100
+	}
+}

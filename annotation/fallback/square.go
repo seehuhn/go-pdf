@@ -30,7 +30,7 @@ import (
 func (g *Generator) addSquareAppearance(a *annotation.Square) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
-	col := a.Color
+	col := paint(a.Color)
 
 	rect := applyMargins(a.Rect, a.Margin)
 
@@ -42,7 +42,7 @@ func (g *Generator) addSquareAppearance(a *annotation.Square) (*form.Form, error
 	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
 
 	hasOutline := col != nil && lw > 0
-	hasFill := a.FillColor != nil
+	hasFill := paint(a.FillColor) != nil
 	if !(hasOutline || hasFill) {
 		a.Rect = rect
 		return &form.Form{

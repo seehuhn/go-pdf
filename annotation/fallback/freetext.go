@@ -38,7 +38,7 @@ const (
 func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error) {
 	// extract information from the pre-set fields
 	lw := annotation.EffectiveBorderWidth(a)
-	bgCol := a.Color
+	bgCol := paint(a.Color)
 
 	calloutLine := a.CalloutLine
 	hasCallout := a.Intent == annotation.FreeTextIntentCallout && len(calloutLine) >= 2

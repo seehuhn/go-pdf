@@ -42,7 +42,7 @@ func (g *Generator) addSoundAppearance(a *annotation.Sound) (*form.Form, error) 
 	}
 	a.Flags |= annotation.FlagNoZoom | annotation.FlagNoRotate
 
-	col := a.Color
+	col := paint(a.Color)
 	if col == nil {
 		col = quireInk2
 	}

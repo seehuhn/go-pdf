@@ -29,11 +29,35 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// Transparent is the colour an empty colour array denotes: no colour at
+// all, so the part of the annotation the entry applies to is not painted.
+// It is distinct from a nil colour, which leaves the entry out of the
+// dictionary and lets the viewer choose.
+var Transparent color.Color = transparent{}
+
+type transparent struct{}
+
+// ColorSpace returns nil: the colour belongs to no colour space.
+func (transparent) ColorSpace() color.Space {
+	return nil
+}
+
+// ToXYZ returns zero tristimulus values.
+func (transparent) ToXYZ() (X, Y, Z float64) {
+	return 0, 0, 0
+}
+
+// RGBA returns fully transparent black.
+func (transparent) RGBA() (r, g, b, a uint32) {
+	return 0, 0, 0, 0
+}
+
 // Extract converts a device-colour array into a [color.Color].
 //
 // The number of array elements selects the colour space: 1 for DeviceGray,
-// 3 for DeviceRGB, and 4 for DeviceCMYK. A missing object or an empty array
-// yields a nil colour. Component values are clipped to the range 0.0 to 1.0.
+// 3 for DeviceRGB, and 4 for DeviceCMYK. An empty array yields
+// [Transparent]; a missing object yields a nil colour. Component values are
+// clipped to the range 0.0 to 1.0.
 func Extract(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 	a, _ := c.Array(obj)
 	if a == nil {
@@ -49,7 +73,7 @@ func Extract(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 
 	switch len(colors) {
 	case 0:
-		return nil, nil
+		return Transparent, nil
 	case 1:
 		return color.DeviceGray(colors[0]), nil
 	case 3:
@@ -63,28 +87,25 @@ func Extract(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 
 // Encode converts a [color.Color] into a device-colour array.
 //
-// The colour must use the DeviceGray, DeviceRGB, or DeviceCMYK colour space,
-// and all component values must lie in the range 0.0 to 1.0.
-// A nil colour yields a nil array.
+// The colour must be [Transparent] or use the DeviceGray, DeviceRGB, or
+// DeviceCMYK colour space, and all component values must lie in the range
+// 0.0 to 1.0.  [Transparent] yields an empty array; a nil colour yields a
+// nil array.
 func Encode(c color.Color) (pdf.Array, error) {
 	if c == nil {
 		return nil, nil
 	}
-
-	s := c.ColorSpace()
-	var x []float64
-	if s != nil {
-		fam := s.Family()
-		switch fam {
-		case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
-			x, _ = color.Values(c)
-		default:
-			return nil, fmt.Errorf("unexpected color space %s", fam)
-		}
+	if c == Transparent {
+		return pdf.Array{}, nil
 	}
 
-	if len(x) == 0 {
-		return nil, nil
+	var x []float64
+	fam := c.ColorSpace().Family()
+	switch fam {
+	case color.FamilyDeviceGray, color.FamilyDeviceRGB, color.FamilyDeviceCMYK:
+		x, _ = color.Values(c)
+	default:
+		return nil, fmt.Errorf("unexpected color space %s", fam)
 	}
 
 	colorArray := make(pdf.Array, len(x))
@@ -98,9 +119,9 @@ func Encode(c color.Color) (pdf.Array, error) {
 }
 
 // ExtractRGB converts a 3-element device-colour array into a DeviceRGB
-// [color.Color]. A missing object or an empty array yields a nil colour;
-// arrays of any other length are rejected. Component values are clipped to
-// the range 0.0 to 1.0.
+// [color.Color]. An empty array yields [Transparent] and a missing object a
+// nil colour; arrays of any other length are rejected. Component values are
+// clipped to the range 0.0 to 1.0.
 func ExtractRGB(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 	a, _ := c.Array(obj)
 	if a == nil {
@@ -108,7 +129,7 @@ func ExtractRGB(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 	}
 
 	if len(a) == 0 {
-		return nil, nil
+		return Transparent, nil
 	}
 
 	if len(a) != 3 {
@@ -126,19 +147,18 @@ func ExtractRGB(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
 }
 
 // EncodeRGB converts a DeviceRGB [color.Color] into a 3-element colour array.
-// A nil colour yields a nil array; colours in any other colour space are
-// rejected. All component values must lie in the range 0.0 to 1.0.
+// [Transparent] yields an empty array and a nil colour a nil array; colours
+// in any other colour space are rejected. All component values must lie in
+// the range 0.0 to 1.0.
 func EncodeRGB(c color.Color) (pdf.Array, error) {
 	if c == nil {
 		return nil, nil
 	}
-
-	s := c.ColorSpace()
-	if s == nil {
-		return nil, fmt.Errorf("color must be DeviceRGB")
+	if c == Transparent {
+		return pdf.Array{}, nil
 	}
 
-	fam := s.Family()
+	fam := c.ColorSpace().Family()
 	if fam != color.FamilyDeviceRGB {
 		return nil, fmt.Errorf("color must be DeviceRGB, got %s", fam)
 	}

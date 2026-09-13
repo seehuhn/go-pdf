@@ -23,10 +23,12 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/extended"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -204,6 +206,15 @@ func (g *Generator) reset(b *builder.Builder) {
 }
 
 var _ annotation.AppearanceGenerator = (*Generator)(nil)
+
+// paint returns the colour an annotation entry asks to be painted with, or
+// nil where the entry is absent or asks for no colour at all.
+func paint(col color.Color) color.Color {
+	if col == colorenc.Transparent {
+		return nil
+	}
+	return col
+}
 
 // New returns a Generator for a PDF file of the given version.  Appearance
 // streams are built for that version, so that operators the file cannot use

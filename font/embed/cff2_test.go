@@ -20,8 +20,6 @@ import (
 	"math"
 	"testing"
 
-	"seehuhn.de/go/sfnt"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
@@ -31,7 +29,6 @@ import (
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/debug/varfont"
-	"seehuhn.de/go/pdf/internal/testfonts"
 )
 
 // embedSimpleCFF embeds F, lays out and encodes text, and reads back the
@@ -195,14 +192,12 @@ func TestEmbedCFF2SimpleStatic(t *testing.T) {
 	}
 }
 
-// a real variable CFF2 font (Adobe's VF prototype) embeds end to end at a
-// non-default instance: subset tag and TN #5902 instance name in the
-// PostScript name, a sane W array, and a non-empty re-parsed FontFile3.
-func TestEmbedCFF2AdobeVFPrototype(t *testing.T) {
-	path := testfonts.Path(t, "AdobeVFPrototype.otf")
-
+// a variable CFF2 font embeds end to end at a non-default instance: subset tag
+// and TN #5902 instance name in the PostScript name, a sane W array, and a
+// non-empty re-parsed FontFile3.
+func TestEmbedCFF2Variable(t *testing.T) {
 	coords := map[string]float64{"wght": 900}
-	F, err := embed.OpenTypeFile(path, &embed.Options{Variations: coords, Composite: true})
+	F, err := embed.OpenTypeFont(varfont.CFF2(), &embed.Options{Variations: coords, Composite: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,11 +207,7 @@ func TestEmbedCFF2AdobeVFPrototype(t *testing.T) {
 		t.Errorf("SubsetTag: got %q, want 6 letters", d.SubsetTag)
 	}
 
-	info, err := sfnt.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	inst, err := info.Instantiate(coords)
+	inst, err := varfont.CFF2().Instantiate(coords)
 	if err != nil {
 		t.Fatal(err)
 	}

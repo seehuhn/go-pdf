@@ -24,8 +24,8 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/file"
-	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/oc"
 )
 
@@ -81,23 +81,10 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// C (optional)
-	if cArr, err := c.Array(dict["C"]); err == nil && cArr != nil {
-		colors := make([]float64, len(cArr))
-		for i, col := range cArr {
-			if num, err := c.Number(col); err == nil {
-				colors[i] = num
-			}
-		}
-		switch len(colors) {
-		case 0:
-			// empty array, treat as absent
-		case 1:
-			common.Color = color.DeviceGray(colors[0])
-		case 3:
-			common.Color = color.DeviceRGB{colors[0], colors[1], colors[2]}
-		case 4:
-			common.Color = color.DeviceCMYK{colors[0], colors[1], colors[2], colors[3]}
-		}
+	if col, err := pdf.Optional(colorenc.Extract(c, dict["C"])); err != nil {
+		return err
+	} else {
+		common.Color = col
 	}
 
 	// StructParent (optional)

@@ -26,6 +26,9 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/annotation/colorenc"
+	"seehuhn.de/go/pdf/graphics/form"
 )
 
 // combWidget builds a comb text field with the given value, MaxLen and
@@ -179,5 +182,55 @@ func TestCombOverlongValue(t *testing.T) {
 	tokens := contentTokens(t, w)
 	if got := countToken(tokens, "Td"); got != 6 {
 		t.Errorf("Td count = %d, want 6 (one per occupied cell)", got)
+	}
+}
+
+// TestWidgetTransparentChrome checks that a widget whose appearance
+// characteristics ask for no background and no border colour, as an empty
+// /BG or /BC array does, gets an appearance which paints neither.
+func TestWidgetTransparentChrome(t *testing.T) {
+	for _, shape := range []string{"text", "radio"} {
+		t.Run(shape, func(t *testing.T) {
+			var w *annotation.Widget
+			switch shape {
+			case "text":
+				f := acroform.NewTextField("t")
+				w = annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 62, URy: 20})
+			case "radio":
+				w = toggleWidget(t, "Off", "On", true)
+			}
+			w.BorderStyle = &annotation.BorderStyle{Width: 1}
+			w.Style = &appearance.Characteristics{
+				BackgroundColor: colorenc.Transparent,
+				BorderColor:     colorenc.Transparent,
+			}
+			s := newGen(t, pdf.V2_0)
+			if err := s.AddAppearance(w); err != nil {
+				t.Fatal(err)
+			}
+
+			var f *form.Form
+			if shape == "text" {
+				f = w.Appearance.Normal
+			} else {
+				f = w.Appearance.NormalMap["Off"]
+			}
+			if f == nil {
+				t.Fatal("no appearance")
+			}
+			r, err := f.Content.RawBytes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer r.Close()
+			data, err := io.ReadAll(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tokens := strings.Fields(string(data))
+			if got := countToken(tokens, "f") + countToken(tokens, "S"); got != 0 {
+				t.Errorf("chrome painted %d times, want none", got)
+			}
+		})
 	}
 }

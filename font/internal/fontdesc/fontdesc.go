@@ -129,10 +129,11 @@ func FromType1(psFont *type1.Font, metrics *afm.Metrics, fontBBox rect.Rect) *fo
 
 // Type1Heights returns the ascent, descent, cap height and x-height of a
 // Type 1 font, in PDF glyph space units and unrounded.  Each is taken from the
-// metrics where these record it, since an AFM file may omit any of them, and
-// derived otherwise: the ascent and descent from the font bounding box, the
-// cap height and x-height by measuring the glyphs.  A height the glyphs
-// cannot supply, such as the cap height of a font with no "H", is 0.
+// metrics where these record it, and derived from the font program otherwise:
+// the ascent and descent from the font bounding box, the cap height and
+// x-height by measuring the glyphs.  An AFM file may either omit a value or
+// write it as zero, which the format treats as the same thing.  A height the
+// glyphs cannot supply, such as the cap height of a font with no "H", is 0.
 //
 // The argument fontBBox is as for [FromType1]: the union of the glyph
 // bounding boxes, superseded by the bounding box of the metrics where given.
@@ -142,7 +143,9 @@ func Type1Heights(psFont *type1.Font, metrics *afm.Metrics, fontBBox rect.Rect) 
 		ascent, descent = metrics.Ascent, metrics.Descent
 		capHeight, xHeight = metrics.CapHeight, metrics.XHeight
 	}
-	if ascent == 0 {
+	// Of these heights only the descender is legitimately negative, so for the
+	// others any non-positive value means the metrics do not record one.
+	if ascent <= 0 {
 		ascent = fontBBox.URy
 	}
 	if descent == 0 {

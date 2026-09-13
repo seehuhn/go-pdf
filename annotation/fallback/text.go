@@ -19,6 +19,8 @@ package fallback
 import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/annotation/colorenc"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -36,32 +38,31 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		URy: a.Rect.URy,
 	}
 
-	bgCol := a.Color
-	if bgCol == nil {
+	// the card is filled with the annotation's colour: the sticky yellow
+	// where the document gives none, and nothing where it asks for no colour
+	var bgCol color.Color
+	switch a.Color {
+	case nil:
 		bgCol = stickyYellow
+	case colorenc.Transparent:
+		// no fill
+	default:
+		bgCol = a.Color
 	}
+	ink := noteInksFor(bgCol)
 
 	b := builder.New(content.Form, nil, g.version)
 
 	switch a.Icon {
 	case annotation.TextIconComment:
 		g.reset(b)
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseFillAndStroke()
-		} else {
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseAndStroke()
-		}
+		drawNoteCard(b, bgCol, ink.outline)
 
 		b.TextBegin()
 		b.TextSetFont(g.icons(), 23)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(quireInk)
+		b.SetFillColor(ink.glyph)
 		b.TextFirstLine(6, 2)
 		b.TextSetHorizontalScaling(0.9)
 		b.TextShow("\u201C")
@@ -69,22 +70,13 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 
 	case annotation.TextIconKey:
 		g.reset(b)
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseFillAndStroke()
-		} else {
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseAndStroke()
-		}
+		drawNoteCard(b, bgCol, ink.outline)
 
 		b.TextBegin()
 		b.TextSetFont(g.icons(), 25)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(quireInk)
+		b.SetFillColor(ink.glyph)
 		b.TextFirstLine(5, 2)
 		b.TextShow("*")
 		b.TextEnd()
@@ -93,11 +85,7 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		delta := 7.0
 
 		g.reset(b)
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-		}
+		setCardPaint(b, bgCol, ink.outline)
 		b.MoveTo(23.5-delta, 0.25)
 		b.LineTo(0.25, 0.25)
 		b.LineTo(0.25, 23.5)
@@ -106,14 +94,10 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 		b.LineTo(23.5-delta, 0.25)
 		b.LineTo(23.5-delta, 0.25+delta)
 		b.LineTo(23.5, 0.25+delta)
-		if bgCol != nil {
-			b.CloseFillAndStroke()
-		} else {
-			b.CloseAndStroke()
-		}
+		closeCard(b, bgCol)
 
 		b.SetLineWidth(1.5)
-		b.SetStrokeColor(quireInk3)
+		b.SetStrokeColor(ink.lines)
 		for y := 19.; y > 6; y -= 3.5 {
 			b.MoveTo(4, y)
 			if y > 10 {
@@ -127,22 +111,13 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	case annotation.TextIconHelp:
 		g.reset(b)
 
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseFillAndStroke()
-		} else {
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseAndStroke()
-		}
+		drawNoteCard(b, bgCol, ink.outline)
 
 		b.TextBegin()
 		b.TextSetFont(g.icons(), 23)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(quireInk)
+		b.SetFillColor(ink.glyph)
 		b.TextFirstLine(6, 4)
 		b.TextShow("?")
 		b.TextEnd()
@@ -150,18 +125,9 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	case annotation.TextIconNewParagraph:
 		g.reset(b)
 
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseFillAndStroke()
-		} else {
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseAndStroke()
-		}
+		drawNoteCard(b, bgCol, ink.outline)
 
-		b.SetStrokeColor(quireInk3)
+		b.SetStrokeColor(ink.lines)
 		b.SetLineWidth(1.5)
 		b.MoveTo(4, 19)
 		b.LineTo(17, 19)
@@ -173,8 +139,8 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 
 		m := (15.5 + 5) / 2
 
-		b.SetStrokeColor(quireInk)
-		b.SetFillColor(quireInk)
+		b.SetStrokeColor(ink.glyph)
+		b.SetFillColor(ink.glyph)
 		b.SetLineWidth(1.8)
 		b.MoveTo(17.5-0.75, 15.5)
 		b.LineTo(17.5-0.75, m)
@@ -188,22 +154,13 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	case annotation.TextIconParagraph:
 		g.reset(b)
 
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseFillAndStroke()
-		} else {
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseAndStroke()
-		}
+		drawNoteCard(b, bgCol, ink.outline)
 
 		b.TextBegin()
 		b.TextSetFont(g.icons(), 16)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(quireInk)
+		b.SetFillColor(ink.glyph)
 		b.TextFirstLine(6, 8)
 		b.TextSetHorizontalScaling(1.4)
 		b.TextShow("¶")
@@ -212,22 +169,13 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	case annotation.TextIconInsert:
 		g.reset(b)
 
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseFillAndStroke()
-		} else {
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseAndStroke()
-		}
+		drawNoteCard(b, bgCol, ink.outline)
 
 		b.TextBegin()
 		b.TextSetFont(g.icons(), 16)
 		b.TextSetRise(0)
 		b.TextSetHorizontalScaling(1)
-		b.SetFillColor(quireInk)
+		b.SetFillColor(ink.glyph)
 		b.TextFirstLine(5.5, 4)
 		b.TextSetHorizontalScaling(1.4)
 		b.TextShow("^")
@@ -236,21 +184,57 @@ func (g *Generator) addTextAppearance(a *annotation.Text) (*form.Form, error) {
 	default:
 		g.reset(b)
 
-		b.SetLineWidth(0.5)
-		b.SetStrokeColor(quireInk2)
-		if bgCol != nil {
-			b.SetFillColor(bgCol)
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseFillAndStroke()
-		} else {
-			b.Rectangle(0.25, 0.25, 23.5, 23.5)
-			b.CloseAndStroke()
-		}
+		drawNoteCard(b, bgCol, ink.outline)
 	}
 
 	return harvest(b, pdf.Rectangle{LLx: 0, LLy: 0, URx: 24, URy: 24})
 }
 
-var (
-	stickyYellow = quireAmber100
-)
+// drawNoteCard draws the card a note's icon is set on: a square outlined in
+// outline and filled with bgCol, or left unfilled where bgCol is nil.
+func drawNoteCard(b *builder.Builder, bgCol, outline color.Color) {
+	setCardPaint(b, bgCol, outline)
+	b.Rectangle(0.25, 0.25, 23.5, 23.5)
+	closeCard(b, bgCol)
+}
+
+// setCardPaint sets the line width and the colours a card is painted with.
+func setCardPaint(b *builder.Builder, bgCol, outline color.Color) {
+	b.SetLineWidth(0.5)
+	b.SetStrokeColor(outline)
+	if bgCol != nil {
+		b.SetFillColor(bgCol)
+	}
+}
+
+// closeCard closes the current path and paints it as a card: filled and
+// stroked, or only stroked where bgCol is nil.
+func closeCard(b *builder.Builder, bgCol color.Color) {
+	if bgCol == nil {
+		b.CloseAndStroke()
+		return
+	}
+	b.CloseFillAndStroke()
+}
+
+// noteInks are the colours a note's marks are drawn in: the glyph, the
+// outline of the card and the ruled lines of the Note icon.
+type noteInks struct {
+	glyph, outline, lines color.Color
+}
+
+// darkCardL is the L* below which a card is too dark for the design inks.
+const darkCardL = 55
+
+// noteInksFor returns the inks for a card filled with bgCol: the design inks
+// on a light card, or on no card at all, and paper white with the lightest
+// ink neutral on a dark one.
+func noteInksFor(bgCol color.Color) noteInks {
+	if bgCol != nil && lightness(bgCol) < darkCardL {
+		return noteInks{glyph: quireAmber50, outline: quireAmber50, lines: quireInk4}
+	}
+	return noteInks{glyph: quireInk, outline: quireInk2, lines: quireInk3}
+}
+
+// stickyYellow is the card colour of a note the document gives no colour.
+var stickyYellow = quireAmber100

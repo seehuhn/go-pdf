@@ -38,7 +38,8 @@ type Redact struct {
 	QuadPoints []float64
 
 	// FillColor (optional) is the color used to fill the redacted area after
-	// the content has been removed.   This must be a DeviceRGB color.
+	// the content has been removed.  This must be a DeviceRGB color or
+	// [colorenc.Transparent].
 	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color

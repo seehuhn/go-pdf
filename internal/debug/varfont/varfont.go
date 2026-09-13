@@ -109,16 +109,19 @@ func Glyf() *sfnt.Font {
 		},
 	}
 
-	// gvar: rect top corners rise by +200 at wght=+1 (advance left to HVAR)
+	// gvar: rect top corners rise by +200 at wght=+1, and the advance grows
+	// by +100 via the second phantom point.  The advance delta repeats the one
+	// HVAR carries: a reader is free to take it from either table, so the two
+	// have to agree for the font to render the same everywhere.
 	rectBlock := mustEncodeTuples([]variation.TupleVariation{
 		{
 			Peak: []variation.F2Dot14{f2(1)},
 			Deltas: []int32{
-				0, 0, 0, 0, 0, 0, 0, 0, // x (4 outline + 4 phantom)
+				0, 0, 0, 0, 0, 100, 0, 0, // x (4 outline + 4 phantom), advance +100
 				0, 0, 200, 200, 0, 0, 0, 0, // y (top corners +200)
 			},
 		},
-	})
+	}, 8)
 	f.Gvar = &gvar.Table{
 		AxisCount: 1,
 		PerGlyph: []gvar.GlyphData{
@@ -171,13 +174,15 @@ func Glyf() *sfnt.Font {
 		},
 	}
 
-	f.VariationsPostScriptName = "QuireMiniVar-"
+	f.VariationsPostScriptName = "QuireMiniVar"
 
 	return f
 }
 
-func mustEncodeTuples(tuples []variation.TupleVariation) []byte {
-	data, err := variation.EncodeTupleData(tuples, 1, 2, 0, nil)
+// mustEncodeTuples serializes one glyph's tuple variations.  nPoints counts
+// the glyph's outline points plus the four phantom points.
+func mustEncodeTuples(tuples []variation.TupleVariation, nPoints int) []byte {
+	data, err := variation.EncodeTupleData(tuples, 1, 2, nPoints, nil)
 	if err != nil {
 		panic(err)
 	}

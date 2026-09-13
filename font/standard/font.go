@@ -75,6 +75,20 @@ func (f Font) New() (*type1.Instance, error) {
 	return shared.Get(f)
 }
 
+// Program returns the font program and metrics bundled for f, in the form
+// [Font.New] builds its instances from: restricted to the character set the
+// specification guarantees, with the metric repairs the bundled AFM files
+// need already applied.
+//
+// A caller which lays out or embeds text wants [Font.New]; this is for one
+// which needs the glyph outlines themselves, for example to convert the font
+// to a format some other system can read.  The values are read afresh on
+// every call and belong to the caller, unlike the shared data behind an
+// instance.
+func (f Font) Program() (*pstype1.Font, *afm.Metrics, error) {
+	return f.data()
+}
+
 // shared holds the instance each standard font is cloned from, read on first
 // use.
 var shared = bundled.New(allStandardFonts, Font.read)
