@@ -29,6 +29,9 @@ import (
 // the same name [Simple.Encode] used: a code left out here because its text is
 // implied must be one the implication holds for.
 func (t *Simple) ToUnicode() *cmap.ToUnicodeFile {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	m := make(map[charcode.Code]string)
 	for k, c := range t.code {
 		glyphName := t.glyphName[k.gid]

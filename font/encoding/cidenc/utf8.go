@@ -18,6 +18,7 @@ package cidenc
 
 import (
 	"iter"
+	"sync"
 
 	"golang.org/x/text/unicode/norm"
 
@@ -35,11 +36,13 @@ type compositeUTF8 struct {
 	wMode font.WritingMode
 
 	codec     *charcode.Codec
-	info      map[charcode.Code]*codeInfo
 	cid0Width float64
 
-	code map[key]charcode.Code
-
+	// mu guards the fields below.  Readers hold it for one lookup at a time,
+	// never across a yield.
+	mu          sync.RWMutex
+	info        map[charcode.Code]*codeInfo
+	code        map[key]charcode.Code
 	nextPrivate rune
 }
 
@@ -73,18 +76,15 @@ func (e *compositeUTF8) Codes(s pdf.String) iter.Seq[font.Code] {
 		for len(s) > 0 {
 			c, k, valid := e.codec.Decode(s)
 
+			var info *codeInfo
 			if valid {
-				info := e.info[c]
-				if info != nil { // code is mapped to a CID
-					code.CID = info.CID
-					code.Width = info.Width / 1000
-					code.Text = info.Text
-				} else { // unmapped code
-					code.CID = 0
-					code.Width = e.cid0Width / 1000
-					code.Text = ""
-				}
-			} else { // invalid code
+				info = e.lookup(c)
+			}
+			if info != nil { // code is mapped to a CID
+				code.CID = info.CID
+				code.Width = info.Width / 1000
+				code.Text = info.Text
+			} else { // unmapped or invalid code
 				code.CID = 0
 				code.Width = e.cid0Width / 1000
 				code.Text = ""
@@ -106,15 +106,22 @@ func (e *compositeUTF8) Codec() *charcode.Codec {
 }
 
 func (e *compositeUTF8) GetCode(cid cid.CID, text string) (charcode.Code, bool) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	key := key{cid, text}
 	code, ok := e.code[key]
 	return code, ok
 }
 
+// Encode returns the code for a CID and text, allocating a new one on first
+// use.  The width is used only when a code is allocated.
 func (e *compositeUTF8) Encode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	key := key{cidVal, text}
-	if _, ok := e.code[key]; ok {
-		return 0, ErrDuplicateCode
+	if code, ok := e.code[key]; ok {
+		return code, nil
 	}
 
 	code, err := e.makeCode(text)
@@ -162,22 +169,22 @@ func runeToCode(r rune) charcode.Code {
 	return code
 }
 
-func (e *compositeUTF8) get(c charcode.Code) *codeInfo {
-	if info, ok := e.info[c]; ok {
-		return info
-	}
-	return &codeInfo{
-		CID:   0,
-		Width: e.cid0Width,
-		Text:  "",
-	}
+// lookup returns the entry for a code, or nil for a code not allocated.  The
+// entry stays valid after the lock is released, because entries are never
+// changed once stored.
+func (e *compositeUTF8) lookup(c charcode.Code) *codeInfo {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.info[c]
 }
 
 func (e *compositeUTF8) CMap(ros *cid.SystemInfo) *cmap.File {
-	m := make(map[charcode.Code]cid.CID)
+	e.mu.RLock()
+	m := make(map[charcode.Code]cid.CID, len(e.info))
 	for c, info := range e.info {
 		m[c] = info.CID
 	}
+	e.mu.RUnlock()
 	cmapInfo := &cmap.File{
 		Name:  "",
 		ROS:   ros,
@@ -189,17 +196,32 @@ func (e *compositeUTF8) CMap(ros *cid.SystemInfo) *cmap.File {
 }
 
 func (e *compositeUTF8) Width(c charcode.Code) float64 {
-	return e.get(c).Width
+	if info := e.lookup(c); info != nil {
+		return info.Width
+	}
+	return e.cid0Width
 }
 
 func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 	return func(yield func(charcode.Code, *Info) bool) {
-		var code Info
+		// the map is walked under the lock and yielded from outside it
+		e.mu.RLock()
+		type entry struct {
+			c    charcode.Code
+			info *codeInfo
+		}
+		entries := make([]entry, 0, len(e.info))
 		for c, info := range e.info {
-			code.CID = info.CID
-			code.Width = info.Width
-			code.Text = info.Text
-			if !yield(c, &code) {
+			entries = append(entries, entry{c, info})
+		}
+		e.mu.RUnlock()
+
+		var code Info
+		for _, en := range entries {
+			code.CID = en.info.CID
+			code.Width = en.info.Width
+			code.Text = en.info.Text
+			if !yield(en.c, &code) {
 				return
 			}
 		}
@@ -207,10 +229,12 @@ func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 }
 
 func (e *compositeUTF8) ToUnicode() *cmap.ToUnicodeFile {
+	e.mu.RLock()
 	m := make(map[charcode.Code]string, len(e.info))
 	for c, info := range e.info {
 		m[c] = info.Text
 	}
+	e.mu.RUnlock()
 
 	toUnicode, err := cmap.NewToUnicodeFile(charcode.UTF8, m)
 	if err != nil {
@@ -223,5 +247,7 @@ func (e *compositeUTF8) ToUnicode() *cmap.ToUnicodeFile {
 func (e *compositeUTF8) CodesRemaining() int {
 	const num_surrogates = 0xDFFF - 0xD800 + 1
 	const num_range = 0x10_FFFF - 0x00_0000 + 1
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return num_range - num_surrogates - len(e.info)
 }

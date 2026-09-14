@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"sync"
 
 	"seehuhn.de/go/pdf/font/mapping"
 	"seehuhn.de/go/postscript/cid"
@@ -31,6 +32,8 @@ import (
 
 // GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
 // Identifier (CID) values.
+//
+// Implementations must be safe for concurrent use.
 type GIDToCID interface {
 	CID(glyph.ID, string) cid.CID
 
@@ -57,12 +60,18 @@ func NewGIDToCIDSequential() GIDToCID {
 }
 
 type gidToCIDSequential struct {
+	// mu guards the two maps.  Entries are only ever added, never changed,
+	// so a CID once assigned stays valid.
+	mu  sync.RWMutex
 	g2c map[glyph.ID]cid.CID
 	c2g map[cid.CID]glyph.ID
 }
 
 // GID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) CID(gid glyph.ID, _ string) cid.CID {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	cidVal, ok := g.g2c[gid]
 	if !ok {
 		cidVal = cid.CID(len(g.g2c))
@@ -73,11 +82,16 @@ func (g *gidToCIDSequential) CID(gid glyph.ID, _ string) cid.CID {
 }
 
 func (g *gidToCIDSequential) GID(cid cid.CID) glyph.ID {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	return g.c2g[cid]
 }
 
 // ROS implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) ROS() *cid.SystemInfo {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
 	h := sha256.New()
 	h.Write([]byte("seehuhn.de/go/pdf/font/cmap.gidToCIDSequential\n"))
 	binary.Write(h, binary.BigEndian, uint64(len(g.g2c)))
@@ -97,6 +111,9 @@ func (g *gidToCIDSequential) ROS() *cid.SystemInfo {
 
 // GIDToCID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) GIDToCID(numGlyph int) []cid.CID {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
 	res := make([]cid.CID, numGlyph)
 	for gid, cid := range g.g2c {
 		res[gid] = cid

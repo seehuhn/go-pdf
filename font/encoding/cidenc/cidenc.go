@@ -39,6 +39,17 @@ type Info struct {
 }
 
 // A CIDEncoder maps character codes to CIDs, glyph widths and text content.
+//
+// Implementations are safe for concurrent use: any number of goroutines may
+// read an encoder while another allocates codes.  Codes are only ever added,
+// never changed or reassigned, so a code once returned stays valid for the
+// life of the encoder.  Iterators hold no lock while yielding, so a caller
+// may allocate codes from inside a loop over one.
+//
+// Each method sees the codes allocated when it was called.  Results of
+// separate calls need not agree with each other, so a caller which combines
+// them, for example to build a font dictionary out of MappedCodes, CMap and
+// ToUnicode, must not allow codes to be allocated in between.
 type CIDEncoder interface {
 	// WritingMode indicates whether the encoding is for horizontal or vertical
 	// writing.
@@ -48,10 +59,20 @@ type CIDEncoder interface {
 	// The iterator returns the information stored for each code.
 	Codes(s pdf.String) iter.Seq[font.Code]
 
-	// MappedCodes iterates over all codes known to the encoder.
+	// MappedCodes iterates over all codes known to the encoder.  The
+	// [Info] pointer is only valid until the next iteration; a caller
+	// which needs to keep the data must copy it.
 	MappedCodes() iter.Seq2[charcode.Code, *Info]
 
-	// Encode assigns a new code to a CID and stores the text and width.
+	// Encode returns the code for a CID and text, allocating a new one on
+	// first use and storing the text and width with it.  A repeat of the
+	// same CID and text yields the code already allocated, and the width
+	// given is ignored.
+	//
+	// An encoder backed by a fixed CMap holds one text and one width per
+	// CID, since the CMap gives each CID a single code.  Such an encoder
+	// returns an error if the text or the width conflicts with the one
+	// already stored, rather than encoding a value it cannot represent.
 	Encode(cidVal cid.CID, text string, width float64) (charcode.Code, error)
 
 	// CodesRemaining returns the number of unallocated codes.
@@ -83,7 +104,6 @@ type codeInfo struct {
 	Text  string
 }
 
-var (
-	ErrDuplicateCode = errors.New("duplicate code")
-	ErrOverflow      = errors.New("too many glyphs")
-)
+// ErrOverflow is returned by [CIDEncoder.Encode] once no further codes can be
+// allocated.
+var ErrOverflow = errors.New("too many glyphs")

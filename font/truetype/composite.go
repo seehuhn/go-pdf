@@ -78,7 +78,6 @@ type Composite struct {
 
 	gidToCID cmap.GIDToCID
 	cidenc.CIDEncoder
-	usedCIDs map[cid.CID]struct{}
 }
 
 var _ font.Layouter = (*Composite)(nil)
@@ -141,7 +140,6 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		layouter:   layouter,
 		gidToCID:   makeGIDToCID(),
 		CIDEncoder: makeEncoder(notdefWidth, opt.WritingMode),
-		usedCIDs:   make(map[cid.CID]struct{}),
 	}
 
 	return f, nil
@@ -180,8 +178,6 @@ func (f *Composite) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 // Encode converts a glyph ID to a character code.
 func (f *Composite) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	cid := f.gidToCID.CID(gid, text)
-	f.usedCIDs[cid] = struct{}{}
-
 	if c, ok := f.CIDEncoder.GetCode(cid, text); ok {
 		return c, true
 	}
@@ -230,8 +226,8 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 	// To minimise file size, we arrange the glyphs in order of increasing CID.
 	cidSet := make(map[cid.CID]struct{})
 	cidSet[0] = struct{}{} // Always include CID 0 (notdef)
-	for cidVal := range f.usedCIDs {
-		cidSet[cidVal] = struct{}{}
+	for _, info := range f.CIDEncoder.MappedCodes() {
+		cidSet[info.CID] = struct{}{}
 	}
 	cidList := slices.Sorted(maps.Keys(cidSet))
 
@@ -257,12 +253,10 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 	// construct the font dictionary and font descriptor
 	dw := math.Round(subsetFont.GlyphWidthPDF(0))
 
-	// gather widths for used CIDs (plus CID 0)
+	// widths of the CIDs in use
 	ww := make(map[cid.CID]float64)
 	for _, info := range f.CIDEncoder.MappedCodes() {
-		if _, used := f.usedCIDs[info.CID]; used || info.CID == 0 {
-			ww[info.CID] = info.Width
-		}
+		ww[info.CID] = info.Width
 	}
 
 	// determine whether the font is symbolic.  Prefer the font's own glyph
@@ -271,9 +265,6 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 	isSymbolic := false
 	for _, info := range f.CIDEncoder.MappedCodes() {
 		if info.CID == 0 {
-			continue
-		}
-		if _, used := f.usedCIDs[info.CID]; !used {
 			continue
 		}
 		origGID := f.gidToCID.GID(info.CID)

@@ -19,6 +19,7 @@ package cidenc
 import (
 	"errors"
 	"iter"
+	"sync"
 
 	"seehuhn.de/go/postscript/cid"
 
@@ -37,6 +38,10 @@ type fixed struct {
 	codec *charcode.Codec
 	all   map[cid.CID]charcode.Code
 	rev   map[charcode.Code]cid.CID
+
+	// mu guards text and width, the two maps Encode adds to; the CMap and
+	// the maps derived from it never change.
+	mu    sync.RWMutex
 	text  map[charcode.Code]string
 	width map[cid.CID]float64
 }
@@ -93,24 +98,19 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[font.Code] {
 				c = 0
 			}
 
+			cidVal := cid.CID(0)
 			if valid {
-				cid := f.rev[c]
-				code = font.Code{
-					CID: cid,
-					// Notdef:         ...
-					Width:          f.width[cid] / 1000,
-					Text:           f.text[c],
-					UseWordSpacing: k == 1 && c == 0x20,
-				}
-			} else {
-				code = font.Code{
-					CID: 0,
-					// Notdef:         ...,
-					Width:          f.width[0] / 1000,
-					Text:           f.text[c],
-					UseWordSpacing: k == 1 && c == 0x20,
-				}
+				cidVal = f.rev[c]
 			}
+			f.mu.RLock()
+			code = font.Code{
+				CID: cidVal,
+				// Notdef:         ...
+				Width:          f.width[cidVal] / 1000,
+				Text:           f.text[c],
+				UseWordSpacing: k == 1 && c == 0x20,
+			}
+			f.mu.RUnlock()
 
 			if !yield(code) {
 				return
@@ -123,42 +123,59 @@ func (f *fixed) Codes(s pdf.String) iter.Seq[font.Code] {
 // MappedCodes iterates over all codes known to the encoder.
 func (f *fixed) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 	return func(yield func(charcode.Code, *Info) bool) {
-		var info Info
+		// the maps are walked under the lock and yielded from outside it
+		f.mu.RLock()
+		type entry struct {
+			code charcode.Code
+			info Info
+		}
+		entries := make([]entry, 0, len(f.text))
 		for code, text := range f.text {
 			cid := f.rev[code]
-			info = Info{
+			entries = append(entries, entry{code, Info{
 				CID:   cid,
 				Width: f.width[cid],
 				Text:  text,
-			}
+			}})
+		}
+		f.mu.RUnlock()
 
-			if !yield(code, &info) {
+		var info Info
+		for _, e := range entries {
+			info = e.info
+			if !yield(e.code, &info) {
 				break
 			}
 		}
 	}
 }
 
-// Encode assigns a new code to a CID and stores the text and width.
+// Encode returns the code the CMap gives a CID, storing the text and width
+// with it on first use.
 func (f *fixed) Encode(cidVal cid.CID, text string, width float64) (charcode.Code, error) {
 	code, ok := f.all[cidVal]
 	if !ok {
 		return 0, errors.New("CID not found in CMap")
 	}
 
-	if existingWidth, hasWidth := f.width[cidVal]; hasWidth {
-		if existingWidth != width {
-			return 0, errors.New("width already set to different value")
-		}
-	} else {
-		f.width[cidVal] = width
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// both conflicts are checked before either map is written, so a rejected
+	// call leaves the encoder unchanged
+	existingWidth, hasWidth := f.width[cidVal]
+	if hasWidth && existingWidth != width {
+		return 0, errors.New("width already set to different value")
+	}
+	existingText, hasText := f.text[code]
+	if hasText && existingText != text {
+		return 0, errors.New("text already set to different value")
 	}
 
-	if existingText, hasText := f.text[code]; hasText {
-		if existingText != text {
-			return 0, errors.New("text already set to different value")
-		}
-	} else {
+	if !hasWidth {
+		f.width[cidVal] = width
+	}
+	if !hasText {
 		f.text[code] = text
 	}
 
@@ -177,6 +194,8 @@ func (f *fixed) Codec() *charcode.Codec {
 
 // GetCode returns the character code for the given CID.
 func (f *fixed) GetCode(cidVal cid.CID, text string) (charcode.Code, bool) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	if _, ok := f.width[cidVal]; !ok {
 		return 0, false
 	}
@@ -185,6 +204,8 @@ func (f *fixed) GetCode(cidVal cid.CID, text string) (charcode.Code, bool) {
 
 // Width returns the width of the given character code.
 func (f *fixed) Width(code charcode.Code) float64 {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return f.width[f.rev[code]]
 }
 
@@ -198,6 +219,9 @@ func (f *fixed) ToUnicode() *cmap.ToUnicodeFile {
 	m := make(map[charcode.Code]string)
 
 	implied, _ := mapping.GetCIDTextMapping(f.cmap.ROS.Registry, f.cmap.ROS.Ordering)
+
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 
 	var buf []byte
 	for code, text := range f.text {

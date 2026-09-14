@@ -29,9 +29,21 @@ import (
 
 // Instance represents a font as used in a PDF content stream.
 //
-// Instances returned by the extractor cache may be shared across
-// goroutines. Implementations used for reading must be safe for
-// concurrent use.
+// Instances may be shared across goroutines.  Implementations used for
+// reading are safe for concurrent use.  For an instance used for writing,
+// [Instance.Codes] and the other per-code accessors may be called by any
+// number of goroutines while one goroutine allocates codes through
+// [Layouter.Encode] or [Layouter.Layout]; each call sees the codes allocated
+// at the time it was made.
+//
+// Building the font dictionary is a writer-side operation, and it combines
+// several such views, so a code allocated while it runs can leave the result
+// inconsistent.  [Instance.FontInfo] builds the dictionary when called, but
+// the Embed method only defers the work to the resource manager: the
+// dictionary is built when the resource manager is closed, so that it picks
+// up every code allocated before the file is written.  A caller which writes
+// the file from another goroutine must therefore stop allocating codes from
+// before Embed until the resource manager has been closed.
 //
 // To extract a font from a PDF file, use
 // [seehuhn.de/go/pdf/graphics/extract.Font].
@@ -55,6 +67,9 @@ type Instance interface {
 	// extract the the glyph corresponding to a character identifier. The
 	// result is a pointer to one of the FontInfo* types defined in the
 	// font/dict package.
+	//
+	// For an instance used for writing, this must be called from the
+	// goroutine which allocates codes.
 	FontInfo() any
 
 	// ResourceName returns the font's preferred resource-dictionary key.

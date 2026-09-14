@@ -17,9 +17,14 @@
 package simpleenc
 
 import (
+	"sync"
 	"testing"
+	"time"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/pdfenc"
+	"seehuhn.de/go/pdf/internal/debug/race"
+	"seehuhn.de/go/sfnt/glyph"
 )
 
 func TestDefaultWidth(t *testing.T) {
@@ -78,5 +83,86 @@ func TestNewSimpleIgnoresSubsetTag(t *testing.T) {
 			t.Errorf("%s: %q needed a ToUnicode entry, so the glyph name did not imply it",
 				name, pointingHand)
 		}
+	}
+}
+
+// TestConcurrentReaders checks that readers can use the table while codes
+// are still being allocated: an edit session types into a font while a
+// renderer draws the text already set in it.
+func TestConcurrentReaders(t *testing.T) {
+	if !race.Enabled {
+		// Only the race detector can see the reads and writes overlap, so
+		// without it the test would burn CPU without being able to fail.
+		t.Skip("needs the race detector; run go test -race")
+	}
+
+	tab := NewSimple(500, "Test", &pdfenc.Standard)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for gid := range glyph.ID(200) {
+			text := string(rune('A' + gid%26))
+			_, _ = tab.Encode(gid+1, "", text, float64(gid))
+
+			// Pace the writer.  Without this it allocates every code well
+			// inside a single reader pass, and the readers spend nearly all
+			// their time on a table which is already final.
+			time.Sleep(50 * time.Microsecond)
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Go(func() {
+			s := make(pdf.String, 256)
+			for i := range s {
+				s[i] = byte(i)
+			}
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+				for range tab.Codes(s) {
+				}
+				for range tab.MappedCodes() {
+				}
+				_ = tab.GID(7)
+				_ = tab.Width(7)
+				_ = tab.GlyphName(3)
+				_ = tab.Glyphs()
+				_ = tab.Encoding()
+				_ = tab.IsSymbolic()
+				_ = tab.CodesRemaining()
+				_ = tab.DefaultWidth()
+				_ = tab.Error()
+				_ = tab.ToUnicode()
+				_, _ = tab.GetCode(3, "C")
+			}
+		})
+	}
+	wg.Wait()
+}
+
+// TestEncodeRepeat checks that encoding a glyph a second time yields the code
+// it already has, so that a lookup and an allocation need not be one atomic
+// step for the caller.
+func TestEncodeRepeat(t *testing.T) {
+	tab := NewSimple(500, "Test", &pdfenc.Standard)
+	c1, err := tab.Encode(5, "A", "A", 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2, err := tab.Encode(5, "A", "A", 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c1 != c2 {
+		t.Errorf("second Encode gave code %d, want %d", c2, c1)
+	}
+	if tab.CodesRemaining() != 255 {
+		t.Errorf("CodesRemaining = %d, want 255", tab.CodesRemaining())
 	}
 }
