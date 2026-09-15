@@ -21,6 +21,7 @@ import (
 	"math"
 	"slices"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
@@ -37,6 +38,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/font/internal/fontdesc"
 	"seehuhn.de/go/pdf/font/internal/fontgeom"
+	"seehuhn.de/go/pdf/font/internal/outline"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/fontname"
@@ -181,14 +183,6 @@ func (f *SimpleGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.
 		})
 	}
 	return seq
-}
-
-// IsBlank reports whether the glyph is blank.
-func (f *SimpleGlyf) IsBlank(gid glyph.ID) bool {
-	if int(gid) >= len(f.Geometry.GlyphExtents) {
-		gid = 0
-	}
-	return f.Geometry.GlyphExtents[gid].IsZero()
 }
 
 func (f *SimpleGlyf) isSymbolic() bool {
@@ -339,4 +333,12 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 	}
 
 	return fontDict, nil
+}
+
+var _ font.Outliner = (*SimpleGlyf)(nil)
+
+// Outline returns the outline of a glyph in text space.
+// See [font.Outliner.Outline].
+func (f *SimpleGlyf) Outline(gid glyph.ID) path.Path {
+	return outline.SFNT(f.info, gid)
 }

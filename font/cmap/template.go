@@ -14,9 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build !race
+package cmap
 
-package race
+import (
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+)
 
-// Enabled reports whether the race detector is in use.
-const Enabled = false
+// UTF8H and UTF8V are templates for horizontal and vertical writing: a code
+// space with no mappings.  A composite font written with one allocates codes
+// for its text from the UTF-8 code space, so that the strings in the content
+// stream are the text itself, and embeds the CMap this produces.
+//
+// The templates must not be modified.
+var (
+	UTF8H = &File{Name: "UTF-8-H", CodeSpaceRange: charcode.UTF8}
+	UTF8V = &File{Name: "UTF-8-V", WMode: font.Vertical, CodeSpaceRange: charcode.UTF8}
+)

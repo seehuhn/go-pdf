@@ -26,7 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/cff"
-	"seehuhn.de/go/pdf/font/encoding/cidenc"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 
@@ -46,8 +46,8 @@ func createDocument(fname string) error {
 
 	cffFont := makefont.OpenType()
 	fontOpt := &cff.OptionsComposite{
-		Language:    language.German,
-		MakeEncoder: cidenc.NewCompositeUtf8,
+		Language: language.German,
+		CMap:     cmap.UTF8H,
 	}
 	F1, err := cff.NewComposite(cffFont, fontOpt)
 	if err != nil {

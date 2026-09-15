@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/internal/debug/race"
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/glyph"
 )
 
@@ -164,5 +165,54 @@ func TestEncodeRepeat(t *testing.T) {
 	}
 	if tab.CodesRemaining() != 255 {
 		t.Errorf("CodesRemaining = %d, want 255", tab.CodesRemaining())
+	}
+}
+
+// TestGlyphID checks the CID scheme [Simple.GlyphID] implements: CID 0 is the
+// notdef glyph, CID c+1 is the glyph of code c, and a CID outside that range
+// or without an allocated code has no glyph.
+func TestGlyphID(t *testing.T) {
+	enc := NewSimple(0, "Test", &pdfenc.WinAnsi)
+
+	// CID 0 is the notdef glyph, whether or not any code is allocated
+	if gid, ok := enc.GlyphID(0); !ok || gid != 0 {
+		t.Errorf("CID 0 selected glyph %d, ok %v; want glyph 0, ok true", gid, ok)
+	}
+	// before anything is allocated, no other CID has a glyph
+	for _, c := range []cid.CID{1, 2, 256, 257, 1 << 20} {
+		if _, ok := enc.GlyphID(c); ok {
+			t.Errorf("CID %d has a glyph before any code is allocated", c)
+		}
+	}
+
+	code, err := enc.Encode(42, "A", "A", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the allocated code is reachable as CID code+1, and nothing else moved
+	if gid, ok := enc.GlyphID(cid.CID(code) + 1); !ok || gid != 42 {
+		t.Errorf("CID %d selected glyph %d, ok %v; want glyph 42, ok true",
+			cid.CID(code)+1, gid, ok)
+	}
+	// Fill the table, so that code 0 has a glyph too.  CID 257 would reach it
+	// if the upper bound were off by one, since byte(257-1) is 0.
+	for i := range glyph.ID(255) {
+		if _, err := enc.Encode(i+100, "", string(rune('a'+i%26))+string(rune('0'+i/26)), 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if enc.GID(0) == 0 || enc.GID(255) == 0 {
+		t.Fatal("the code table did not fill up")
+	}
+	// the last code is CID 256, the largest CID a simple font has
+	if gid, ok := enc.GlyphID(256); !ok || gid != enc.GID(255) {
+		t.Errorf("CID 256 selected glyph %d, ok %v; want glyph %d, ok true",
+			gid, ok, enc.GID(255))
+	}
+	for _, c := range []cid.CID{257, 258, 1 << 20} {
+		if gid, ok := enc.GlyphID(c); ok {
+			t.Errorf("CID %d is outside the code range but selects glyph %d", c, gid)
+		}
 	}
 }

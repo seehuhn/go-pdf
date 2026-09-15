@@ -18,7 +18,6 @@ package cmap_test
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"golang.org/x/image/font/gofont/goregular"
@@ -27,7 +26,6 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/page"
 	"seehuhn.de/go/pdf/pagetree"
@@ -36,9 +34,26 @@ import (
 	"seehuhn.de/go/sfnt/parser"
 )
 
+// TestPredefined writes text through a predefined CMap and reads it back.
+// The identity CMap encodes every CID, so only a CMap with a real
+// code-to-CID mapping checks that the glyphs are assigned CIDs the CMap
+// has codes for.
 func TestPredefined(t *testing.T) {
-	const testText = "Hello"
+	cases := []struct {
+		cmapName string
+		text     string
+	}{
+		{"Adobe-Japan1-7", "Hello"},
+		{"UniJIS-UCS2-H", "§ 5 ± 3 °C"},
+	}
+	for _, c := range cases {
+		t.Run(c.cmapName, func(t *testing.T) {
+			testPredefined(t, c.cmapName, c.text)
+		})
+	}
+}
 
+func testPredefined(t *testing.T, cmapName, testText string) {
 	buf := &bytes.Buffer{}
 
 	// step 1: write a complete PDF document
@@ -53,32 +68,14 @@ func TestPredefined(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lookup, err := fontInfo.CMapTable.GetBest()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cmapInfo, err := cmap.Predefined("Adobe-Japan1-7")
+	cmapInfo, err := cmap.Predefined(cmapName)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	fontOpt := &truetype.OptionsComposite{
-		Language:    language.English,
-		WritingMode: font.Horizontal,
-		MakeGIDToCID: func() cmap.GIDToCID {
-			return cmap.NewGIDToCIDFromROS(cmapInfo.ROS, lookup)
-		},
-		MakeEncoder: func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder {
-			if cmapInfo.WMode != wMode {
-				panic(fmt.Sprintf("cmap %s has wMode %d, but requested wMode is %d", cmapInfo.Name, cmapInfo.WMode, wMode))
-			}
-			enc, err := cidenc.NewFromCMap(cmapInfo, cid0Width)
-			if err != nil {
-				panic(err)
-			}
-			return enc
-		},
+		Language: language.English,
+		CMap:     cmapInfo,
 	}
 
 	F, err := truetype.NewComposite(fontInfo, fontOpt)
@@ -117,8 +114,8 @@ func TestPredefined(t *testing.T) {
 	encoding, err := pdf.NewCursor(r).Name(fontDict["Encoding"])
 	if err != nil {
 		t.Fatal(err)
-	} else if encoding != "Adobe-Japan1-7" {
-		t.Errorf("expected encoding 'Adobe-Japan1-7', got %q", encoding)
+	} else if encoding != pdf.Name(cmapName) {
+		t.Errorf("expected encoding %q, got %q", cmapName, encoding)
 	}
 
 	if _, present := fontDict["ToUnicode"]; present {
@@ -147,7 +144,7 @@ func TestPredefined(t *testing.T) {
 	}
 
 	if allText != testText {
-		t.Errorf("expected text 'Hello', got %q", allText)
+		t.Errorf("expected text %q, got %q", testText, allText)
 	}
 
 	err = r.Close()

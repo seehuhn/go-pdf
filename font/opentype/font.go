@@ -21,7 +21,6 @@ import (
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
-	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/sfnt"
 )
@@ -44,9 +43,20 @@ type OptionsComposite struct {
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
 
-	WritingMode  font.WritingMode
-	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
+	// CMap encodes the text in the content stream.  It fixes the writing
+	// mode and, through its character collection, the CIDs the glyphs are
+	// written as.  A nil CMap selects the predefined Identity-H.  A CMap
+	// without mappings, such as [cmap.UTF8H], has codes allocated from its
+	// code space as the text requires.
+	CMap *cmap.File
+
+	// GIDToCID, if set, decides the CID each glyph is written as; its
+	// character collection must be the CMap's, unless the CMap is one of
+	// the Identity CMaps or has no mappings.  When nil, the mapping is
+	// derived from the CMap, which is only possible for a character
+	// collection the library knows the text of.  A mapping which allocates
+	// CIDs as glyphs are used must not be shared between fonts.
+	GIDToCID cmap.GIDToCID
 
 	// Variations pins the axes of a variable font before embedding.  Keys are
 	// variation axis tags; omitted axes keep their default value.  A variable

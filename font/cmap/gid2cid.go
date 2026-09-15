@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"sync"
 
@@ -40,8 +41,6 @@ type GIDToCID interface {
 	GID(cid.CID) glyph.ID
 
 	ROS() *cid.SystemInfo
-
-	GIDToCID(numGlyph int) []cid.CID
 }
 
 // NewGIDToCIDSequential returns a GIDToCID which assigns CID values
@@ -67,7 +66,7 @@ type gidToCIDSequential struct {
 	c2g map[cid.CID]glyph.ID
 }
 
-// GID implements the [GIDToCID] interface.
+// CID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) CID(gid glyph.ID, _ string) cid.CID {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -81,6 +80,7 @@ func (g *gidToCIDSequential) CID(gid glyph.ID, _ string) cid.CID {
 	return cidVal
 }
 
+// GID implements the [GIDToCID] interface.
 func (g *gidToCIDSequential) GID(cid cid.CID) glyph.ID {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
@@ -109,18 +109,6 @@ func (g *gidToCIDSequential) ROS() *cid.SystemInfo {
 	}
 }
 
-// GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDSequential) GIDToCID(numGlyph int) []cid.CID {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	res := make([]cid.CID, numGlyph)
-	for gid, cid := range g.g2c {
-		res[gid] = cid
-	}
-	return res
-}
-
 // NewGIDToCIDIdentity returns a GIDToCID which uses the GID values
 // directly as CID values.
 func NewGIDToCIDIdentity() GIDToCID {
@@ -129,14 +117,18 @@ func NewGIDToCIDIdentity() GIDToCID {
 
 type gidToCIDIdentity struct{}
 
-// GID implements the [GIDToCID] interface.
+// CID implements the [GIDToCID] interface.
 func (g *gidToCIDIdentity) CID(gid glyph.ID, _ string) cid.CID {
 	return cid.CID(gid)
 }
 
-// CID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GID(cid cid.CID) glyph.ID {
-	return glyph.ID(cid)
+// GID implements the [GIDToCID] interface.
+func (g *gidToCIDIdentity) GID(c cid.CID) glyph.ID {
+	// the Identity ordering has no CIDs beyond the range of a GID
+	if c > math.MaxUint16 {
+		return 0
+	}
+	return glyph.ID(c)
 }
 
 // ROS implements the [GIDToCID] interface.
@@ -148,72 +140,79 @@ func (g *gidToCIDIdentity) ROS() *cid.SystemInfo {
 	}
 }
 
-// GIDToCID implements the [GIDToCID] interface.
-func (g *gidToCIDIdentity) GIDToCID(numGlyph int) []cid.CID {
-	res := make([]cid.CID, numGlyph)
-	for i := range res {
-		res[i] = cid.CID(i)
-	}
-	return res
-}
-
-type gid2CIDFromROS struct {
+type gidToCIDFromCMap struct {
 	ros *cid.SystemInfo
 	g2c map[glyph.ID]cid.CID
 	c2g map[cid.CID]glyph.ID
 }
 
-func NewGIDToCIDFromROS(ros *cid.SystemInfo, cmap interface{ Lookup(rune) glyph.ID }) GIDToCID {
-	m, _ := mapping.GetCIDTextMapping(ros.Registry, ros.Ordering)
+// NewGIDToCIDFromCMap returns a GIDToCID for fonts written with the CMap f.
+// Every CID handed out is one the CMap has a code for.  Glyphs are matched
+// to CIDs via the text the CMap's character collection assigns to each CID,
+// looked up in lookup.  Where several such CIDs share a glyph, each of them
+// selects that glyph, while the glyph itself is written as the smallest of
+// them.
+//
+// The error wraps [fs.ErrNotExist] if no text mapping is known for the
+// collection, as for Adobe-Identity.
+func NewGIDToCIDFromCMap(f *File, lookup interface{ Lookup(rune) glyph.ID }) (GIDToCID, error) {
+	codec, err := f.Codec()
+	if err != nil {
+		return nil, err
+	}
+	m, err := mapping.GetCIDTextMapping(f.ROS.Registry, f.ROS.Ordering)
+	if err != nil {
+		return nil, err
+	}
+
+	// A code mapped by both a CMap and its parent belongs to the child, so
+	// the last mapping seen for a code is the one which counts.
+	encodable := maps.Collect(f.All(codec))
+
 	g2c := make(map[glyph.ID]cid.CID)
 	c2g := make(map[cid.CID]glyph.ID)
-	for cidValInt, s := range m {
-		rr := []rune(s)
+	for _, cidVal := range encodable {
+		rr := []rune(m[cidVal])
 		if len(rr) != 1 {
 			continue
 		}
-		gid := cmap.Lookup(rr[0])
+		gid := lookup.Lookup(rr[0])
 		if gid == 0 {
-			continue // skip .notdef glyphs
-		}
-
-		cidVal := cidValInt
-		if otherCid, ok := g2c[gid]; ok && otherCid < cidVal {
-			// in case several CIDs map to the same GID, we keep the smallest
-			// CID value
-
-			// TODO(voss): should we set c2g[cidVal] = gid in this case?
-
 			continue
 		}
-		g2c[gid] = cidVal
 		c2g[cidVal] = gid
+		if other, ok := g2c[gid]; !ok || cidVal < other {
+			g2c[gid] = cidVal
+		}
 	}
-	return &gid2CIDFromROS{
-		ros: ros,
-		g2c: g2c,
-		c2g: c2g,
-	}
+	return &gidToCIDFromCMap{ros: f.ROS, g2c: g2c, c2g: c2g}, nil
 }
 
-func (g *gid2CIDFromROS) CID(gid glyph.ID, _ string) cid.CID {
+// CID implements the [GIDToCID] interface.
+func (g *gidToCIDFromCMap) CID(gid glyph.ID, _ string) cid.CID {
 	return g.g2c[gid]
 }
 
-func (g *gid2CIDFromROS) GID(cid cid.CID) glyph.ID {
-	return g.c2g[cid]
+// GID implements the [GIDToCID] interface.
+func (g *gidToCIDFromCMap) GID(c cid.CID) glyph.ID {
+	return g.c2g[c]
 }
 
-func (g *gid2CIDFromROS) ROS() *cid.SystemInfo {
+// ROS implements the [GIDToCID] interface.
+func (g *gidToCIDFromCMap) ROS() *cid.SystemInfo {
 	return g.ros
 }
 
-func (g *gid2CIDFromROS) GIDToCID(numGlyph int) []cid.CID {
-	res := make([]cid.CID, numGlyph)
-	for gid, cidVal := range g.g2c {
-		if int(gid) < len(res) {
-			res[gid] = cidVal
+// NewGIDToCIDFromMap returns a GIDToCID for a fixed table of CIDs, for a
+// character collection the library knows nothing about.  Glyphs missing
+// from the table are written as CID 0.  Where several glyphs share a CID,
+// the CID selects the smallest of them.
+func NewGIDToCIDFromMap(ros *cid.SystemInfo, g2c map[glyph.ID]cid.CID) GIDToCID {
+	c2g := make(map[cid.CID]glyph.ID, len(g2c))
+	for gid, c := range g2c {
+		if other, ok := c2g[c]; !ok || gid < other {
+			c2g[c] = gid
 		}
 	}
-	return res
+	return &gidToCIDFromCMap{ros: ros, g2c: maps.Clone(g2c), c2g: c2g}
 }

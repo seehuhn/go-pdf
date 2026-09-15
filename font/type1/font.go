@@ -20,6 +20,7 @@ import (
 	"errors"
 	"math"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/psenc"
@@ -427,4 +428,13 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 func clone[T any](x *T) *T {
 	y := *x
 	return &y
+}
+
+var _ font.Outliner = (*Instance)(nil)
+
+// Outline returns the outline of a glyph in text space.
+// See [font.Outliner.Outline].
+func (f *Instance) Outline(gid glyph.ID) path.Path {
+	g := f.psFont.Glyphs[f.GlyphNames[gid]]
+	return g.Path().Transform(f.psFont.FontMatrix)
 }

@@ -22,7 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
-	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
@@ -42,11 +42,12 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	raw := makefont.OpenType()
-	opt := &opentype.OptionsComposite{
-		WritingMode: font.Vertical,
+	identityV, err := cmap.Predefined("Identity-V")
+	if err != nil {
+		return err
 	}
-	F, err := opentype.NewComposite(raw, opt)
+	raw := makefont.OpenType()
+	F, err := opentype.NewComposite(raw, &opentype.OptionsComposite{CMap: identityV})
 	if err != nil {
 		return err
 	}

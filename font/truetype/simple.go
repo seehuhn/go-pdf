@@ -22,6 +22,8 @@ import (
 	"slices"
 
 	"golang.org/x/text/language"
+
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/postscript/type1/names"
 
 	"seehuhn.de/go/sfnt"
@@ -38,6 +40,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
 	"seehuhn.de/go/pdf/font/internal/fontdesc"
 	"seehuhn.de/go/pdf/font/internal/fontgeom"
+	"seehuhn.de/go/pdf/font/internal/outline"
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
@@ -377,4 +380,12 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 		dict.Width[c] = info.Width
 	}
 	return dict, nil
+}
+
+var _ font.Outliner = (*Simple)(nil)
+
+// Outline returns the outline of a glyph in text space.
+// See [font.Outliner.Outline].
+func (f *Simple) Outline(gid glyph.ID) path.Path {
+	return outline.SFNT(f.info, gid)
 }

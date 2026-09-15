@@ -14,9 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//go:build !race
+package cmap
 
-package race
+import (
+	"testing"
 
-// Enabled reports whether the race detector is in use.
-const Enabled = false
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
+)
+
+func TestUTF8Templates(t *testing.T) {
+	for _, f := range []*File{UTF8H, UTF8V} {
+		if !f.CodeSpaceRange.Equivalent(charcode.UTF8) {
+			t.Errorf("%s: code space is not UTF-8", f.Name)
+		}
+		if len(f.CIDSingles)+len(f.CIDRanges) != 0 || f.Parent != nil {
+			t.Errorf("%s: template has mappings", f.Name)
+		}
+		if f.IsPredefined() {
+			t.Errorf("%s: template counts as predefined", f.Name)
+		}
+	}
+	if UTF8H.WMode != font.Horizontal || UTF8V.WMode != font.Vertical {
+		t.Error("template writing modes are wrong")
+	}
+}

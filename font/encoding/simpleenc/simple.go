@@ -431,3 +431,17 @@ func (t *Simple) Codec() *charcode.Codec {
 
 // ErrOverflow is returned by [Simple.Encode] once all 256 codes are in use.
 var ErrOverflow = errors.New("too many glyphs")
+
+// GlyphID returns the glyph a CID selects, for the CID scheme of simple
+// fonts: CID 0 is the notdef glyph and CID c+1 is the glyph of code c.  ok is
+// false for a code no glyph has been assigned to.
+func (t *Simple) GlyphID(c cid.CID) (glyph.ID, bool) {
+	if c == 0 {
+		return 0, true
+	}
+	if c > 256 {
+		return 0, false
+	}
+	gid := t.GID(byte(c - 1))
+	return gid, gid != 0
+}

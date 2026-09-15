@@ -22,6 +22,7 @@ import (
 	"math"
 	"slices"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
 
@@ -36,8 +37,10 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/sfntglyphs"
+	"seehuhn.de/go/pdf/font/internal/cidsetup"
 	"seehuhn.de/go/pdf/font/internal/fontdesc"
 	"seehuhn.de/go/pdf/font/internal/fontgeom"
+	"seehuhn.de/go/pdf/font/internal/outline"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/fontname"
@@ -92,16 +95,11 @@ func newCompositeGlyf(info *sfnt.Font, opt *OptionsComposite) (*CompositeGlyf, e
 		return nil, err
 	}
 
-	makeGIDToCID := cmap.NewGIDToCIDSequential
-	if opt.MakeGIDToCID != nil {
-		makeGIDToCID = opt.MakeGIDToCID
-	}
-
-	makeEncoder := cidenc.NewCompositeIdentity
-	if opt.MakeEncoder != nil {
-		makeEncoder = opt.MakeEncoder
-	}
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
+	gidToCID, enc, err := cidsetup.FromCMap(opt.CMap, opt.GIDToCID, info, notdefWidth)
+	if err != nil {
+		return nil, err
+	}
 
 	f := &CompositeGlyf{
 		info:     info,
@@ -109,8 +107,8 @@ func newCompositeGlyf(info *sfnt.Font, opt *OptionsComposite) (*CompositeGlyf, e
 
 		Descriptor: descriptor,
 		layouter:   layouter,
-		gidToCID:   makeGIDToCID(),
-		CIDEncoder: makeEncoder(notdefWidth, opt.WritingMode),
+		gidToCID:   gidToCID,
+		CIDEncoder: enc,
 	}
 
 	return f, nil
@@ -282,4 +280,22 @@ func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
 	}
 
 	return fontDict, nil
+}
+
+var _ font.Outliner = (*CompositeGlyf)(nil)
+
+// GlyphID returns the glyph a CID selects.
+// See [font.Outliner.GlyphID].
+func (f *CompositeGlyf) GlyphID(c cid.CID) (glyph.ID, bool) {
+	gid := f.gidToCID.GID(c)
+	if int(gid) >= f.info.NumGlyphs() {
+		return 0, false
+	}
+	return gid, gid != 0 || c == 0
+}
+
+// Outline returns the outline of a glyph in text space.
+// See [font.Outliner.Outline].
+func (f *CompositeGlyf) Outline(gid glyph.ID) path.Path {
+	return outline.SFNT(f.info, gid)
 }

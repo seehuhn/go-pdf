@@ -1,5 +1,3 @@
-//go:build race
-
 // seehuhn.de/go/pdf - a library for reading and writing PDF files
 // Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
 //
@@ -15,6 +13,8 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+//go:build race
 
 package race
 

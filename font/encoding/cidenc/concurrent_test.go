@@ -25,8 +25,23 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/internal/debug/race"
 )
+
+// identityEncoder returns an encoder for the predefined Identity-H CMap.
+func identityEncoder(t *testing.T) CIDEncoder {
+	t.Helper()
+	f, err := cmap.Predefined("Identity-H")
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := NewFromCMap(f, 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return enc
+}
 
 // TestConcurrentReaders checks that readers can use an encoder while codes
 // are still being allocated: an edit session types into a font while a
@@ -40,7 +55,7 @@ func TestConcurrentReaders(t *testing.T) {
 
 	encoders := map[string]CIDEncoder{
 		"utf8":     NewCompositeUtf8(500, font.Horizontal),
-		"identity": NewCompositeIdentity(500, font.Horizontal),
+		"identity": identityEncoder(t),
 	}
 	for name, enc := range encoders {
 		t.Run(name, func(t *testing.T) {
@@ -94,7 +109,7 @@ func TestConcurrentReaders(t *testing.T) {
 func TestEncodeRepeat(t *testing.T) {
 	for name, enc := range map[string]CIDEncoder{
 		"utf8":     NewCompositeUtf8(500, font.Horizontal),
-		"identity": NewCompositeIdentity(500, font.Horizontal),
+		"identity": identityEncoder(t),
 	} {
 		t.Run(name, func(t *testing.T) {
 			c1, err := enc.Encode(5, "A", 600)
@@ -117,7 +132,7 @@ func TestEncodeRepeat(t *testing.T) {
 // instead of encoding one it cannot represent.  A rejected call must leave the
 // stored value alone.
 func TestEncodeConflict(t *testing.T) {
-	enc := NewCompositeIdentity(500, font.Horizontal)
+	enc := identityEncoder(t)
 	code, err := enc.Encode(5, "A", 600)
 	if err != nil {
 		t.Fatal(err)

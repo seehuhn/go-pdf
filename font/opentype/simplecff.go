@@ -22,6 +22,7 @@ import (
 	"slices"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/path"
 
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -36,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
 	"seehuhn.de/go/pdf/font/internal/fontdesc"
 	"seehuhn.de/go/pdf/font/internal/fontgeom"
+	"seehuhn.de/go/pdf/font/internal/outline"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/internal/fontname"
@@ -285,4 +287,12 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	}
 
 	return fontDict, nil
+}
+
+var _ font.Outliner = (*SimpleCFF)(nil)
+
+// Outline returns the outline of a glyph in text space.
+// See [font.Outliner.Outline].
+func (f *SimpleCFF) Outline(gid glyph.ID) path.Path {
+	return outline.SFNT(f.info, gid)
 }

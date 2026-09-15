@@ -98,8 +98,5 @@ func (g *Geometry) IsFixedPitch() bool {
 
 // IsBlank reports whether the glyph is blank.
 func (g *Geometry) IsBlank(gid glyph.ID) bool {
-	if int(gid) >= len(g.GlyphExtents) {
-		gid = 0
-	}
 	return g.GlyphExtents[gid].IsZero()
 }

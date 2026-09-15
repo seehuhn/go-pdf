@@ -19,6 +19,7 @@ package cidenc
 import (
 	"errors"
 	"iter"
+	"maps"
 	"sync"
 
 	"seehuhn.de/go/postscript/cid"
@@ -56,11 +57,21 @@ func NewFromCMap(cmap *cmap.File, cid0Width float64) (CIDEncoder, error) {
 		return nil, err
 	}
 
+	// A code mapped by both the CMap and its parent belongs to the CMap,
+	// so the last mapping seen for a code is the one which counts, and a
+	// CID reachable only through a shadowed mapping gets no code.
+	rev := maps.Collect(cmap.All(codec))
+
+	// A CID reachable through several codes is written as the smallest of
+	// them, so that the choice does not depend on map iteration order.
 	all := make(map[cid.CID]charcode.Code)
-	rev := make(map[charcode.Code]cid.CID)
-	for code, cid := range cmap.All(codec) {
-		all[cid] = code
-		rev[code] = cid
+	for code, c := range cmap.All(codec) {
+		if rev[code] != c {
+			continue
+		}
+		if prev, ok := all[c]; !ok || code < prev {
+			all[c] = code
+		}
 	}
 
 	width := make(map[cid.CID]float64)

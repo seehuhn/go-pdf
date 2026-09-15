@@ -25,6 +25,7 @@ import (
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/path"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/postscript/type1/names"
@@ -41,8 +42,10 @@ import (
 	"seehuhn.de/go/pdf/font/encoding/cidenc"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
+	"seehuhn.de/go/pdf/font/internal/cidsetup"
 	"seehuhn.de/go/pdf/font/internal/fontdesc"
 	"seehuhn.de/go/pdf/font/internal/fontgeom"
+	"seehuhn.de/go/pdf/font/internal/outline"
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/subset"
@@ -54,9 +57,20 @@ type OptionsComposite struct {
 	GsubFeatures map[string]bool
 	GposFeatures map[string]bool
 
-	WritingMode  font.WritingMode
-	MakeGIDToCID func() cmap.GIDToCID
-	MakeEncoder  func(cid0Width float64, wMode font.WritingMode) cidenc.CIDEncoder
+	// CMap encodes the text in the content stream.  It fixes the writing
+	// mode and, through its character collection, the CIDs the glyphs are
+	// written as.  A nil CMap selects the predefined Identity-H.  A CMap
+	// without mappings, such as [cmap.UTF8H], has codes allocated from its
+	// code space as the text requires.
+	CMap *cmap.File
+
+	// GIDToCID, if set, decides the CID each glyph is written as; its
+	// character collection must be the CMap's, unless the CMap is one of
+	// the Identity CMaps or has no mappings.  When nil, the mapping is
+	// derived from the CMap, which is only possible for a character
+	// collection the library knows the text of.  A mapping which allocates
+	// CIDs as glyphs are used must not be shared between fonts.
+	GIDToCID cmap.GIDToCID
 
 	// Variations pins the axes of a variable font before embedding.  Keys are
 	// variation axis tags; omitted axes keep their default value.  A CFF2 or
@@ -131,15 +145,11 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		return nil, err
 	}
 
-	makeGIDToCID := cmap.NewGIDToCIDSequential
-	if opt.MakeGIDToCID != nil {
-		makeGIDToCID = opt.MakeGIDToCID
-	}
-	makeEncoder := cidenc.NewCompositeIdentity
-	if opt.MakeEncoder != nil {
-		makeEncoder = opt.MakeEncoder
-	}
 	notdefWidth := math.Round(info.GlyphWidthPDF(0))
+	gidToCID, enc, err := cidsetup.FromCMap(opt.CMap, opt.GIDToCID, info, notdefWidth)
+	if err != nil {
+		return nil, err
+	}
 
 	f := &Composite{
 		cffFont:    cffFont,
@@ -150,8 +160,8 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		Geometry: geom,
 		layouter: layouter,
 
-		gidToCID:   makeGIDToCID(),
-		CIDEncoder: makeEncoder(notdefWidth, opt.WritingMode),
+		gidToCID:   gidToCID,
+		CIDEncoder: enc,
 	}
 
 	return f, nil
@@ -366,4 +376,22 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 	}
 
 	return fontDict, nil
+}
+
+var _ font.Outliner = (*Composite)(nil)
+
+// GlyphID returns the glyph a CID selects.
+// See [font.Outliner.GlyphID].
+func (f *Composite) GlyphID(c cid.CID) (glyph.ID, bool) {
+	gid := f.gidToCID.GID(c)
+	if int(gid) >= f.cffFont.NumGlyphs() {
+		return 0, false
+	}
+	return gid, gid != 0 || c == 0
+}
+
+// Outline returns the outline of a glyph in text space.
+// See [font.Outliner.Outline].
+func (f *Composite) Outline(gid glyph.ID) path.Path {
+	return outline.CFF(f.cffFont, gid)
 }
