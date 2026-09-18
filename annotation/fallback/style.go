@@ -103,6 +103,12 @@ type Generator struct {
 	// read it.
 	contentFont font.Layouter
 
+	// typewriterFont is the font used to render the text of a FreeText
+	// annotation with the TypeWriter intent: Courier, the fixed-width face
+	// the intent's name promises.  Made on first use, like contentFont.
+	// Use [Generator.typewriter] to read it.
+	typewriterFont font.Layouter
+
 	// version is the PDF version targeted by the appearance streams.  It is
 	// passed through to [builder.New] so that operators the file cannot use
 	// are rejected at build time, and decides whether the reset state can be
@@ -144,6 +150,16 @@ func (g *Generator) ContentFont() font.Layouter {
 		g.contentFont = font.Must(standard.Helvetica.New())
 	}
 	return g.contentFont
+}
+
+// typewriter returns the font used to render the text of a FreeText
+// annotation with the TypeWriter intent: Courier, made on first use like
+// [Generator.ContentFont].
+func (g *Generator) typewriter() font.Layouter {
+	if g.typewriterFont == nil {
+		g.typewriterFont = font.Must(standard.Courier.New())
+	}
+	return g.typewriterFont
 }
 
 // breaker returns the LineBreaker to use for laying out text content: the

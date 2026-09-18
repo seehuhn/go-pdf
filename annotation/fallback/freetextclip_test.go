@@ -65,7 +65,7 @@ func TestFreeTextClipMatchesContentWidth(t *testing.T) {
 		}
 
 		// and the lines a viewer gets for that width really do fit in it
-		lines, err := NewStyle().Lines(contents, clip)
+		lines, err := NewStyle().Lines(contents, clip, freeTextFontSize)
 		if err != nil {
 			t.Fatal(err)
 		}

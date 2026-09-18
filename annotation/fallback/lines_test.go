@@ -38,7 +38,7 @@ func TestStyleLinesWordBreaks(t *testing.T) {
 	// choose a width just wide enough for "a b" but not for "a b c"
 	width := F.Layout(nil, freeTextFontSize, "a b").TotalWidth() + 1
 
-	got, err := s.Lines(contents, width)
+	got, err := s.Lines(contents, width, freeTextFontSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestStyleLinesHyphen(t *testing.T) {
 	F := font.Must(standard.Helvetica.New())
 	width := F.Layout(nil, freeTextFontSize, "photo-").TotalWidth() + 1
 
-	got, err := s.Lines("photograph", width)
+	got, err := s.Lines("photograph", width, freeTextFontSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestStyleLinesUsesNewContentFont(t *testing.T) {
 	contents := "a b c"
 	width := courier.Layout(nil, freeTextFontSize, "a b").TotalWidth() + 1
 
-	got, err := s.Lines(contents, width)
+	got, err := s.Lines(contents, width, freeTextFontSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestStyleLinesFontError(t *testing.T) {
 		NewContentFont: func() (font.Layouter, error) { return nil, errNoFont },
 	}
 
-	_, err := s.Lines("hello", 100)
+	_, err := s.Lines("hello", 100, freeTextFontSize)
 	if !errors.Is(err, errNoFont) {
 		t.Errorf("error = %v, want the one from NewContentFont", err)
 	}
@@ -139,7 +139,7 @@ func TestStyleLinesMatchesGenerator(t *testing.T) {
 	contents := "photograph"
 	width := 0.0
 
-	got, err := s.Lines(contents, width)
+	got, err := s.Lines(contents, width, freeTextFontSize)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,5 +163,27 @@ func TestStyleLinesMatchesGenerator(t *testing.T) {
 		if gotText != text {
 			t.Errorf("line %d: Style.Lines gives %q, Generator's wrap draws %q", i, gotText, text)
 		}
+	}
+}
+
+// A larger size wraps the same text at the same width into more lines,
+// since larger glyphs need more room.
+func TestStyleLinesSizeAffectsWrap(t *testing.T) {
+	s := NewStyle()
+	contents := "one two three four five six seven eight nine ten"
+	width := 200.0
+
+	small, err := s.Lines(contents, width, 9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	large, err := s.Lines(contents, width, 18)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(large) <= len(small) {
+		t.Errorf("Lines(..., 18) gave %d lines, Lines(..., 9) gave %d; want more at the larger size",
+			len(large), len(small))
 	}
 }

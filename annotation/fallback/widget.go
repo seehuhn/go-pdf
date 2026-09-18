@@ -18,6 +18,7 @@ package fallback
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -802,7 +803,9 @@ func parseDA(da string) (size float64, col color.Color) {
 
 func daFloat(s string) (float64, bool) {
 	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
+	// a PDF file cannot hold an infinity or a NaN, so a token which reads as
+	// one names no number the appearance could use
+	if err != nil || math.IsInf(v, 0) || math.IsNaN(v) {
 		return 0, false
 	}
 	return v, true

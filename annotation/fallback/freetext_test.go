@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 // appearanceContent returns the content stream of an annotation's normal
@@ -124,5 +125,131 @@ func TestFreeTextCalloutMargin(t *testing.T) {
 	inner := applyMargins(a.Rect, a.Margin)
 	if !inner.NearlyEqual(&box, 0.01) {
 		t.Errorf("applying Margin to Rect gives %v, want the text box %v", inner, box)
+	}
+}
+
+// TestFreeTextHonoursDAFontSize checks that the generator draws text at the
+// size the default appearance string asks for, keeps that size in the
+// rewritten DA, and leaves the annotation's alignment as set.
+func TestFreeTextHonoursDAFontSize(t *testing.T) {
+	a := &annotation.FreeText{
+		Common: annotation.Common{
+			Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 400, URy: 200},
+			Contents: "one two three four five six seven eight nine ten " +
+				"eleven twelve thirteen fourteen",
+		},
+		DefaultAppearance: "/Helv 18 Tf 0 g",
+		Align:             pdf.TextAlignCenter,
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	body := appearanceContent(t, a)
+	if !strings.Contains(body, "18 Tf") {
+		t.Errorf("content stream does not set the font size to 18:\n%s", body)
+	}
+	if strings.Contains(body, "12 Tf") {
+		t.Errorf("content stream still sets the fixed font size 12:\n%s", body)
+	}
+	if !strings.Contains(a.DefaultAppearance, "18 Tf") {
+		t.Errorf("default appearance %q does not keep the font size 18", a.DefaultAppearance)
+	}
+	if a.Align != pdf.TextAlignCenter {
+		t.Errorf("Align = %v, want it kept as TextAlignCenter", a.Align)
+	}
+}
+
+// TestFreeTextDefaultFontSize checks that a DA which names no usable font
+// size falls back to the default size 12: no size at all, a size of 0, and a
+// size a PDF file cannot hold, which would leave the appearance unwritable.
+func TestFreeTextDefaultFontSize(t *testing.T) {
+	cases := []struct {
+		name string
+		da   string
+	}{
+		{"no size", "0 g"},
+		{"zero", "/Helv 0 Tf 0 g"},
+		{"infinite", "/Helv Inf Tf 0 g"},
+		{"not a number", "/Helv NaN Tf 0 g"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			a := &annotation.FreeText{
+				Common: annotation.Common{
+					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
+					Contents: "hello",
+				},
+				DefaultAppearance: c.da,
+			}
+
+			g := newGen(t, pdf.V2_0)
+			if err := g.AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+
+			body := appearanceContent(t, a)
+			if !strings.Contains(body, "12 Tf") {
+				t.Errorf("content stream does not fall back to font size 12:\n%s", body)
+			}
+			if !strings.Contains(a.DefaultAppearance, "12 Tf") {
+				t.Errorf("default appearance %q does not fall back to font size 12", a.DefaultAppearance)
+			}
+		})
+	}
+}
+
+// TestFreeTextTypewriterEncodesAtV2 checks that a Typewriter FreeText's
+// appearance can be written to a PDF 2.0 file: the typewriter font must not
+// carry a fixed /Name, since PDF 2.0 forbids that font dictionary entry (see
+// annotation/fallback/style.go's Generator.typewriter), and a font instance
+// asking for one fails the writer close instead of saving the document.
+func TestFreeTextTypewriterEncodesAtV2(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	a := &annotation.FreeText{
+		Common: annotation.Common{
+			Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
+			Contents: "hello",
+		},
+		Markup:            annotation.Markup{Intent: annotation.FreeTextIntentTypeWriter},
+		DefaultAppearance: "/Cour 12 Tf 0 g",
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Encode(rm); err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestFreeTextTypewriterFont checks that a Typewriter FreeText is drawn in
+// its own font, distinct from the shared content font every other FreeText
+// uses, and that a plain FreeText still uses the shared one.
+func TestFreeTextTypewriterFont(t *testing.T) {
+	g := newGen(t, pdf.V2_0)
+	plain := &annotation.FreeText{Markup: annotation.Markup{Intent: annotation.FreeTextIntentPlain}}
+	typewriter := &annotation.FreeText{Markup: annotation.Markup{Intent: annotation.FreeTextIntentTypeWriter}}
+
+	if g.freeTextFont(plain) != g.ContentFont() {
+		t.Error("a plain FreeText should be drawn in the shared content font")
+	}
+	if g.freeTextFont(typewriter) != g.typewriter() {
+		t.Error("a Typewriter FreeText should be drawn in the typewriter font")
+	}
+	if g.freeTextFont(typewriter) == g.ContentFont() {
+		t.Error("the typewriter font must not be the same instance as the content font")
+	}
+	if name := g.typewriter().PostScriptName(); name != "Courier" {
+		t.Errorf("typewriter font PostScript name = %q, want %q", name, "Courier")
 	}
 }

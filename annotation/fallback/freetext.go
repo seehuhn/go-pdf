@@ -19,10 +19,12 @@ package fallback
 import (
 	"fmt"
 	"slices"
+	"strconv"
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -34,6 +36,16 @@ const (
 	freeTextFontSize = 12
 	freeTextPadding  = 2
 )
+
+// freeTextFont returns the font a FreeText annotation's text is drawn in:
+// Courier for the Typewriter intent, and the shared content font for
+// everything else.
+func (g *Generator) freeTextFont(a *annotation.FreeText) font.Layouter {
+	if a.Intent == annotation.FreeTextIntentTypeWriter {
+		return g.typewriter()
+	}
+	return g.ContentFont()
+}
 
 func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, error) {
 	// extract information from the pre-set fields
@@ -47,8 +59,12 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
 
 	// the annotation's own default appearance says what colour its text is
-	// drawn in; the generator's ink stands in where it names none
-	_, textCol := parseDA(a.DefaultAppearance)
+	// drawn in, and what size; the generator's ink stands in where it names
+	// no colour, and the default size where it names none or an invalid one
+	size, textCol := parseDA(a.DefaultAppearance)
+	if size <= 0 {
+		size = freeTextFontSize
+	}
 
 	inner := applyMargins(a.Rect, a.Margin)
 
@@ -74,7 +90,6 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		a.BorderEffect = nil
 	}
 
-	a.Align = pdf.TextAlignLeft
 	a.DefaultStyle = ""
 
 	// generate the appearance stream
@@ -152,14 +167,14 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 
 	// render text content if present
 	if a.Contents != "" {
-		F := g.ContentFont()
+		F := g.freeTextFont(a)
 
 		clipLeft := inner.LLx + lw + freeTextPadding
 		clipBottom := inner.LLy + lw + freeTextPadding
 		clipWidth := inner.Dx() - 2*lw - 2*freeTextPadding
 		clipHeight := inner.Dy() - 2*lw - 2*freeTextPadding
 
-		lineHeight := pdf.Round(F.GetGeometry().Leading*freeTextFontSize, 2)
+		lineHeight := pdf.Round(F.GetGeometry().Leading*size, 2)
 
 		b.PushGraphicsState()
 		if co != nil {
@@ -171,14 +186,14 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		b.EndPath()
 
 		b.TextBegin()
-		b.TextSetFont(F, freeTextFontSize)
+		b.TextSetFont(F, size)
 		b.SetFillColor(textCol)
 		b.TextSetHorizontalScaling(1)
 		b.TextSetRise(0)
 		wrapper := text.WrapWith(g.breaker(), clipWidth, a.Contents)
-		yPos := inner.URy - lw - freeTextPadding - freeTextFontSize
+		yPos := inner.URy - lw - freeTextPadding - size
 		lineNo := 0
-		for line := range wrapper.Lines(F, freeTextFontSize) {
+		for line := range wrapper.Lines(F, size) {
 			switch lineNo {
 			case 0:
 				b.TextFirstLine(clipLeft, yPos)
@@ -222,9 +237,9 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	}
 
 	// set DA to match the font/size/color used in the appearance stream
-	fontName := b.FontName(g.ContentFont())
-	a.DefaultAppearance = fmt.Sprintf("/%s %d Tf %s",
-		fontName, freeTextFontSize, daColorOperator(textCol))
+	fontName := b.FontName(g.freeTextFont(a))
+	a.DefaultAppearance = fmt.Sprintf("/%s %s Tf %s",
+		fontName, strconv.FormatFloat(size, 'f', -1, 64), daColorOperator(textCol))
 
 	return harvest(b, outer)
 }

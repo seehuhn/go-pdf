@@ -33,15 +33,16 @@ type Line struct {
 
 // Lines reports how [Generator.AddAppearance] breaks text into lines for the
 // content of a FreeText annotation, using the style's font (NewContentFont,
-// or Helvetica where that is nil), the fixed font size used for FreeText
-// content, and the style's LineBreaker (or [gtext.WhitespaceBreaker] where
-// that is nil).
+// or Helvetica where that is nil), the given font size, and the style's
+// LineBreaker (or [gtext.WhitespaceBreaker] where that is nil).
 //
 // Width is the space available for the text, in the same units and with the
 // same meaning as the clipWidth computed for a FreeText appearance: the
 // annotation's inner rectangle, narrowed by its border width and content
 // padding on both sides.  A caller which asks about a FreeText annotation
-// must derive width the same way to get the same lines back.
+// must derive width the same way to get the same lines back.  size is the
+// font size, in points, matching the size the appearance draws the content
+// at; the caller passes a positive value.
 //
 // The returned lines cover the whole of text, in order, with no gaps or
 // overlaps: bytes consumed by whitespace at a line break, or replaced by a
@@ -49,7 +50,7 @@ type Line struct {
 //
 // An error is returned only if NewContentFont fails; the default font never
 // does.
-func (s *Style) Lines(text string, width float64) ([]Line, error) {
+func (s *Style) Lines(text string, width, size float64) ([]Line, error) {
 	F, err := s.linesFont()
 	if err != nil {
 		return nil, err
@@ -62,7 +63,7 @@ func (s *Style) Lines(text string, width float64) ([]Line, error) {
 
 	wrapper := gtext.WrapWith(breaker, width, text)
 	var lines []Line
-	for r := range wrapper.Ranges(F, freeTextFontSize) {
+	for r := range wrapper.Ranges(F, size) {
 		lines = append(lines, Line{Start: r.Start, End: r.End, Hyphen: r.Hyphen})
 	}
 	return lines, nil
