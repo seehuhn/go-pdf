@@ -481,19 +481,14 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 	}
 
 	// compute the bounding box from the quad points
-	for _, point := range qq {
-		link.Common.Rect.ExtendVec(point)
-	}
+	link.Common.Rect = pdf.RectangleFromPoints(qq...)
 
 	if len(quadPoints) > 1 {
 		link.QuadPoints = qq
 
 		// Avoid rounding issues when viewers check whether the quad points
 		// are inside the rectangle.
-		link.Common.Rect.LLx -= 0.01
-		link.Common.Rect.LLy -= 0.01
-		link.Common.Rect.URx += 0.01
-		link.Common.Rect.URy += 0.01
+		link.Common.Rect = link.Common.Rect.Grow(0.01)
 	}
 	link.Common.Rect.IRound(2)
 

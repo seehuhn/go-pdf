@@ -19,12 +19,24 @@ package fallback
 import (
 	"math"
 
+	"seehuhn.de/go/geom/linalg"
 	"seehuhn.de/go/geom/path"
+	"seehuhn.de/go/geom/polygon"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 )
+
+// maxSamplePoints bounds the number of points the polygon boundary is sampled
+// at.  The spacing follows the line width, so without a bound the sample count
+// grows with the size of the polygon, and a file can ask for an unbounded
+// amount of memory, and a content stream to match, from a handful of vertices
+// with large coordinates.  The bound is far above what a cloud drawn round the
+// largest page PDF allows needs at the finest spacing, so it takes effect only
+// for a polygon which could not be shown anyway; from there on the bulges grow
+// larger instead of more numerous.
+const maxSamplePoints = 20000
 
 // cloudOutline holds precomputed cloud border geometry.
 type cloudOutline struct {
@@ -41,8 +53,13 @@ func newCloudOutline(vertices []vec.Vec2, intensity, lw float64) *cloudOutline {
 		return nil
 	}
 
+	perimeter := polygon.Perimeter(vertices)
+	if !(perimeter > 0) {
+		return nil
+	}
+
 	// ensure CCW winding
-	if signedArea(vertices) < 0 {
+	if polygon.SignedArea(vertices) < 0 {
 		rev := make([]vec.Vec2, n)
 		for i, v := range vertices {
 			rev[n-1-i] = v
@@ -50,11 +67,15 @@ func newCloudOutline(vertices []vec.Vec2, intensity, lw float64) *cloudOutline {
 		vertices = rev
 	}
 
-	// step 1: sample equidistant points
-	points := sampleEquidistant(vertices, lw)
-	if len(points) < 3 {
-		return nil
+	// step 1: sample equidistant points, spaced by the line width
+	targetDist := min(4*(lw+1), 20)
+	nSamples := math.Round(perimeter / targetDist)
+	if !(nSamples >= 3) { // false as well for a line width which is not a number
+		nSamples = 3
 	}
+	// The polygon has at least three vertices and a positive perimeter, and
+	// at least three samples are asked for, so this returns that many points.
+	points := polygon.Resample(vertices, int(min(nSamples, maxSamplePoints)))
 
 	// step 2: detect flat base
 	baseStart, baseSeg := findFlatBase(points)
@@ -192,31 +213,11 @@ func (co *cloudOutline) stroke() path.Path {
 	return d.Iter()
 }
 
-// drawPath replays path p on builder b, rounding every coordinate to two
-// decimal places as it is emitted, and returns the bounding box of every
-// point it saw at full precision, control points included.
+// drawPath draws path p and returns the bounding box of every point it
+// contains at full precision, control points included.
 func drawPath(b *builder.Builder, p path.Path) pdf.Rectangle {
-	var bbox pdf.Rectangle
-	for cmd, pts := range p {
-		for _, pt := range pts {
-			bbox.ExtendVec(pt)
-		}
-		switch cmd {
-		case path.CmdMoveTo:
-			b.MoveTo(pdf.Round(pts[0].X, 2), pdf.Round(pts[0].Y, 2))
-		case path.CmdLineTo:
-			b.LineTo(pdf.Round(pts[0].X, 2), pdf.Round(pts[0].Y, 2))
-		case path.CmdCubeTo:
-			b.CurveTo(
-				pdf.Round(pts[0].X, 2), pdf.Round(pts[0].Y, 2),
-				pdf.Round(pts[1].X, 2), pdf.Round(pts[1].Y, 2),
-				pdf.Round(pts[2].X, 2), pdf.Round(pts[2].Y, 2),
-			)
-		case path.CmdClose:
-			b.ClosePath()
-		}
-	}
-	return bbox
+	b.DrawPath(p, 2)
+	return pdf.RectangleFromRect(p.BBox())
 }
 
 // fillPath draws the closed fill path and returns the bounding box.
@@ -287,10 +288,10 @@ func (co *cloudOutline) trimToCloud(outside, inside vec.Vec2) vec.Vec2 {
 	bestT := math.Inf(1)
 
 	consider := func(a, b vec.Vec2) {
-		t, ok := segmentIntersect(outside, inside, a, b)
+		p, t, _, ok := linalg.SegmentIntersection(outside, inside, a, b)
 		if ok && t < bestT {
 			bestT = t
-			best = outside.Add(inside.Sub(outside).Mul(t))
+			best = p
 		}
 	}
 
@@ -315,43 +316,10 @@ func (co *cloudOutline) trimToCloud(outside, inside vec.Vec2) vec.Vec2 {
 func flattenCubic(p0, cp1, cp2, p3 vec.Vec2, n int, consider func(a, b vec.Vec2)) {
 	prev := p0
 	for i := 1; i <= n; i++ {
-		u := float64(i) / float64(n)
-		pt := cubicPoint(p0, cp1, cp2, p3, u)
+		pt := path.EvalCubic(p0, cp1, cp2, p3, float64(i)/float64(n))
 		consider(prev, pt)
 		prev = pt
 	}
-}
-
-// cubicPoint evaluates a cubic Bezier curve at parameter u.
-func cubicPoint(p0, cp1, cp2, p3 vec.Vec2, u float64) vec.Vec2 {
-	mu := 1 - u
-	a := mu * mu * mu
-	b := 3 * mu * mu * u
-	c := 3 * mu * u * u
-	d := u * u * u
-	return vec.Vec2{
-		X: a*p0.X + b*cp1.X + c*cp2.X + d*p3.X,
-		Y: a*p0.Y + b*cp1.Y + c*cp2.Y + d*p3.Y,
-	}
-}
-
-// segmentIntersect returns the parameter t at which the segment p->q
-// crosses the segment a->b, and whether such a crossing exists within
-// both segments.
-func segmentIntersect(p, q, a, b vec.Vec2) (t float64, ok bool) {
-	d1 := q.Sub(p)
-	d2 := b.Sub(a)
-	denom := d1.Cross(d2)
-	if denom == 0 {
-		return 0, false
-	}
-	diff := a.Sub(p)
-	t = diff.Cross(d2) / denom
-	s := diff.Cross(d1) / denom
-	if t < 0 || t > 1 || s < 0 || s > 1 {
-		return 0, false
-	}
-	return t, true
 }
 
 // tangentAngle computes the forward tangent angle at point k
@@ -362,56 +330,6 @@ func tangentAngle(points []vec.Vec2, k int) float64 {
 	next := (k + 1) % n
 	d := points[next].Sub(points[prev])
 	return math.Atan2(d.Y, d.X)
-}
-
-// sampleEquidistant places equidistant points along the polygon boundary.
-func sampleEquidistant(vertices []vec.Vec2, lw float64) []vec.Vec2 {
-	n := len(vertices)
-	if n < 3 {
-		return nil
-	}
-
-	// compute edge lengths and total perimeter
-	edgeLens := make([]float64, n)
-	var perimeter float64
-	for i := range n {
-		j := (i + 1) % n
-		edgeLens[i] = vertices[j].Sub(vertices[i]).Length()
-		perimeter += edgeLens[i]
-	}
-
-	if perimeter < 1e-9 {
-		return nil
-	}
-
-	targetDist := min(4*(lw+1), 20)
-	nPoints := max(3, int(math.Round(perimeter/targetDist)))
-	actualDist := perimeter / float64(nPoints)
-
-	points := make([]vec.Vec2, 0, nPoints)
-
-	for i := range nPoints {
-		dist := float64(i) * actualDist
-
-		// find which edge this distance falls on
-		d := dist
-		for e := range n {
-			if d <= edgeLens[e]+1e-9 {
-				var t float64
-				if edgeLens[e] > 1e-9 {
-					t = min(d/edgeLens[e], 1)
-				}
-				a := vertices[e]
-				b := vertices[(e+1)%n]
-				p := a.Add(b.Sub(a).Mul(t))
-				points = append(points, p)
-				break
-			}
-			d -= edgeLens[e]
-		}
-	}
-
-	return points
 }
 
 // findFlatBase detects a flat base edge in the equidistant points.
@@ -540,9 +458,8 @@ func drawCloudyBorder(b *builder.Builder, vertices []vec.Vec2,
 
 // drawPlainPolygon draws the vertices as a simple closed polygon path.
 func drawPlainPolygon(b *builder.Builder, vertices []vec.Vec2) pdf.Rectangle {
-	var bbox pdf.Rectangle
+	bbox := pdf.RectangleFromPoints(vertices...)
 	for i, v := range vertices {
-		bbox.ExtendVec(v)
 		x := pdf.Round(v.X, 2)
 		y := pdf.Round(v.Y, 2)
 		if i == 0 {
@@ -553,15 +470,4 @@ func drawPlainPolygon(b *builder.Builder, vertices []vec.Vec2) pdf.Rectangle {
 	}
 	b.ClosePath()
 	return bbox
-}
-
-// signedArea returns twice the signed area of a polygon. Positive means CCW.
-func signedArea(vertices []vec.Vec2) float64 {
-	n := len(vertices)
-	var area float64
-	for i := range n {
-		j := (i + 1) % n
-		area += vertices[i].X*vertices[j].Y - vertices[j].X*vertices[i].Y
-	}
-	return area
 }

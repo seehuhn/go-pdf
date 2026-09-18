@@ -53,7 +53,7 @@ func spikeTipX(lw float64) float64 {
 
 func TestStrokeBoundsCap(t *testing.T) {
 	pts := []vec.Vec2{{X: 10, Y: 20}, {X: 30, Y: 20}}
-	got, ok := strokeBounds([][]vec.Vec2{pts}, false, 4, graphics.LineJoinRound, defaultMiterLimit)
+	got, ok := strokeBounds([][]vec.Vec2{pts}, false, 4, graphics.LineJoinRound, graphics.DefaultMiterLimit)
 	if !ok {
 		t.Fatal("no bounds for a two-point path")
 	}
@@ -64,10 +64,10 @@ func TestStrokeBoundsCap(t *testing.T) {
 }
 
 func TestStrokeBoundsEmpty(t *testing.T) {
-	if _, ok := strokeBounds(nil, false, 4, graphics.LineJoinRound, defaultMiterLimit); ok {
+	if _, ok := strokeBounds(nil, false, 4, graphics.LineJoinRound, graphics.DefaultMiterLimit); ok {
 		t.Error("an empty path has bounds")
 	}
-	if _, ok := strokeBounds([][]vec.Vec2{{}}, false, 4, graphics.LineJoinRound, defaultMiterLimit); ok {
+	if _, ok := strokeBounds([][]vec.Vec2{{}}, false, 4, graphics.LineJoinRound, graphics.DefaultMiterLimit); ok {
 		t.Error("a path with no points has bounds")
 	}
 }
@@ -79,7 +79,7 @@ func TestStrokeBoundsMiterSpike(t *testing.T) {
 	const lw = 4
 
 	miter, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, lw,
-		graphics.LineJoinMiter, defaultMiterLimit)
+		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
 	if !ok {
 		t.Fatal("no bounds for the triangle")
 	}
@@ -89,7 +89,7 @@ func TestStrokeBoundsMiterSpike(t *testing.T) {
 	}
 
 	round, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, lw,
-		graphics.LineJoinRound, defaultMiterLimit)
+		graphics.LineJoinRound, graphics.DefaultMiterLimit)
 	if !ok {
 		t.Fatal("no bounds for the triangle")
 	}
@@ -121,7 +121,7 @@ func TestStrokeBoundsOpenPathHasNoJoinAtEnds(t *testing.T) {
 	const lw = 4
 
 	got, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, false, lw,
-		graphics.LineJoinMiter, defaultMiterLimit)
+		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
 	if !ok {
 		t.Fatal("no bounds for the path")
 	}

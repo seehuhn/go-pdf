@@ -22,6 +22,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/geom/vec"
 )
 
 func TestTextString_Get(t *testing.T) {
@@ -447,5 +450,55 @@ func TestCatalogWriteMissingPages(t *testing.T) {
 	rm := NewResourceManager(w)
 	if _, err := (&Catalog{}).Encode(rm); err == nil {
 		t.Errorf("missing Pages not rejected")
+	}
+}
+
+func TestRectangleRectRoundTrip(t *testing.T) {
+	r := rect.Rect{LLx: -1.5, LLy: 2, URx: 3.25, URy: 400}
+
+	pdfRect := RectangleFromRect(r)
+	want := Rectangle{LLx: -1.5, LLy: 2, URx: 3.25, URy: 400}
+	if pdfRect != want {
+		t.Errorf("got %v, want %v", pdfRect, want)
+	}
+
+	if got := pdfRect.ToRect(); got != r {
+		t.Errorf("round trip gave %v, want %v", got, r)
+	}
+}
+
+func TestRectangleGrow(t *testing.T) {
+	r := Rectangle{LLx: 1, LLy: 2, URx: 5, URy: 8}
+
+	got := r.Grow(1.5)
+	want := Rectangle{LLx: -0.5, LLy: 0.5, URx: 6.5, URy: 9.5}
+	if got != want {
+		t.Errorf("Grow(1.5) = %v, want %v", got, want)
+	}
+	if back := got.Grow(-1.5); back != r {
+		t.Errorf("Grow(1.5).Grow(-1.5) = %v, want %v", back, r)
+	}
+}
+
+func TestRectangleFromPoints(t *testing.T) {
+	if got := RectangleFromPoints(); !got.IsZero() {
+		t.Errorf("no points gave %v, want the zero rectangle", got)
+	}
+
+	// a first point at the origin must not be lost
+	got := RectangleFromPoints(vec.Vec2{X: 0, Y: 0}, vec.Vec2{X: 5, Y: 5})
+	want := Rectangle{LLx: 0, LLy: 0, URx: 5, URy: 5}
+	if got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+
+	got = RectangleFromPoints(
+		vec.Vec2{X: 3, Y: -1},
+		vec.Vec2{X: -2, Y: 4},
+		vec.Vec2{X: 1, Y: 1},
+	)
+	want = Rectangle{LLx: -2, LLy: -1, URx: 3, URy: 4}
+	if got != want {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }

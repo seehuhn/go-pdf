@@ -213,22 +213,54 @@ func TestCloudOutlineTrimToCloud(t *testing.T) {
 	}
 }
 
-func TestSignedArea(t *testing.T) {
-	// CCW square should have positive area
-	area := signedArea(unitSquare)
-	if area <= 0 {
-		t.Errorf("expected positive area for CCW polygon, got %f", area)
-	}
+// TestCloudOutlineSampleLimit checks that a polygon with coordinates far
+// beyond any page does not make the generator sample an unbounded number of
+// boundary points, or emit a content stream to match.  The spacing follows
+// the line width, so without the limit both would grow with the coordinates
+// while the file stayed the same size.
+func TestCloudOutlineSampleLimit(t *testing.T) {
+	for _, size := range []float64{1e5, 1e10, 1e30, 1e100} {
+		verts := []vec.Vec2{
+			{X: 0, Y: 0},
+			{X: size, Y: 0},
+			{X: size, Y: size},
+			{X: 0, Y: size},
+		}
 
-	// CW version
-	cw := []vec.Vec2{
-		{X: 0, Y: 0},
-		{X: 0, Y: 100},
-		{X: 100, Y: 100},
-		{X: 100, Y: 0},
+		co := newCloudOutline(verts, 1, 1)
+		if co == nil {
+			t.Errorf("size %g: no cloud outline", size)
+			continue
+		}
+		if len(co.points) > maxSamplePoints {
+			t.Errorf("size %g: sampled %d points, limit is %d",
+				size, len(co.points), maxSamplePoints)
+		}
+
+		segments := 0
+		for range co.fill() {
+			segments++
+		}
+		if segments > maxSamplePoints {
+			t.Errorf("size %g: fill path has %d segments", size, segments)
+		}
 	}
-	area = signedArea(cw)
-	if area >= 0 {
-		t.Errorf("expected negative area for CW polygon, got %f", area)
+}
+
+// TestCloudOutlineDegenerate checks that a polygon which encloses nothing is
+// rejected rather than dividing by a zero perimeter.
+func TestCloudOutlineDegenerate(t *testing.T) {
+	cases := map[string][]vec.Vec2{
+		"no vertices":         nil,
+		"one vertex":          {{X: 7, Y: 7}},
+		"two vertices":        {{X: 0, Y: 0}, {X: 100, Y: 0}},
+		"coincident vertices": {{X: 7, Y: 7}, {X: 7, Y: 7}, {X: 7, Y: 7}},
+	}
+	for name, verts := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, _, ok := CloudOutline(verts, 1, 1); ok {
+				t.Error("expected no cloud")
+			}
+		})
 	}
 }

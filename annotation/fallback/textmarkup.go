@@ -56,23 +56,12 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 	}
 
 	// bounding box from all quad points
-	bbox := pdf.Rectangle{
-		LLx: a.QuadPoints[0].X,
-		LLy: a.QuadPoints[0].Y,
-		URx: a.QuadPoints[0].X,
-		URy: a.QuadPoints[0].Y,
-	}
-	for _, p := range a.QuadPoints[1:] {
-		bbox.ExtendVec(p)
-	}
+	bbox := pdf.RectangleFromPoints(a.QuadPoints...)
 	var expand float64
 	if a.Type == annotation.TextMarkupTypeSquiggly {
 		expand = lw/2 + squigglyAmplitude
 	}
-	bbox.LLx -= expand
-	bbox.LLy -= expand
-	bbox.URx += expand
-	bbox.URy += expand
+	bbox = bbox.Grow(expand)
 	bbox.IRound(2)
 	a.Rect = bbox
 

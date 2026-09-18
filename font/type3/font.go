@@ -134,10 +134,7 @@ func (g *Glyph) extract() (width float64, bbox rect.Rect, err error) {
 	hasPoints := false
 	addPoint := func(x, y float64) {
 		hasPoints = true
-		pathBBox.LLx = min(pathBBox.LLx, x)
-		pathBBox.LLy = min(pathBBox.LLy, y)
-		pathBBox.URx = max(pathBBox.URx, x)
-		pathBBox.URy = max(pathBBox.URy, y)
+		pathBBox.Add(x, y)
 	}
 	for name, args := range it.All() {
 		if first {
@@ -314,27 +311,7 @@ func (f *Font) New() (font.Layouter, error) {
 		// transform bounding box from glyph space to text space
 		bbox := rawBBoxes[i]
 		if !bbox.IsZero() {
-			corners := []struct{ x, y float64 }{
-				{bbox.LLx, bbox.LLy},
-				{bbox.LLx, bbox.URy},
-				{bbox.URx, bbox.LLy},
-				{bbox.URx, bbox.URy},
-			}
-			M := f.FontMatrix
-			ee[i] = rect.Rect{
-				LLx: math.Inf(+1),
-				LLy: math.Inf(+1),
-				URx: math.Inf(-1),
-				URy: math.Inf(-1),
-			}
-			for _, c := range corners {
-				x := M[0]*c.x + M[2]*c.y + M[4]
-				y := M[1]*c.x + M[3]*c.y + M[5]
-				ee[i].LLx = min(ee[i].LLx, x)
-				ee[i].LLy = min(ee[i].LLy, y)
-				ee[i].URx = max(ee[i].URx, x)
-				ee[i].URy = max(ee[i].URy, y)
-			}
+			ee[i] = bbox.Transform(f.FontMatrix)
 		}
 		ww[i] = rawWidths[i] * qh
 	}

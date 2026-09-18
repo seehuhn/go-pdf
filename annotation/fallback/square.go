@@ -89,12 +89,7 @@ func (g *Generator) addSquareAppearance(a *annotation.Square) (*form.Form, error
 		}
 		cloudBBox := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
 		// expand by half line width for stroke
-		bbox = pdf.Rectangle{
-			LLx: cloudBBox.LLx - lw/2,
-			LLy: cloudBBox.LLy - lw/2,
-			URx: cloudBBox.URx + lw/2,
-			URy: cloudBBox.URy + lw/2,
-		}
+		bbox = cloudBBox.Grow(lw / 2)
 		// rounded outwards, so that the rectangle still contains the square
 		// and no inset comes out negative
 		bbox = roundOut(bbox)

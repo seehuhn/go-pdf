@@ -19,15 +19,12 @@ package fallback
 import (
 	"math"
 
+	"seehuhn.de/go/geom/linalg"
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 )
-
-// defaultMiterLimit is the miter limit of a graphics state which does not set
-// one (Table 51).
-const defaultMiterLimit = 10
 
 // roundOut returns the smallest rectangle with two-decimal edges which
 // contains r.
@@ -89,33 +86,13 @@ func strokeBounds(subpaths [][]vec.Vec2, closed bool, lw float64, join graphics.
 				default:
 					prev, next = p, p // an end point of an open path: no join
 				}
-				if prev != p && next != p {
-					r = max(r, miterRadius(prev, p, next, lw, miterLimit))
-				}
+				// A vertex which carries no join gives two zero directions,
+				// for which the miter reaches no further than the bevel.
+				length, _ := linalg.MiterLength(p.Sub(prev), next.Sub(p), lw, miterLimit)
+				r = max(r, length)
 			}
 			extend(p, r)
 		}
 	}
 	return bbox, seeded
-}
-
-// miterRadius returns how far the miter join at b, between the segments a-b
-// and b-c, reaches from b.  A corner whose miter is longer than miterLimit
-// times the line width is bevelled instead (§8.4.3.5), and then reaches only
-// half the line width, as does a corner whose segments are degenerate.
-func miterRadius(a, b, c vec.Vec2, lw, miterLimit float64) float64 {
-	in := b.Sub(a)
-	out := c.Sub(b)
-	lin, lout := in.Length(), out.Length()
-	if lin == 0 || lout == 0 {
-		return lw / 2
-	}
-
-	// half the angle the two segments enclose at b
-	cosTheta := min(max(-in.Dot(out)/(lin*lout), -1), 1)
-	sinHalf := math.Sqrt((1 - cosTheta) / 2)
-	if sinHalf <= 0 || 1/sinHalf > miterLimit {
-		return lw / 2
-	}
-	return lw / 2 / sinHalf
 }

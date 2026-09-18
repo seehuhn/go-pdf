@@ -19,6 +19,7 @@ package builder
 import (
 	"math"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 )
@@ -67,6 +68,30 @@ func (b *Builder) CurveTo(x1, y1, x2, y2, x3, y3 float64) {
 // This implements the PDF graphics operator "h".
 func (b *Builder) ClosePath() {
 	b.emit(content.OpClosePath)
+}
+
+// DrawPath appends the segments of p to the current path.  Coordinates are
+// rounded to the given number of decimal digits as they are written.
+//
+// Quadratic Bezier segments are converted to cubic ones, since PDF content
+// streams have no operator for them.
+func (b *Builder) DrawPath(p path.Path, digits int) {
+	for cmd, pts := range p.ToCubic() {
+		switch cmd {
+		case path.CmdMoveTo:
+			b.MoveTo(pdf.Round(pts[0].X, digits), pdf.Round(pts[0].Y, digits))
+		case path.CmdLineTo:
+			b.LineTo(pdf.Round(pts[0].X, digits), pdf.Round(pts[0].Y, digits))
+		case path.CmdCubeTo:
+			b.CurveTo(
+				pdf.Round(pts[0].X, digits), pdf.Round(pts[0].Y, digits),
+				pdf.Round(pts[1].X, digits), pdf.Round(pts[1].Y, digits),
+				pdf.Round(pts[2].X, digits), pdf.Round(pts[2].Y, digits),
+			)
+		case path.CmdClose:
+			b.ClosePath()
+		}
+	}
 }
 
 // Rectangle appends a rectangle to the current path as a closed subpath.

@@ -148,13 +148,8 @@ func newMarkup(markupType annotation.TextMarkupType, col color.Color, qq []vec.V
 		Type:       markupType,
 		QuadPoints: qq,
 	}
-	for _, p := range qq {
-		a.Rect.ExtendVec(p)
-	}
-	a.Rect.LLx -= 2
-	a.Rect.LLy -= 2
-	a.Rect.URx += 2
-	a.Rect.URy += 2
+	a.Rect = pdf.RectangleFromPoints(qq...)
+	a.Rect = a.Rect.Grow(2)
 	a.Rect.IRound(1)
 	return a
 }

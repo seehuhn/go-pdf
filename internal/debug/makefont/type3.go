@@ -17,8 +17,6 @@
 package makefont
 
 import (
-	"seehuhn.de/go/geom/path"
-
 	"seehuhn.de/go/sfnt/glyf"
 	"seehuhn.de/go/sfnt/glyph"
 
@@ -77,20 +75,7 @@ func Type3() (font.Layouter, error) {
 				float64(bbox.URx), float64(bbox.URy))
 
 			// Draw the glyph path
-			glyphPath := origOutlines.Path(gid)
-			cubicPath := glyphPath.ToCubic()
-			for cmd, pts := range cubicPath {
-				switch cmd {
-				case path.CmdMoveTo:
-					b.MoveTo(pts[0].X, pts[0].Y)
-				case path.CmdLineTo:
-					b.LineTo(pts[0].X, pts[0].Y)
-				case path.CmdCubeTo:
-					b.CurveTo(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y, pts[2].X, pts[2].Y)
-				case path.CmdClose:
-					b.ClosePath()
-				}
-			}
+			b.DrawPath(origOutlines.Path(gid), 4)
 			b.Fill()
 		} else {
 			// Empty glyph - just width, no drawing

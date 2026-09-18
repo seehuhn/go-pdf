@@ -33,6 +33,12 @@ type ClipPath struct {
 	CTM     matrix.Matrix
 }
 
+// DefaultMiterLimit is the miter limit of a graphics state which does not set
+// one.  A join whose miter is longer than this multiple of the line width is
+// bevelled instead, which happens where the segments enclose an angle of less
+// than about 11.5 degrees.
+const DefaultMiterLimit = 10
+
 // State represents the current graphics state of a PDF processor,
 // within a content stream.  When reading or writing content streams,
 // this is updated after each operator in the stream.
@@ -97,7 +103,7 @@ type State struct {
 	LineJoin LineJoinStyle
 
 	// MiterLimit is the maximum miter length to line width ratio for mitered
-	// joins.  The value must be at least 1.
+	// joins.  The value must be at least 1.  See [DefaultMiterLimit].
 	MiterLimit float64
 
 	// DashPattern specifies the lengths of alternating dashes and gaps, in user space units.
@@ -221,7 +227,7 @@ func NewState() State {
 		LineWidth:   1,
 		LineCap:     LineCapButt,
 		LineJoin:    LineJoinMiter,
-		MiterLimit:  10,
+		MiterLimit:  DefaultMiterLimit,
 		DashPattern: []float64{},
 		DashPhase:   0,
 

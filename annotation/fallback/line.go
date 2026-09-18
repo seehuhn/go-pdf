@@ -17,8 +17,6 @@
 package fallback
 
 import (
-	"math"
-
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
@@ -67,7 +65,7 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 	// the line itself; it has two points, so it carries caps and no join
 	segment := []vec.Vec2{{X: x1, Y: y1}, {X: x2, Y: y2}}
 	bbox, _ := strokeBounds([][]vec.Vec2{segment}, false, lw,
-		graphics.LineJoinMiter, defaultMiterLimit)
+		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
 
 	// expand for line endings
 	le0 := normalizeLE(a.LineEndingStyle[0])
@@ -98,58 +96,33 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 
 // expandBBoxForLeaderLines expands the bounding box to include leader lines
 func expandBBoxForLeaderLines(bbox *pdf.Rectangle, a *annotation.Line, lw float64) {
-	x1, y1 := a.Coords[0], a.Coords[1]
-	x2, y2 := a.Coords[2], a.Coords[3]
+	from := vec.Vec2{X: a.Coords[0], Y: a.Coords[1]}
+	to := vec.Vec2{X: a.Coords[2], Y: a.Coords[3]}
 
-	// calculate perpendicular direction (left when looking from start to end)
-	dx := x2 - x1
-	dy := y2 - y1
-	length := math.Sqrt(dx*dx + dy*dy)
-	if length < 0.1 {
+	d := to.Sub(from)
+	if d.Length() < 0.1 {
 		return
 	}
+	dir := d.Normalize()
+	perp := d.Normal() // left when looking from start to end
 
-	// perpendicular vector (rotated 90° counter-clockwise)
-	perpX := -dy / length
-	perpY := dx / length
+	// leader line endpoints, offset along the line
+	start := from.Add(dir.Mul(a.LLO))
+	end := to.Sub(dir.Mul(a.LLO))
 
-	// calculate leader line endpoints
-	// start point with offset
-	startX := x1 + a.LLO*dx/length
-	startY := y1 + a.LLO*dy/length
+	// the line proper, drawn LL away from the coordinates, and the extensions
+	// which reach LLE back from it towards them
+	shiftedStart := start.Add(perp.Mul(a.LL))
+	shiftedEnd := end.Add(perp.Mul(a.LL))
+	extStart := shiftedStart.Sub(perp.Mul(a.LLE))
+	extEnd := shiftedEnd.Sub(perp.Mul(a.LLE))
 
-	// end point with offset
-	endX := x2 - a.LLO*dx/length
-	endY := y2 - a.LLO*dy/length
-
-	// shifted line endpoints
-	shiftedStartX := startX + a.LL*perpX
-	shiftedStartY := startY + a.LL*perpY
-	shiftedEndX := endX + a.LL*perpX
-	shiftedEndY := endY + a.LL*perpY
-
-	// extension points
-	extStartX := shiftedStartX - a.LLE*perpX
-	extStartY := shiftedStartY - a.LLE*perpY
-	extEndX := shiftedEndX - a.LLE*perpX
-	extEndY := shiftedEndY - a.LLE*perpY
-
-	// include all points in bbox
-	points := []float64{
-		startX, startY,
-		endX, endY,
-		shiftedStartX, shiftedStartY,
-		shiftedEndX, shiftedEndY,
-		extStartX, extStartY,
-		extEndX, extEndY,
-	}
-
-	for i := 0; i < len(points); i += 2 {
-		x, y := points[i], points[i+1]
-		bbox.LLx = min(bbox.LLx, x-lw/2)
-		bbox.LLy = min(bbox.LLy, y-lw/2)
-		bbox.URx = max(bbox.URx, x+lw/2)
-		bbox.URy = max(bbox.URy, y+lw/2)
+	points := []vec.Vec2{start, end, shiftedStart, shiftedEnd, extStart, extEnd}
+	for _, p := range points {
+		bbox.LLx = min(bbox.LLx, p.X-lw/2)
+		bbox.LLy = min(bbox.LLy, p.Y-lw/2)
+		bbox.URx = max(bbox.URx, p.X+lw/2)
+		bbox.URy = max(bbox.URy, p.Y+lw/2)
 	}
 }
 
@@ -166,84 +139,65 @@ func drawSimpleLineBuilder(b *builder.Builder, a *annotation.Line) {
 
 // drawLineWithLeaderLinesBuilder draws a line with leader lines (dimension line style)
 func drawLineWithLeaderLinesBuilder(b *builder.Builder, a *annotation.Line) {
-	x1, y1 := a.Coords[0], a.Coords[1]
-	x2, y2 := a.Coords[2], a.Coords[3]
+	from := vec.Vec2{X: a.Coords[0], Y: a.Coords[1]}
+	to := vec.Vec2{X: a.Coords[2], Y: a.Coords[3]}
 
-	// calculate direction and perpendicular vectors
-	dx := x2 - x1
-	dy := y2 - y1
-	length := math.Sqrt(dx*dx + dy*dy)
-	if length < 0.1 {
+	d := to.Sub(from)
+	if d.Length() < 0.1 {
 		// line too short, fall back to simple line
 		drawSimpleLineBuilder(b, a)
 		return
 	}
+	dir := d.Normalize()
+	perp := d.Normal() // left when looking from start to end
 
-	// unit vectors
-	dirX := dx / length
-	dirY := dy / length
+	// leader line endpoints, offset along the line
+	start := from.Add(dir.Mul(a.LLO))
+	end := to.Sub(dir.Mul(a.LLO))
 
-	// perpendicular vector (rotated 90° counter-clockwise)
-	perpX := -dirY
-	perpY := dirX
-
-	// calculate key points
-	// start point with offset
-	startX := x1 + a.LLO*dirX
-	startY := y1 + a.LLO*dirY
-
-	// end point with offset
-	endX := x2 - a.LLO*dirX
-	endY := y2 - a.LLO*dirY
-
-	// shifted line endpoints
-	shiftedStartX := startX + a.LL*perpX
-	shiftedStartY := startY + a.LL*perpY
-	shiftedEndX := endX + a.LL*perpX
-	shiftedEndY := endY + a.LL*perpY
-
-	// extension points (for leader line extensions)
-	extStartX := shiftedStartX - a.LLE*perpX
-	extStartY := shiftedStartY - a.LLE*perpY
-	extEndX := shiftedEndX - a.LLE*perpX
-	extEndY := shiftedEndY - a.LLE*perpY
+	// the line proper, drawn LL away from the coordinates, and the extensions
+	// which reach LLE back from it towards them
+	shiftedStart := start.Add(perp.Mul(a.LL))
+	shiftedEnd := end.Add(perp.Mul(a.LL))
+	extStart := shiftedStart.Sub(perp.Mul(a.LLE))
+	extEnd := shiftedEnd.Sub(perp.Mul(a.LLE))
 
 	// draw the leader lines (perpendicular segments)
 	// start leader line
-	b.MoveTo(pdf.Round(extStartX, 2), pdf.Round(extStartY, 2))
-	b.LineTo(pdf.Round(startX, 2), pdf.Round(startY, 2))
+	b.MoveTo(pdf.Round(extStart.X, 2), pdf.Round(extStart.Y, 2))
+	b.LineTo(pdf.Round(start.X, 2), pdf.Round(start.Y, 2))
 	b.Stroke()
 
 	// end leader line
-	b.MoveTo(pdf.Round(extEndX, 2), pdf.Round(extEndY, 2))
-	b.LineTo(pdf.Round(endX, 2), pdf.Round(endY, 2))
+	b.MoveTo(pdf.Round(extEnd.X, 2), pdf.Round(extEnd.Y, 2))
+	b.LineTo(pdf.Round(end.X, 2), pdf.Round(end.Y, 2))
 	b.Stroke()
 
 	// draw the main line with endings
 	// start ending
 	if a.LineEndingStyle[0] != "" && a.LineEndingStyle[0] != annotation.LineEndingStyleNone {
 		info := lineEndingInfo{
-			At:        vec.Vec2{X: shiftedStartX, Y: shiftedStartY},
-			Dir:       vec.Vec2{X: shiftedStartX - shiftedEndX, Y: shiftedStartY - shiftedEndY},
+			At:        shiftedStart,
+			Dir:       shiftedStart.Sub(shiftedEnd),
 			FillColor: paint(a.FillColor),
 			IsStart:   true,
 		}
 		drawLineEndingBuilder(b, a.LineEndingStyle[0], info)
 	} else {
-		b.MoveTo(pdf.Round(shiftedStartX, 2), pdf.Round(shiftedStartY, 2))
+		b.MoveTo(pdf.Round(shiftedStart.X, 2), pdf.Round(shiftedStart.Y, 2))
 	}
 
 	// end ending
 	if a.LineEndingStyle[1] != "" && a.LineEndingStyle[1] != annotation.LineEndingStyleNone {
 		info := lineEndingInfo{
-			At:        vec.Vec2{X: shiftedEndX, Y: shiftedEndY},
-			Dir:       vec.Vec2{X: shiftedEndX - shiftedStartX, Y: shiftedEndY - shiftedStartY},
+			At:        shiftedEnd,
+			Dir:       shiftedEnd.Sub(shiftedStart),
 			FillColor: paint(a.FillColor),
 			IsStart:   false,
 		}
 		drawLineEndingBuilder(b, a.LineEndingStyle[1], info)
 	} else {
-		b.LineTo(pdf.Round(shiftedEndX, 2), pdf.Round(shiftedEndY, 2))
+		b.LineTo(pdf.Round(shiftedEnd.X, 2), pdf.Round(shiftedEnd.Y, 2))
 		b.Stroke()
 	}
 }

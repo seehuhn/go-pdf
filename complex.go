@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/geom/vec"
 )
 
@@ -191,6 +192,35 @@ type Rectangle struct {
 	LLx, LLy, URx, URy float64
 }
 
+// RectangleFromRect converts a rectangle in the representation used by the
+// geometry packages to a PDF rectangle.
+func RectangleFromRect(r rect.Rect) Rectangle {
+	return Rectangle{LLx: r.LLx, LLy: r.LLy, URx: r.URx, URy: r.URy}
+}
+
+// RectangleFromPoints returns the smallest rectangle which contains all of
+// the given points.  The zero rectangle is returned for no points.
+func RectangleFromPoints(points ...vec.Vec2) Rectangle {
+	if len(points) == 0 {
+		return Rectangle{}
+	}
+	p := points[0]
+	r := Rectangle{LLx: p.X, LLy: p.Y, URx: p.X, URy: p.Y}
+	for _, p := range points[1:] {
+		r.LLx = min(r.LLx, p.X)
+		r.LLy = min(r.LLy, p.Y)
+		r.URx = max(r.URx, p.X)
+		r.URy = max(r.URy, p.Y)
+	}
+	return r
+}
+
+// ToRect converts the rectangle to the representation used by the geometry
+// packages.
+func (r Rectangle) ToRect() rect.Rect {
+	return rect.Rect{LLx: r.LLx, LLy: r.LLy, URx: r.URx, URy: r.URy}
+}
+
 // Dx returns the width of the rectangle.
 func (r *Rectangle) Dx() float64 {
 	return r.URx - r.LLx
@@ -259,7 +289,8 @@ func (r *Rectangle) YPos(rel float64) float64 {
 	return r.LLy + rel*(r.URy-r.LLy)
 }
 
-// Extend enlarges the rectangle to also cover `other`.
+// Extend enlarges the rectangle to also cover other.  A zero rectangle, on
+// either side, counts as absent rather than as a point at the origin.
 func (r *Rectangle) Extend(other *Rectangle) {
 	if other.IsZero() {
 		return
@@ -282,21 +313,12 @@ func (r *Rectangle) Extend(other *Rectangle) {
 	}
 }
 
-// ExtendVec enlarges the rectangle to also cover v.
-func (r *Rectangle) ExtendVec(v vec.Vec2) {
-	isZero := r.IsZero()
-	if v.X < r.LLx || isZero {
-		r.LLx = v.X
-	}
-	if v.Y < r.LLy || isZero {
-		r.LLy = v.Y
-	}
-	if v.X > r.URx || isZero {
-		r.URx = v.X
-	}
-	if v.Y > r.URy || isZero {
-		r.URy = v.Y
-	}
+// Grow returns the rectangle enlarged by d on each of its four sides, so that
+// it becomes 2*d wider and 2*d taller.  A negative d shrinks the rectangle
+// instead, and shrinking by more than half the width or height turns the
+// rectangle inside out rather than collapsing it to an empty one.
+func (r Rectangle) Grow(d float64) Rectangle {
+	return RectangleFromRect(r.ToRect().Grow(d))
 }
 
 // Intersect returns the intersection of r and other, or nil if the

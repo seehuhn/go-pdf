@@ -87,12 +87,7 @@ func (g *Generator) addCircleAppearance(a *annotation.Circle) (*form.Form, error
 	var bbox pdf.Rectangle
 	if isCloudy {
 		cloudBBox := drawCloudyBorder(b, cloudVerts, be.Intensity, lw, hasFill, hasOutline)
-		bbox = pdf.Rectangle{
-			LLx: cloudBBox.LLx - lw/2,
-			LLy: cloudBBox.LLy - lw/2,
-			URx: cloudBBox.URx + lw/2,
-			URy: cloudBBox.URy + lw/2,
-		}
+		bbox = cloudBBox.Grow(lw / 2)
 		// rounded outwards, so that the rectangle still contains the ellipse
 		// and no inset comes out negative
 		bbox = roundOut(bbox)
@@ -148,8 +143,16 @@ func flattenEllipse(rect pdf.Rectangle, lw float64) []vec.Vec2 {
 	h := (rx - ry) * (rx - ry) / ((rx + ry) * (rx + ry))
 	perimeter := math.Pi * (rx + ry) * (1 + 3*h/(10+math.Sqrt(4-3*h)))
 
-	// target segment length ~4 points
-	n := max(12, int(math.Ceil(perimeter/4)))
+	// The spacing is fixed, so the vertex count grows with the size of the
+	// ellipse.  It is capped at the number of points the cloudy border can
+	// resolve, which is all the polygon is used for, so nothing is lost: a
+	// rectangle with coordinates far outside any page would otherwise ask for
+	// an unbounded amount of memory, and the conversion to int is undefined
+	// for a count beyond the range of int64.
+	n := 12
+	if k := math.Ceil(perimeter / 4); k > 12 {
+		n = int(min(k, maxSamplePoints))
+	}
 
 	verts := make([]vec.Vec2, n)
 	for i := range n {

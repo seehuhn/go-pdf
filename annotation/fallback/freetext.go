@@ -134,12 +134,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 				b.Stroke()
 				outer.Extend(&strokeBBox)
 				// expand for stroke width
-				outer = pdf.Rectangle{
-					LLx: outer.LLx - lw/2,
-					LLy: outer.LLy - lw/2,
-					URx: outer.URx + lw/2,
-					URy: outer.URy + lw/2,
-				}
+				outer = outer.Grow(lw / 2)
 			}
 		} else if bgCol != nil || hasBorder {
 			if bgCol != nil {

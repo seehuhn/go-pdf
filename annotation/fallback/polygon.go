@@ -92,12 +92,7 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	if isCloudy {
 		if len(verts) >= 3 {
 			cloudBBox := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
-			bbox = pdf.Rectangle{
-				LLx: cloudBBox.LLx - lw/2,
-				LLy: cloudBBox.LLy - lw/2,
-				URx: cloudBBox.URx + lw/2,
-				URy: cloudBBox.URy + lw/2,
-			}
+			bbox = cloudBBox.Grow(lw / 2)
 			bbox.IRound(2)
 			a.Rect = bbox
 			drawn = true
@@ -123,7 +118,7 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 // join, and a sharp corner reaches beyond the border width.
 func polygonPathBBox(verts []vec.Vec2, lw float64) pdf.Rectangle {
 	r, ok := strokeBounds([][]vec.Vec2{verts}, true, lw,
-		graphics.LineJoinMiter, defaultMiterLimit)
+		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
 	if !ok {
 		return pdf.Rectangle{}
 	}

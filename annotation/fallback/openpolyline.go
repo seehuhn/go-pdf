@@ -81,7 +81,7 @@ func drawOpenPolyline(b *builder.Builder, points []vec.Vec2, startLE, endLE anno
 // default miter joins, so a sharp corner reaches beyond the line width.
 func openPolylineBBox(points []vec.Vec2, lw float64, startLE, endLE annotation.LineEndingStyle) pdf.Rectangle {
 	bbox, ok := strokeBounds([][]vec.Vec2{points}, false, lw,
-		graphics.LineJoinMiter, defaultMiterLimit)
+		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
 	if !ok {
 		return pdf.Rectangle{}
 	}

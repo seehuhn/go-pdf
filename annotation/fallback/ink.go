@@ -104,7 +104,7 @@ func hasInkPoints(paths [][]vec.Vec2) bool {
 // The joins are round, so no vertex reaches further than half the line width.
 // Empty sub-paths are skipped.
 func inkBBox(paths [][]vec.Vec2, lw float64) pdf.Rectangle {
-	bbox, ok := strokeBounds(paths, false, lw, graphics.LineJoinRound, defaultMiterLimit)
+	bbox, ok := strokeBounds(paths, false, lw, graphics.LineJoinRound, graphics.DefaultMiterLimit)
 	if !ok {
 		return pdf.Rectangle{}
 	}
