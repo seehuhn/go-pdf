@@ -93,12 +93,14 @@ func (g *Generator) addCircleAppearance(a *annotation.Circle) (*form.Form, error
 			URx: cloudBBox.URx + lw/2,
 			URy: cloudBBox.URy + lw/2,
 		}
-		bbox.IRound(2)
+		// rounded outwards, so that the rectangle still contains the ellipse
+		// and no inset comes out negative
+		bbox = roundOut(bbox)
 		a.Margin = []float64{
-			max(0, rect.LLx-bbox.LLx),
-			max(0, rect.LLy-bbox.LLy),
-			max(0, bbox.URx-rect.URx),
-			max(0, bbox.URy-rect.URy),
+			pdf.Round(rect.LLx-bbox.LLx, 4),
+			pdf.Round(rect.LLy-bbox.LLy, 4),
+			pdf.Round(bbox.URx-rect.URx, 4),
+			pdf.Round(bbox.URy-rect.URy, 4),
 		}
 		a.Rect = bbox
 	} else {

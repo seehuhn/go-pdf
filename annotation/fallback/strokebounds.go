@@ -29,6 +29,21 @@ import (
 // one (Table 51).
 const defaultMiterLimit = 10
 
+// roundOut returns the smallest rectangle with two-decimal edges which
+// contains r.
+//
+// An annotation whose /RD gives an inner rectangle as insets from its own
+// needs its rectangle rounded this way: rounding to nearest can move an edge
+// inside the rectangle it is derived from, and an inset may not be negative.
+func roundOut(r pdf.Rectangle) pdf.Rectangle {
+	return pdf.Rectangle{
+		LLx: math.Floor(r.LLx*100) / 100,
+		LLy: math.Floor(r.LLy*100) / 100,
+		URx: math.Ceil(r.URx*100) / 100,
+		URy: math.Ceil(r.URy*100) / 100,
+	}
+}
+
 // strokeBounds returns the rectangle covered by stroking the polylines in
 // subpaths with a line of width lw.  It is the bounding box an appearance
 // stream drawing them needs, and the annotation rectangle that appearance is

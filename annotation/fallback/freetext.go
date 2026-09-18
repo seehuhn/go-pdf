@@ -18,7 +18,6 @@ package fallback
 
 import (
 	"fmt"
-	"math"
 	"slices"
 	"strconv"
 
@@ -228,12 +227,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	// Finalize the outer rectangle.  It is rounded outwards, so that it still
 	// contains the text box: /RD records the box as insets from this
 	// rectangle, and an inset may not be negative.
-	outer = pdf.Rectangle{
-		LLx: math.Floor(outer.LLx*100) / 100,
-		LLy: math.Floor(outer.LLy*100) / 100,
-		URx: math.Ceil(outer.URx*100) / 100,
-		URy: math.Ceil(outer.URy*100) / 100,
-	}
+	outer = roundOut(outer)
 	a.Rect = outer
 	if inner.NearlyEqual(&outer, 0.01) {
 		a.Margin = nil
