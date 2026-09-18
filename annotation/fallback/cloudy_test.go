@@ -20,6 +20,8 @@ import (
 	"math"
 	"testing"
 
+	"seehuhn.de/go/geom/path"
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -32,6 +34,14 @@ var unitSquare = []vec.Vec2{
 	{X: 100, Y: 0},
 	{X: 100, Y: 100},
 	{X: 0, Y: 100},
+}
+
+// CCW 100x60 rectangle
+var wideRectangle = []vec.Vec2{
+	{X: 0, Y: 0},
+	{X: 100, Y: 0},
+	{X: 100, Y: 60},
+	{X: 0, Y: 60},
 }
 
 func hasCurveOps(ops []content.Operator) bool {
@@ -132,6 +142,74 @@ func TestCloudyBorderTriangle(t *testing.T) {
 	}
 	if bbox.IsZero() {
 		t.Error("expected non-zero bbox")
+	}
+}
+
+func TestCloudOutlineRectangle(t *testing.T) {
+	fill, stroke, ok := CloudOutline(wideRectangle, 1, 1)
+	if !ok {
+		t.Fatal("expected ok for 100x60 rectangle")
+	}
+
+	var lastCmd path.Command
+	var sawCmd bool
+	for cmd := range fill {
+		lastCmd = cmd
+		sawCmd = true
+	}
+	if !sawCmd || lastCmd != path.CmdClose {
+		t.Errorf("expected fill path to be closed, last command %v", lastCmd)
+	}
+
+	want := rect.Rect{LLx: 0, LLy: 0, URx: 100, URy: 60}
+
+	fillBBox := fill.BBox()
+	if !fillBBox.Covers(want) {
+		t.Errorf("fill bbox %v does not contain rectangle %v", fillBBox, want)
+	}
+
+	strokeBBox := stroke.BBox()
+	if !strokeBBox.Covers(want) {
+		t.Errorf("stroke bbox %v does not contain rectangle %v", strokeBBox, want)
+	}
+}
+
+func TestCloudOutlineTooSmall(t *testing.T) {
+	tiny := []vec.Vec2{
+		{X: 0, Y: 0},
+		{X: 2, Y: 0},
+		{X: 2, Y: 2},
+		{X: 0, Y: 2},
+	}
+	_, _, ok := CloudOutline(tiny, 1, 1)
+	if ok {
+		t.Error("expected !ok for a 2x2 rectangle")
+	}
+}
+
+func TestCloudOutlineTrimToCloud(t *testing.T) {
+	co := newCloudOutline(wideRectangle, 1, 1)
+	if co == nil {
+		t.Fatal("expected a cloud outline for the 100x60 rectangle")
+	}
+
+	// left side's midpoint: outside the box, but within bulge reach
+	got := co.trimToCloud(vec.Vec2{X: -40, Y: 30}, vec.Vec2{X: 0, Y: 30})
+	if got.X >= 0 {
+		t.Errorf("expected trimmed point outside the box, got %v", got)
+	}
+	if got.X <= -20 {
+		t.Errorf("expected trimmed point within bulge reach, got %v", got)
+	}
+	if math.Abs(got.Y-30) > 1 {
+		t.Errorf("expected trimmed point near y=30, got %v", got)
+	}
+
+	// a segment fully inside the cloud, away from the outline
+	inside := vec.Vec2{X: 60, Y: 35}
+	got2 := co.trimToCloud(vec.Vec2{X: 40, Y: 25}, inside)
+	if got2 != inside {
+		t.Errorf("expected inside point unchanged, got %v", got2)
 	}
 }
 

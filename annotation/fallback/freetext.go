@@ -162,6 +162,9 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		b.SetStrokeColor(quireInk)
 		reversed := slices.Clone(calloutLine)
 		slices.Reverse(reversed)
+		if co != nil {
+			reversed[0] = co.trimToCloud(reversed[1], reversed[0])
+		}
 		drawOpenPolyline(b, reversed, annotation.LineEndingStyleNone, a.LineEndingStyle, bgCol)
 	}
 

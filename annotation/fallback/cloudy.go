@@ -19,6 +19,7 @@ package fallback
 import (
 	"math"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
@@ -112,49 +113,52 @@ func (co *cloudOutline) bulgeEnd(i int) int {
 	return (i + 1) % len(co.cusps)
 }
 
-// fillPath draws the closed fill path and returns the bounding box.
-func (co *cloudOutline) fillPath(b *builder.Builder) pdf.Rectangle {
-	var bbox pdf.Rectangle
+// CloudOutline returns the paths the generator draws a cloudy border with
+// round the polygon vertices: the closed fill path and the open stroke
+// path with its cusp ticks. lineWidth is the border's stroke width, which
+// sets the bulge size together with intensity (0 to 2). ok is false when
+// the polygon is too small for a cloud, in which case a caller draws the
+// plain polygon instead.
+func CloudOutline(vertices []vec.Vec2, intensity, lineWidth float64) (fill, stroke path.Path, ok bool) {
+	co := newCloudOutline(vertices, intensity, lineWidth)
+	if co == nil {
+		return path.Empty, path.Empty, false
+	}
+	return co.fill(), co.stroke(), true
+}
+
+// fill returns the closed fill path, at full precision.
+func (co *cloudOutline) fill() path.Path {
+	var d path.Data
 	nBulges := co.numBulges()
 
 	if co.hasBase {
 		// base line
 		baseStart := co.points[co.cusps[nBulges]]
 		baseEnd := co.points[co.cusps[0]]
-		b.MoveTo(pdf.Round(baseStart.X, 2), pdf.Round(baseStart.Y, 2))
-		b.LineTo(pdf.Round(baseEnd.X, 2), pdf.Round(baseEnd.Y, 2))
-		bbox.ExtendVec(baseStart)
-		bbox.ExtendVec(baseEnd)
+		d.MoveTo(baseStart)
+		d.LineTo(baseEnd)
 	} else {
 		start := co.points[co.cusps[0]]
-		b.MoveTo(pdf.Round(start.X, 2), pdf.Round(start.Y, 2))
-		bbox.ExtendVec(start)
+		d.MoveTo(start)
 	}
 
 	for i := range nBulges {
 		cp1, cp2, endPt := co.bulgeControlPoints(i)
-		bbox.ExtendVec(cp1)
-		bbox.ExtendVec(cp2)
-		bbox.ExtendVec(endPt)
-		b.CurveTo(
-			pdf.Round(cp1.X, 2), pdf.Round(cp1.Y, 2),
-			pdf.Round(cp2.X, 2), pdf.Round(cp2.Y, 2),
-			pdf.Round(endPt.X, 2), pdf.Round(endPt.Y, 2),
-		)
+		d.CubeTo(cp1, cp2, endPt)
 	}
 
-	b.ClosePath()
-	return bbox
+	d.Close()
+	return d.Iter()
 }
 
-// strokePath draws the open stroke path with cusp crossings.
-func (co *cloudOutline) strokePath(b *builder.Builder) pdf.Rectangle {
-	var bbox pdf.Rectangle
+// stroke returns the open stroke path with cusp crossings, at full precision.
+func (co *cloudOutline) stroke() path.Path {
+	var d path.Data
 	nBulges := co.numBulges()
 
 	start := co.points[co.cusps[0]]
-	b.MoveTo(pdf.Round(start.X, 2), pdf.Round(start.Y, 2))
-	bbox.ExtendVec(start)
+	d.MoveTo(start)
 
 	for i := range nBulges {
 		endIdx := co.bulgeEnd(i)
@@ -162,14 +166,7 @@ func (co *cloudOutline) strokePath(b *builder.Builder) pdf.Rectangle {
 		cp1, cp2, endPt := co.bulgeControlPoints(i)
 		chord := endPt.Sub(startPt).Length()
 
-		bbox.ExtendVec(cp1)
-		bbox.ExtendVec(cp2)
-		bbox.ExtendVec(endPt)
-		b.CurveTo(
-			pdf.Round(cp1.X, 2), pdf.Round(cp1.Y, 2),
-			pdf.Round(cp2.X, 2), pdf.Round(cp2.Y, 2),
-			pdf.Round(endPt.X, 2), pdf.Round(endPt.Y, 2),
-		)
+		d.CubeTo(cp1, cp2, endPt)
 
 		// cusp crossing at non-base-transition cusps
 		isBaseTrans := co.hasBase && (endIdx == 0 || endIdx == nBulges)
@@ -181,20 +178,55 @@ func (co *cloudOutline) strokePath(b *builder.Builder) pdf.Rectangle {
 				X: ext * math.Cos(extAngle),
 				Y: ext * math.Sin(extAngle),
 			})
-			b.MoveTo(pdf.Round(extPt.X, 2), pdf.Round(extPt.Y, 2))
-			b.LineTo(pdf.Round(endPt.X, 2), pdf.Round(endPt.Y, 2))
-			bbox.ExtendVec(extPt)
+			d.MoveTo(extPt)
+			d.LineTo(endPt)
 		}
 	}
 
 	// base line
 	if co.hasBase {
 		baseEnd := co.points[co.cusps[0]]
-		b.LineTo(pdf.Round(baseEnd.X, 2), pdf.Round(baseEnd.Y, 2))
-		bbox.ExtendVec(baseEnd)
+		d.LineTo(baseEnd)
 	}
 
+	return d.Iter()
+}
+
+// drawPath replays path p on builder b, rounding every coordinate to two
+// decimal places as it is emitted, and returns the bounding box of every
+// point it saw at full precision, control points included.
+func drawPath(b *builder.Builder, p path.Path) pdf.Rectangle {
+	var bbox pdf.Rectangle
+	for cmd, pts := range p {
+		for _, pt := range pts {
+			bbox.ExtendVec(pt)
+		}
+		switch cmd {
+		case path.CmdMoveTo:
+			b.MoveTo(pdf.Round(pts[0].X, 2), pdf.Round(pts[0].Y, 2))
+		case path.CmdLineTo:
+			b.LineTo(pdf.Round(pts[0].X, 2), pdf.Round(pts[0].Y, 2))
+		case path.CmdCubeTo:
+			b.CurveTo(
+				pdf.Round(pts[0].X, 2), pdf.Round(pts[0].Y, 2),
+				pdf.Round(pts[1].X, 2), pdf.Round(pts[1].Y, 2),
+				pdf.Round(pts[2].X, 2), pdf.Round(pts[2].Y, 2),
+			)
+		case path.CmdClose:
+			b.ClosePath()
+		}
+	}
 	return bbox
+}
+
+// fillPath draws the closed fill path and returns the bounding box.
+func (co *cloudOutline) fillPath(b *builder.Builder) pdf.Rectangle {
+	return drawPath(b, co.fill())
+}
+
+// strokePath draws the open stroke path with cusp crossings.
+func (co *cloudOutline) strokePath(b *builder.Builder) pdf.Rectangle {
+	return drawPath(b, co.stroke())
 }
 
 // bulgeControlPoints computes the Bezier control points for bulge i.
@@ -246,6 +278,80 @@ func (co *cloudOutline) baseAngle() float64 {
 	to := co.points[co.cusps[0]]
 	d := to.Sub(from)
 	return math.Atan2(d.Y, d.X)
+}
+
+// trimToCloud returns where the segment from outside towards inside first
+// crosses the cloud's stroke outline, or inside itself when it never does.
+func (co *cloudOutline) trimToCloud(outside, inside vec.Vec2) vec.Vec2 {
+	best := inside
+	bestT := math.Inf(1)
+
+	consider := func(a, b vec.Vec2) {
+		t, ok := segmentIntersect(outside, inside, a, b)
+		if ok && t < bestT {
+			bestT = t
+			best = outside.Add(inside.Sub(outside).Mul(t))
+		}
+	}
+
+	const flattenSteps = 16
+	nBulges := co.numBulges()
+	for i := range nBulges {
+		p0 := co.points[co.cusps[i]]
+		cp1, cp2, endPt := co.bulgeControlPoints(i)
+		flattenCubic(p0, cp1, cp2, endPt, flattenSteps, consider)
+	}
+	if co.hasBase {
+		baseStart := co.points[co.cusps[nBulges]]
+		baseEnd := co.points[co.cusps[0]]
+		consider(baseStart, baseEnd)
+	}
+
+	return best
+}
+
+// flattenCubic approximates a cubic Bezier curve with n line segments and
+// calls consider on each segment's endpoints.
+func flattenCubic(p0, cp1, cp2, p3 vec.Vec2, n int, consider func(a, b vec.Vec2)) {
+	prev := p0
+	for i := 1; i <= n; i++ {
+		u := float64(i) / float64(n)
+		pt := cubicPoint(p0, cp1, cp2, p3, u)
+		consider(prev, pt)
+		prev = pt
+	}
+}
+
+// cubicPoint evaluates a cubic Bezier curve at parameter u.
+func cubicPoint(p0, cp1, cp2, p3 vec.Vec2, u float64) vec.Vec2 {
+	mu := 1 - u
+	a := mu * mu * mu
+	b := 3 * mu * mu * u
+	c := 3 * mu * u * u
+	d := u * u * u
+	return vec.Vec2{
+		X: a*p0.X + b*cp1.X + c*cp2.X + d*p3.X,
+		Y: a*p0.Y + b*cp1.Y + c*cp2.Y + d*p3.Y,
+	}
+}
+
+// segmentIntersect returns the parameter t at which the segment p->q
+// crosses the segment a->b, and whether such a crossing exists within
+// both segments.
+func segmentIntersect(p, q, a, b vec.Vec2) (t float64, ok bool) {
+	d1 := q.Sub(p)
+	d2 := b.Sub(a)
+	denom := d1.Cross(d2)
+	if denom == 0 {
+		return 0, false
+	}
+	diff := a.Sub(p)
+	t = diff.Cross(d2) / denom
+	s := diff.Cross(d1) / denom
+	if t < 0 || t > 1 || s < 0 || s > 1 {
+		return 0, false
+	}
+	return t, true
 }
 
 // tangentAngle computes the forward tangent angle at point k
