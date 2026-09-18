@@ -18,6 +18,7 @@ package fallback
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 
@@ -191,7 +192,10 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		b.TextSetHorizontalScaling(1)
 		b.TextSetRise(0)
 		wrapper := text.WrapWith(g.breaker(), clipWidth, a.Contents)
-		yPos := inner.URy - lw - freeTextPadding - size
+		// The first baseline sits one ascent below the top of the content
+		// area.  This leaves the rest of the leading below the last line,
+		// where the descenders need it, instead of above the first line.
+		yPos := inner.URy - lw - freeTextPadding - pdf.Round(F.GetGeometry().Ascent*size, 2)
 		lineNo := 0
 		for line := range wrapper.Lines(F, size) {
 			switch lineNo {
@@ -221,8 +225,15 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		b.PopGraphicsState()
 	}
 
-	// finalize outer rectangle
-	outer.IRound(2)
+	// Finalize the outer rectangle.  It is rounded outwards, so that it still
+	// contains the text box: /RD records the box as insets from this
+	// rectangle, and an inset may not be negative.
+	outer = pdf.Rectangle{
+		LLx: math.Floor(outer.LLx*100) / 100,
+		LLy: math.Floor(outer.LLy*100) / 100,
+		URx: math.Ceil(outer.URx*100) / 100,
+		URy: math.Ceil(outer.URy*100) / 100,
+	}
 	a.Rect = outer
 	if inner.NearlyEqual(&outer, 0.01) {
 		a.Margin = nil
