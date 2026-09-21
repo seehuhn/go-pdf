@@ -2753,6 +2753,18 @@ types:
     refTypes:
     - Encoding
     notes: see Adobe PDF Reference 1.0, 6.8.3
+  - goName: SingleUse
+    pdfKey:
+    pdfType:
+    required: false
+    goType: bool
+    notes: controls direct vs indirect embedding; not a PDF entry
+  - goName: FontFallback
+    pdfKey:
+    pdfType:
+    required: false
+    goType: func(name pdf.Name) font.Instance
+    notes: supplies the font for a Tf naming a font absent from Font; not a PDF entry
   fileDependent: false
   writeMethod: (*Resources).Embed
   goPackage: content

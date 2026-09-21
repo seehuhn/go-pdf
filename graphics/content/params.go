@@ -161,14 +161,22 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		}
 
 	case OpTextSetFont: // Tf
+		// the operator table leaves the font bits to us, since a Tf naming
+		// a font the resources lack leaves the text font as it was
 		fontName, ok1 := getName(args, 0)
 		size, ok2 := getNumber(args, 1)
-		if ok1 && ok2 && s.Resources != nil && s.Resources.Font != nil {
-			if F := s.Resources.Font[fontName]; F != nil {
-				p.TextFont = F
-				p.TextFontSize = size
-				s.GState.Set |= graphics.StateTextFont
-			}
+		if !ok1 || !ok2 || s.Resources == nil {
+			break
+		}
+		F := s.Resources.Font[fontName]
+		if F == nil && s.Resources.FontFallback != nil {
+			F = s.Resources.FontFallback(fontName)
+		}
+		if F != nil {
+			p.TextFont = F
+			p.TextFontSize = size
+			s.Usable |= graphics.StateTextFont
+			s.GState.Set |= graphics.StateTextFont
 		}
 
 	case OpTextSetRenderingMode: // Tr

@@ -195,7 +195,7 @@ func extractType1(c pdf.Cursor, stream *pdf.Stream) (*pattern.Type1, error) {
 	}
 
 	// extract resources (required)
-	pat.Res = &content.Resources{}
+	pat.Res = &content.Resources{FontFallback: StandardFontFallback}
 	if resObj := dict["Resources"]; resObj != nil {
 		res, err := pdf.Decode(c, resObj, Resources)
 		if err != nil {

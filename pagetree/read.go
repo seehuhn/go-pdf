@@ -210,9 +210,11 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 }
 
 // fillInherited completes a page dictionary with the inheritable attributes
-// in force from its ancestors, and removes the /Parent entry.  A page
-// without a usable MediaBox anywhere in its ancestry is given the US
-// Letter size, as in other readers.
+// in force from its ancestors, and removes the /Parent entry.  The two
+// required entries are repaired where the ancestry supplies neither: a page
+// without a usable MediaBox is given the US Letter size, as in other
+// readers, and one without Resources an empty dictionary, so that the page
+// reads like one which declares no resources of its own.
 func fillInherited(c pdf.Cursor, node, inherited pdf.Dict, inheritable []pdf.Name) error {
 	for _, name := range inheritable {
 		ok, err := usable(c, name, node[name])
@@ -224,8 +226,13 @@ func fillInherited(c pdf.Cursor, node, inherited pdf.Dict, inheritable []pdf.Nam
 		}
 		if val, canInherit := inherited[name]; canInherit {
 			node[name] = val
-		} else if name == "MediaBox" {
+			continue
+		}
+		switch name {
+		case "MediaBox":
 			node[name] = letterBox()
+		case "Resources":
+			node[name] = pdf.Dict{}
 		}
 	}
 	delete(node, "Parent")

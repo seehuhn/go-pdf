@@ -198,7 +198,7 @@ func (s *State) Push() error {
 // Pop restores the previous graphics state (for the Q operator).
 func (s *State) Pop() error {
 	if s.Version > 0 && s.Version < pdf.V2_0 && s.CurrentObject == ObjText {
-		return fmt.Errorf("Q in text object: %w", ErrInvalidContext)
+		return fmt.Errorf("operator Q in text object: %w", ErrInvalidContext)
 	}
 	if _, err := s.popNesting(pairQ, "Q"); err != nil {
 		return err
@@ -257,7 +257,7 @@ func (s *State) MarkedContentEnd() (*graphics.MarkedContent, error) {
 // them.  It is a no-op only when no BMC frame is open at all.  Callers
 // should call it immediately after the corresponding BMC/BDC operator.
 func (s *State) AttachMarkedContent(mc *graphics.MarkedContent) {
-	for i := len(s.nesting) - 1; i >= 0; i-- {
+	for i := range slices.Backward(s.nesting) {
 		if s.nesting[i].Kind == pairBMC {
 			s.nesting[i].MC = mc
 			return

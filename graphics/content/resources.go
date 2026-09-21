@@ -56,6 +56,12 @@ type Resources struct {
 	// SingleUse determines whether the resource dictionary is embedded
 	// directly (true) or as an indirect object reference (false).
 	SingleUse bool
+
+	// FontFallback, when non-nil, supplies the font for a Tf operator whose
+	// name has no entry in Font.  A nil result leaves the text font
+	// unchanged.  The field is not part of the resource dictionary: Embed
+	// ignores it and Equal does not compare it.
+	FontFallback func(name pdf.Name) font.Instance
 }
 
 // ProcSet describes the legacy procedure-set declaration for a resource

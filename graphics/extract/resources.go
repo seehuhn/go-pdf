@@ -41,7 +41,8 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 
 	// create result with SingleUse based on indirectness
 	res := &content.Resources{
-		SingleUse: isDirect,
+		SingleUse:    isDirect,
+		FontFallback: StandardFontFallback,
 	}
 
 	// extract ExtGState subdictionary

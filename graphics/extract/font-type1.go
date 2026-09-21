@@ -77,25 +77,7 @@ func extractFontType1(c pdf.Cursor, obj pdf.Object) (*dict.Type1, error) {
 		return nil, err
 	}
 	if fd == nil && stdInfo != nil {
-		fd = &font.Descriptor{
-			FontName:     d.PostScriptName,
-			FontFamily:   stdInfo.FontFamily,
-			FontStretch:  os2.WidthNormal,
-			FontWeight:   stdInfo.FontWeight,
-			IsFixedPitch: stdInfo.IsFixedPitch,
-			IsSerif:      stdInfo.IsSerif,
-			IsItalic:     stdInfo.ItalicAngle != 0,
-			IsSymbolic:   stdInfo.IsSymbolic,
-			FontBBox:     stdInfo.FontBBox,
-			ItalicAngle:  stdInfo.ItalicAngle,
-			Ascent:       stdInfo.Ascent,
-			Descent:      stdInfo.Descent,
-			CapHeight:    stdInfo.CapHeight,
-			XHeight:      stdInfo.XHeight,
-			StemV:        stdInfo.StemV,
-			StemH:        stdInfo.StemH,
-			MissingWidth: stdInfo.Width[".notdef"],
-		}
+		fd = standardDescriptor(d.PostScriptName, stdInfo)
 	}
 	d.Descriptor = fd
 
@@ -118,17 +100,7 @@ func extractFontType1(c pdf.Cursor, obj pdf.Object) (*dict.Type1, error) {
 		defaultWidth = fd.MissingWidth
 	}
 	if !getSimpleWidths(d.Width[:], c, fontDict, defaultWidth) && stdInfo != nil {
-		for c := range 256 {
-			name := enc(byte(c))
-			if name == encoding.UseBuiltin {
-				name = stdInfo.Encoding[c]
-			}
-			w, ok := stdInfo.Width[name]
-			if !ok {
-				w = stdInfo.Width[".notdef"]
-			}
-			d.Width[c] = w
-		}
+		standardWidths(d.Width[:], enc, stdInfo)
 	}
 
 	d.ToUnicode, _ = pdf.Decode(c, fontDict["ToUnicode"], cmap.ExtractToUnicode)
@@ -136,6 +108,47 @@ func extractFontType1(c pdf.Cursor, obj pdf.Object) (*dict.Type1, error) {
 	repairType1(d, c.Getter())
 
 	return d, nil
+}
+
+// standardDescriptor returns the font descriptor of a standard 14 font, built
+// from the font's built-in metrics.
+func standardDescriptor(psName string, stdInfo *stdmtx.FontData) *font.Descriptor {
+	return &font.Descriptor{
+		FontName:     psName,
+		FontFamily:   stdInfo.FontFamily,
+		FontStretch:  os2.WidthNormal,
+		FontWeight:   stdInfo.FontWeight,
+		IsFixedPitch: stdInfo.IsFixedPitch,
+		IsSerif:      stdInfo.IsSerif,
+		IsItalic:     stdInfo.ItalicAngle != 0,
+		IsSymbolic:   stdInfo.IsSymbolic,
+		FontBBox:     stdInfo.FontBBox,
+		ItalicAngle:  stdInfo.ItalicAngle,
+		Ascent:       stdInfo.Ascent,
+		Descent:      stdInfo.Descent,
+		CapHeight:    stdInfo.CapHeight,
+		XHeight:      stdInfo.XHeight,
+		StemV:        stdInfo.StemV,
+		StemH:        stdInfo.StemH,
+		MissingWidth: stdInfo.Width[".notdef"],
+	}
+}
+
+// standardWidths fills ww with the glyph widths of a standard 14 font under
+// the encoding enc, the font's built-in encoding standing in for the codes
+// enc leaves to it.
+func standardWidths(ww []float64, enc encoding.Simple, stdInfo *stdmtx.FontData) {
+	for c := range 256 {
+		name := enc(byte(c))
+		if name == encoding.UseBuiltin {
+			name = stdInfo.Encoding[c]
+		}
+		w, ok := stdInfo.Width[name]
+		if !ok {
+			w = stdInfo.Width[".notdef"]
+		}
+		ww[c] = w
+	}
 }
 
 // repairType1 fixes invalid data in a Type1 font dictionary after extraction.

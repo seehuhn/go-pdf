@@ -115,7 +115,7 @@ var operators = map[OpName]*opInfo{
 	OpSetLineDash:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineDash},
 	OpSetRenderingIntent:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText, Sets: graphics.StateRenderingIntent},
 	OpSetFlatnessTolerance: {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateFlatnessTolerance},
-	OpSetExtGState:         {Since: pdf.V1_2, Allowed: ObjPage | ObjText}, // Sets determined from resource
+	OpSetExtGState:         {Since: pdf.V1_2, Allowed: ObjPage | ObjText}, // Sets determined from resources
 
 	// Path Construction
 	OpMoveTo:    {Since: pdf.V1_0, Allowed: ObjPage | ObjPath, Transition: ObjPath},
@@ -151,7 +151,7 @@ var operators = map[OpName]*opInfo{
 	OpTextSetWordSpacing:       {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextWordSpacing},
 	OpTextSetHorizontalScaling: {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextHorizontalScaling},
 	OpTextSetLeading:           {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextLeading},
-	OpTextSetFont:              {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextFont},
+	OpTextSetFont:              {Since: pdf.V1_0, Allowed: ObjAny}, // Sets determined from resources
 	OpTextSetRenderingMode:     {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextRenderingMode},
 	OpTextSetRise:              {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextRise},
 

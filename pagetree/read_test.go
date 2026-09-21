@@ -180,8 +180,10 @@ func TestIterator(t *testing.T) {
 	data.Put(rootRef, root)
 	data.GetMeta().Catalog.Pages = rootRef
 
+	// pages inheriting no Resources are repaired to an empty dictionary
+	none := pdf.Dict{}
 	expectedResource := []pdf.Object{
-		nil, pdf.Name("Q"), pdf.Name("P"), pdf.Name("P"), nil, nil, nil, nil, nil, nil,
+		none, pdf.Name("Q"), pdf.Name("P"), pdf.Name("P"), none, none, none, none, none, none,
 	}
 	expectedRotate := []pdf.Object{
 		nil, nil, nil, nil, pdf.Integer(90), pdf.Integer(90), pdf.Integer(90), pdf.Integer(180), pdf.Integer(180), pdf.Integer(180),
@@ -348,5 +350,55 @@ func TestInheritNullBox(t *testing.T) {
 				t.Errorf("unexpected MediaBox (-want +got):\n%s", d)
 			}
 		})
+	}
+}
+
+// TestInheritMissingResources checks that a page whose ancestry supplies no
+// Resources reads as one declaring an empty dictionary, while a page which
+// inherits one, or has its own, keeps it.
+func TestInheritMissingResources(t *testing.T) {
+	rootRes := pdf.Dict{"ProcSet": pdf.Array{pdf.Name("PDF")}}
+	ownRes := pdf.Dict{"ProcSet": pdf.Array{pdf.Name("Text")}}
+	for _, tc := range []struct {
+		name    string
+		res     pdf.Object // the page's own Resources, nil for none
+		rootRes pdf.Object // the root's Resources, nil for none
+		want    pdf.Object
+	}{
+		{"own", ownRes, rootRes, ownRes},
+		{"inherited", nil, rootRes, rootRes},
+		{"none anywhere", nil, nil, pdf.Dict{}},
+	} {
+		for _, walker := range walkers {
+			t.Run(tc.name+"/"+walker.name, func(t *testing.T) {
+				data, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				rootRef := data.Alloc()
+				pageRef := data.Alloc()
+
+				page := pdf.Dict{"Type": pdf.Name("Page"), "Parent": rootRef}
+				if tc.res != nil {
+					page["Resources"] = tc.res
+				}
+				data.Put(pageRef, page)
+				root := pdf.Dict{
+					"Type":  pdf.Name("Pages"),
+					"Count": pdf.Integer(1),
+					"Kids":  pdf.Array{pageRef},
+				}
+				if tc.rootRes != nil {
+					root["Resources"] = tc.rootRes
+				}
+				data.Put(rootRef, root)
+				data.GetMeta().Catalog.Pages = rootRef
+
+				dict, err := walker.get(data)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if d := cmp.Diff(tc.want, dict["Resources"]); d != "" {
+					t.Errorf("unexpected Resources (-want +got):\n%s", d)
+				}
+			})
+		}
 	}
 }

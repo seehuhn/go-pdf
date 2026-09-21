@@ -188,7 +188,7 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 	} else if version >= pdf.V2_0 {
 		// PDF 2.0 requires a Resources entry; normalise the malformed
 		// input to an empty Resources dict.
-		f.Res = &content.Resources{}
+		f.Res = &content.Resources{FontFallback: StandardFontFallback}
 	}
 	// f.Res remains nil for pre-2.0 forms without a Resources entry; the
 	// renderer falls back to the surrounding page's resources.
