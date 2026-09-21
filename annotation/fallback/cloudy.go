@@ -38,15 +38,123 @@ import (
 // larger instead of more numerous.
 const maxSamplePoints = 20000
 
+// minBulges is the fewest bulges a cloud is drawn with: below three the
+// outline reads as a rounded polygon rather than as a cloud.  An outline
+// with no room for three of the size asked for gets three smaller ones.
+const minBulges = 3
+
+// cloudGiveUp is the share of a shape's size, as [cloudSize] measures it,
+// that a border may take before a cloud is given up on.  Past it the stroke
+// leaves too little inside to read as a shape with a border round it,
+// whatever is drawn along that border.
+const cloudGiveUp = 0.54
+
+// cloudTickLimit is the share of a shape's size that a border may take
+// before the cusp ticks are dropped.  Past it the pen is wide enough to blot
+// a tick into the two bulges it sits between, so that it reads as a blob at
+// the join rather than as the mark of a pen lifted and set down again.
+const cloudTickLimit = 0.33
+
+// cloudSize measures the room a shape has for a border drawn round it, as
+// the geometric mean of two widths: 4*area/perimeter, which a long thin
+// shape takes mostly from its shorter side, and sqrt(area), which it takes
+// from its overall extent.  Neither alone predicts the width at which detail
+// along the border stops reading -- the first grows too slowly as a shape
+// stretches, the second too fast -- while their mean holds from square to
+// sixteen-to-one, and across rectangles, ellipses and triangles alike.
+func cloudSize(vertices []vec.Vec2, perimeter float64) float64 {
+	area := math.Abs(polygon.SignedArea(vertices))
+	return math.Sqrt((4 * area / perimeter) * math.Sqrt(area))
+}
+
+// pathExtent returns the rectangle the points of a path lie in.
+//
+// It is not [path.Path.BBox], which includes the control points of a curve:
+// a cloud's bulges reach only about three quarters as far as the control
+// points which shape them, which is too coarse to fit a cloud into a
+// rectangle with.
+func pathExtent(p path.Path) pdf.Rectangle {
+	ext := pdf.Rectangle{
+		LLx: math.Inf(1), LLy: math.Inf(1),
+		URx: math.Inf(-1), URy: math.Inf(-1),
+	}
+	add := func(pt vec.Vec2) {
+		ext.LLx = min(ext.LLx, pt.X)
+		ext.LLy = min(ext.LLy, pt.Y)
+		ext.URx = max(ext.URx, pt.X)
+		ext.URy = max(ext.URy, pt.Y)
+	}
+
+	var cur vec.Vec2
+	for cmd, pts := range p {
+		switch cmd {
+		case path.CmdCubeTo:
+			for _, t := range cubicExtrema(cur, pts[0], pts[1], pts[2]) {
+				add(path.EvalCubic(cur, pts[0], pts[1], pts[2], t))
+			}
+			add(pts[2])
+		default:
+			// a command whose shape this does not know contributes its
+			// points as they stand, control points included
+			for _, pt := range pts {
+				add(pt)
+			}
+		}
+		if n := len(pts); n > 0 {
+			cur = pts[n-1]
+		}
+	}
+	return ext
+}
+
+// cubicExtrema returns the parameters in (0, 1) at which a cubic Bezier
+// curve turns round in x or in y, which is where it reaches furthest.
+func cubicExtrema(p0, c1, c2, p3 vec.Vec2) []float64 {
+	var ts []float64
+	for _, v := range [][4]float64{
+		{p0.X, c1.X, c2.X, p3.X},
+		{p0.Y, c1.Y, c2.Y, p3.Y},
+	} {
+		// the derivative of the curve, divided by three
+		a := -v[0] + 3*v[1] - 3*v[2] + v[3]
+		b := 2 * (v[0] - 2*v[1] + v[2])
+		c := -v[0] + v[1]
+
+		if math.Abs(a) < 1e-12 {
+			if b != 0 {
+				ts = appendIfInside(ts, -c/b)
+			}
+			continue
+		}
+		disc := b*b - 4*a*c
+		if disc < 0 {
+			continue
+		}
+		root := math.Sqrt(disc)
+		ts = appendIfInside(ts, (-b+root)/(2*a))
+		ts = appendIfInside(ts, (-b-root)/(2*a))
+	}
+	return ts
+}
+
+func appendIfInside(ts []float64, t float64) []float64 {
+	if t > 0 && t < 1 {
+		return append(ts, t)
+	}
+	return ts
+}
+
 // cloudOutline holds precomputed cloud border geometry.
 type cloudOutline struct {
 	points  []vec.Vec2 // equidistant boundary points (CCW)
 	cusps   []int      // point indices for bulge start/end
 	hasBase bool       // whether a flat base was detected
+	noTicks bool       // whether the pen is too wide for the cusp ticks
 }
 
-// newCloudOutline computes the cloud outline for a polygon.
-// Returns nil if the polygon is too small for cloud bulges (< 3 bulges).
+// newCloudOutline computes the cloud outline for a polygon.  It returns nil
+// where no cloud is drawn: a degenerate polygon, or one whose border is so
+// wide that nothing is left inside it (see [cloudGiveUp]).
 func newCloudOutline(vertices []vec.Vec2, intensity, lw float64) *cloudOutline {
 	n := len(vertices)
 	if n < 3 {
@@ -67,20 +175,25 @@ func newCloudOutline(vertices []vec.Vec2, intensity, lw float64) *cloudOutline {
 		vertices = rev
 	}
 
-	// step 1: sample equidistant points, spaced by the line width
-	targetDist := min(4*(lw+1), 20)
-	nSamples := math.Round(perimeter / targetDist)
+	// step 1: sample the outline.  The spacing follows the line width, but
+	// only weakly: a pen twice as thick asks for a bulge about a quarter
+	// larger, not twice as large, so that the bulge count keeps falling as
+	// the pen grows rather than freezing once the pen passes some size.
+	requestedDist := 8 * math.Cbrt(max(lw, 0.1))
+	nSamples := math.Round(perimeter / requestedDist)
 	if !(nSamples >= 3) { // false as well for a line width which is not a number
 		nSamples = 3
 	}
-	// The polygon has at least three vertices and a positive perimeter, and
-	// at least three samples are asked for, so this returns that many points.
+	// the outline is sampled at least this finely whatever the pen asks
+	// for, so that there are always enough points to describe the fewest
+	// bulges a cloud is drawn with.  Sampling and bulge size are separate:
+	// sampling more finely than the pen asked for must not invent bulges.
+	nSamples = max(nSamples, 4*minBulges*2)
 	points := polygon.Resample(vertices, int(min(nSamples, maxSamplePoints)))
 
 	// step 2: detect flat base
 	baseStart, baseSeg := findFlatBase(points)
 
-	// step 3: determine bulge count
 	ppb := max(2, int(math.Round(3*intensity)))
 	nPoints := len(points)
 
@@ -89,9 +202,41 @@ func newCloudOutline(vertices []vec.Vec2, intensity, lw float64) *cloudOutline {
 	if hasBase {
 		cloudLen = nPoints - baseSeg
 	}
-	nBulges := int(math.Round(float64(cloudLen) / float64(ppb)))
 
-	if nBulges < 3 {
+	// step 3: the bulge count.
+	//
+	// The intensity and the line width together ask for a bulge of a
+	// certain length of outline: a thicker pen wants a larger bulge, or the
+	// cloud turns to mush.  The count is how many such bulges the cloud's
+	// share of the perimeter has room for, taken from that arc length
+	// rather than from the sample count, which may be finer.
+	//
+	// An outline too short for even minBulges of them gets that many
+	// smaller ones instead: a cloud is given up on for having no room to
+	// enclose anything, below, and not for wanting bulges it cannot fit.
+	cloudPerimeter := perimeter * float64(cloudLen) / float64(nPoints)
+	nBulges := int(math.Round(cloudPerimeter / (float64(ppb) * requestedDist)))
+	nBulges = max(minBulges, nBulges)
+	// no more bulges than the sampled outline can describe, which also
+	// bounds the count for a polygon whose coordinates are far larger than
+	// any page: the count follows the real perimeter, which nothing caps
+	nBulges = min(nBulges, cloudLen/2)
+	if nBulges < minBulges {
+		return nil
+	}
+
+	// A border wider than this leaves too little inside the shape to read
+	// as a shape with a border round it, whatever is drawn along it, so the
+	// cloud gives way to the plain polygon.  This is the only thing a cloud
+	// is given up for, and it depends on the shape and the pen alone -- not
+	// on the intensity, which changes how a cloud looks rather than whether
+	// one can be drawn at all.
+	//
+	// It is the second of two steps, the first being the cusp ticks: as the
+	// pen grows the cloud loses its ticks, then its bulges, rather than
+	// going from a cloud to a bare outline in one jump.
+	size := cloudSize(vertices, perimeter)
+	if lw > cloudGiveUp*size {
 		return nil
 	}
 
@@ -115,6 +260,7 @@ func newCloudOutline(vertices []vec.Vec2, intensity, lw float64) *cloudOutline {
 		points:  points,
 		cusps:   cusps,
 		hasBase: hasBase,
+		noTicks: lw > cloudTickLimit*size,
 	}
 }
 
@@ -135,10 +281,12 @@ func (co *cloudOutline) bulgeEnd(i int) int {
 }
 
 // CloudOutline returns the paths the generator draws a cloudy border with
-// round the polygon vertices: the closed fill path and the open stroke
-// path with its cusp ticks. lineWidth is the border's stroke width, which
-// sets the bulge size together with intensity (0 to 2). ok is false when
-// the polygon is too small for a cloud, in which case a caller draws the
+// round the polygon vertices: the closed fill path and the open stroke path.
+// lineWidth is the border's stroke width, which sets the bulge size together
+// with intensity (0 to 2). The stroke path carries a small tick across each
+// cusp, except where the pen is wide enough to blot the ticks into the
+// bulges, when they are left out. ok is false where the border is too wide
+// for the polygon to enclose anything, in which case a caller draws the
 // plain polygon instead.
 func CloudOutline(vertices []vec.Vec2, intensity, lineWidth float64) (fill, stroke path.Path, ok bool) {
 	co := newCloudOutline(vertices, intensity, lineWidth)
@@ -191,7 +339,7 @@ func (co *cloudOutline) stroke() path.Path {
 
 		// cusp crossing at non-base-transition cusps
 		isBaseTrans := co.hasBase && (endIdx == 0 || endIdx == nBulges)
-		if !isBaseTrans {
+		if !isBaseTrans && !co.noTicks {
 			theta := tangentAngle(co.points, co.cusps[endIdx])
 			extAngle := theta + 3*math.Pi/4
 			ext := 0.1 * chord
@@ -213,11 +361,11 @@ func (co *cloudOutline) stroke() path.Path {
 	return d.Iter()
 }
 
-// drawPath draws path p and returns the bounding box of every point it
-// contains at full precision, control points included.
+// drawPath draws path p and returns the rectangle its ink lies in, at full
+// precision.
 func drawPath(b *builder.Builder, p path.Path) pdf.Rectangle {
 	b.DrawPath(p, 2)
-	return pdf.RectangleFromRect(p.BBox())
+	return pathExtent(p)
 }
 
 // fillPath draws the closed fill path and returns the bounding box.
@@ -443,7 +591,12 @@ func drawCloudyBorder(b *builder.Builder, vertices []vec.Vec2,
 	}
 
 	if hasStroke {
+		// A cloud has no square corner anywhere, and the outside of a cusp
+		// is where the path turns almost back on itself: a miter there
+		// blows the limit and falls back to a bevel, which cuts a wedge out
+		// of the stroke once the pen is wide.
 		b.SetLineCap(graphics.LineCapRound)
+		b.SetLineJoin(graphics.LineJoinRound)
 		strokeBBox := co.strokePath(b)
 		b.Stroke()
 		if hasFill {

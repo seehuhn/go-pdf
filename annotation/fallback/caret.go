@@ -21,8 +21,6 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/content/builder"
-	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -61,18 +59,7 @@ func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) 
 		}
 	}
 
-	b := builder.New(content.Form, nil, g.version)
-
-	g.reset(b)
-	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-		gs := &extgstate.ExtGState{
-			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-			StrokeAlpha: 1 - a.StrokingTransparency,
-			FillAlpha:   1 - a.NonStrokingTransparency,
-			SingleUse:   true,
-		}
-		b.SetExtGState(gs)
-	}
+	b := g.begin()
 
 	// The caret is the proofreader's insertion mark drawn with a pen: two
 	// strokes that leave the top of the mark together, run down the neck
@@ -148,5 +135,5 @@ func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) 
 		b.TextEnd()
 	}
 
-	return harvest(b, a.Rect)
+	return g.harvest(b, a.Rect, a.GetCommon())
 }

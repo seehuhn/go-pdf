@@ -44,6 +44,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+
+	err = icons("C.pdf")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 // withoutAP generates a PDF 1.7 file where ca=CA and appearance streams are

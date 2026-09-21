@@ -46,18 +46,16 @@ func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 		}, nil
 	}
 
-	b := builder.New(content.Form, nil, g.version)
+	b := g.begin()
 
 	switch style {
 	case "U": // underline
-		g.reset(b)
 		b.SetStrokeColor(col)
 		b.SetLineWidth(borderWidth)
 		b.MoveTo(pdf.Round(bbox.LLx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 		b.LineTo(pdf.Round(bbox.URx, 2), pdf.Round(bbox.LLy+borderWidth/2, 2))
 		b.Stroke()
 	case "D": // dashed
-		g.reset(b)
 		b.SetStrokeColor(col)
 		b.SetLineWidth(borderWidth)
 		b.SetLineDash(dashPattern, 0)
@@ -68,13 +66,10 @@ func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 			pdf.Round(bbox.URy-bbox.LLy-borderWidth, 2))
 		b.Stroke()
 	case "B":
-		g.reset(b)
 		drawBeveledBorder(b, bbox, borderWidth, col, true)
 	case "I":
-		g.reset(b)
 		drawBeveledBorder(b, bbox, borderWidth, col, false)
 	default: // solid or unknown
-		g.reset(b)
 		b.SetStrokeColor(col)
 		b.SetLineWidth(borderWidth)
 		b.Rectangle(
@@ -85,7 +80,7 @@ func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 		b.Stroke()
 	}
 
-	return harvest(b, bbox)
+	return g.harvest(b, bbox, a.GetCommon())
 }
 
 // drawBeveledBorder fills a raised ("B" beveled) or, when raised is false, an

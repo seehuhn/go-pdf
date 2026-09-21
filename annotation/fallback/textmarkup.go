@@ -41,9 +41,7 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 	}
 
 	if col == nil {
-		b := builder.New(content.Form, nil, g.version)
-		g.reset(b)
-		return harvest(b, a.Rect)
+		return g.harvest(g.begin(), a.Rect, nil)
 	}
 
 	// line width for the stroked types; a highlight is a fill and uses none
@@ -65,18 +63,7 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 	bbox.IRound(2)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, g.version)
-	g.reset(b)
-
-	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-		gs := &extgstate.ExtGState{
-			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-			StrokeAlpha: 1 - a.StrokingTransparency,
-			FillAlpha:   1 - a.NonStrokingTransparency,
-			SingleUse:   true,
-		}
-		b.SetExtGState(gs)
-	}
+	b := g.begin()
 
 	numQuads := len(a.QuadPoints) / 4
 
@@ -137,7 +124,7 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		}
 	}
 
-	return harvest(b, bbox)
+	return g.harvest(b, bbox, a.GetCommon())
 }
 
 // The widths the stroked text markup types are drawn with, and the shape of

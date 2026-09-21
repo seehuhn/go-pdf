@@ -20,6 +20,7 @@ import (
 	"errors"
 	"maps"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
@@ -29,9 +30,11 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/graphics/text"
 )
 
@@ -232,6 +235,19 @@ func paint(col color.Color) color.Color {
 	return col
 }
 
+// begin starts an appearance stream: a builder for the generator's PDF
+// version, with the graphics state reset.
+//
+// The drawing is built opaque.  The annotation's transparency is applied
+// when the stream is closed with [Generator.harvest], which is the only way
+// to turn a builder into an appearance, so it cannot be left out by
+// accident.
+func (g *Generator) begin() *builder.Builder {
+	b := builder.New(content.Form, nil, g.version)
+	g.reset(b)
+	return b
+}
+
 // New returns a Generator for a PDF file of the given version.  Appearance
 // streams are built for that version, so that operators the file cannot use
 // are rejected at build time.
@@ -378,10 +394,69 @@ func syncAppearanceState(c *annotation.Common) {
 	}
 }
 
-// harvest finalizes the builder into a form with the given bounding box.  It
-// returns an error if the content stream cannot be built, for example because
-// it uses operators unavailable in the target PDF version.
-func harvest(b *builder.Builder, bbox pdf.Rectangle) (*form.Form, error) {
+// harvest finalizes the builder into a form with the given bounding box, and
+// gives the annotation's transparency effect.  It returns an error if the
+// content stream cannot be built, for example because it uses operators
+// unavailable in the target PDF version.
+//
+// c is the annotation the appearance belongs to, or nil for an appearance
+// which paints nothing and so has no transparency to carry.
+func (g *Generator) harvest(b *builder.Builder, bbox pdf.Rectangle, c *annotation.Common) (*form.Form, error) {
+	ops, err := b.Harvest()
+	if err != nil {
+		return nil, err
+	}
+	return g.applyAlpha(&form.Form{
+		Content: ops,
+		Res:     b.Resources,
+		BBox:    bbox,
+	}, c)
+}
+
+// applyAlpha paints an opaque drawing once at the annotation's opacity, as a
+// transparency group, so that the annotation composites with the page as a
+// single object.
+//
+// Carrying the opacity is the generator's job: §12.5.2 says a /CA entry
+// "shall not be used if the annotation has an appearance stream", which
+// leaves the stream as the only place the value can still live.
+//
+// Setting the alpha in the drawing's own graphics state instead would apply
+// it to each painting operation separately, so that ink painted over other
+// ink -- an icon's symbol on its card, a cloudy border's stroke over its
+// fill -- let the lower paint show through the upper one.  §11.7.4.5 grants
+// exactly this treatment to a path both filled and stroked in one operation,
+// and its NOTE 2 gives the reason: to avoid a "double border effect that is
+// usually undesirable".  Viewers extend that to the annotation as a whole.
+//
+// The group names no colour space of its own, so that it blends in the one
+// the page uses: §11.6.6 makes the page's space the default for a group
+// which is an annotation appearance, and naming a space here would convert
+// the annotation's colours into it.  For the same reason the group is not
+// isolated, which changes nothing while its contents are opaque.
+func (g *Generator) applyAlpha(ap *form.Form, c *annotation.Common) (*form.Form, error) {
+	if c == nil || (c.StrokingTransparency == 0 && c.NonStrokingTransparency == 0) {
+		return ap, nil
+	}
+
+	// the group is painted where the drawing was, so the form matrix moves
+	// out to the wrapper and the group itself is left untransformed
+	m := ap.Matrix
+	ap.Matrix = matrix.Matrix{}
+	ap.Group = &group.TransparencyAttributes{SingleUse: true}
+
+	b := builder.New(content.Form, nil, g.version)
+	// the alpha is one minus the transparency, a subtraction which for an
+	// ordinary value such as 0.7 is not exact in binary; it is rounded so
+	// that the file carries 0.3 rather than 0.30000000000000004
+	b.SetExtGState(&extgstate.ExtGState{
+		Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
+		StrokeAlpha: pdf.Round(1-c.StrokingTransparency, 10),
+		FillAlpha:   pdf.Round(1-c.NonStrokingTransparency, 10),
+		SingleUse:   true,
+	})
+	b.DrawXObject(ap)
+
 	ops, err := b.Harvest()
 	if err != nil {
 		return nil, err
@@ -389,19 +464,87 @@ func harvest(b *builder.Builder, bbox pdf.Rectangle) (*form.Form, error) {
 	return &form.Form{
 		Content: ops,
 		Res:     b.Resources,
-		BBox:    bbox,
+		BBox:    ap.BBox,
+		Matrix:  m,
 	}, nil
 }
 
-// applyMargins adjusts a rectangle by applying margins (RD array)
-func applyMargins(rect pdf.Rectangle, margin []float64) pdf.Rectangle {
-	// apply margins (RD array) if specified
-	if len(margin) == 4 {
-		// RD format: [left, bottom, right, top]
-		rect.LLx += margin[0] // left margin
-		rect.LLy += margin[1] // bottom margin
-		rect.URx -= margin[2] // right margin
-		rect.URy -= margin[3] // top margin
+// fitToInk grows the annotation rectangle to take in ink which reached
+// outside the outer edge of its border, and records where that edge was in
+// the margins.  This is what /RD is for (§12.5.6.8): a border effect pushes
+// the rectangle out beyond the square or ellipse itself, and the margins
+// give the difference back.  The rectangle the appearance is drawn in is
+// returned.
+//
+// Where the ink stayed inside the outer edge there is nothing to record, and
+// the rectangle and the margins are left as the file gave them, as they are
+// for a plain border.  The margins are dropped where the file could not
+// carry them: the specification asks for values which are not negative and
+// whose sums leave a rectangle behind, which an annotation with no extent
+// has no room for.
+func fitToInk(c *annotation.Common, margin *[]float64, outer, ink pdf.Rectangle) pdf.Rectangle {
+	// The ink is measured from the exact path, while the path written to the
+	// file carries two decimals, so a point of it can land a little outside
+	// what was measured.  The allowance is made only on the sides the ink
+	// reached past: where it stayed inside, rounding the outer edge itself
+	// outwards covers the rounding of the path.
+	bbox := outer
+	grown := false
+	if ink.LLx < outer.LLx {
+		bbox.LLx = ink.LLx - pathPrecision
+		grown = true
 	}
-	return rect
+	if ink.LLy < outer.LLy {
+		bbox.LLy = ink.LLy - pathPrecision
+		grown = true
+	}
+	if ink.URx > outer.URx {
+		bbox.URx = ink.URx + pathPrecision
+		grown = true
+	}
+	if ink.URy > outer.URy {
+		bbox.URy = ink.URy + pathPrecision
+		grown = true
+	}
+	if !grown {
+		return roundOut(c.Rect)
+	}
+	bbox = roundOut(bbox)
+
+	m := []float64{
+		pdf.Round(outer.LLx-bbox.LLx, 4),
+		pdf.Round(outer.LLy-bbox.LLy, 4),
+		pdf.Round(bbox.URx-outer.URx, 4),
+		pdf.Round(bbox.URy-outer.URy, 4),
+	}
+
+	c.Rect = bbox
+	if m[0]+m[2] < bbox.Dx() && m[1]+m[3] < bbox.Dy() {
+		*margin = m
+	} else {
+		*margin = nil
+	}
+	return bbox
+}
+
+// applyMargins moves the edges of rect inwards by the margins the annotation
+// gives in its /RD entry.  Margins which leave no rectangle at all are
+// dropped, so that a file giving unusable ones reads as one giving none.
+func applyMargins(rect pdf.Rectangle, margin []float64) pdf.Rectangle {
+	if len(margin) != 4 {
+		return rect
+	}
+	// RD format: [left, bottom, right, top]
+	inner := pdf.Rectangle{
+		LLx: rect.LLx + margin[0],
+		LLy: rect.LLy + margin[1],
+		URx: rect.URx - margin[2],
+		URy: rect.URy - margin[3],
+	}
+	// accepting the valid case rather than rejecting the invalid one, so
+	// that a NaN margin is refused too
+	if !(inner.Dx() > 0 && inner.Dy() > 0) {
+		return rect
+	}
+	return inner
 }

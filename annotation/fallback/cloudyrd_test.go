@@ -17,8 +17,8 @@
 package fallback
 
 import (
-	"math"
 	"math/rand"
+	"slices"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -27,15 +27,17 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-// TestCloudyShapeRDDescribesTheShape checks that the /RD of a cloudy Circle
-// or Square gives back the shape the annotation was asked for.
+// TestCloudyShapeRDRecordsTheBorder checks what a cloudy Circle or Square
+// does with its rectangle: the curls bulge outside the border they are drawn
+// along, the rectangle grows to take them in, and /RD gives the difference
+// back.  This is the case §12.5.6.8 describes, where a border effect pushes
+// Rect out beyond the shape itself.
 //
-// /RD records the shape as insets from the annotation rectangle, so the
-// rectangle less the insets has to be the shape again.  A rectangle rounded
-// to nearest can have an edge land inside the shape, which makes an inset
-// negative; an inset clamped to zero instead hides that, and claims a shape
-// the caller never asked for.
-func TestCloudyShapeRDDescribesTheShape(t *testing.T) {
+// Rect less /RD has to come back as the edge the file gave, both so that the
+// shape stays where it was put and so that building the appearance a second
+// time leaves it there.
+func TestCloudyShapeRDRecordsTheBorder(t *testing.T) {
+	const penWidth = 3
 	rng := rand.New(rand.NewSource(1))
 
 	for _, shape := range []string{"circle", "square"} {
@@ -45,18 +47,24 @@ func TestCloudyShapeRDDescribesTheShape(t *testing.T) {
 			rm := pdf.NewResourceManager(w)
 
 			for range 100 {
-				x := rng.Float64() * 500
-				y := rng.Float64() * 700
-				rect := pdf.Rectangle{LLx: x, LLy: y, URx: x + 120, URy: y + 80}
+				// coordinates as a file would give them: the appearance
+				// bounding box follows the annotation rectangle, so long
+				// fractions in the rectangle land in the file twice over
+				x := pdf.Round(rng.Float64()*500, 2)
+				y := pdf.Round(rng.Float64()*700, 2)
+				rect := pdf.Rectangle{LLx: x, LLy: y, URx: x + 120, URy: y + 80}.Round(2)
+				margin := []float64{3, 3, 3, 3}
+				outer := applyMargins(rect, margin)
 
-				common := annotation.Common{Rect: rect}
-				style := &annotation.BorderStyle{Width: 1}
+				common := annotation.Common{Rect: rect, Color: color.Black}
+				style := &annotation.BorderStyle{Width: penWidth}
 				effect := &annotation.BorderEffect{Style: "C", Intensity: 2}
 				var a annotation.Annotation
 				switch shape {
 				case "circle":
 					a = &annotation.Circle{
 						Common:       common,
+						Margin:       margin,
 						BorderStyle:  style,
 						BorderEffect: effect,
 						FillColor:    color.DeviceGray(0.5),
@@ -64,6 +72,7 @@ func TestCloudyShapeRDDescribesTheShape(t *testing.T) {
 				default:
 					a = &annotation.Square{
 						Common:       common,
+						Margin:       margin,
 						BorderStyle:  style,
 						BorderEffect: effect,
 						FillColor:    color.DeviceGray(0.5),
@@ -73,31 +82,47 @@ func TestCloudyShapeRDDescribesTheShape(t *testing.T) {
 				if err := g.AddAppearance(a); err != nil {
 					t.Fatal(err)
 				}
-				margin := marginOf(t, a)
-				if len(margin) != 4 {
-					t.Fatalf("shape at %g,%g has no RD", x, y)
-				}
-				for i, xi := range margin {
-					if xi < 0 {
-						t.Fatalf("shape at %g,%g: RD entry %d is %g", x, y, i, xi)
-					}
+
+				// the border's outer edge is where the file put it
+				got := applyMargins(a.GetCommon().Rect, marginOf(t, a))
+				if !got.NearlyEqual(&outer, 0.01) {
+					t.Fatalf("shape at %g,%g: Rect less RD is %v, want %v",
+						x, y, got, outer)
 				}
 
-				// the rectangle less the insets is the shape again, which a
-				// clamped inset would not give back
-				outer := a.GetCommon().Rect
-				got := pdf.Rectangle{
-					LLx: outer.LLx + margin[0],
-					LLy: outer.LLy + margin[1],
-					URx: outer.URx - margin[2],
-					URy: outer.URy - margin[3],
+				ink := inkBounds(t, a).Grow(penWidth / 2.0)
+				grown := a.GetCommon().Rect
+
+				// the curls reach outside that edge, which is what the
+				// rectangle has to grow for
+				if ink.URy <= outer.URy || ink.LLx >= outer.LLx {
+					t.Fatalf("shape at %g,%g: the cloud covers %v, inside the border edge %v",
+						x, y, ink, outer)
 				}
-				for _, d := range []float64{
-					got.LLx - rect.LLx, got.LLy - rect.LLy,
-					got.URx - rect.URx, got.URy - rect.URy,
-				} {
-					if math.Abs(d) > 1e-4 {
-						t.Fatalf("shape at %g,%g: RD gives %v, want %v", x, y, got, rect)
+
+				// and the rectangle took them in
+				const eps = 1e-6
+				if ink.LLx < grown.LLx-eps || ink.LLy < grown.LLy-eps ||
+					ink.URx > grown.URx+eps || ink.URy > grown.URy+eps {
+					t.Fatalf("shape at %g,%g: the cloud covers %v, outside %v",
+						x, y, ink, grown)
+				}
+
+				// building the appearance again leaves the annotation where
+				// it is: the second run reads back the edge the first one
+				// recorded
+				before, beforeMargin := grown, slices.Clone(marginOf(t, a))
+				if err := g.AddAppearance(a); err != nil {
+					t.Fatal(err)
+				}
+				if after := a.GetCommon().Rect; !after.NearlyEqual(&before, 0.02) {
+					t.Fatalf("shape at %g,%g: a second appearance moves Rect to %v from %v",
+						x, y, after, before)
+				}
+				for i, m := range marginOf(t, a) {
+					if d := m - beforeMargin[i]; d > 0.02 || d < -0.02 {
+						t.Fatalf("shape at %g,%g: a second appearance changes RD to %v from %v",
+							x, y, marginOf(t, a), beforeMargin)
 					}
 				}
 
@@ -109,7 +134,7 @@ func TestCloudyShapeRDDescribesTheShape(t *testing.T) {
 	}
 }
 
-// marginOf returns the /RD array the generator set on an annotation.
+// marginOf returns the /RD array of an annotation.
 func marginOf(t *testing.T, a annotation.Annotation) []float64 {
 	t.Helper()
 

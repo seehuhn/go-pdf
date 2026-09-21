@@ -134,7 +134,22 @@ func (l *Line) getBorderStyle() *BorderStyle {
 	return l.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (l *Line) setBorderStyle(bs *BorderStyle) {
+	l.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry carries no
+// version of its own (§12.5.6.7), so it is available as soon as the type is.
+func (l *Line) borderStyleVersion() pdf.Version {
+	return pdf.V1_3
+}
+
 func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out, "line annotation", pdf.V1_3); err != nil {
+		return nil, err
+	}
+
 	if l.BorderStyle != nil && l.Common.Border != nil {
 		return nil, errors.New("Border and BorderStyle are mutually exclusive")
 	}

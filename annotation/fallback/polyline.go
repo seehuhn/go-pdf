@@ -19,10 +19,7 @@ package fallback
 import (
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/content/builder"
-	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -54,18 +51,7 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 	bbox := openPolylineBBox(points, lw, startLE, endLE)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, g.version)
-
-	g.reset(b)
-	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-		gs := &extgstate.ExtGState{
-			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-			StrokeAlpha: 1 - a.StrokingTransparency,
-			FillAlpha:   1 - a.NonStrokingTransparency,
-			SingleUse:   true,
-		}
-		b.SetExtGState(gs)
-	}
+	b := g.begin()
 
 	b.SetLineWidth(lw)
 	b.SetStrokeColor(col)
@@ -75,7 +61,7 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 
 	drawOpenPolyline(b, points, startLE, endLE, paint(a.FillColor))
 
-	return harvest(b, bbox)
+	return g.harvest(b, bbox, a.GetCommon())
 }
 
 // polylineVertices extracts the vertex list from a polyline annotation.

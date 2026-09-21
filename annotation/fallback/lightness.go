@@ -104,21 +104,34 @@ func labToCMYK(L, A, B float64) (c, m, y, k float64) {
 	return c, m, y, color.ClipComponent(k, 0, 1)
 }
 
-// lightness returns the L* of a device colour.  A colour in any other space
-// counts as fully light; none can be written to an annotation's colour
-// entries anyway.
+// lightness returns the L* of a device colour.
 func lightness(col color.Color) float64 {
+	L, _, _ := toLab(col)
+	return L
+}
+
+// toLab returns the L*a*b* coordinates of a device colour.  A colour in any
+// other space counts as fully light and unsaturated; none can be written to
+// an annotation's colour entries anyway.
+func toLab(col color.Color) (L, A, B float64) {
 	components, _ := color.Values(col)
 	switch col.ColorSpace().Family() {
 	case color.FamilyDeviceGray:
-		return grayToL(components[0])
+		return grayToL(components[0]), 0, 0
 	case color.FamilyDeviceRGB:
-		L, _, _ := rgbToLab(components[0], components[1], components[2])
-		return L
+		return rgbToLab(components[0], components[1], components[2])
 	case color.FamilyDeviceCMYK:
-		L, _, _ := cmykToLab(components[0], components[1], components[2], components[3])
-		return L
+		return cmykToLab(components[0], components[1], components[2], components[3])
 	default:
-		return 100
+		return 100, 0, 0
 	}
+}
+
+// mix returns the colour f of the way from a to b, taken in L*a*b* so that
+// the result keeps the distance from each that the eye sees.
+func mix(a, b color.Color, f float64) color.Color {
+	aL, aA, aB := toLab(a)
+	bL, bA, bB := toLab(b)
+	r, g, blue := labToRGB(aL+f*(bL-aL), aA+f*(bA-aA), aB+f*(bB-aB))
+	return color.DeviceRGB{r, g, blue}
 }

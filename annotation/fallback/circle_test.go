@@ -26,15 +26,16 @@ import (
 )
 
 func TestFlattenEllipseTooSmall(t *testing.T) {
+	// an ellipse needs half an axis in each direction to be worth drawing
 	cases := map[string]pdf.Rectangle{
-		"empty":       {},
-		"thin in x":   {URx: 1.5, URy: 100},
-		"thin in y":   {URx: 100, URy: 1.5},
-		"inset by lw": {URx: 2.9, URy: 2.9},
+		"empty":     {},
+		"thin in x": {URx: 0.9, URy: 100},
+		"thin in y": {URx: 100, URy: 0.9},
+		"tiny":      {URx: 0.9, URy: 0.9},
 	}
 	for name, r := range cases {
 		t.Run(name, func(t *testing.T) {
-			if got := flattenEllipse(r, 2); got != nil {
+			if got := flattenEllipse(r); got != nil {
 				t.Errorf("got %d vertices, want none", len(got))
 			}
 		})
@@ -42,14 +43,13 @@ func TestFlattenEllipseTooSmall(t *testing.T) {
 }
 
 // TestFlattenEllipseOnCurve checks that the vertices lie on the ellipse
-// inscribed in the rectangle, inset by half the line width.
+// inscribed in the rectangle.
 func TestFlattenEllipseOnCurve(t *testing.T) {
 	r := pdf.Rectangle{LLx: 10, LLy: 20, URx: 110, URy: 80}
-	const lw = 4
-	rx, ry := (r.Dx()-lw)/2, (r.Dy()-lw)/2
+	rx, ry := r.Dx()/2, r.Dy()/2
 	xMid, yMid := (r.LLx+r.URx)/2, (r.LLy+r.URy)/2
 
-	verts := flattenEllipse(r, lw)
+	verts := flattenEllipse(r)
 	if len(verts) < 12 {
 		t.Fatalf("got %d vertices", len(verts))
 	}
@@ -69,7 +69,7 @@ func TestFlattenEllipseOnCurve(t *testing.T) {
 // would eventually leave the range of int.
 func TestFlattenEllipseSampleLimit(t *testing.T) {
 	for _, size := range []float64{1e5, 1e10, 1e30, 1e100} {
-		verts := flattenEllipse(pdf.Rectangle{URx: size, URy: size}, 1)
+		verts := flattenEllipse(pdf.Rectangle{URx: size, URy: size})
 		if len(verts) > maxSamplePoints {
 			t.Errorf("size %g: got %d vertices, limit is %d",
 				size, len(verts), maxSamplePoints)

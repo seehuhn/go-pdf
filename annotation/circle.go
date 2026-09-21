@@ -98,7 +98,22 @@ func (c *Circle) getBorderStyle() *BorderStyle {
 	return c.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (c *Circle) setBorderStyle(bs *BorderStyle) {
+	c.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry carries no
+// version of its own (§12.5.6.8), so it is available as soon as the type is.
+func (c *Circle) borderStyleVersion() pdf.Version {
+	return pdf.V1_3
+}
+
 func (c *Circle) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out, "circle annotation", pdf.V1_3); err != nil {
+		return nil, err
+	}
+
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Circle"),
 	}

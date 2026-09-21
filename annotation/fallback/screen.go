@@ -22,7 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -44,9 +43,7 @@ func (g *Generator) addScreenAppearance(a *annotation.Screen) (*form.Form, error
 		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}, nil
 	}
 
-	b := builder.New(content.Form, nil, g.version)
-	g.reset(b)
-	mediaAlpha(b, a.StrokingTransparency, a.NonStrokingTransparency)
+	b := g.begin()
 
 	if a.Style != nil && a.Style.Icon != nil {
 		b.PushGraphicsState()
@@ -57,7 +54,7 @@ func (g *Generator) addScreenAppearance(a *annotation.Screen) (*form.Form, error
 		drawMediaPlaceholder(b, rect)
 	}
 
-	return harvest(b, rect)
+	return g.harvest(b, rect, a.GetCommon())
 }
 
 // fitToRect returns the transform that maps the form's bounding box, after the

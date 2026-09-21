@@ -20,7 +20,10 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
 func TestEffectiveBorderWidth(t *testing.T) {
@@ -167,6 +170,208 @@ func TestEffectiveBorderDash(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := EffectiveBorderDash(tc.a); !slices.Equal(got, tc.want) {
 				t.Errorf("EffectiveBorderDash = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSetBorderWidth checks that a width set through [SetBorderWidth] is the
+// width [EffectiveBorderWidth] reads back, whichever of the two places the
+// annotation was carrying its border in, and that the annotation is never
+// left carrying both.
+func TestSetBorderWidth(t *testing.T) {
+	cases := []struct {
+		name string
+		a    Annotation
+		// wantStyle is whether the width should land in the border style
+		// dictionary rather than in the border array
+		wantStyle bool
+	}{
+		{"neither", &Square{}, true},
+		{"border array only", &Square{Common: Common{Border: &Border{Width: 2}}}, false},
+		{"style only", &Square{BorderStyle: &BorderStyle{Width: 3}}, true},
+		{"a line", &Line{}, true},
+		{"a circle", &Circle{}, true},
+		{"a polygon", &Polygon{}, true},
+		{"a polyline", &PolyLine{}, true},
+		{"a free text box", &FreeText{}, true},
+		{"a widget", &Widget{}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			SetBorderWidth(tc.a, 6, pdf.V2_0)
+
+			if got := EffectiveBorderWidth(tc.a); got != 6 {
+				t.Errorf("effective width = %v, want 6", got)
+			}
+			bs, ok := tc.a.(borderStyled)
+			if !ok {
+				t.Fatal("the case is set up wrongly: the type carries no border style")
+			}
+			hasStyle := bs.getBorderStyle() != nil
+			if hasStyle != tc.wantStyle {
+				t.Errorf("the width went into the style = %v, want %v",
+					hasStyle, tc.wantStyle)
+			}
+			// the two are mutually exclusive: an annotation carrying both
+			// cannot be written at all
+			if hasStyle && tc.a.GetCommon().Border != nil {
+				t.Error("the border array was left in place beside the style")
+			}
+		})
+	}
+}
+
+// TestSetBorderWidthBelowTheStyleVersion checks that a width set on a type
+// whose style dictionary the file is too old to carry goes into the border
+// array instead.  A link annotation's BS entry arrived in PDF 1.6, where the
+// type dates from PDF 1.0, so a style written at an earlier version would
+// leave the annotation unwritable.
+func TestSetBorderWidthBelowTheStyleVersion(t *testing.T) {
+	for _, tc := range []struct {
+		version   pdf.Version
+		wantStyle bool
+	}{
+		{pdf.V1_0, false},
+		{pdf.V1_5, false},
+		{pdf.V1_6, true},
+		{pdf.V2_0, true},
+	} {
+		t.Run(tc.version.String(), func(t *testing.T) {
+			a := &Link{}
+			SetBorderWidth(a, 2, tc.version)
+
+			if got := EffectiveBorderWidth(a); got != 2 {
+				t.Errorf("effective width = %v, want 2", got)
+			}
+			if got := a.BorderStyle != nil; got != tc.wantStyle {
+				t.Errorf("the width went into the style = %v, want %v",
+					got, tc.wantStyle)
+			}
+
+			w, _ := memfile.NewPDFWriter(t, tc.version, nil)
+			rm := pdf.NewResourceManager(w)
+			if _, err := a.Encode(rm); err != nil {
+				t.Errorf("the annotation cannot be written: %v", err)
+			}
+		})
+	}
+}
+
+// TestSetBorderWidthZeroVersion checks that a caller with no version to give
+// gets the border array, which every version of the format has.
+func TestSetBorderWidthZeroVersion(t *testing.T) {
+	a := &Link{}
+	SetBorderWidth(a, 2, 0)
+
+	if a.BorderStyle != nil {
+		t.Error("the width went into a style dictionary the file may not carry")
+	}
+	if got := EffectiveBorderWidth(a); got != 2 {
+		t.Errorf("effective width = %v, want 2", got)
+	}
+}
+
+// TestSetBorderWidthKeepsTheStyle checks that only the width changes: a
+// dashed border stays dashed, and the corner radii of a border array are
+// not silently dropped for a type which has nowhere else to put them.
+func TestSetBorderWidthKeepsTheStyle(t *testing.T) {
+	a := &Square{BorderStyle: &BorderStyle{
+		Width: 1, Style: "D", DashArray: []float64{3, 2},
+	}}
+	SetBorderWidth(a, 4, pdf.V2_0)
+
+	if a.BorderStyle.Width != 4 {
+		t.Errorf("width = %v, want 4", a.BorderStyle.Width)
+	}
+	if a.BorderStyle.Style != "D" {
+		t.Errorf("style = %q, want D", a.BorderStyle.Style)
+	}
+	if !slices.Equal(a.BorderStyle.DashArray, []float64{3, 2}) {
+		t.Errorf("dash array = %v, want [3 2]", a.BorderStyle.DashArray)
+	}
+}
+
+// TestSetBorderWidthKeepsTheArray checks that a border the annotation was
+// already carrying in its array keeps its corner radii and dashes, which a
+// style dictionary has no room for.
+func TestSetBorderWidthKeepsTheArray(t *testing.T) {
+	a := &Square{Common: Common{Border: &Border{
+		HCornerRadius: 3, VCornerRadius: 4, Width: 1, DashArray: []float64{5, 2},
+	}}}
+	SetBorderWidth(a, 7, pdf.V2_0)
+
+	if a.BorderStyle != nil {
+		t.Fatal("the border moved into a style, losing the corner radii")
+	}
+	want := &Border{
+		HCornerRadius: 3, VCornerRadius: 4, Width: 7, DashArray: []float64{5, 2},
+	}
+	if diff := cmp.Diff(want, a.Border); diff != "" {
+		t.Errorf("border changed beyond its width (-want +got):\n%s", diff)
+	}
+}
+
+// TestSetBorderWidthCopiesTheArray checks that a border array shared between
+// annotations is not changed underneath the ones which were not asked about.
+func TestSetBorderWidthCopiesTheArray(t *testing.T) {
+	shared := &Border{Width: 1}
+	a := &Text{Common: Common{Border: shared}}
+	b := &Text{Common: Common{Border: shared}}
+
+	SetBorderWidth(a, 5, pdf.V2_0)
+
+	if got := EffectiveBorderWidth(a); got != 5 {
+		t.Errorf("effective width = %v, want 5", got)
+	}
+	if got := EffectiveBorderWidth(b); got != 1 {
+		t.Errorf("the other annotation changed too: width = %v, want 1", got)
+	}
+	if shared.Width != 1 {
+		t.Errorf("the shared border was modified: width = %v, want 1", shared.Width)
+	}
+}
+
+// TestSetBorderWidthOnAPlainType checks that a type with no border style
+// dictionary takes the width in its border array, which is the only place
+// it has for one.
+func TestSetBorderWidthOnAPlainType(t *testing.T) {
+	a := &Text{}
+	SetBorderWidth(a, 3, pdf.V2_0)
+
+	if got := EffectiveBorderWidth(a); got != 3 {
+		t.Errorf("effective width = %v, want 3", got)
+	}
+	if a.Border == nil {
+		t.Fatal("the width went nowhere")
+	}
+}
+
+// TestSetBorderWidthZeroRemovesIt checks that a width of 0 leaves the
+// annotation with no border at all, in either place: a border missing at
+// this point is one the file asked to be left undrawn.
+func TestSetBorderWidthZeroRemovesIt(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		a    *Square
+	}{
+		{"both", &Square{
+			Common:      Common{Border: &Border{Width: 2}},
+			BorderStyle: &BorderStyle{Width: 3},
+		}},
+		{"array only", &Square{Common: Common{Border: &Border{Width: 2}}}},
+		{"style only", &Square{BorderStyle: &BorderStyle{Width: 3}}},
+		{"neither", &Square{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			SetBorderWidth(tc.a, 0, pdf.V2_0)
+
+			if got := EffectiveBorderWidth(tc.a); got != 0 {
+				t.Errorf("effective width = %v, want 0", got)
+			}
+			if tc.a.Border != nil || tc.a.BorderStyle != nil {
+				t.Errorf("border = %v, style = %v, want neither",
+					tc.a.Border, tc.a.BorderStyle)
 			}
 		})
 	}

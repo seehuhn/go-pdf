@@ -30,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/text"
@@ -278,29 +277,30 @@ func (g *Generator) fieldContext(w *annotation.Widget) (b *builder.Builder, widt
 		m = matrix.Matrix{1, 0, 0, 1, llx, lly}
 	}
 
-	b = builder.New(content.Form, nil, g.version)
-	g.reset(b)
+	b = g.begin()
 	return b, width, height, m
 }
 
-func (g *Generator) finishForm(b *builder.Builder, width, height float64, m matrix.Matrix) (*form.Form, error) {
+func (g *Generator) finishForm(b *builder.Builder, width, height float64, m matrix.Matrix,
+	c *annotation.Common) (*form.Form, error) {
+
 	ops, err := b.Harvest()
 	if err != nil {
 		return nil, err
 	}
-	return &form.Form{
+	return g.applyAlpha(&form.Form{
 		Content: ops,
 		Res:     b.Resources,
 		BBox:    pdf.Rectangle{LLx: 0, LLy: 0, URx: width, URy: height},
 		Matrix:  m,
-	}, nil
+	}, c)
 }
 
 // drawChromeField draws background and border only.
 func (g *Generator) drawChromeField(w *annotation.Widget) (*form.Form, error) {
 	b, width, height, m := g.fieldContext(w)
 	drawChrome(b, width, height, w)
-	return g.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m, w.GetCommon())
 }
 
 // chromeColors returns the background and border colours a widget's
@@ -393,7 +393,7 @@ func (g *Generator) drawToggle(w *annotation.Widget, fld *widgetField, on bool) 
 		g.drawDingbat(b, width, height, glyph)
 	}
 
-	return g.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m, w.GetCommon())
 }
 
 // drawCircleChrome fills and strokes a circular field background and border.
@@ -465,7 +465,7 @@ func (g *Generator) drawPushButton(w *annotation.Widget) (*form.Form, error) {
 		b.TextEnd()
 	}
 
-	return g.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m, w.GetCommon())
 }
 
 // drawTextField draws a text field's chrome and value.
@@ -488,7 +488,7 @@ func (g *Generator) drawTextField(w *annotation.Widget, fld *widgetField) (*form
 		g.drawSingleLine(b, width, height, lw, pad, fld, fld.Value)
 	}
 
-	return g.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m, w.GetCommon())
 }
 
 // drawSingleLine draws text as a single, vertically centred line.
@@ -633,7 +633,7 @@ func (g *Generator) drawChoiceField(w *annotation.Widget, fld *widgetField) (*fo
 		g.drawListBox(b, width, height, lw, pad, fld)
 	}
 
-	return g.finishForm(b, width, height, m)
+	return g.finishForm(b, width, height, m, w.GetCommon())
 }
 
 // drawCombo draws the selected value as a single line plus a divider and a

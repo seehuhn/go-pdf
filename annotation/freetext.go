@@ -111,6 +111,17 @@ func (f *FreeText) getBorderStyle() *BorderStyle {
 	return f.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (f *FreeText) setBorderStyle(bs *BorderStyle) {
+	f.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry is PDF 1.3
+// (§12.5.6.6), which is the version of the type itself.
+func (f *FreeText) borderStyleVersion() pdf.Version {
+	return pdf.V1_3
+}
+
 func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "free text annotation", pdf.V1_3); err != nil {
 		return nil, err
@@ -221,7 +232,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if f.BorderStyle != nil {
-		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", pdf.V1_3); err != nil {
+		if err := pdf.CheckVersion(rm.Out, "free text annotation BS entry", f.borderStyleVersion()); err != nil {
 			return nil, err
 		}
 		bs, err := rm.Embed(f.BorderStyle)

@@ -22,7 +22,6 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 )
@@ -30,22 +29,21 @@ import (
 func (g *Generator) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
+	col := paint(a.Color)
 
 	bbox := calculateLineBBox(a, lw)
 	a.Rect = bbox
 
-	b := builder.New(content.Form, nil, g.version)
-
 	// the border width is the thickness of the line itself, so a width of 0
-	// leaves the annotation with nothing to draw
-	if lw <= 0 {
-		g.reset(b)
-		return harvest(b, bbox)
+	// leaves the annotation with nothing to draw, as does a file which names
+	// no ink to draw it in
+	if col == nil || lw <= 0 {
+		return g.harvest(g.begin(), bbox, nil)
 	}
 
-	g.reset(b)
+	b := g.begin()
 	b.SetLineWidth(lw)
-	b.SetStrokeColor(quireInk)
+	b.SetStrokeColor(col)
 	b.SetLineDash(dashPattern, 0)
 
 	if a.LL != 0 {
@@ -54,7 +52,7 @@ func (g *Generator) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 		drawSimpleLineBuilder(b, a)
 	}
 
-	return harvest(b, bbox)
+	return g.harvest(b, bbox, a.GetCommon())
 }
 
 // calculateLineBBox calculates the bounding box for the line annotation

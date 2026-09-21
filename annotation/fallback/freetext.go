@@ -26,8 +26,6 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
-	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/text"
 )
@@ -78,14 +76,12 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 
 	// Set some relevant ignored fields: even if they are not used
 	// for rendering, these may be useful in case the appearance stream
-	// needs to be re-generated after edits.  A nil Border is the "no border"
-	// value; a zero width cannot be expressed as a border array.
-	if lw > 0 {
-		a.Border = &annotation.Border{Width: lw}
-	} else {
-		a.Border = nil
-	}
-	a.BorderStyle = nil
+	// needs to be re-generated after edits.  The width is set through
+	// [annotation.SetBorderWidth], which puts it where the annotation reads
+	// it from and clears the other of the two mutually exclusive places a
+	// border can live, so a style the document gave keeps its dashes rather
+	// than coming back solid.
+	annotation.SetBorderWidth(a, lw, g.version)
 	if !isCloudy {
 		a.BorderEffect = nil
 	}
@@ -93,9 +89,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	a.DefaultStyle = ""
 
 	// generate the appearance stream
-	b := builder.New(content.Form, nil, g.version)
-
-	g.reset(b)
+	b := g.begin()
 
 	// precompute cloud outline if applicable
 	var co *cloudOutline
@@ -244,5 +238,5 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	a.DefaultAppearance = fmt.Sprintf("/%s %s Tf %s",
 		fontName, strconv.FormatFloat(size, 'f', -1, 64), daColorOperator(textCol))
 
-	return harvest(b, outer)
+	return g.harvest(b, outer, a.GetCommon())
 }

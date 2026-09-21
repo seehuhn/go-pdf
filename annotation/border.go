@@ -56,10 +56,16 @@ var PDFDefaultBorder = &Border{Width: 1}
 // style dictionary, so that a rule reading the style can be written once for
 // all of them.  Each type's style is reachable through its exported
 // BorderStyle field; this interface exists to reach it from an [Annotation],
-// and adding a case to it means implementing the method on the new type.
+// and adding a case to it means implementing the methods on the new type.
+//
+// borderStyleVersion is the version at which the type's BS entry may be
+// written, which is the type's own version except where the entry arrived
+// later.  A type's Encode uses it too, so that the version is stated once.
 type borderStyled interface {
 	Annotation
 	getBorderStyle() *BorderStyle
+	setBorderStyle(*BorderStyle)
+	borderStyleVersion() pdf.Version
 }
 
 var (
@@ -73,6 +79,61 @@ var (
 	_ borderStyled = (*Square)(nil)
 	_ borderStyled = (*Widget)(nil)
 )
+
+// SetBorderWidth sets the width of the border drawn around the annotation,
+// in default user space units.  A width of 0 removes the border, which is
+// what an annotation with neither entry asks for.  v is the version of the
+// file the annotation will be written to.
+//
+// A border lives in one of two places: the border style dictionary, for the
+// types which have one, and the [Common.Border] array otherwise.  The two
+// are mutually exclusive -- an annotation carrying both cannot be written --
+// and a style takes precedence over the array wherever a file gives both, so
+// a caller which writes the array by hand on a type that has a style leaves
+// the new width unread and the annotation unwritable.  This function writes
+// to the place the annotation reads from, and clears the other, so that
+// [EffectiveBorderWidth] returns what was set.
+//
+// Only the width changes: an entry already present keeps everything else it
+// says, the style and dash pattern of a style dictionary as well as the
+// corner radii of an array.  An annotation carrying neither is given a
+// style, which is what a cloudy border effect wants beside it, where the
+// file can hold one; some types gained their style dictionary later than the
+// type itself, a link annotation's arriving in PDF 1.6 where the type dates
+// from PDF 1.0.  Below that version the array is used instead, and the zero
+// version, which stands for none, therefore chooses the array too.
+func SetBorderWidth(a Annotation, width float64, v pdf.Version) {
+	c := a.GetCommon()
+
+	if bs, ok := a.(borderStyled); ok {
+		if style := bs.getBorderStyle(); style != nil {
+			c.Border = nil
+			if width <= 0 {
+				bs.setBorderStyle(nil)
+			} else {
+				style.Width = width
+			}
+			return
+		}
+		if width > 0 && c.Border == nil && v >= bs.borderStyleVersion() {
+			bs.setBorderStyle(&BorderStyle{Width: width})
+			return
+		}
+	}
+
+	if width <= 0 {
+		c.Border = nil
+		return
+	}
+	// a copy, so that a border the caller shares between annotations, or the
+	// package-level [PDFDefaultBorder], is not changed underneath them
+	border := Border{Width: width}
+	if c.Border != nil {
+		border = *c.Border
+		border.Width = width
+	}
+	c.Border = &border
+}
 
 // EffectiveBorderWidth returns the width of the border drawn around the
 // annotation, in default user space units.  A width of 0 means no border is

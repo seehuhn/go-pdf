@@ -68,6 +68,17 @@ func (i *Ink) getBorderStyle() *BorderStyle {
 	return i.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (i *Ink) setBorderStyle(bs *BorderStyle) {
+	i.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry carries no
+// version of its own (§12.5.6.13), so it is available as soon as the type is.
+func (i *Ink) borderStyleVersion() pdf.Version {
+	return pdf.V1_3
+}
+
 func (i *Ink) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "ink annotation", pdf.V1_3); err != nil {
 		return nil, err

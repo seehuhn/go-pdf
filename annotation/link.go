@@ -99,6 +99,18 @@ func (l *Link) getBorderStyle() *BorderStyle {
 	return l.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (l *Link) setBorderStyle(bs *BorderStyle) {
+	l.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  A link annotation's BS
+// entry arrived in PDF 1.6 (§12.5.6.5), long after the type itself, so a
+// width set at an earlier version goes into the border array instead.
+func (l *Link) borderStyleVersion() pdf.Version {
+	return pdf.V1_6
+}
+
 func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if l.Action != nil && l.Destination != nil {
 		return nil, errors.New("conflicting Action and Destination fields in Link annotation")
@@ -162,7 +174,7 @@ func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if l.BorderStyle != nil {
-		if err := pdf.CheckVersion(rm.Out, "link annotation BS entry", pdf.V1_6); err != nil {
+		if err := pdf.CheckVersion(rm.Out, "link annotation BS entry", l.borderStyleVersion()); err != nil {
 			return nil, err
 		}
 		ref, err := rm.Embed(l.BorderStyle)

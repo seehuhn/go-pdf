@@ -91,6 +91,17 @@ func (w *Widget) getBorderStyle() *BorderStyle {
 	return w.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (w *Widget) setBorderStyle(bs *BorderStyle) {
+	w.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry is PDF 1.2
+// (§12.5.6.19), which is the version of the type itself.
+func (w *Widget) borderStyleVersion() pdf.Version {
+	return pdf.V1_2
+}
+
 // ParentField returns [Widget.Field].
 //
 // This implements the acroform.Widget interface.

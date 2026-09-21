@@ -22,10 +22,7 @@ import (
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/content/builder"
-	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -34,11 +31,9 @@ func (g *Generator) addCircleAppearance(a *annotation.Circle) (*form.Form, error
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := paint(a.Color)
 
-	rect := applyMargins(a.Rect, a.Margin)
-
-	if m := min(rect.Dx(), rect.Dy()); lw > m/2 {
-		lw = m / 2
-	}
+	// the outer edge of the ellipse's own border; see
+	// [Generator.addSquareAppearance], which follows the same rule
+	outer := applyMargins(a.Rect, a.Margin)
 
 	be := a.BorderEffect
 	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
@@ -46,26 +41,25 @@ func (g *Generator) addCircleAppearance(a *annotation.Circle) (*form.Form, error
 	hasOutline := col != nil && lw > 0
 	hasFill := paint(a.FillColor) != nil
 	if !(hasOutline || hasFill) {
-		a.Rect = rect
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},
-			BBox:    rect,
+			BBox:    roundOut(a.Rect),
 		}, nil
 	}
 
-	b := builder.New(content.Form, nil, g.version)
-
-	g.reset(b)
-	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-		gs := &extgstate.ExtGState{
-			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-			StrokeAlpha: 1 - a.StrokingTransparency,
-			FillAlpha:   1 - a.NonStrokingTransparency,
-			SingleUse:   true,
-		}
-		b.SetExtGState(gs)
+	// a pen wider than this would turn the ellipse it is drawn round inside
+	// out
+	if m := min(outer.Dx(), outer.Dy()); lw > m/2 {
+		lw = m / 2
 	}
+	pen := 0.0
+	if hasOutline {
+		pen = lw
+	}
+	rect := outer.Grow(-pen / 2)
+
+	b := g.begin()
 
 	if hasOutline {
 		b.SetLineWidth(lw)
@@ -78,62 +72,47 @@ func (g *Generator) addCircleAppearance(a *annotation.Circle) (*form.Form, error
 		b.SetFillColor(a.FillColor)
 	}
 
-	var cloudVerts []vec.Vec2
+	// the curls of a cloudy border bulge outside the ellipse they are drawn
+	// round, and Rect grows to take them in
 	if isCloudy {
-		cloudVerts = flattenEllipse(rect, lw)
-		isCloudy = cloudVerts != nil
-	}
-
-	var bbox pdf.Rectangle
-	if isCloudy {
-		cloudBBox := drawCloudyBorder(b, cloudVerts, be.Intensity, lw, hasFill, hasOutline)
-		bbox = cloudBBox.Grow(lw / 2)
-		// rounded outwards, so that the rectangle still contains the ellipse
-		// and no inset comes out negative
-		bbox = roundOut(bbox)
-		a.Margin = []float64{
-			pdf.Round(rect.LLx-bbox.LLx, 4),
-			pdf.Round(rect.LLy-bbox.LLy, 4),
-			pdf.Round(bbox.URx-rect.URx, 4),
-			pdf.Round(bbox.URy-rect.URy, 4),
-		}
-		a.Rect = bbox
-	} else {
-		xMid := (rect.LLx + rect.URx) / 2
-		yMid := (rect.LLy + rect.URy) / 2
-		rx := (rect.Dx() - lw) / 2
-		ry := (rect.Dy() - lw) / 2
-
-		k := (math.Sqrt2 - 1.0) * 4 / 3
-
-		b.MoveTo(xMid+rx, yMid)
-		b.CurveTo(xMid+rx, yMid+ry*k, xMid+rx*k, yMid+ry, xMid, yMid+ry)
-		b.CurveTo(xMid-rx*k, yMid+ry, xMid-rx, yMid+ry*k, xMid-rx, yMid)
-		b.CurveTo(xMid-rx, yMid-ry*k, xMid-rx*k, yMid-ry, xMid, yMid-ry)
-		b.CurveTo(xMid+rx*k, yMid-ry, xMid+rx, yMid-ry*k, xMid+rx, yMid)
-		b.ClosePath()
-		bbox = rect
-		a.Rect = rect
-		switch {
-		case hasOutline && hasFill:
-			b.FillAndStroke()
-		case hasFill:
-			b.Fill()
-		default: // hasOutline
-			b.Stroke()
+		if verts := flattenEllipse(rect); verts != nil {
+			ink := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
+			return g.harvest(b, fitToInk(&a.Common, &a.Margin, outer, ink.Grow(pen/2)), a.GetCommon())
 		}
 	}
 
-	return harvest(b, bbox)
-}
-
-// flattenEllipse approximates the ellipse inscribed in rect (inset by lw/2) as
-// a polygon with enough vertices for smooth cloud curls.
-func flattenEllipse(rect pdf.Rectangle, lw float64) []vec.Vec2 {
 	xMid := (rect.LLx + rect.URx) / 2
 	yMid := (rect.LLy + rect.URy) / 2
-	rx := (rect.Dx() - lw) / 2
-	ry := (rect.Dy() - lw) / 2
+	rx := rect.Dx() / 2
+	ry := rect.Dy() / 2
+
+	k := (math.Sqrt2 - 1.0) * 4 / 3
+
+	b.MoveTo(xMid+rx, yMid)
+	b.CurveTo(xMid+rx, yMid+ry*k, xMid+rx*k, yMid+ry, xMid, yMid+ry)
+	b.CurveTo(xMid-rx*k, yMid+ry, xMid-rx, yMid+ry*k, xMid-rx, yMid)
+	b.CurveTo(xMid-rx, yMid-ry*k, xMid-rx*k, yMid-ry, xMid, yMid-ry)
+	b.CurveTo(xMid+rx*k, yMid-ry, xMid+rx, yMid-ry*k, xMid+rx, yMid)
+	b.ClosePath()
+	switch {
+	case hasOutline && hasFill:
+		b.FillAndStroke()
+	case hasFill:
+		b.Fill()
+	default: // hasOutline
+		b.Stroke()
+	}
+
+	return g.harvest(b, roundOut(a.Rect), a.GetCommon())
+}
+
+// flattenEllipse approximates the ellipse inscribed in rect as
+// a polygon with enough vertices for smooth cloud curls.
+func flattenEllipse(rect pdf.Rectangle) []vec.Vec2 {
+	xMid := (rect.LLx + rect.URx) / 2
+	yMid := (rect.LLy + rect.URy) / 2
+	rx := rect.Dx() / 2
+	ry := rect.Dy() / 2
 
 	if rx < 0.5 || ry < 0.5 {
 		return nil

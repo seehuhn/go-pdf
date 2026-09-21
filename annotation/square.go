@@ -99,8 +99,19 @@ func (s *Square) getBorderStyle() *BorderStyle {
 	return s.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (s *Square) setBorderStyle(bs *BorderStyle) {
+	s.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry carries no
+// version of its own (§12.5.6.8), so it is available as soon as the type is.
+func (s *Square) borderStyleVersion() pdf.Version {
+	return pdf.V1_3
+}
+
 func (s *Square) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	if err := pdf.CheckVersion(rm.Out, "square annotations", pdf.V1_3); err != nil {
+	if err := pdf.CheckVersion(rm.Out, "square annotation", pdf.V1_3); err != nil {
 		return nil, err
 	}
 

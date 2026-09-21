@@ -18,6 +18,7 @@ package fallback
 
 import (
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -251,5 +252,62 @@ func TestFreeTextTypewriterFont(t *testing.T) {
 	}
 	if name := g.typewriter().PostScriptName(); name != "Courier" {
 		t.Errorf("typewriter font PostScript name = %q, want %q", name, "Courier")
+	}
+}
+
+// TestFreeTextKeepsItsBorderStyle checks that generating an appearance
+// leaves the border the document gave.  The generator records the effective
+// width where a later regeneration can read it, and must not turn a dashed
+// or bevelled border into a plain one on the way: an edited box is written
+// back to the file, so a style lost here is lost for good.
+func TestFreeTextKeepsItsBorderStyle(t *testing.T) {
+	a := &annotation.FreeText{
+		Common:            annotation.Common{Rect: pdf.Rectangle{URx: 200, URy: 60}},
+		DefaultAppearance: "/Helv 12 Tf 0 g",
+		BorderStyle: &annotation.BorderStyle{
+			Width: 2, Style: "D", DashArray: []float64{3, 2},
+		},
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := annotation.EffectiveBorderWidth(a); got != 2 {
+		t.Errorf("border width = %v, want 2", got)
+	}
+	if got := annotation.EffectiveBorderStyle(a); got != "D" {
+		t.Errorf("border style = %q, want D", got)
+	}
+	if got := annotation.EffectiveBorderDash(a); !slices.Equal(got, []float64{3, 2}) {
+		t.Errorf("dash array = %v, want [3 2]", got)
+	}
+	// the two places a border can live are mutually exclusive: an annotation
+	// carrying both cannot be written at all
+	if a.BorderStyle != nil && a.Common.Border != nil {
+		t.Error("the annotation carries both a border style and a border array")
+	}
+}
+
+// TestFreeTextBorderlessStaysBorderless checks that a box the document drew
+// without a border still has none after its appearance is generated, in
+// either of the two places one can live.
+func TestFreeTextBorderlessStaysBorderless(t *testing.T) {
+	a := &annotation.FreeText{
+		Common:            annotation.Common{Rect: pdf.Rectangle{URx: 200, URy: 60}},
+		DefaultAppearance: "/Helv 12 Tf 0 g",
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := annotation.EffectiveBorderWidth(a); got != 0 {
+		t.Errorf("border width = %v, want 0", got)
+	}
+	if a.BorderStyle != nil || a.Common.Border != nil {
+		t.Errorf("border = %v, style = %v, want neither", a.Common.Border, a.BorderStyle)
 	}
 }

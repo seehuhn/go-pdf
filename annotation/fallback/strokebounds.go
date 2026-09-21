@@ -26,6 +26,12 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 )
 
+// pathPrecision is how far a path written to the file can lie outside the
+// coordinates it was computed from: the operands carry two decimals, and a
+// point of a curve is a weighted average of them, so it moves by no more
+// than half of the last digit.
+const pathPrecision = 0.005
+
 // roundOut returns the smallest rectangle with two-decimal edges which
 // contains r.
 //

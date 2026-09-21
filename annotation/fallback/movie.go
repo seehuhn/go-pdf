@@ -20,10 +20,8 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
-	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/movie"
 )
@@ -40,9 +38,7 @@ func (g *Generator) addMovieAppearance(a *annotation.Movie) (*form.Form, error) 
 		return &form.Form{Content: nil, Res: &content.Resources{}, BBox: rect}, nil
 	}
 
-	b := builder.New(content.Form, nil, g.version)
-	g.reset(b)
-	mediaAlpha(b, a.StrokingTransparency, a.NonStrokingTransparency)
+	b := g.begin()
 
 	// PosterFromMovieFile lives inside an undecoded movie container, so we can
 	// only draw a poster that is an embedded image XObject.
@@ -55,22 +51,7 @@ func (g *Generator) addMovieAppearance(a *annotation.Movie) (*form.Form, error) 
 		drawMediaPlaceholder(b, rect)
 	}
 
-	return harvest(b, rect)
-}
-
-// mediaAlpha applies the annotation's stroking and non-stroking transparency
-// to the builder's graphics state.  The transparency fields are zero for fully
-// opaque, so a non-zero value sets the corresponding alpha.
-func mediaAlpha(b *builder.Builder, strokeTransparency, fillTransparency float64) {
-	if strokeTransparency == 0 && fillTransparency == 0 {
-		return
-	}
-	b.SetExtGState(&extgstate.ExtGState{
-		Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-		StrokeAlpha: pdf.Round(1-strokeTransparency, 10),
-		FillAlpha:   pdf.Round(1-fillTransparency, 10),
-		SingleUse:   true,
-	})
+	return g.harvest(b, rect, a.GetCommon())
 }
 
 // drawMediaPlaceholder fills rect with a light chrome panel and a centred,

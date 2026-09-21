@@ -102,8 +102,19 @@ func (p *Polygon) getBorderStyle() *BorderStyle {
 	return p.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (p *Polygon) setBorderStyle(bs *BorderStyle) {
+	p.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry carries no
+// version of its own (§12.5.6.9), so it is available as soon as the type is.
+func (p *Polygon) borderStyleVersion() pdf.Version {
+	return pdf.V1_5
+}
+
 func (p *Polygon) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	if err := pdf.CheckVersion(rm.Out, "polygon annotations", pdf.V1_5); err != nil {
+	if err := pdf.CheckVersion(rm.Out, "polygon annotation", pdf.V1_5); err != nil {
 		return nil, err
 	}
 

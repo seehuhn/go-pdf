@@ -24,16 +24,18 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/annotation/colorenc"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
-	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
 func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
-	col := a.Color
+	// A stamp is drawn as a label rather than as an icon, so it has no
+	// background for /C to fill: §12.5.2 gives the entry no other meaning,
+	// and the ink is the generator's own.  An empty array, which asks for no
+	// background, therefore leaves the stamp as it would be with no /C at
+	// all, rather than taking the stamp away.
+	col := paint(a.Color)
 	if col == nil {
 		col = quireSignalError
 	}
@@ -43,7 +45,7 @@ func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) 
 	rect := a.Rect
 	w := rect.Dx()
 	h := rect.Dy()
-	if w <= 0 || h <= 0 || col == colorenc.Transparent {
+	if w <= 0 || h <= 0 {
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},
@@ -51,18 +53,7 @@ func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) 
 		}, nil
 	}
 
-	b := builder.New(content.Form, nil, g.version)
-
-	g.reset(b)
-	if a.StrokingTransparency != 0 || a.NonStrokingTransparency != 0 {
-		gs := &extgstate.ExtGState{
-			Set:         graphics.StateStrokeAlpha | graphics.StateFillAlpha,
-			StrokeAlpha: 1 - a.StrokingTransparency,
-			FillAlpha:   1 - a.NonStrokingTransparency,
-			SingleUse:   true,
-		}
-		b.SetExtGState(gs)
-	}
+	b := g.begin()
 
 	cx := (rect.LLx + rect.URx) / 2
 	cy := (rect.LLy + rect.URy) / 2
@@ -139,7 +130,7 @@ func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) 
 
 	b.PopGraphicsState()
 
-	return harvest(b, rect)
+	return g.harvest(b, rect, a.GetCommon())
 }
 
 // stampLabel converts a StampIcon name to display text.

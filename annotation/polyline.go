@@ -107,8 +107,19 @@ func (p *PolyLine) getBorderStyle() *BorderStyle {
 	return p.BorderStyle
 }
 
+// setBorderStyle implements [borderStyled].
+func (p *PolyLine) setBorderStyle(bs *BorderStyle) {
+	p.BorderStyle = bs
+}
+
+// borderStyleVersion implements [borderStyled].  The BS entry carries no
+// version of its own (§12.5.6.9), so it is available as soon as the type is.
+func (p *PolyLine) borderStyleVersion() pdf.Version {
+	return pdf.V1_5
+}
+
 func (p *PolyLine) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	if err := pdf.CheckVersion(rm.Out, "polyline annotations", pdf.V1_5); err != nil {
+	if err := pdf.CheckVersion(rm.Out, "polyline annotation", pdf.V1_5); err != nil {
 		return nil, err
 	}
 

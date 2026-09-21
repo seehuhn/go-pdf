@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/geom/path"
+	"seehuhn.de/go/geom/polygon"
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
@@ -174,6 +175,10 @@ func TestCloudOutlineRectangle(t *testing.T) {
 	}
 }
 
+// TestCloudOutlineTooSmall checks that a shape with no room for a border
+// gets no cloud.  What counts is the pen against the shape, not the shape
+// on its own: the rule is scale free, so a 2 by 2 box with a 2 point pen is
+// the same case as a 200 by 200 box with a 200 point one.
 func TestCloudOutlineTooSmall(t *testing.T) {
 	tiny := []vec.Vec2{
 		{X: 0, Y: 0},
@@ -181,9 +186,9 @@ func TestCloudOutlineTooSmall(t *testing.T) {
 		{X: 2, Y: 2},
 		{X: 0, Y: 2},
 	}
-	_, _, ok := CloudOutline(tiny, 1, 1)
+	_, _, ok := CloudOutline(tiny, 1, 2)
 	if ok {
-		t.Error("expected !ok for a 2x2 rectangle")
+		t.Error("expected !ok for a 2x2 rectangle with a 2pt pen")
 	}
 }
 
@@ -262,5 +267,134 @@ func TestCloudOutlineDegenerate(t *testing.T) {
 				t.Error("expected no cloud")
 			}
 		})
+	}
+}
+
+// cloudRect is a w by h rectangle, counter-clockwise from the origin.
+func cloudRect(w, h float64) []vec.Vec2 {
+	return []vec.Vec2{{X: 0, Y: 0}, {X: w, Y: 0}, {X: w, Y: h}, {X: 0, Y: h}}
+}
+
+// TestCloudBulgeCountFallsWithTheLineWidth checks that a thicker pen draws
+// fewer, larger bulges all the way up, rather than the count freezing once
+// the pen passes some width: bulges no bigger than the line they are drawn
+// with read as mush.
+func TestCloudBulgeCountFallsWithTheLineWidth(t *testing.T) {
+	verts := cloudRect(200, 100)
+	prev := 0
+	for i, lw := range []float64{1, 2, 4, 8, 16, 32} {
+		co := newCloudOutline(verts, 1.5, lw)
+		if co == nil {
+			t.Fatalf("width %v: no cloud, but the border is far from filling the shape", lw)
+		}
+		n := co.numBulges()
+		if i > 0 && n > prev {
+			t.Errorf("width %v draws %d bulges, more than the %d at the width before",
+				lw, n, prev)
+		}
+		if n < minBulges {
+			t.Errorf("width %v draws %d bulges, fewer than the %d a cloud needs",
+				lw, n, minBulges)
+		}
+		prev = n
+	}
+	if prev >= 10 {
+		t.Errorf("the count never fell: %d bulges at the widest pen", prev)
+	}
+}
+
+// TestCloudBulgesShrinkToFit checks that an outline with no room for
+// [minBulges] of the size the pen and the intensity ask for gets that many
+// smaller ones, rather than no cloud at all.  Only a border too wide for the
+// shape gives a cloud up, which is what the next test covers.
+func TestCloudBulgesShrinkToFit(t *testing.T) {
+	// a small rectangle at the highest intensity: the bulge asked for is
+	// longer than the whole outline
+	co := newCloudOutline(cloudRect(40, 25), 2, 4)
+	if co == nil {
+		t.Fatal("no cloud, though the border is well inside what the shape can carry")
+	}
+	if got := co.numBulges(); got != minBulges {
+		t.Errorf("got %d bulges, want %d", got, minBulges)
+	}
+}
+
+// TestCloudGivesUpWhenTheBorderFillsTheShape checks the one thing a cloud is
+// given up for: a border taking more than [cloudGiveUp] of the room the shape
+// has for one leaves too little inside to read as a shape with a border round
+// it.  The rule depends on the shape and the pen alone, not on the intensity,
+// and it follows [cloudSize] rather than the shorter side, which puts the
+// limit far too low for a long thin shape.
+func TestCloudGivesUpWhenTheBorderFillsTheShape(t *testing.T) {
+	for _, size := range [][2]float64{{200, 100}, {100, 50}, {40, 25}, {150, 150}, {500, 50}} {
+		verts := cloudRect(size[0], size[1])
+		limit := cloudGiveUp * cloudSize(verts, polygon.Perimeter(verts))
+		for _, intensity := range []float64{0.5, 1, 1.5, 2} {
+			if co := newCloudOutline(verts, intensity, limit*0.98); co == nil {
+				t.Errorf("%v at intensity %v: no cloud just inside the limit %.2f",
+					size, intensity, limit)
+			}
+			if co := newCloudOutline(verts, intensity, limit*1.02); co != nil {
+				t.Errorf("%v at intensity %v: still a cloud past the limit %.2f",
+					size, intensity, limit)
+			}
+		}
+	}
+}
+
+// TestCloudSimplifiesBeforeItGivesUp checks that the two steps come in the
+// right order and stay apart: the ticks go first, and the cloud itself is
+// kept for a good stretch of pen widths after that.
+func TestCloudSimplifiesBeforeItGivesUp(t *testing.T) {
+	if cloudTickLimit >= cloudGiveUp {
+		t.Fatalf("ticks dropped at %v, cloud given up at %v: no simplified cloud at all",
+			cloudTickLimit, cloudGiveUp)
+	}
+	if cloudGiveUp/cloudTickLimit < 1.25 {
+		t.Errorf("the simplified cloud covers only %.2fx in pen width",
+			cloudGiveUp/cloudTickLimit)
+	}
+}
+
+// countMoveTo counts the subpaths of p: the cusp ticks are drawn as separate
+// subpaths, so this is how many of them a stroke path carries.
+func countMoveTo(p path.Path) int {
+	n := 0
+	for cmd := range p {
+		if cmd == path.CmdMoveTo {
+			n++
+		}
+	}
+	return n
+}
+
+// TestCloudDropsCuspTicksWhenThePenIsWide checks that the small ticks drawn
+// across each cusp are dropped once the pen is wide enough to blot them into
+// the bulges they sit between, leaving a cloud of plain curls.  The width
+// this happens at follows the room the shape has for a border, not the
+// intensity, which changes the size of the bulges rather than the size of
+// the shape they are drawn round.
+func TestCloudDropsCuspTicksWhenThePenIsWide(t *testing.T) {
+	verts := cloudRect(150, 150)
+	limit := cloudTickLimit * cloudSize(verts, polygon.Perimeter(verts))
+
+	for _, intensity := range []float64{0.5, 1, 1.5, 2} {
+		narrow := newCloudOutline(verts, intensity, limit*0.98)
+		if narrow == nil {
+			t.Fatalf("intensity %v: no cloud just inside the limit %.2f", intensity, limit)
+		}
+		if countMoveTo(narrow.stroke()) < 2 {
+			t.Errorf("intensity %v: no cusp ticks just inside the limit %.2f",
+				intensity, limit)
+		}
+
+		wide := newCloudOutline(verts, intensity, limit*1.02)
+		if wide == nil {
+			t.Fatalf("intensity %v: no cloud just past the limit %.2f", intensity, limit)
+		}
+		if got := countMoveTo(wide.stroke()); got != 1 {
+			t.Errorf("intensity %v: %d subpaths just past the limit %.2f, want the ticks gone",
+				intensity, got, limit)
+		}
 	}
 }
