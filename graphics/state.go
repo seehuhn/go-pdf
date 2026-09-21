@@ -37,7 +37,7 @@ type ClipPath struct {
 // one.  A join whose miter is longer than this multiple of the line width is
 // bevelled instead, which happens where the segments enclose an angle of less
 // than about 11.5 degrees.
-const DefaultMiterLimit = 10
+const DefaultMiterLimit = path.DefaultMiterLimit
 
 // State represents the current graphics state of a PDF processor,
 // within a content stream.  When reading or writing content streams,

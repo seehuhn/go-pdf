@@ -19,7 +19,7 @@ package fallback
 import (
 	"math"
 
-	"seehuhn.de/go/geom/linalg"
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
@@ -52,53 +52,19 @@ func roundOut(r pdf.Rectangle) pdf.Rectangle {
 // stream drawing them needs, and the annotation rectangle that appearance is
 // placed in.
 //
-// Each vertex is surrounded by half the line width, which covers a butt, round
-// or projecting square cap as well as a round or bevel join.  A miter join
-// reaches further, and how much further depends on how sharp the corner is, so
-// the interior vertices of a miter-joined path are surrounded by the miter
-// length instead, unless the corner is too sharp for miterLimit and the join is
-// bevelled.  A closed path has a join at every vertex, an open one only at the
-// vertices between its first and its last.
+// The generators which use this stroke with a butt or a round cap, neither of
+// which reaches further than half the line width, so the bounds are taken
+// with a butt cap.  A projecting square cap reaches further, and needs
+// [path.PolylineStrokeBBox] called directly.
 //
 // The second result is false if no sub-path has a vertex, in which case there
 // is nothing to bound.
 func strokeBounds(subpaths [][]vec.Vec2, closed bool, lw float64, join graphics.LineJoinStyle, miterLimit float64) (pdf.Rectangle, bool) {
-	var bbox pdf.Rectangle
-	seeded := false
-
-	extend := func(p vec.Vec2, r float64) {
-		if !seeded {
-			bbox = pdf.Rectangle{LLx: p.X - r, LLy: p.Y - r, URx: p.X + r, URy: p.Y + r}
-			seeded = true
-			return
-		}
-		bbox.LLx = min(bbox.LLx, p.X-r)
-		bbox.LLy = min(bbox.LLy, p.Y-r)
-		bbox.URx = max(bbox.URx, p.X+r)
-		bbox.URy = max(bbox.URy, p.Y+r)
-	}
-
-	for _, pts := range subpaths {
-		n := len(pts)
-		for i, p := range pts {
-			r := lw / 2
-			if join == graphics.LineJoinMiter && n >= 3 {
-				var prev, next vec.Vec2
-				switch {
-				case i > 0 && i < n-1:
-					prev, next = pts[i-1], pts[i+1]
-				case closed:
-					prev, next = pts[(i+n-1)%n], pts[(i+1)%n]
-				default:
-					prev, next = p, p // an end point of an open path: no join
-				}
-				// A vertex which carries no join gives two zero directions,
-				// for which the miter reaches no further than the bevel.
-				length, _ := linalg.MiterLength(p.Sub(prev), next.Sub(p), lw, miterLimit)
-				r = max(r, length)
-			}
-			extend(p, r)
-		}
-	}
-	return bbox, seeded
+	bbox, ok := path.PolylineStrokeBBox(subpaths, closed, path.StrokeOptions{
+		Width:      lw,
+		Cap:        path.CapButt,
+		Join:       join,
+		MiterLimit: miterLimit,
+	})
+	return pdf.RectangleFromRect(bbox), ok
 }

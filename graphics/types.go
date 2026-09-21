@@ -17,6 +17,7 @@
 package graphics
 
 import (
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -255,49 +256,31 @@ func (m BlendMode) Equal(other BlendMode) bool {
 	return true
 }
 
-// LineCapStyle is the style of the end of a line.
-type LineCapStyle uint8
+// LineCapStyle is the style of the end of a line.  It is the cap style of
+// the geometry package, so a value can be passed to its stroking functions
+// without conversion.
+type LineCapStyle = path.CapStyle
 
 // Possible values for LineCapStyle.
 // See section 8.4.3.3 of PDF 32000-1:2008.
 const (
-	LineCapButt   LineCapStyle = 0
-	LineCapRound  LineCapStyle = 1
-	LineCapSquare LineCapStyle = 2
+	LineCapButt   = path.CapButt
+	LineCapRound  = path.CapRound
+	LineCapSquare = path.CapSquare
 )
 
-func (c LineCapStyle) String() string {
-	switch c {
-	case LineCapRound:
-		return "round"
-	case LineCapSquare:
-		return "square"
-	default:
-		return "butt"
-	}
-}
-
-// LineJoinStyle is the style of the corner of a line.
-type LineJoinStyle uint8
+// LineJoinStyle is the style of the corner of a line.  It is the join style
+// of the geometry package, so a value can be passed to its stroking
+// functions without conversion.
+type LineJoinStyle = path.JoinStyle
 
 // Possible values for LineJoinStyle.
 // See section 8.4.3.4 of PDF 32000-1:2008.
 const (
-	LineJoinMiter LineJoinStyle = 0
-	LineJoinRound LineJoinStyle = 1
-	LineJoinBevel LineJoinStyle = 2
+	LineJoinMiter = path.JoinMiter
+	LineJoinRound = path.JoinRound
+	LineJoinBevel = path.JoinBevel
 )
-
-func (j LineJoinStyle) String() string {
-	switch j {
-	case LineJoinRound:
-		return "round"
-	case LineJoinBevel:
-		return "bevel"
-	default:
-		return "miter"
-	}
-}
 
 // RenderingIntent controls how colors are adjusted when converting between
 // color spaces with different gamuts.
