@@ -137,3 +137,100 @@ func TestByName(t *testing.T) {
 		})
 	}
 }
+
+// TestPlacesCoverEveryFont checks that every one of the fourteen fonts has a
+// place in a family, since [Font.Face] and [Font.Style] answer from that
+// table and a font missing from it would have no faces at all.
+func TestPlacesCoverEveryFont(t *testing.T) {
+	for _, f := range All {
+		if _, ok := places[f]; !ok {
+			t.Errorf("%s has no place", f)
+		}
+	}
+}
+
+// TestStyleAndRegularFace pins the style each font name spells out, and the
+// regular face its family is named by.
+func TestStyleAndRegularFace(t *testing.T) {
+	cases := []struct {
+		font    Font
+		regular Font
+		bold    bool
+		italic  bool
+	}{
+		{Courier, Courier, false, false},
+		{CourierBold, Courier, true, false},
+		{CourierOblique, Courier, false, true},
+		{CourierBoldOblique, Courier, true, true},
+		{Helvetica, Helvetica, false, false},
+		{HelveticaBold, Helvetica, true, false},
+		{HelveticaOblique, Helvetica, false, true},
+		{HelveticaBoldOblique, Helvetica, true, true},
+		{TimesRoman, TimesRoman, false, false},
+		{TimesBold, TimesRoman, true, false},
+		{TimesItalic, TimesRoman, false, true},
+		{TimesBoldItalic, TimesRoman, true, true},
+		{Symbol, Symbol, false, false},
+		{ZapfDingbats, ZapfDingbats, false, false},
+	}
+	for _, c := range cases {
+		t.Run(string(c.font), func(t *testing.T) {
+			if got := c.font.Face(false, false); got != c.regular {
+				t.Errorf("regular face = %q, want %q", got, c.regular)
+			}
+			bold, italic := c.font.Style()
+			if bold != c.bold || italic != c.italic {
+				t.Errorf("style = (%v, %v), want (%v, %v)", bold, italic, c.bold, c.italic)
+			}
+		})
+	}
+}
+
+// TestFaceRoundTrip checks the identity a caller combining two sources of
+// style relies on: asking a font for the style it already has gives it back.
+func TestFaceRoundTrip(t *testing.T) {
+	for _, f := range All {
+		if got := f.Face(f.Style()); got != f {
+			t.Errorf("%s.Face(%s.Style()) = %q", f, f, got)
+		}
+	}
+}
+
+func TestFace(t *testing.T) {
+	cases := []struct {
+		font   Font
+		bold   bool
+		italic bool
+		want   Font
+	}{
+		// a style added to the regular face, one taken away again, and one
+		// exchanged for the other
+		{Helvetica, true, true, HelveticaBoldOblique},
+		{HelveticaBoldOblique, false, false, Helvetica},
+		{HelveticaBold, false, true, HelveticaOblique},
+		{HelveticaOblique, true, false, HelveticaBold},
+		// Times names its italic face Italic where Helvetica says Oblique
+		{TimesRoman, false, true, TimesItalic},
+		{TimesItalic, true, true, TimesBoldItalic},
+		{Courier, false, true, CourierOblique},
+		// a family with a single face has nothing else to give
+		{Symbol, true, true, Symbol},
+		{ZapfDingbats, true, false, ZapfDingbats},
+	}
+	for _, c := range cases {
+		t.Run(string(c.font), func(t *testing.T) {
+			if got := c.font.Face(c.bold, c.italic); got != c.want {
+				t.Errorf("Face(%v, %v) = %q, want %q", c.bold, c.italic, got, c.want)
+			}
+		})
+	}
+}
+
+func TestFacePanicsOnUnknownFont(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("no panic for a font outside the fourteen")
+		}
+	}()
+	Font("Arial").Face(false, false)
+}

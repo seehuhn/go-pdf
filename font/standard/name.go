@@ -62,6 +62,41 @@ func ByName(name string) (Font, bool) {
 	return f, ok
 }
 
+// Style reports whether f is a bold face, and whether it is an italic or
+// oblique face.  The font must be one of the fourteen listed in [All].
+func (f Font) Style() (bold, italic bool) {
+	p := f.place()
+	return p.bold, p.italic
+}
+
+// Face returns the face of f's family with the given style.
+// Face(false, false) gives the family's regular face: Courier, Helvetica,
+// Times-Roman, Symbol or ZapfDingbats.  A family with a single face, Symbol
+// or ZapfDingbats, gives that face whatever style is asked for.  The font
+// must be one of the fourteen listed in [All].
+func (f Font) Face(bold, italic bool) Font {
+	var style string
+	switch {
+	case bold && italic:
+		style = "BoldItalic"
+	case bold:
+		style = "Bold"
+	case italic:
+		style = "Italic"
+	}
+	return f.place().faces[style]
+}
+
+// place returns where f sits in its family, and panics if f is not one of
+// the fourteen standard fonts.
+func (f Font) place() place {
+	p, ok := places[f]
+	if !ok {
+		panic("not a standard font: " + string(f))
+	}
+	return p
+}
+
 // shortNames are the abbreviations conventionally used to name the standard
 // fonts in default-appearance strings.
 var shortNames = map[string]Font{
@@ -82,8 +117,8 @@ var families = map[string]map[string]Font{
 	"TimesNewRoman": timesFaces,
 	"Courier":       courierFaces,
 	"CourierNew":    courierFaces,
-	"Symbol":        singleFace(Symbol),
-	"ZapfDingbats":  singleFace(ZapfDingbats),
+	"Symbol":        symbolFaces,
+	"ZapfDingbats":  zapfDingbatsFaces,
 }
 
 var helveticaFaces = map[string]Font{
@@ -114,6 +149,10 @@ var courierFaces = map[string]Font{
 	"BoldOblique": CourierBoldOblique,
 }
 
+var symbolFaces = singleFace(Symbol)
+
+var zapfDingbatsFaces = singleFace(ZapfDingbats)
+
 // singleFace returns the face table of a family whose only face is f,
 // whatever style the name claims.
 func singleFace(f Font) map[string]Font {
@@ -125,4 +164,29 @@ func singleFace(f Font) map[string]Font {
 		"BoldItalic":  f,
 		"BoldOblique": f,
 	}
+}
+
+// place is where one of the fourteen fonts sits in its family.
+type place struct {
+	faces        map[string]Font // the faces of the family, by style suffix
+	bold, italic bool
+}
+
+// places gives the family and style of each of the fourteen fonts, so that
+// a font can be exchanged for another face of the same family.
+var places = map[Font]place{
+	Courier:              {courierFaces, false, false},
+	CourierBold:          {courierFaces, true, false},
+	CourierOblique:       {courierFaces, false, true},
+	CourierBoldOblique:   {courierFaces, true, true},
+	Helvetica:            {helveticaFaces, false, false},
+	HelveticaBold:        {helveticaFaces, true, false},
+	HelveticaOblique:     {helveticaFaces, false, true},
+	HelveticaBoldOblique: {helveticaFaces, true, true},
+	TimesRoman:           {timesFaces, false, false},
+	TimesBold:            {timesFaces, true, false},
+	TimesItalic:          {timesFaces, false, true},
+	TimesBoldItalic:      {timesFaces, true, true},
+	Symbol:               {symbolFaces, false, false},
+	ZapfDingbats:         {zapfDingbatsFaces, false, false},
 }
