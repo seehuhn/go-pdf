@@ -74,19 +74,13 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		outer.Extend(&clBBox)
 	}
 
-	// Set some relevant ignored fields: even if they are not used
-	// for rendering, these may be useful in case the appearance stream
-	// needs to be re-generated after edits.  The width is set through
-	// [annotation.SetBorderWidth], which puts it where the annotation reads
-	// it from and clears the other of the two mutually exclusive places a
-	// border can live, so a style the document gave keeps its dashes rather
-	// than coming back solid.
+	// The border width is not used when an appearance stream is present, but
+	// it is recorded in the annotation so that the appearance can be
+	// regenerated after an edit.  [annotation.SetBorderWidth] writes the width
+	// to the entry the annotation reads it from and clears the other of the
+	// two mutually exclusive entries, BS and Border.  Because only the width
+	// changes, a border style given by the document keeps its dash pattern.
 	annotation.SetBorderWidth(a, lw, g.version)
-	if !isCloudy {
-		a.BorderEffect = nil
-	}
-
-	a.DefaultStyle = ""
 
 	// generate the appearance stream
 	b := g.begin()

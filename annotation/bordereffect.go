@@ -47,6 +47,8 @@ type BorderEffect struct {
 
 var _ pdf.Embedder = (*BorderEffect)(nil)
 
+// ExtractBorderEffect decodes a border effect dictionary.  A missing S entry
+// gives the style "S", and Intensity is read only for the cloudy style "C".
 func ExtractBorderEffect(c pdf.Cursor, obj pdf.Object, isDirect bool) (*BorderEffect, error) {
 
 	dict, err := c.Dict(obj)
@@ -71,8 +73,6 @@ func ExtractBorderEffect(c pdf.Cursor, obj pdf.Object, isDirect bool) (*BorderEf
 			return nil, err
 		} else if intensity >= 0.0 && intensity <= 2.0 {
 			effect.Intensity = intensity
-		} else {
-			effect.Intensity = 1.0
 		}
 	}
 
@@ -81,6 +81,8 @@ func ExtractBorderEffect(c pdf.Cursor, obj pdf.Object, isDirect bool) (*BorderEf
 	return effect, nil
 }
 
+// Embed adds the border effect dictionary to a PDF file.  The dictionary is
+// returned directly if SingleUse is set, and as a reference otherwise.
 func (be *BorderEffect) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "border effect dictionary", pdf.V1_5); err != nil {
 		return nil, err

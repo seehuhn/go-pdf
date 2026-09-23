@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 var borderEffectTestCases = []struct {
@@ -107,6 +108,24 @@ func TestBorderEffectRoundTrip(t *testing.T) {
 			t.Run(tc.name+"-"+v.String(), func(t *testing.T) {
 				borderEffectRoundTrip(t, v, tc.data)
 			})
+		}
+	}
+}
+
+// TestBorderEffectInvalidIntensity checks that an invalid intensity, either
+// out of range or not a number, is dropped on read, as though the file had
+// given no I entry.
+func TestBorderEffectInvalidIntensity(t *testing.T) {
+	x := pdf.NewExtractor(mock.Getter)
+	for _, intensity := range []pdf.Object{pdf.Number(-0.5), pdf.Number(2.5), pdf.Name("x")} {
+		dict := pdf.Dict{"S": pdf.Name("C"), "I": intensity}
+		got, err := pdf.Decode(pdf.CursorAt(x, nil), dict, ExtractBorderEffect)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := &BorderEffect{Style: "C", SingleUse: true}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("I = %v: wrong result (-want +got):\n%s", intensity, diff)
 		}
 	}
 }

@@ -33,7 +33,8 @@ type Properties struct {
 	OCGs []*Group
 
 	// D is the default configuration, defining initial group states
-	// and UI presentation.
+	// and UI presentation.  Its BaseState must be empty or BaseStateON,
+	// and its Intent must be nil or contain the single name "View".
 	D *Configuration
 
 	// Configs (optional) lists alternate configurations.

@@ -311,3 +311,30 @@ func TestFreeTextBorderlessStaysBorderless(t *testing.T) {
 		t.Errorf("border = %v, style = %v, want neither", a.Common.Border, a.BorderStyle)
 	}
 }
+
+// TestFreeTextKeepsStyleAndBorderEffect checks that generating an appearance
+// leaves the default style string and a non-cloudy border effect as the
+// document gave them.  Neither changes the appearance drawn, but both belong
+// to the annotation and are written back when it is saved after an edit.
+func TestFreeTextKeepsStyleAndBorderEffect(t *testing.T) {
+	const ds = "font: Helvetica 12pt; color: #FF0000"
+	be := &annotation.BorderEffect{Style: "S"}
+	a := &annotation.FreeText{
+		Common:            annotation.Common{Rect: pdf.Rectangle{URx: 200, URy: 60}},
+		DefaultAppearance: "/Helv 12 Tf 0 g",
+		DefaultStyle:      ds,
+		BorderEffect:      be,
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	if a.DefaultStyle != ds {
+		t.Errorf("default style = %q, want %q", a.DefaultStyle, ds)
+	}
+	if a.BorderEffect != be {
+		t.Errorf("border effect = %+v, want %+v", a.BorderEffect, be)
+	}
+}
