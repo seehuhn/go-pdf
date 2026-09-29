@@ -96,12 +96,15 @@ var (
 //
 // Only the width changes: an entry already present keeps everything else it
 // says, the style and dash pattern of a style dictionary as well as the
-// corner radii of an array.  An annotation carrying neither is given a
-// style, which is what a cloudy border effect wants beside it, where the
-// file can hold one; some types gained their style dictionary later than the
-// type itself, a link annotation's arriving in PDF 1.6 where the type dates
-// from PDF 1.0.  Below that version the array is used instead, and the zero
-// version, which stands for none, therefore chooses the array too.
+// corner radii of an array.  The annotation is given a changed copy of the
+// entry, so that an entry it shares with other annotations, or with a
+// shallow copy of itself, is left as it was.  An annotation carrying neither
+// is given a style, which is what a cloudy border effect wants beside it,
+// where the file can hold one; some types gained their style dictionary
+// later than the type itself, a link annotation's arriving in PDF 1.6 where
+// the type dates from PDF 1.0.  Below that version the array is used
+// instead, and the zero version, which stands for none, therefore chooses
+// the array too.
 func SetBorderWidth(a Annotation, width float64, v pdf.Version) {
 	c := a.GetCommon()
 
@@ -111,7 +114,11 @@ func SetBorderWidth(a Annotation, width float64, v pdf.Version) {
 			if width <= 0 {
 				bs.setBorderStyle(nil)
 			} else {
-				style.Width = width
+				// a copy, so that a style the caller shares between
+				// annotations is not changed underneath them
+				copied := *style
+				copied.Width = width
+				bs.setBorderStyle(&copied)
 			}
 			return
 		}
@@ -125,8 +132,8 @@ func SetBorderWidth(a Annotation, width float64, v pdf.Version) {
 		c.Border = nil
 		return
 	}
-	// a copy, so that a border the caller shares between annotations, or the
-	// package-level [PDFDefaultBorder], is not changed underneath them
+	// a copy, as above; this also protects the package-level
+	// [PDFDefaultBorder]
 	border := Border{Width: width}
 	if c.Border != nil {
 		border = *c.Border

@@ -332,6 +332,27 @@ func TestSetBorderWidthCopiesTheArray(t *testing.T) {
 	}
 }
 
+// TestSetBorderWidthCopiesTheStyle checks that a border style dictionary
+// shared between annotations is not changed underneath the ones which were
+// not asked about.
+func TestSetBorderWidthCopiesTheStyle(t *testing.T) {
+	shared := &BorderStyle{Width: 1, Style: "D", DashArray: []float64{3, 2}}
+	a := &Square{BorderStyle: shared}
+	b := &Square{BorderStyle: shared}
+
+	SetBorderWidth(a, 5, pdf.V2_0)
+
+	if got := EffectiveBorderWidth(a); got != 5 {
+		t.Errorf("effective width = %v, want 5", got)
+	}
+	if got := EffectiveBorderWidth(b); got != 1 {
+		t.Errorf("the other annotation changed too: width = %v, want 1", got)
+	}
+	if shared.Width != 1 {
+		t.Errorf("the shared style was modified: width = %v, want 1", shared.Width)
+	}
+}
+
 // TestSetBorderWidthOnAPlainType checks that a type with no border style
 // dictionary takes the width in its border array, which is the only place
 // it has for one.
