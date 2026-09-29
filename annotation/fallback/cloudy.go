@@ -600,7 +600,7 @@ func (co *cloudOutline) draw(b *builder.Builder, lw float64, hasFill, hasStroke 
 		b.SetLineJoin(graphics.LineJoinRound)
 		strokeBBox := co.strokePath(b)
 		b.Stroke()
-		strokeBBox = strokeBBox.Grow(lw / 2)
+		strokeBBox = strokeBBox.Grow(lw/2 + hairlineAllowance(lw))
 		if hasFill {
 			bbox.Extend(&strokeBBox)
 		} else {

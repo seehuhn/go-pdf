@@ -119,13 +119,22 @@ func countStrokes(t *testing.T, a annotation.Annotation) int {
 	return n
 }
 
+// hairlineTypes lists the annotation types whose "border" is the line they
+// draw, rather than a border round a shape.  A width of 0 draws these as a
+// hairline instead of leaving them out.
+var hairlineTypes = []string{"Line", "PolyLine", "Polygon", "Ink"}
+
 // TestNoBorderDrawsNoStroke checks that an annotation asking for no border
 // gets an appearance which strokes nothing, while the same annotation with a
 // border of width 1 does stroke.  A nil [annotation.Common.Border] is what an
 // explicit zero width in the file decodes to, and a zero width means no border
-// is drawn.
+// is drawn.  The types in [hairlineTypes] are checked by
+// [TestZeroWidthDrawsHairline] instead.
 func TestNoBorderDrawsNoStroke(t *testing.T) {
 	for name, pair := range borderCases() {
+		if slices.Contains(hairlineTypes, name) {
+			continue
+		}
 		t.Run(name, func(t *testing.T) {
 			noBorder, withBorder := pair[0], pair[1]
 
@@ -152,6 +161,53 @@ func TestNoBorderDrawsNoStroke(t *testing.T) {
 				t.Error("an annotation with a border of width 1 stroked nothing")
 			}
 		})
+	}
+}
+
+// TestZeroWidthDrawsHairline checks that the types in [hairlineTypes] are
+// stroked with line width 0 when their border width is 0, and that their
+// rectangle allows for the hairline.
+func TestZeroWidthDrawsHairline(t *testing.T) {
+	cases := borderCases()
+	for _, name := range hairlineTypes {
+		t.Run(name, func(t *testing.T) {
+			a := cases[name][0]
+			if w := annotation.EffectiveBorderWidth(a); w != 0 {
+				t.Fatalf("border width %v, want 0: the case is set up wrongly", w)
+			}
+
+			s := newGen(t, pdf.V2_0)
+			if err := s.AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+
+			if n := countStrokes(t, a); n == 0 {
+				t.Error("a zero-width line stroked nothing")
+			}
+			tokens := strings.Fields(string(appearanceStream(t, a)))
+			i := slices.Index(tokens, "w")
+			if i < 1 || tokens[i-1] != "0" {
+				t.Error("the line is not drawn as a hairline")
+			}
+		})
+	}
+}
+
+// TestHairlineRect checks that the rectangle of a zero-width line leaves
+// room for the hairline on every side.
+func TestHairlineRect(t *testing.T) {
+	a := &annotation.Line{
+		Common: annotation.Common{Color: color.DeviceRGB{1, 0, 0}},
+		Coords: [4]float64{10, 20, 110, 20},
+	}
+	s := newGen(t, pdf.V2_0)
+	if err := s.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+	const h = hairlineWidth / 2
+	r := a.Rect
+	if r.LLx > 10-h || r.URx < 110+h || r.LLy > 20-h || r.URy < 20+h {
+		t.Errorf("rectangle %v leaves no room for the hairline", r)
 	}
 }
 

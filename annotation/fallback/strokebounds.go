@@ -47,6 +47,21 @@ func roundOut(r pdf.Rectangle) pdf.Rectangle {
 	}
 }
 
+// hairlineWidth is the width allowed for a hairline, the stroke a line width
+// of 0 asks for.  A hairline is the thinnest line the device can show, one
+// device pixel, which is no wider than a point at 72 dpi and above.
+const hairlineWidth = 1.0
+
+// hairlineAllowance returns how far a rectangle measured for a stroke of
+// width lw has to grow on every side to hold it as drawn: half of
+// [hairlineWidth] for a hairline, and nothing otherwise.
+func hairlineAllowance(lw float64) float64 {
+	if lw == 0 {
+		return hairlineWidth / 2
+	}
+	return 0
+}
+
 // roundPoints returns a copy of pts with every point rounded to two
 // decimals, the precision a path is written to the file with.
 //

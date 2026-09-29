@@ -54,7 +54,8 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	be := a.BorderEffect
 	isCloudy := be != nil && be.Style == "C" && be.Intensity > 0
 
-	hasOutline := col != nil && lw > 0
+	// a width of 0 draws a hairline
+	hasOutline := col != nil && lw >= 0
 	hasFill := paint(a.FillColor) != nil
 	if !(hasOutline || hasFill) {
 		return &form.Form{
@@ -126,7 +127,7 @@ func polygonPathBBox(verts []vec.Vec2, lw float64) pdf.Rectangle {
 	if !ok {
 		return pdf.Rectangle{}
 	}
-	return roundOut(r)
+	return roundOut(r.Grow(hairlineAllowance(lw)))
 }
 
 // polygonVertices extracts the vertex list from a polygon annotation.

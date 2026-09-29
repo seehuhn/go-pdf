@@ -39,49 +39,79 @@ type lineEndingInfo struct {
 
 	// For filling line endings, FillColor is used for the filled area.
 	FillColor color.Color
-
-	// If IsStart is true, the current point is set to the connection point
-	// after drawing the line ending. If IsStart is false, a LineTo() to the
-	// connection point is appended to the current path before drawing the line
-	// ending.
-	IsStart bool
 }
 
-// drawLineEndingBuilder draws a line ending using builder.Builder.
-func drawLineEndingBuilder(b *builder.Builder, style annotation.LineEndingStyle, info lineEndingInfo) {
-	// normalize direction vectors
+// lineEnding is a line ending, laid out at one end of a line
+type lineEnding interface {
+	// connection returns the point where the line meets the ending,
+	// for line width lw
+	connection(lw float64) vec.Vec2
+	// drawShape draws the ending itself, complete with its own
+	// fill/stroke painting operator; it leaves no open path
+	drawShape(b *builder.Builder)
+}
+
+// newLineEnding returns the ending of the given style; a direction
+// shorter than 0.1 gives no ending (style None), otherwise Dir is normalised
+func newLineEnding(style annotation.LineEndingStyle, info lineEndingInfo) lineEnding {
 	if info.Dir.Length() < 0.1 {
-		style = annotation.LineEndingStyleNone
-	} else {
-		info.Dir = info.Dir.Normalize()
+		return none(info)
 	}
+	info.Dir = info.Dir.Normalize()
 
 	switch style {
 	case annotation.LineEndingStyleSquare:
-		square(info).drawBuilder(b)
+		return square(info)
 	case annotation.LineEndingStyleCircle:
-		circle(info).drawBuilder(b)
+		return circle(info)
 	case annotation.LineEndingStyleDiamond:
-		diamond(info).drawBuilder(b)
+		return diamond(info)
 	case annotation.LineEndingStyleOpenArrow:
-		a := arrow{lineEndingInfo: info}
-		a.drawBuilder(b)
+		return arrow{lineEndingInfo: info}
 	case annotation.LineEndingStyleClosedArrow:
-		a := arrow{lineEndingInfo: info, closed: true}
-		a.drawBuilder(b)
+		return arrow{lineEndingInfo: info, closed: true}
 	case annotation.LineEndingStyleButt:
-		butt(info).drawBuilder(b)
+		return butt(info)
 	case annotation.LineEndingStyleROpenArrow:
-		a := arrow{lineEndingInfo: info, reverse: true}
-		a.drawBuilder(b)
+		return arrow{lineEndingInfo: info, reverse: true}
 	case annotation.LineEndingStyleRClosedArrow:
-		a := arrow{lineEndingInfo: info, closed: true, reverse: true}
-		a.drawBuilder(b)
+		return arrow{lineEndingInfo: info, closed: true, reverse: true}
 	case annotation.LineEndingStyleSlash:
-		slash(info).drawBuilder(b)
+		return slash(info)
 	default: // annotation.LineEndingStyleNone
-		none(info).drawBuilder(b)
+		return none(info)
 	}
+}
+
+// setFill selects the fill colour, if the ending is filled.
+func (le lineEndingInfo) setFill(b *builder.Builder) {
+	if le.FillColor != nil {
+		b.SetFillColor(le.FillColor)
+	}
+}
+
+// paint paints the current path, filling it if the ending is filled.
+// If closed is true, the path is closed first.
+func (le lineEndingInfo) paint(b *builder.Builder, closed bool) {
+	switch {
+	case le.FillColor != nil && closed:
+		b.CloseFillAndStroke()
+	case le.FillColor != nil:
+		b.FillAndStroke()
+	case closed:
+		b.CloseAndStroke()
+	default:
+		b.Stroke()
+	}
+}
+
+// strokeSegment strokes the line from At+n to At-n.
+func (le lineEndingInfo) strokeSegment(b *builder.Builder, n vec.Vec2) {
+	p1 := le.At.Add(n)
+	p2 := le.At.Sub(n)
+	b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
+	b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
+	b.Stroke()
 }
 
 // lineEndingBBox enlarges a bounding box to include the line ending.
@@ -124,15 +154,11 @@ func lineEndingBBox(bbox *pdf.Rectangle, style annotation.LineEndingStyle, info 
 
 type none lineEndingInfo
 
-func (le none) drawBuilder(b *builder.Builder) {
-	if !le.IsStart {
-		b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-		b.Stroke()
-	}
-	if le.IsStart {
-		b.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-	}
+func (le none) connection(lw float64) vec.Vec2 {
+	return le.At
 }
+
+func (le none) drawShape(b *builder.Builder) {}
 
 // ---------------------------------------------------------------------------
 
@@ -176,24 +202,14 @@ func (le butt) size(lw float64) float64 {
 	return max(3.5, 7*lw)
 }
 
-func (le butt) drawBuilder(b *builder.Builder) {
+func (le butt) connection(lw float64) vec.Vec2 {
+	return le.At
+}
+
+func (le butt) drawShape(b *builder.Builder) {
 	n := le.Dir.Normal()
 	n.IMul(le.size(b.State.GState.LineWidth) / 2)
-
-	if le.IsStart {
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		b.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-	} else {
-		b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		b.Stroke()
-	}
+	lineEndingInfo(le).strokeSegment(b, n)
 }
 
 // ---------------------------------------------------------------------------
@@ -240,26 +256,16 @@ func (le slash) size(lw float64) float64 {
 	return max(5, 10*lw)
 }
 
-func (le slash) drawBuilder(b *builder.Builder) {
+func (le slash) connection(lw float64) vec.Vec2 {
+	return le.At
+}
+
+func (le slash) drawShape(b *builder.Builder) {
 	a := 0.5              // cos(60°)
 	c := math.Sqrt(3) / 2 // sin(60°)
 	n := vec.Vec2{X: a*le.Dir.X - c*le.Dir.Y, Y: a*le.Dir.Y + c*le.Dir.X}
 	n.IMul(le.size(b.State.GState.LineWidth) / 2)
-
-	if le.IsStart {
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		b.MoveTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-	} else {
-		b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2))
-		p1 := le.At.Add(n)
-		p2 := le.At.Sub(n)
-		b.MoveTo(pdf.Round(p1.X, 2), pdf.Round(p1.Y, 2))
-		b.LineTo(pdf.Round(p2.X, 2), pdf.Round(p2.Y, 2))
-		b.Stroke()
-	}
+	lineEndingInfo(le).strokeSegment(b, n)
 }
 
 // ---------------------------------------------------------------------------
@@ -297,34 +303,17 @@ func (le square) size(lw float64) float64 {
 	return max(3, 6*lw)
 }
 
-func (le square) drawBuilder(b *builder.Builder) {
-	size := le.size(b.State.GState.LineWidth)
-	a := (size / 2) / max(math.Abs(le.Dir.X), math.Abs(le.Dir.Y))
+func (le square) connection(lw float64) vec.Vec2 {
+	a := (le.size(lw) / 2) / max(math.Abs(le.Dir.X), math.Abs(le.Dir.Y))
+	return le.At.Sub(le.Dir.Mul(a))
+}
 
-	if le.IsStart {
-		if le.FillColor != nil {
-			b.SetFillColor(le.FillColor)
-			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			b.FillAndStroke()
-		} else {
-			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			b.Stroke()
-		}
-		pos := le.At.Sub(le.Dir.Mul(a))
-		b.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-	} else {
-		pos := le.At.Sub(le.Dir.Mul(a))
-		b.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-		b.Stroke()
-		if le.FillColor != nil {
-			b.SetFillColor(le.FillColor)
-			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			b.FillAndStroke()
-		} else {
-			b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
-			b.Stroke()
-		}
-	}
+func (le square) drawShape(b *builder.Builder) {
+	size := le.size(b.State.GState.LineWidth)
+	info := lineEndingInfo(le)
+	info.setFill(b)
+	b.Rectangle(pdf.Round(le.At.X-size/2, 2), pdf.Round(le.At.Y-size/2, 2), pdf.Round(size, 2), pdf.Round(size, 2))
+	info.paint(b, false)
 }
 
 // ---------------------------------------------------------------------------
@@ -357,33 +346,16 @@ func (le circle) size(lw float64) float64 {
 	return max(3.5, 7*lw)
 }
 
-func (le circle) drawBuilder(b *builder.Builder) {
-	size := le.size(b.State.GState.LineWidth)
+func (le circle) connection(lw float64) vec.Vec2 {
+	return le.At.Sub(le.Dir.Mul(0.5 * le.size(lw)))
+}
 
-	if le.IsStart {
-		if le.FillColor != nil {
-			b.SetFillColor(le.FillColor)
-			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			b.FillAndStroke()
-		} else {
-			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			b.Stroke()
-		}
-		pos := le.At.Sub(le.Dir.Mul(0.5 * size))
-		b.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-	} else {
-		pos := le.At.Sub(le.Dir.Mul(0.5 * size))
-		b.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-		b.Stroke()
-		if le.FillColor != nil {
-			b.SetFillColor(le.FillColor)
-			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			b.FillAndStroke()
-		} else {
-			b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
-			b.Stroke()
-		}
-	}
+func (le circle) drawShape(b *builder.Builder) {
+	size := le.size(b.State.GState.LineWidth)
+	info := lineEndingInfo(le)
+	info.setFill(b)
+	b.Circle(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y, 2), pdf.Round(0.5*size, 2))
+	info.paint(b, false)
 }
 
 // ---------------------------------------------------------------------------
@@ -421,47 +393,20 @@ func (le diamond) size(lw float64) float64 {
 	return max(4, 8*lw)
 }
 
-func (le diamond) drawBuilder(b *builder.Builder) {
-	size := le.size(b.State.GState.LineWidth)
-	a := size / (math.Abs(le.Dir.X) + math.Abs(le.Dir.Y)) / 2
-	L := size
+func (le diamond) connection(lw float64) vec.Vec2 {
+	a := le.size(lw) / (math.Abs(le.Dir.X) + math.Abs(le.Dir.Y)) / 2
+	return le.At.Sub(le.Dir.Mul(a))
+}
 
-	if le.IsStart {
-		if le.FillColor != nil {
-			b.SetFillColor(le.FillColor)
-			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			b.CloseFillAndStroke()
-		} else {
-			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			b.CloseAndStroke()
-		}
-		pos := le.At.Sub(le.Dir.Mul(a))
-		b.MoveTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-	} else {
-		pos := le.At.Sub(le.Dir.Mul(a))
-		b.LineTo(pdf.Round(pos.X, 2), pdf.Round(pos.Y, 2))
-		b.Stroke()
-		if le.FillColor != nil {
-			b.SetFillColor(le.FillColor)
-			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			b.CloseFillAndStroke()
-		} else {
-			b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
-			b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
-			b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
-			b.CloseAndStroke()
-		}
-	}
+func (le diamond) drawShape(b *builder.Builder) {
+	L := le.size(b.State.GState.LineWidth)
+	info := lineEndingInfo(le)
+	info.setFill(b)
+	b.MoveTo(pdf.Round(le.At.X+L/2, 2), pdf.Round(le.At.Y, 2))
+	b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y+L/2, 2))
+	b.LineTo(pdf.Round(le.At.X-L/2, 2), pdf.Round(le.At.Y, 2))
+	b.LineTo(pdf.Round(le.At.X, 2), pdf.Round(le.At.Y-L/2, 2))
+	info.paint(b, true)
 }
 
 // ---------------------------------------------------------------------------
@@ -499,62 +444,32 @@ func (le arrow) extend(b *pdf.Rectangle, lw float64) {
 	}
 }
 
-func (le arrow) drawBuilder(b *builder.Builder) {
-	tip, base1, base2 := le.corners(b.State.GState.LineWidth)
-
-	var connectX, connectY float64
-	if le.reverse {
-		connectX, connectY = le.At.X, le.At.Y
-	} else if le.closed {
-		m := vec.Middle(base1, base2)
-		connectX, connectY = m.X, m.Y
-	} else {
-		v, _ := linalg.Miter(base1, tip, base2, b.State.GState.LineWidth, false)
-		connectX, connectY = v.X, v.Y
+func (le arrow) connection(lw float64) vec.Vec2 {
+	switch {
+	case le.reverse:
+		return le.At
+	case le.closed:
+		_, base1, base2 := le.corners(lw)
+		return vec.Middle(base1, base2)
+	default:
+		tip, base1, base2 := le.corners(lw)
+		v, _ := linalg.Miter(base1, tip, base2, lw, false)
+		return v
 	}
+}
 
-	if le.IsStart {
-		if le.closed {
-			if le.FillColor != nil {
-				b.SetFillColor(le.FillColor)
-				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				b.CloseFillAndStroke()
-			} else {
-				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				b.CloseAndStroke()
-			}
-		} else {
-			b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-			b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-			b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-		}
-		b.MoveTo(pdf.Round(connectX, 2), pdf.Round(connectY, 2))
+func (le arrow) drawShape(b *builder.Builder) {
+	tip, base1, base2 := le.corners(b.State.GState.LineWidth)
+	if le.closed {
+		le.setFill(b)
+	}
+	b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
+	b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
+	b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
+	if le.closed {
+		le.paint(b, true)
 	} else {
-		b.LineTo(pdf.Round(connectX, 2), pdf.Round(connectY, 2))
 		b.Stroke()
-		if le.closed {
-			if le.FillColor != nil {
-				b.SetFillColor(le.FillColor)
-				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				b.CloseFillAndStroke()
-			} else {
-				b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-				b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-				b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-				b.CloseAndStroke()
-			}
-		} else {
-			b.MoveTo(pdf.Round(base1.X, 2), pdf.Round(base1.Y, 2))
-			b.LineTo(pdf.Round(tip.X, 2), pdf.Round(tip.Y, 2))
-			b.LineTo(pdf.Round(base2.X, 2), pdf.Round(base2.Y, 2))
-			b.Stroke()
-		}
 	}
 }
 

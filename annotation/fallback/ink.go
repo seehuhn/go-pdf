@@ -30,7 +30,8 @@ func (g *Generator) addInkAppearance(a *annotation.Ink) (*form.Form, error) {
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := paint(a.Color)
 
-	if col == nil || lw <= 0 || !hasInkPoints(a.InkList) {
+	// a width of 0 draws a hairline
+	if col == nil || lw < 0 || !hasInkPoints(a.InkList) {
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},
@@ -96,5 +97,5 @@ func inkBBox(paths [][]vec.Vec2, lw float64) pdf.Rectangle {
 	if !ok {
 		return pdf.Rectangle{}
 	}
-	return roundOut(bbox)
+	return roundOut(bbox.Grow(hairlineAllowance(lw)))
 }

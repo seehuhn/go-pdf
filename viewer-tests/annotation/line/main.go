@@ -61,11 +61,12 @@ func createDocument(filename string) error {
 	opt := &pdf.WriterOptions{
 		HumanReadable: true,
 	}
-	page, err := document.CreateSinglePage(filename, paper, pdf.V1_7, opt)
+	doc, err := document.CreateMultiPage(filename, paper, pdf.V1_7, opt)
 	if err != nil {
 		return err
 	}
 
+	page := doc.AddPage()
 	page.DrawShading(pageBackground(paper))
 
 	style, err := fallback.NewStyle().New(pdf.V1_7)
@@ -201,6 +202,8 @@ func createDocument(filename string) error {
 			Contents: "no line style specified",
 			Color:    color.Black,
 			Flags:    annotation.FlagPrint,
+			// the PDF default, which is written by leaving Border out
+			Border: annotation.PDFDefaultBorder,
 		},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
@@ -210,6 +213,34 @@ func createDocument(filename string) error {
 		},
 	}
 	err = w.addAnnotationPair(borderLine3)
+	if err != nil {
+		return err
+	}
+
+	w.yPos -= borderTestStep
+
+	// line with width 0, which asks for a hairline; a nil Border is written
+	// as [0 0 0]
+	borderLine4 := &annotation.Line{
+		Common: annotation.Common{
+			Rect: pdf.Rectangle{
+				LLx: pdf.Round(leftColStart-10, 2),
+				LLy: pdf.Round(w.yPos-10, 2),
+				URx: pdf.Round(leftColEnd+10, 2),
+				URy: pdf.Round(w.yPos+10, 2),
+			},
+			Contents: "Border width 0",
+			Color:    color.Black,
+			Flags:    annotation.FlagPrint,
+		},
+		Coords: [4]float64{
+			pdf.Round(leftColStart, 2),
+			pdf.Round(w.yPos, 2),
+			pdf.Round(leftColEnd, 2),
+			pdf.Round(w.yPos, 2),
+		},
+	}
+	err = w.addAnnotationPair(borderLine4)
 	if err != nil {
 		return err
 	}
@@ -306,19 +337,62 @@ func createDocument(filename string) error {
 		return err
 	}
 
+	// captions on a slanted line, on a line running from right to left, and
+	// with two lines of text
+	moreCaptions := []struct {
+		contents string
+		x0, dy0  float64
+		x1, dy1  float64
+		above    bool
+	}{
+		{"slanted caption", leftColStart, -15, leftColEnd, 15, false},
+		{"right to left, top", leftColEnd, 0, leftColStart, 0, true},
+		{"two-line\ncaption", leftColStart, 0, leftColEnd, 0, false},
+	}
+	for _, c := range moreCaptions {
+		w.yPos -= 2 * captionTestStep
+		line := &annotation.Line{
+			Common: annotation.Common{
+				Rect: pdf.Rectangle{
+					LLx: pdf.Round(leftColStart-10, 2),
+					LLy: pdf.Round(w.yPos-30, 2),
+					URx: pdf.Round(leftColEnd+10, 2),
+					URy: pdf.Round(w.yPos+30, 2),
+				},
+				Contents: c.contents,
+				Color:    color.Black,
+				Flags:    annotation.FlagPrint,
+			},
+			Coords: [4]float64{
+				pdf.Round(c.x0, 2),
+				pdf.Round(w.yPos+c.dy0, 2),
+				pdf.Round(c.x1, 2),
+				pdf.Round(w.yPos+c.dy1, 2),
+			},
+			BorderStyle:  lineStyle,
+			Caption:      true,
+			CaptionAbove: c.above,
+		}
+		err = w.addAnnotationPair(line)
+		if err != nil {
+			return err
+		}
+	}
+
 	// -----------------------------------------------------------------------
 
-	// Group 4: Leader line tests
-	w.yPos -= 72 // extra gap before next group
+	// Group 4: Leader line tests, on a page of their own
+	err = page.Close()
+	if err != nil {
+		return err
+	}
+	page = doc.AddPage()
+	page.DrawShading(pageBackground(paper))
+	w.page = page
+	w.yPos = startY
 
 	// positive LL
-	page.PushGraphicsState()
-	page.SetLineWidth(5)
-	page.SetStrokeColor(color.DeviceGray(0.9))
-	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.yPos, 2))
-	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.yPos, 2))
-	page.Stroke()
-	page.PopGraphicsState()
+	w.drawGuide()
 
 	leaderPos := &annotation.Line{
 		Common: annotation.Common{
@@ -328,7 +402,7 @@ func createDocument(filename string) error {
 				URx: pdf.Round(leftColEnd+10, 2),
 				URy: pdf.Round(w.yPos+30, 2),
 			},
-			Contents: "LL=30 (positive)",
+			Contents: "LL=24 (positive)",
 			Color:    color.Black,
 			Flags:    annotation.FlagPrint,
 		},
@@ -349,13 +423,7 @@ func createDocument(filename string) error {
 	w.yPos -= 36
 
 	// negative LL
-	page.PushGraphicsState()
-	page.SetLineWidth(5)
-	page.SetStrokeColor(color.DeviceGray(0.9))
-	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.yPos, 2))
-	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.yPos, 2))
-	page.Stroke()
-	page.PopGraphicsState()
+	w.drawGuide()
 
 	leaderNeg := &annotation.Line{
 		Common: annotation.Common{
@@ -386,13 +454,7 @@ func createDocument(filename string) error {
 	w.yPos -= 120
 
 	// combined LL, LLE, LLO
-	page.PushGraphicsState()
-	page.SetLineWidth(5)
-	page.SetStrokeColor(color.DeviceGray(0.9))
-	page.MoveTo(pdf.Round(leftColStart, 2), pdf.Round(w.yPos, 2))
-	page.LineTo(pdf.Round(leftColEnd, 2), pdf.Round(w.yPos, 2))
-	page.Stroke()
-	page.PopGraphicsState()
+	w.drawGuide()
 
 	leaderCombo := &annotation.Line{
 		Common: annotation.Common{
@@ -400,7 +462,7 @@ func createDocument(filename string) error {
 				LLx: pdf.Round(leftColStart-10, 2),
 				LLy: pdf.Round(w.yPos-30, 2),
 				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+30, 2),
+				URy: pdf.Round(w.yPos+75, 2),
 			},
 			Contents: "LL=50, LLE=10, LLO=10",
 			Color:    color.Black,
@@ -423,13 +485,64 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	return page.Close()
+	w.yPos -= 72
+
+	// caption on a line with leader lines
+	w.drawGuide()
+	leaderCaption := &annotation.Line{
+		Common: annotation.Common{
+			Rect: pdf.Rectangle{
+				LLx: pdf.Round(leftColStart-10, 2),
+				LLy: pdf.Round(w.yPos-10, 2),
+				URx: pdf.Round(leftColEnd+10, 2),
+				URy: pdf.Round(w.yPos+40, 2),
+			},
+			Contents: "LL=24 with caption",
+			Color:    color.Black,
+			Flags:    annotation.FlagPrint,
+		},
+		Coords: [4]float64{
+			pdf.Round(leftColStart, 2),
+			pdf.Round(w.yPos, 2),
+			pdf.Round(leftColEnd, 2),
+			pdf.Round(w.yPos, 2),
+		},
+		BorderStyle: lineStyle,
+		LL:          24,
+		Caption:     true,
+	}
+	err = w.addAnnotationPair(leaderCaption)
+	if err != nil {
+		return err
+	}
+
+	err = page.Close()
+	if err != nil {
+		return err
+	}
+	return doc.Close()
 }
 
 type writer struct {
 	page  *document.Page
 	style *fallback.Generator
 	yPos  float64
+}
+
+// drawGuide marks, in both columns, where the coordinates of a line with
+// leader lines lie
+func (w *writer) drawGuide() {
+	page := w.page
+	page.PushGraphicsState()
+	page.SetLineWidth(5)
+	page.SetStrokeColor(color.DeviceGray(0.9))
+	for _, x0 := range []float64{leftColStart, rightColStart} {
+		x1 := x0 + leftColEnd - leftColStart
+		page.MoveTo(pdf.Round(x0, 2), pdf.Round(w.yPos, 2))
+		page.LineTo(pdf.Round(x1, 2), pdf.Round(w.yPos, 2))
+	}
+	page.Stroke()
+	page.PopGraphicsState()
 }
 
 func (w *writer) addAnnotation(a annotation.Annotation) {

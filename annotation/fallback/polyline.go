@@ -30,7 +30,8 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := paint(a.Color)
 
-	if col == nil || lw <= 0 {
+	// a width of 0 draws a hairline
+	if col == nil || lw < 0 {
 		return &form.Form{
 			Content: nil,
 			Res:     &content.Resources{},

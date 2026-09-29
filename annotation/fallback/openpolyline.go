@@ -41,40 +41,41 @@ func drawOpenPolyline(b *builder.Builder, points []vec.Vec2, startLE, endLE anno
 	if len(points) < 2 {
 		return
 	}
-
 	n := len(points)
 
-	// start point
-	if startLE != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:        points[0],
-			Dir:       points[0].Sub(points[1]),
-			FillColor: fillColor,
-			IsStart:   true,
+	lw := b.State.GState.LineWidth
+	e0 := newLineEnding(startLE, lineEndingInfo{At: points[0], Dir: points[0].Sub(points[1]), FillColor: fillColor})
+	e1 := newLineEnding(endLE, lineEndingInfo{At: points[n-1], Dir: points[n-1].Sub(points[n-2]), FillColor: fillColor})
+	c := roundPoints([]vec.Vec2{e0.connection(lw), e1.connection(lw)})
+
+	// The endings join the path at points set back from its ends.  Where an
+	// end segment is shorter than the setback, the path starts or stops at
+	// the inner point of that segment instead, so that it does not run
+	// backwards through the ending.
+	var path []vec.Vec2
+	if n == 2 {
+		if c[0].Sub(c[1]).Dot(points[0].Sub(points[1])) >= 0 {
+			path = c
 		}
-		drawLineEndingBuilder(b, startLE, info)
 	} else {
-		b.MoveTo(points[0].X, points[0].Y)
+		if c[0].Sub(points[1]).Dot(points[0].Sub(points[1])) >= 0 {
+			path = append(path, c[0])
+		}
+		path = append(path, points[1:n-1]...)
+		if c[1].Sub(points[n-2]).Dot(points[n-1].Sub(points[n-2])) >= 0 {
+			path = append(path, c[1])
+		}
 	}
 
-	// intermediate points
-	for i := 1; i < n-1; i++ {
-		b.LineTo(points[i].X, points[i].Y)
-	}
-
-	// end point
-	if endLE != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:        points[n-1],
-			Dir:       points[n-1].Sub(points[n-2]),
-			FillColor: fillColor,
-			IsStart:   false,
+	e0.drawShape(b)
+	if len(path) >= 2 {
+		b.MoveTo(path[0].X, path[0].Y)
+		for _, p := range path[1:] {
+			b.LineTo(p.X, p.Y)
 		}
-		drawLineEndingBuilder(b, endLE, info)
-	} else {
-		b.LineTo(points[n-1].X, points[n-1].Y)
 		b.Stroke()
 	}
+	e1.drawShape(b)
 }
 
 // openPolylineBBox computes a bounding box for an open polyline with the
@@ -111,5 +112,5 @@ func openPolylineBBox(points []vec.Vec2, lw float64, join graphics.LineJoinStyle
 
 	// the line endings are drawn with two decimals, which can carry them a
 	// little outside the exact geometry measured here
-	return roundOut(bbox.Grow(pathPrecision))
+	return roundOut(bbox.Grow(pathPrecision + hairlineAllowance(lw)))
 }

@@ -17,11 +17,17 @@
 package fallback
 
 import (
+	"math"
+	"strings"
+
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 )
@@ -30,177 +36,311 @@ func (g *Generator) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 	lw := annotation.EffectiveBorderWidth(a)
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := paint(a.Color)
+	geom := newLineGeometry(a)
+	bbox := calculateLineBBox(a, geom, lw)
 
-	bbox := calculateLineBBox(a, lw)
-	a.Rect = bbox
-
-	// the border width is the thickness of the line itself, so a width of 0
-	// leaves the annotation with nothing to draw, as does a file which names
-	// no ink to draw it in
-	if col == nil || lw <= 0 {
+	// the border width is the thickness of the line itself, and a width of 0
+	// draws a hairline rather than nothing; only a file which names no ink
+	// leaves the annotation with nothing to draw
+	if col == nil || lw < 0 {
+		a.Rect = bbox
 		return g.harvest(g.begin(), bbox, nil)
 	}
+
+	capt := g.layoutCaption(a, geom.main, lw)
+	if capt != nil && !capt.bbox.IsZero() {
+		textBBox := roundOut(capt.bbox)
+		bbox.Extend(&textBBox)
+	}
+	a.Rect = bbox
 
 	b := g.begin()
 	b.SetLineWidth(lw)
 	b.SetStrokeColor(col)
 	b.SetLineDash(dashPattern, 0)
 
-	if a.LL != 0 {
-		drawLineWithLeaderLinesBuilder(b, a)
-	} else {
-		drawSimpleLineBuilder(b, a)
+	drawLine(b, a, geom, capt)
+	if capt != nil {
+		capt.draw(b, g.ContentFont(), col)
 	}
 
 	return g.harvest(b, bbox, a.GetCommon())
 }
 
 // calculateLineBBox calculates the bounding box for the line annotation
-func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
-	// the line itself; it has two points, so it carries caps and no join
-	segment := lineEndpoints(a)
-	bbox, _ := strokeBounds([][]vec.Vec2{segment}, false, lw,
+func calculateLineBBox(a *annotation.Line, geom lineGeometry, lw float64) pdf.Rectangle {
+	// every piece is a single segment, so it carries caps and no join
+	segments := append([][]vec.Vec2{geom.main}, geom.leaders...)
+	bbox, _ := strokeBounds(segments, false, lw,
 		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
-	p1, p2 := segment[0], segment[1]
 
-	// expand for line endings
+	p1, p2 := geom.main[0], geom.main[1]
 	le0 := normalizeLE(a.LineEndingStyle[0])
 	le1 := normalizeLE(a.LineEndingStyle[1])
 	if le0 != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:  p1,
-			Dir: p1.Sub(p2),
-		}
-		lineEndingBBox(&bbox, le0, info, lw)
+		lineEndingBBox(&bbox, le0, lineEndingInfo{At: p1, Dir: p1.Sub(p2)}, lw)
 	}
 	if le1 != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:  p2,
-			Dir: p2.Sub(p1),
-		}
-		lineEndingBBox(&bbox, le1, info, lw)
+		lineEndingBBox(&bbox, le1, lineEndingInfo{At: p2, Dir: p2.Sub(p1)}, lw)
 	}
 
-	// expand for leader lines if present
-	if a.LL != 0 {
-		expandBBoxForLeaderLines(&bbox, a, lw)
-	}
-
-	// the line endings and leader lines are drawn with two decimals, which
-	// can carry them a little outside the exact geometry measured here
-	return roundOut(bbox.Grow(pathPrecision))
+	// the line endings are drawn with two decimals, which can carry them a
+	// little outside the exact geometry measured here
+	return roundOut(bbox.Grow(pathPrecision + hairlineAllowance(lw)))
 }
 
-// lineEndpoints returns the two points of a line without leader lines,
-// rounded to the two decimals they are drawn with.
-func lineEndpoints(a *annotation.Line) []vec.Vec2 {
-	return roundPoints([]vec.Vec2{
-		{X: a.Coords[0], Y: a.Coords[1]},
-		{X: a.Coords[2], Y: a.Coords[3]},
-	})
+// lineGeometry is the geometry a Line annotation is drawn with, every point
+// rounded to the two decimals it is written with.
+type lineGeometry struct {
+	// main is the line proper, which carries the line endings
+	main []vec.Vec2
+
+	// leaders holds one segment for each leader line, extension included;
+	// it is nil for a line without leader lines
+	leaders [][]vec.Vec2
 }
 
-// expandBBoxForLeaderLines expands the bounding box to include leader lines
-func expandBBoxForLeaderLines(bbox *pdf.Rectangle, a *annotation.Line, lw float64) {
+// newLineGeometry lays out a Line annotation.
+//
+// Leader lines stand at the two points in L, perpendicular to the line, on
+// its left for positive LL and on its right for negative LL.  A leader starts
+// LLO away from its point and is |LL| long, so the line proper is drawn
+// LLO+|LL| away from the points; the leader then runs on LLE past it.  A line
+// too short to have a direction is drawn without leader lines.
+func newLineGeometry(a *annotation.Line) lineGeometry {
 	from := vec.Vec2{X: a.Coords[0], Y: a.Coords[1]}
 	to := vec.Vec2{X: a.Coords[2], Y: a.Coords[3]}
 
 	d := to.Sub(from)
-	if d.Length() < 0.1 {
-		return
+	if a.LL == 0 || d.Length() < 0.1 {
+		return lineGeometry{main: roundPoints([]vec.Vec2{from, to})}
 	}
-	dir := d.Normalize()
-	perp := d.Normal() // left when looking from start to end
 
-	// leader line endpoints, offset along the line
-	start := from.Add(dir.Mul(a.LLO))
-	end := to.Sub(dir.Mul(a.LLO))
+	// the side the leader lines grow towards
+	side := d.Normal()
+	if a.LL < 0 {
+		side = side.Mul(-1)
+	}
+	ll := math.Abs(a.LL)
 
-	// the line proper, drawn LL away from the coordinates, and the extensions
-	// which reach LLE back from it towards them
-	shiftedStart := start.Add(perp.Mul(a.LL))
-	shiftedEnd := end.Add(perp.Mul(a.LL))
-	extStart := shiftedStart.Sub(perp.Mul(a.LLE))
-	extEnd := shiftedEnd.Sub(perp.Mul(a.LLE))
-
-	points := []vec.Vec2{start, end, shiftedStart, shiftedEnd, extStart, extEnd}
-	for _, p := range points {
-		bbox.LLx = min(bbox.LLx, p.X-lw/2)
-		bbox.LLy = min(bbox.LLy, p.Y-lw/2)
-		bbox.URx = max(bbox.URx, p.X+lw/2)
-		bbox.URy = max(bbox.URy, p.Y+lw/2)
+	offset := side.Mul(a.LLO + ll)
+	leaderStart := side.Mul(a.LLO)
+	leaderEnd := side.Mul(a.LLO + ll + a.LLE)
+	return lineGeometry{
+		main: roundPoints([]vec.Vec2{from.Add(offset), to.Add(offset)}),
+		leaders: [][]vec.Vec2{
+			roundPoints([]vec.Vec2{from.Add(leaderStart), from.Add(leaderEnd)}),
+			roundPoints([]vec.Vec2{to.Add(leaderStart), to.Add(leaderEnd)}),
+		},
 	}
 }
 
-// drawSimpleLineBuilder draws a line without leader lines
-func drawSimpleLineBuilder(b *builder.Builder, a *annotation.Line) {
-	points := lineEndpoints(a)
-	le0 := normalizeLE(a.LineEndingStyle[0])
-	le1 := normalizeLE(a.LineEndingStyle[1])
-	drawOpenPolyline(b, points, le0, le1, paint(a.FillColor))
-}
-
-// drawLineWithLeaderLinesBuilder draws a line with leader lines (dimension line style)
-func drawLineWithLeaderLinesBuilder(b *builder.Builder, a *annotation.Line) {
-	from := vec.Vec2{X: a.Coords[0], Y: a.Coords[1]}
-	to := vec.Vec2{X: a.Coords[2], Y: a.Coords[3]}
-
-	d := to.Sub(from)
-	if d.Length() < 0.1 {
-		// line too short, fall back to simple line
-		drawSimpleLineBuilder(b, a)
-		return
-	}
-	dir := d.Normalize()
-	perp := d.Normal() // left when looking from start to end
-
-	// leader line endpoints, offset along the line
-	start := from.Add(dir.Mul(a.LLO))
-	end := to.Sub(dir.Mul(a.LLO))
-
-	// the line proper, drawn LL away from the coordinates, and the extensions
-	// which reach LLE back from it towards them
-	shiftedStart := start.Add(perp.Mul(a.LL))
-	shiftedEnd := end.Add(perp.Mul(a.LL))
-	extStart := shiftedStart.Sub(perp.Mul(a.LLE))
-	extEnd := shiftedEnd.Sub(perp.Mul(a.LLE))
-
-	// draw the leader lines (perpendicular segments)
-	// start leader line
-	b.MoveTo(pdf.Round(extStart.X, 2), pdf.Round(extStart.Y, 2))
-	b.LineTo(pdf.Round(start.X, 2), pdf.Round(start.Y, 2))
-	b.Stroke()
-
-	// end leader line
-	b.MoveTo(pdf.Round(extEnd.X, 2), pdf.Round(extEnd.Y, 2))
-	b.LineTo(pdf.Round(end.X, 2), pdf.Round(end.Y, 2))
-	b.Stroke()
-
-	// draw the main line with endings
-	// start ending
-	if a.LineEndingStyle[0] != "" && a.LineEndingStyle[0] != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:        shiftedStart,
-			Dir:       shiftedStart.Sub(shiftedEnd),
-			FillColor: paint(a.FillColor),
-			IsStart:   true,
-		}
-		drawLineEndingBuilder(b, a.LineEndingStyle[0], info)
-	} else {
-		b.MoveTo(pdf.Round(shiftedStart.X, 2), pdf.Round(shiftedStart.Y, 2))
-	}
-
-	// end ending
-	if a.LineEndingStyle[1] != "" && a.LineEndingStyle[1] != annotation.LineEndingStyleNone {
-		info := lineEndingInfo{
-			At:        shiftedEnd,
-			Dir:       shiftedEnd.Sub(shiftedStart),
-			FillColor: paint(a.FillColor),
-			IsStart:   false,
-		}
-		drawLineEndingBuilder(b, a.LineEndingStyle[1], info)
-	} else {
-		b.LineTo(pdf.Round(shiftedEnd.X, 2), pdf.Round(shiftedEnd.Y, 2))
+// drawLine draws the line proper with its line endings, and the leader
+// lines if there are any.  An inline caption leaves a gap in the line proper.
+func drawLine(b *builder.Builder, a *annotation.Line, geom lineGeometry, capt *lineCaption) {
+	for _, seg := range geom.leaders {
+		b.MoveTo(seg[0].X, seg[0].Y)
+		b.LineTo(seg[1].X, seg[1].Y)
 		b.Stroke()
 	}
+
+	le0 := normalizeLE(a.LineEndingStyle[0])
+	le1 := normalizeLE(a.LineEndingStyle[1])
+	fill := paint(a.FillColor)
+	if capt == nil || !capt.gapped {
+		drawOpenPolyline(b, geom.main, le0, le1, fill)
+		return
+	}
+
+	// The two halves run from the line endings inwards, to the edges of the
+	// gap.  The endings take their direction from the whole line, so that
+	// they keep it even where the caption leaves no line beside them.  A
+	// half which the gap reaches into the ending of is left out, since it
+	// would run backwards through the ending.
+	p1, p2 := geom.main[0], geom.main[1]
+	d := p2.Sub(p1)
+	length := d.Length()
+	along := func(p vec.Vec2) float64 { return p.Sub(p1).Dot(d) / length }
+	q := roundPoints([]vec.Vec2{
+		p1.Add(d.Mul(capt.gap[0] / length)),
+		p1.Add(d.Mul(capt.gap[1] / length)),
+	})
+
+	lw := b.State.GState.LineWidth
+	e0 := newLineEnding(le0, lineEndingInfo{At: p1, Dir: p1.Sub(p2), FillColor: fill})
+	e1 := newLineEnding(le1, lineEndingInfo{At: p2, Dir: p2.Sub(p1), FillColor: fill})
+	c := roundPoints([]vec.Vec2{e0.connection(lw), e1.connection(lw)})
+
+	e0.drawShape(b)
+	if along(q[0]) > along(c[0]) {
+		b.MoveTo(c[0].X, c[0].Y)
+		b.LineTo(q[0].X, q[0].Y)
+		b.Stroke()
+	}
+	if along(q[1]) < along(c[1]) {
+		// the dashes run on as though the line continued behind the caption
+		dash := b.State.GState.DashPattern
+		if len(dash) > 0 {
+			b.SetLineDash(dash, pdf.Round(along(q[1])-along(c[0]), 2))
+		}
+		b.MoveTo(q[1].X, q[1].Y)
+		b.LineTo(c[1].X, c[1].Y)
+		b.Stroke()
+		if len(dash) > 0 {
+			b.SetLineDash(dash, 0)
+		}
+	}
+	e1.drawShape(b)
+}
+
+const (
+	// captionFontSize is the size a Line annotation's caption is set in
+	captionFontSize = 9
+
+	// captionGap is the space an inline caption leaves between its text and
+	// the line on either side
+	captionGap = 2
+
+	// captionSlack is the room, as a fraction of the font size, left round
+	// the text of a caption in the annotation rectangle.  The glyphs are
+	// measured with this library's metrics, while a viewer may draw a font
+	// which is not embedded with a substitute whose glyphs reach a little
+	// further; the rectangle clips anything beyond it.
+	captionSlack = 0.15
+)
+
+// lineCaption is the layout of the caption of a Line annotation.
+type lineCaption struct {
+	// lines holds the lines of the caption text, and tm the text matrix
+	// each of them is shown with
+	lines []*font.GlyphSeq
+	tm    []matrix.Matrix
+
+	// gap is the part of the line proper an inline caption leaves free, as
+	// distances from the start of the line; it is used only if gapped is set
+	gap    [2]float64
+	gapped bool
+
+	// bbox is the rectangle the caption needs: the glyphs, the height of
+	// the font and its advance widths, with [captionSlack] round them
+	bbox pdf.Rectangle
+}
+
+// layoutCaption lays out the caption of a Line annotation along the line
+// proper, main.  It returns nil where the annotation asks for no caption or
+// has no text for one.
+//
+// The caption runs in the direction of the line, from its start to its end,
+// so that a line running from right to left carries its caption upside down.
+// An inline caption is centred on the line, which is broken round it, and a
+// caption above the line stands on it, on the left of the line's direction.
+// The caption offset moves the text along the line, in its direction, and
+// across it, towards the side a caption above the line stands on.
+func (g *Generator) layoutCaption(a *annotation.Line, main []vec.Vec2, lw float64) *lineCaption {
+	if !a.Caption || a.Contents == "" {
+		return nil
+	}
+	F := g.ContentFont()
+	fontGeom := F.GetGeometry()
+
+	p1, p2 := main[0], main[1]
+	d := p2.Sub(p1)
+	length := d.Length()
+	dir := vec.Vec2{X: 1}
+	if length >= 0.1 {
+		dir = d.Mul(1 / length)
+	}
+
+	// the reading direction of the caption, rounded so that the text matrix
+	// is written exactly as it is measured here
+	right := vec.Vec2{X: pdf.Round(dir.X, 4), Y: pdf.Round(dir.Y, 4)}
+	up := right.Rot90()
+
+	var h, v float64
+	if len(a.CaptionOffset) == 2 {
+		h, v = a.CaptionOffset[0], a.CaptionOffset[1]
+	}
+
+	capt := &lineCaption{}
+	width := 0.0
+	for _, text := range captionLines(a.Contents) {
+		seq := F.Layout(nil, captionFontSize, text)
+		capt.lines = append(capt.lines, seq)
+		width = max(width, seq.TotalWidth())
+	}
+
+	// the height of the first baseline above the line
+	leading := fontGeom.Leading * captionFontSize
+	extra := float64(len(capt.lines)-1) * leading
+	var first float64
+	if a.CaptionAbove {
+		first = lw/2 - fontGeom.Descent*captionFontSize + extra
+	} else {
+		// Centring the capitals on the line leaves lower-case text, whose
+		// bulk lies below the cap height, looking low; the band centred
+		// reaches halfway between the x-height and the cap height instead.
+		band := (fontGeom.CapHeight + fontGeom.XHeight) / 2 * captionFontSize
+		first = (extra - band) / 2
+	}
+
+	mid := p1.Add(p2).Mul(0.5)
+	for i, seq := range capt.lines {
+		x := h - seq.TotalWidth()/2
+		y := v + first - float64(i)*leading
+		origin := mid.Add(right.Mul(x)).Add(up.Mul(y))
+		M := matrix.Matrix{right.X, right.Y, up.X, up.Y,
+			pdf.Round(origin.X, 2), pdf.Round(origin.Y, 2)}
+		capt.tm = append(capt.tm, M)
+
+		box := pdf.Rectangle{
+			LLx: 0,
+			LLy: fontGeom.Descent * captionFontSize,
+			URx: seq.TotalWidth(),
+			URy: fontGeom.Ascent * captionFontSize,
+		}
+		if ink := fontGeom.BoundingBox(captionFontSize, seq); ink != nil && !ink.IsZero() {
+			box.Extend(ink)
+		}
+		box = box.Grow(captionSlack * captionFontSize)
+		placed := pdf.RectangleFromPoints(
+			M.Apply(vec.Vec2{X: box.LLx, Y: box.LLy}),
+			M.Apply(vec.Vec2{X: box.URx, Y: box.LLy}),
+			M.Apply(vec.Vec2{X: box.LLx, Y: box.URy}),
+			M.Apply(vec.Vec2{X: box.URx, Y: box.URy}),
+		)
+		capt.bbox.Extend(&placed)
+	}
+
+	if !a.CaptionAbove && length >= 0.1 {
+		centre := length/2 + h
+		half := width/2 + captionGap
+		capt.gap = [2]float64{
+			min(max(centre-half, 0), length),
+			min(max(centre+half, 0), length),
+		}
+		capt.gapped = true
+	}
+	return capt
+}
+
+// captionLines splits a caption into its lines, at any of the line breaks
+// CR, LF and CR LF.
+func captionLines(text string) []string {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\r", "\n")
+	return strings.Split(text, "\n")
+}
+
+// draw shows the caption in the given font and colour.
+func (capt *lineCaption) draw(b *builder.Builder, F font.Layouter, col color.Color) {
+	b.TextBegin()
+	b.TextSetFont(F, captionFontSize)
+	b.SetFillColor(col)
+	b.TextSetHorizontalScaling(1)
+	b.TextSetRise(0)
+	for i, seq := range capt.lines {
+		b.TextSetMatrix(capt.tm[i])
+		b.TextShowGlyphs(seq)
+	}
+	b.TextEnd()
 }
