@@ -41,7 +41,8 @@ func (g *Generator) addInkAppearance(a *annotation.Ink) (*form.Form, error) {
 	// We draw InkList only. The optional PDF 2.0 Path entry is used by
 	// viewers for click hit-testing, not for the drawn line. The wording in
 	// Table 185 appears to conflate the two roles and is best ignored here.
-	bbox := inkBBox(a.InkList, lw)
+	paths := roundPaths(a.InkList)
+	bbox := inkBBox(paths, lw)
 	a.Rect = bbox
 
 	b := g.begin()
@@ -57,19 +58,18 @@ func (g *Generator) addInkAppearance(a *annotation.Ink) (*form.Form, error) {
 		b.SetLineDash(dashPattern, 0)
 	}
 
-	for _, pts := range a.InkList {
+	for _, pts := range paths {
 		if len(pts) == 0 {
 			continue
 		}
-		x0, y0 := pdf.Round(pts[0].X, 2), pdf.Round(pts[0].Y, 2)
-		b.MoveTo(x0, y0)
+		b.MoveTo(pts[0].X, pts[0].Y)
 		if len(pts) == 1 {
 			// zero-length segment + round cap = filled disk of diameter lw
-			b.LineTo(x0, y0)
+			b.LineTo(pts[0].X, pts[0].Y)
 			continue
 		}
 		for _, p := range pts[1:] {
-			b.LineTo(pdf.Round(p.X, 2), pdf.Round(p.Y, 2))
+			b.LineTo(p.X, p.Y)
 		}
 	}
 	b.Stroke()
@@ -87,14 +87,14 @@ func hasInkPoints(paths [][]vec.Vec2) bool {
 	return false
 }
 
-// inkBBox returns the bounding box of the stroke drawn along every sub-path.
-// The joins are round, so no vertex reaches further than half the line width.
-// Empty sub-paths are skipped.
+// inkBBox returns the bounding box of the stroke drawn along every sub-path,
+// rounded outwards.  The joins are round, so no vertex reaches further than
+// half the line width.  The points must already have the two decimals they
+// are drawn with; see [roundPaths].  Empty sub-paths are skipped.
 func inkBBox(paths [][]vec.Vec2, lw float64) pdf.Rectangle {
 	bbox, ok := strokeBounds(paths, false, lw, graphics.LineJoinRound, graphics.DefaultMiterLimit)
 	if !ok {
 		return pdf.Rectangle{}
 	}
-	bbox.IRound(2)
-	return bbox
+	return roundOut(bbox)
 }

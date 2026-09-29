@@ -228,3 +228,174 @@ func TestPolygonWithTwoVertices(t *testing.T) {
 		t.Error("the polygon stroked nothing")
 	}
 }
+
+// TestRoundOutKeepsTwoDecimalValues checks that roundOut leaves edges alone
+// which already have two decimals, including those, like 0.29, whose
+// product with 100 is not a whole number in floating point.
+func TestRoundOutKeepsTwoDecimalValues(t *testing.T) {
+	for i := -100000; i <= 100000; i++ {
+		x := float64(i) / 100
+		r := pdf.Rectangle{LLx: x, LLy: x, URx: x, URy: x}
+		if got := roundOut(r); got != r {
+			t.Fatalf("roundOut(%v) = %v, want unchanged", r, got)
+		}
+	}
+}
+
+// TestRoundOutContains checks that roundOut returns the smallest rectangle
+// with two-decimal edges which contains its argument.
+func TestRoundOutContains(t *testing.T) {
+	for _, x := range []float64{0.289, 0.2899999999, 0.291, 9.625, 20.375, -0.071, -3.005, 1e-9, -1e-9} {
+		r := pdf.Rectangle{LLx: x, LLy: x, URx: x, URy: x}
+		got := roundOut(r)
+		for _, v := range []float64{got.LLx, got.LLy, got.URx, got.URy} {
+			if pdf.Round(v, 2) != v {
+				t.Errorf("roundOut(%g): edge %v has more than two decimals", x, v)
+			}
+		}
+		if got.LLx > x || got.LLy > x || got.URx < x || got.URy < x {
+			t.Errorf("roundOut(%g) = %v does not contain it", x, got)
+		}
+		if got.LLx+0.01 <= x || got.URx-0.01 >= x {
+			t.Errorf("roundOut(%g) = %v is not the smallest", x, got)
+		}
+	}
+}
+
+// TestAppearanceBoundsRoundOutwards checks that a rectangle derived from a
+// stroke holds it where half the line width puts an edge exactly between two
+// hundredths.  Rounding to nearest takes such an edge away from zero, which
+// on the lower-left side is into the stroke.
+func TestAppearanceBoundsRoundOutwards(t *testing.T) {
+	const lw = 0.75
+	pts := []vec.Vec2{{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 20, Y: 20}}
+	verts := []float64{10, 10, 20, 10, 20, 20}
+
+	common := func() annotation.Common {
+		return annotation.Common{
+			Color:  color.DeviceRGB{1, 0, 0},
+			Border: &annotation.Border{Width: lw},
+		}
+	}
+	cases := map[string]annotation.Annotation{
+		"Polygon":  &annotation.Polygon{Common: common(), Vertices: verts},
+		"PolyLine": &annotation.PolyLine{Common: common(), Vertices: verts},
+		"Ink":      &annotation.Ink{Common: common(), InkList: [][]vec.Vec2{pts}},
+		"Line":     &annotation.Line{Common: common(), Coords: [4]float64{10, 10, 20, 20}},
+	}
+
+	for name, a := range cases {
+		t.Run(name, func(t *testing.T) {
+			g := newGen(t, pdf.V2_0)
+			if err := g.AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+			rect := a.GetCommon().Rect
+			if rect.LLx > 10-lw/2 || rect.LLy > 10-lw/2 || rect.URx < 20+lw/2 || rect.URy < 20+lw/2 {
+				t.Errorf("rectangle %v does not hold the stroke", rect)
+			}
+		})
+	}
+}
+
+// TestInkBoundsAreTight checks that the rectangle of an ink annotation, whose
+// points are drawn exactly as rounded, is the smallest one with two-decimal
+// edges that holds the stroke.
+func TestInkBoundsAreTight(t *testing.T) {
+	a := &annotation.Ink{
+		Common: annotation.Common{
+			Color:  color.DeviceRGB{1, 0, 0},
+			Border: &annotation.Border{Width: 0.75},
+		},
+		InkList: [][]vec.Vec2{{{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 20, Y: 20}}},
+	}
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+	want := pdf.Rectangle{LLx: 9.62, LLy: 9.62, URx: 20.38, URy: 20.38}
+	if a.Rect != want {
+		t.Errorf("rectangle = %v, want %v", a.Rect, want)
+	}
+}
+
+// TestPolyLineMiterAfterRounding checks the rectangle of a polyline whose
+// corner is just too sharp for a miter join, but which rounding the vertices
+// to two decimals opens up far enough to take one.  The rectangle must hold
+// the miter drawn.
+func TestPolyLineMiterAfterRounding(t *testing.T) {
+	const lw = 10
+	s := 0.1985 // rounds to 0.2
+	c := math.Sqrt(1 - s*s)
+	a := &annotation.PolyLine{
+		Common: annotation.Common{
+			Color:  color.DeviceRGB{1, 0, 0},
+			Border: &annotation.Border{Width: lw},
+		},
+		Vertices: []float64{1, 0, 0, 0, c, s},
+	}
+
+	drawn := []vec.Vec2{{X: 1, Y: 0}, {X: 0, Y: 0}, {X: pdf.Round(c, 2), Y: pdf.Round(s, 2)}}
+	want, _ := strokeBounds([][]vec.Vec2{drawn}, false, lw,
+		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+	if want.LLx > -lw {
+		t.Fatalf("test case gives no miter spike: %v", want)
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+	r := a.Rect
+	if r.LLx > want.LLx || r.LLy > want.LLy || r.URx < want.URx || r.URy < want.URy {
+		t.Errorf("rectangle %v does not hold the stroke %v", a.Rect, want)
+	}
+}
+
+// TestVertexRectMatchesGenerator checks that PolygonRect and PolyLineRect
+// give the rectangle the generator derives for the same annotation, and
+// report an annotation with too few vertices.
+func TestVertexRectMatchesGenerator(t *testing.T) {
+	verts := []float64{10, 10, 20, 10.004, 10, 12.196}
+	common := func() annotation.Common {
+		return annotation.Common{
+			Color:  color.DeviceRGB{1, 0, 0},
+			Border: &annotation.Border{Width: 3},
+		}
+	}
+
+	pg := &annotation.Polygon{Common: common(), Vertices: verts}
+	want, ok := PolygonRect(pg)
+	if !ok {
+		t.Fatal("PolygonRect found no vertices")
+	}
+	if err := newGen(t, pdf.V2_0).AddAppearance(pg); err != nil {
+		t.Fatal(err)
+	}
+	if pg.Rect != want {
+		t.Errorf("polygon: generator Rect = %v, PolygonRect = %v", pg.Rect, want)
+	}
+
+	pl := &annotation.PolyLine{
+		Common:          common(),
+		Vertices:        verts,
+		LineEndingStyle: [2]annotation.LineEndingStyle{annotation.LineEndingStyleClosedArrow, annotation.LineEndingStyleCircle},
+	}
+	want, ok = PolyLineRect(pl)
+	if !ok {
+		t.Fatal("PolyLineRect found no vertices")
+	}
+	if err := newGen(t, pdf.V2_0).AddAppearance(pl); err != nil {
+		t.Fatal(err)
+	}
+	if pl.Rect != want {
+		t.Errorf("polyline: generator Rect = %v, PolyLineRect = %v", pl.Rect, want)
+	}
+
+	if _, ok := PolygonRect(&annotation.Polygon{Vertices: []float64{1, 2}}); ok {
+		t.Error("PolygonRect accepted a single vertex")
+	}
+	if _, ok := PolyLineRect(&annotation.PolyLine{Vertices: []float64{1, 2}}); ok {
+		t.Error("PolyLineRect accepted a single vertex")
+	}
+}

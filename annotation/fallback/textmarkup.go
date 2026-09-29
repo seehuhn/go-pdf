@@ -59,8 +59,9 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 	if a.Type == annotation.TextMarkupTypeSquiggly {
 		expand = lw/2 + squigglyAmplitude
 	}
-	bbox = bbox.Grow(expand)
-	bbox.IRound(2)
+	// the path is drawn with two decimals, which can carry it a little
+	// outside the exact geometry measured here
+	bbox = roundOut(bbox.Grow(expand + pathPrecision))
 	a.Rect = bbox
 
 	b := g.begin()

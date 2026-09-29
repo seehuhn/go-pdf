@@ -338,3 +338,67 @@ func TestFreeTextKeepsStyleAndBorderEffect(t *testing.T) {
 		t.Errorf("border effect = %+v, want %+v", a.BorderEffect, be)
 	}
 }
+
+// TestFreeTextCloudyCalloutRect checks that a cloudy border's stroke width
+// is added to the cloud alone: the rectangle ends where the round cap of the
+// callout line ends, not another half line width beyond it.
+func TestFreeTextCloudyCalloutRect(t *testing.T) {
+	const lw = 4
+	a := &annotation.FreeText{
+		Common: annotation.Common{
+			Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
+			Contents: "hello",
+			Border:   &annotation.Border{Width: lw},
+		},
+		Markup: annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+		// a horizontal line out to the left, whose cap reaches to x = 18
+		CalloutLine:  []vec.Vec2{{X: 20, Y: 130}, {X: 100, Y: 130}},
+		BorderEffect: &annotation.BorderEffect{Style: "C", Intensity: 1},
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := 17.99; a.Rect.LLx != want {
+		t.Errorf("Rect.LLx = %g, want %g", a.Rect.LLx, want)
+	}
+	if a.Rect.URx <= 200 || a.Rect.URy <= 160 || a.Rect.LLy >= 100 {
+		t.Errorf("Rect %v does not take in the curls of the cloud", a.Rect)
+	}
+}
+
+// TestFreeTextCalloutRound checks that a callout line is drawn with round
+// caps and joins, whatever its border, and that the rectangle is measured
+// with that join: a sharp knee with a miter join would reach far beyond it.
+func TestFreeTextCalloutRound(t *testing.T) {
+	const lw = 4
+	a := &annotation.FreeText{
+		Common: annotation.Common{
+			Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
+			Contents: "hello",
+			Border:   &annotation.Border{Width: lw},
+		},
+		Markup: annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+		// the line doubles back at its knee, x = 20, by 20 degrees: sharp,
+		// but within the miter limit
+		CalloutLine: []vec.Vec2{{X: 60, Y: 130}, {X: 20, Y: 130}, {X: 100, Y: 159.12}},
+	}
+
+	g := newGen(t, pdf.V2_0)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := 17.99; a.Rect.LLx != want {
+		t.Errorf("Rect.LLx = %g, want %g", a.Rect.LLx, want)
+	}
+	stream := string(appearanceStream(t, a))
+	if !strings.Contains(stream, "1 J") {
+		t.Error("the callout line is not drawn with a round cap")
+	}
+	if !strings.Contains(stream, "1 j") {
+		t.Error("the callout line is not drawn with a round join")
+	}
+}

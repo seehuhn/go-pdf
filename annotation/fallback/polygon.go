@@ -32,14 +32,15 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	col := paint(a.Color)
 
 	verts := polygonVertices(a)
+	pts := roundPoints(verts)
 
 	bbox := a.Rect
 	derived := false
-	if bbox.IsZero() && len(verts) >= 2 {
+	if bbox.IsZero() && len(pts) >= 2 {
 		// a file which leaves Rect out still says where the polygon is, in
 		// its vertices; without a rectangle the appearance would have no
 		// bounding box and could not be written back out
-		bbox = polygonPathBBox(verts, lw)
+		bbox = polygonPathBBox(pts, lw)
 		a.Rect = bbox
 		derived = true
 	}
@@ -77,17 +78,15 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	}
 
 	drawn := false
-	if isCloudy {
-		if len(verts) >= 3 {
-			cloudBBox := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
-			bbox = cloudBBox.Grow(lw / 2)
-			bbox.IRound(2)
+	if isCloudy && len(verts) >= 3 {
+		if ink, ok := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline); ok {
+			bbox = roundOut(ink.Grow(pathPrecision))
 			a.Rect = bbox
 			drawn = true
 		}
 	}
-	if !drawn {
-		drawPolygonPath(b, a)
+	if !drawn && len(pts) > 0 {
+		drawPolygonPath(b, pts)
 		switch {
 		case hasOutline && hasFill:
 			b.FillAndStroke()
@@ -101,17 +100,33 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 	return g.harvest(b, bbox, a.GetCommon())
 }
 
+// PolygonRect returns the rectangle the fallback appearance of a Polygon
+// annotation without a cloudy border needs: the bounds of the stroke along
+// the vertices, with its miter joins, rounded outwards to two decimals.  The
+// generator derives Rect this way where the annotation has none, and keeps
+// a Rect it is given; a caller which edits the vertices or the border width
+// can use this to give the annotation a rectangle the stroke fits in.  The
+// second result is false if the annotation has fewer than two vertices.
+func PolygonRect(a *annotation.Polygon) (pdf.Rectangle, bool) {
+	pts := roundPoints(polygonVertices(a))
+	if len(pts) < 2 {
+		return pdf.Rectangle{}, false
+	}
+	return polygonPathBBox(pts, annotation.EffectiveBorderWidth(a)), true
+}
+
 // polygonPathBBox is the rectangle bounding the stroke drawn along a
-// polygon's vertices.  The path is closed, so every vertex carries a miter
-// join, and a sharp corner reaches beyond the border width.
+// polygon's vertices, rounded outwards.  The path is closed, so every vertex
+// carries a miter join, and a sharp corner reaches beyond the border width.
+// The vertices must be the rounded ones the polygon is drawn through; see
+// [roundPoints].
 func polygonPathBBox(verts []vec.Vec2, lw float64) pdf.Rectangle {
 	r, ok := strokeBounds([][]vec.Vec2{verts}, true, lw,
 		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
 	if !ok {
 		return pdf.Rectangle{}
 	}
-	r.IRound(2)
-	return r
+	return roundOut(r)
 }
 
 // polygonVertices extracts the vertex list from a polygon annotation.
@@ -127,13 +142,12 @@ func polygonVertices(a *annotation.Polygon) []vec.Vec2 {
 	return nil
 }
 
-// drawPolygonPath draws the original (non-cloudy) polygon path.
-func drawPolygonPath(b *builder.Builder, a *annotation.Polygon) {
-	if len(a.Vertices) >= 4 {
-		b.MoveTo(a.Vertices[0], a.Vertices[1])
-		for i := 2; i+1 < len(a.Vertices); i += 2 {
-			b.LineTo(a.Vertices[i], a.Vertices[i+1])
-		}
+// drawPolygonPath draws a closed path through pts, which must be non-empty
+// and already rounded; see [roundPoints].
+func drawPolygonPath(b *builder.Builder, pts []vec.Vec2) {
+	b.MoveTo(pts[0].X, pts[0].Y)
+	for _, p := range pts[1:] {
+		b.LineTo(p.X, p.Y)
 	}
 	b.ClosePath()
 }

@@ -55,15 +55,6 @@ func hasCurveOps(ops []content.Operator) bool {
 	return false
 }
 
-func hasOp(ops []content.Operator, name content.OpName) bool {
-	for _, op := range ops {
-		if op.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
 func TestCloudyBorderSmallPolygon(t *testing.T) {
 	// tiny polygon too small for 3 cloud bulges
 	tiny := []vec.Vec2{
@@ -72,19 +63,17 @@ func TestCloudyBorderSmallPolygon(t *testing.T) {
 		{X: 1, Y: 1.7},
 	}
 	b := builder.New(content.Form, nil, pdf.V2_0)
-	drawCloudyBorder(b, tiny, 1, 1, true, true)
-
-	if hasCurveOps(b.Stream) {
-		t.Error("expected no CurveTo ops for small polygon fallback")
+	if _, ok := drawCloudyBorder(b, tiny, 1, 1, true, true); ok {
+		t.Error("a cloud was drawn round a polygon too small for one")
 	}
-	if !hasOp(b.Stream, content.OpMoveTo) {
-		t.Error("expected MoveTo in plain polygon")
+	if len(b.Stream) > 0 {
+		t.Error("the given-up cloud left operators behind")
 	}
 }
 
 func TestCloudyBorderRectangle(t *testing.T) {
 	b := builder.New(content.Form, nil, pdf.V2_0)
-	bbox := drawCloudyBorder(b, unitSquare, 1, 1, true, true)
+	bbox, _ := drawCloudyBorder(b, unitSquare, 1, 1, true, true)
 
 	if !hasCurveOps(b.Stream) {
 		t.Error("expected CurveTo ops for cloudy border")
@@ -104,10 +93,10 @@ func TestCloudyBorderCWReversal(t *testing.T) {
 	}
 
 	b1 := builder.New(content.Form, nil, pdf.V2_0)
-	bbox1 := drawCloudyBorder(b1, unitSquare, 1, 1, true, false)
+	bbox1, _ := drawCloudyBorder(b1, unitSquare, 1, 1, true, false)
 
 	b2 := builder.New(content.Form, nil, pdf.V2_0)
-	bbox2 := drawCloudyBorder(b2, cw, 1, 1, true, false)
+	bbox2, _ := drawCloudyBorder(b2, cw, 1, 1, true, false)
 
 	// bounding boxes should be similar (tolerance accounts for bulge placement shift)
 	if math.Abs(bbox1.Dx()-bbox2.Dx()) > 5 || math.Abs(bbox1.Dy()-bbox2.Dy()) > 5 {
@@ -117,7 +106,7 @@ func TestCloudyBorderCWReversal(t *testing.T) {
 
 func TestCloudyBorderBBox(t *testing.T) {
 	b := builder.New(content.Form, nil, pdf.V2_0)
-	bbox := drawCloudyBorder(b, unitSquare, 1, 1, true, false)
+	bbox, _ := drawCloudyBorder(b, unitSquare, 1, 1, true, false)
 
 	// bbox must include the polygon
 	if bbox.URx < 100 || bbox.URy < 100 {
@@ -136,7 +125,7 @@ func TestCloudyBorderTriangle(t *testing.T) {
 		{X: 0, Y: 86.6},
 	}
 	b := builder.New(content.Form, nil, pdf.V2_0)
-	bbox := drawCloudyBorder(b, tri, 1, 1, true, true)
+	bbox, _ := drawCloudyBorder(b, tri, 1, 1, true, true)
 
 	if !hasCurveOps(b.Stream) {
 		t.Error("expected CurveTo ops for triangle")

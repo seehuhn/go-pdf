@@ -34,8 +34,9 @@ func normalizeLE(le annotation.LineEndingStyle) annotation.LineEndingStyle {
 }
 
 // drawOpenPolyline draws an open path through points with optional line
-// endings at the start and end.  The line width, stroke color, and dash
-// pattern must already be set on the builder.
+// endings at the start and end.  The points must already be rounded; see
+// [roundPoints].  The line width, stroke color, and dash pattern must already
+// be set on the builder.
 func drawOpenPolyline(b *builder.Builder, points []vec.Vec2, startLE, endLE annotation.LineEndingStyle, fillColor color.Color) {
 	if len(points) < 2 {
 		return
@@ -53,12 +54,12 @@ func drawOpenPolyline(b *builder.Builder, points []vec.Vec2, startLE, endLE anno
 		}
 		drawLineEndingBuilder(b, startLE, info)
 	} else {
-		b.MoveTo(pdf.Round(points[0].X, 2), pdf.Round(points[0].Y, 2))
+		b.MoveTo(points[0].X, points[0].Y)
 	}
 
 	// intermediate points
 	for i := 1; i < n-1; i++ {
-		b.LineTo(pdf.Round(points[i].X, 2), pdf.Round(points[i].Y, 2))
+		b.LineTo(points[i].X, points[i].Y)
 	}
 
 	// end point
@@ -71,17 +72,19 @@ func drawOpenPolyline(b *builder.Builder, points []vec.Vec2, startLE, endLE anno
 		}
 		drawLineEndingBuilder(b, endLE, info)
 	} else {
-		b.LineTo(pdf.Round(points[n-1].X, 2), pdf.Round(points[n-1].Y, 2))
+		b.LineTo(points[n-1].X, points[n-1].Y)
 		b.Stroke()
 	}
 }
 
 // openPolylineBBox computes a bounding box for an open polyline with the
-// given line width and optional line endings.  The path is stroked with the
-// default miter joins, so a sharp corner reaches beyond the line width.
-func openPolylineBBox(points []vec.Vec2, lw float64, startLE, endLE annotation.LineEndingStyle) pdf.Rectangle {
+// given line width, line join and optional line endings.  With miter joins,
+// which use the default miter limit, a sharp corner reaches beyond the line
+// width.  The points must be the rounded ones the polyline is drawn through;
+// see [roundPoints].
+func openPolylineBBox(points []vec.Vec2, lw float64, join graphics.LineJoinStyle, startLE, endLE annotation.LineEndingStyle) pdf.Rectangle {
 	bbox, ok := strokeBounds([][]vec.Vec2{points}, false, lw,
-		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+		join, graphics.DefaultMiterLimit)
 	if !ok {
 		return pdf.Rectangle{}
 	}
@@ -106,6 +109,7 @@ func openPolylineBBox(points []vec.Vec2, lw float64, startLE, endLE annotation.L
 		lineEndingBBox(&bbox, endLE, info, lw)
 	}
 
-	bbox.IRound(2)
-	return bbox
+	// the line endings are drawn with two decimals, which can carry them a
+	// little outside the exact geometry measured here
+	return roundOut(bbox.Grow(pathPrecision))
 }

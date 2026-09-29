@@ -563,25 +563,26 @@ func runNearMinY(points []vec.Vec2, start, length int, minY, yRange float64) boo
 	return avgY-minY <= 0.1*yRange
 }
 
-// drawCloudyBorder draws a cloudy border for a polygon.
-// Returns the bounding box. Falls back to a plain polygon if too few bulges.
+// drawCloudyBorder draws a cloudy border round a polygon and returns the
+// rectangle its ink lies in, the stroke included; see [cloudOutline.draw].
+//
+// Where the border is too wide for a cloud, nothing is drawn and the second
+// result is false.  The caller then draws the plain border of its shape.
 func drawCloudyBorder(b *builder.Builder, vertices []vec.Vec2,
-	intensity, lw float64, hasFill, hasStroke bool) pdf.Rectangle {
+	intensity, lw float64, hasFill, hasStroke bool) (pdf.Rectangle, bool) {
 
 	co := newCloudOutline(vertices, intensity, lw)
 	if co == nil {
-		bbox := drawPlainPolygon(b, vertices)
-		switch {
-		case hasFill && hasStroke:
-			b.FillAndStroke()
-		case hasFill:
-			b.Fill()
-		case hasStroke:
-			b.Stroke()
-		}
-		return bbox
+		return pdf.Rectangle{}, false
 	}
+	return co.draw(b, lw, hasFill, hasStroke), true
+}
 
+// draw fills and strokes the cloud, in the colours and with the line width
+// already set, and returns the rectangle its ink lies in, the stroke
+// included.  The cloud is measured on the exact path, which is written with
+// two decimals, so a caller allows [pathPrecision] beyond it.
+func (co *cloudOutline) draw(b *builder.Builder, lw float64, hasFill, hasStroke bool) pdf.Rectangle {
 	var bbox pdf.Rectangle
 
 	if hasFill {
@@ -599,6 +600,7 @@ func drawCloudyBorder(b *builder.Builder, vertices []vec.Vec2,
 		b.SetLineJoin(graphics.LineJoinRound)
 		strokeBBox := co.strokePath(b)
 		b.Stroke()
+		strokeBBox = strokeBBox.Grow(lw / 2)
 		if hasFill {
 			bbox.Extend(&strokeBBox)
 		} else {
@@ -606,21 +608,5 @@ func drawCloudyBorder(b *builder.Builder, vertices []vec.Vec2,
 		}
 	}
 
-	return bbox
-}
-
-// drawPlainPolygon draws the vertices as a simple closed polygon path.
-func drawPlainPolygon(b *builder.Builder, vertices []vec.Vec2) pdf.Rectangle {
-	bbox := pdf.RectangleFromPoints(vertices...)
-	for i, v := range vertices {
-		x := pdf.Round(v.X, 2)
-		y := pdf.Round(v.Y, 2)
-		if i == 0 {
-			b.MoveTo(x, y)
-		} else {
-			b.LineTo(x, y)
-		}
-	}
-	b.ClosePath()
 	return bbox
 }

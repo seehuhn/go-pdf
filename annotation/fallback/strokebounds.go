@@ -40,11 +40,54 @@ const pathPrecision = 0.005
 // inside the rectangle it is derived from, and an inset may not be negative.
 func roundOut(r pdf.Rectangle) pdf.Rectangle {
 	return pdf.Rectangle{
-		LLx: math.Floor(r.LLx*100) / 100,
-		LLy: math.Floor(r.LLy*100) / 100,
-		URx: math.Ceil(r.URx*100) / 100,
-		URy: math.Ceil(r.URy*100) / 100,
+		LLx: roundDown(r.LLx),
+		LLy: roundDown(r.LLy),
+		URx: -roundDown(-r.URx),
+		URy: -roundDown(-r.URy),
 	}
+}
+
+// roundPoints returns a copy of pts with every point rounded to two
+// decimals, the precision a path is written to the file with.
+//
+// A generator draws a polyline through the rounded points and measures its
+// stroke from the same points, so that the bounds hold the path exactly as
+// it is drawn.  A margin added to bounds taken from the exact points is not
+// enough where the path has miter joins: moving a vertex by a fraction of a
+// hundredth can turn a bevelled corner into a long miter.
+func roundPoints(pts []vec.Vec2) []vec.Vec2 {
+	if pts == nil {
+		return nil
+	}
+	out := make([]vec.Vec2, len(pts))
+	for i, p := range pts {
+		out[i] = vec.Vec2{X: pdf.Round(p.X, 2), Y: pdf.Round(p.Y, 2)}
+	}
+	return out
+}
+
+// roundPaths applies [roundPoints] to every sub-path.
+func roundPaths(subpaths [][]vec.Vec2) [][]vec.Vec2 {
+	out := make([][]vec.Vec2, len(subpaths))
+	for i, pts := range subpaths {
+		out[i] = roundPoints(pts)
+	}
+	return out
+}
+
+// roundDown returns the largest two-decimal value which is not greater
+// than x.
+//
+// Scaling x by 100 is not exact, so taking the floor of x*100 can move a
+// value which already has two decimals, such as 0.29, down by 0.01.  The
+// value is therefore rounded to nearest first, which leaves such a value
+// alone, and stepped down only when that lands above x.
+func roundDown(x float64) float64 {
+	n := math.Round(x * 100)
+	if n/100 > x {
+		n--
+	}
+	return n / 100
 }
 
 // strokeBounds returns the rectangle covered by stroking the polylines in

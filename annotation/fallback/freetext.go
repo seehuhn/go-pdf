@@ -67,12 +67,6 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	inner := applyMargins(a.Rect, a.Margin)
 
 	outer := inner
-	if hasCallout {
-		reversed := slices.Clone(calloutLine)
-		slices.Reverse(reversed)
-		clBBox := openPolylineBBox(reversed, lw, annotation.LineEndingStyleNone, a.LineEndingStyle)
-		outer.Extend(&clBBox)
-	}
 
 	// The border width is not used when an appearance stream is present, but
 	// it is recorded in the annotation so that the appearance can be
@@ -101,6 +95,21 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		co = newCloudOutline(verts, be.Intensity, lw)
 	}
 
+	// the callout line, running from the text box to the point it marks,
+	// with the points it is drawn through
+	var callout []vec.Vec2
+	if hasCallout {
+		reversed := slices.Clone(calloutLine)
+		slices.Reverse(reversed)
+		if co != nil {
+			reversed[0] = co.trimToCloud(reversed[1], reversed[0])
+		}
+		callout = roundPoints(reversed)
+		clBBox := openPolylineBBox(callout, lw, graphics.LineJoinRound,
+			annotation.LineEndingStyleNone, a.LineEndingStyle)
+		outer.Extend(&clBBox)
+	}
+
 	// draw border and background
 	if a.Intent != annotation.FreeTextIntentTypeWriter {
 		// a border width of 0 asks for no border
@@ -112,17 +121,10 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		if co != nil {
 			if bgCol != nil {
 				b.SetFillColor(bgCol)
-				fillBBox := co.fillPath(b)
-				b.Fill()
-				outer.Extend(&fillBBox)
 			}
-			if hasBorder {
-				b.SetLineCap(graphics.LineCapRound)
-				strokeBBox := co.strokePath(b)
-				b.Stroke()
-				outer.Extend(&strokeBBox)
-				// expand for stroke width
-				outer = outer.Grow(lw / 2)
+			if bgCol != nil || hasBorder {
+				ink := co.draw(b, lw, bgCol != nil, hasBorder).Grow(pathPrecision)
+				outer.Extend(&ink)
 			}
 		} else if bgCol != nil || hasBorder {
 			if bgCol != nil {
@@ -143,12 +145,9 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	if hasCallout {
 		b.SetLineWidth(lw)
 		b.SetStrokeColor(quireInk)
-		reversed := slices.Clone(calloutLine)
-		slices.Reverse(reversed)
-		if co != nil {
-			reversed[0] = co.trimToCloud(reversed[1], reversed[0])
-		}
-		drawOpenPolyline(b, reversed, annotation.LineEndingStyleNone, a.LineEndingStyle, bgCol)
+		b.SetLineCap(graphics.LineCapRound)
+		b.SetLineJoin(graphics.LineJoinRound)
+		drawOpenPolyline(b, callout, annotation.LineEndingStyleNone, a.LineEndingStyle, bgCol)
 	}
 
 	// render text content if present

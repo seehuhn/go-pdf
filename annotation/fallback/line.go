@@ -57,28 +57,26 @@ func (g *Generator) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 
 // calculateLineBBox calculates the bounding box for the line annotation
 func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
-	x1, y1 := a.Coords[0], a.Coords[1]
-	x2, y2 := a.Coords[2], a.Coords[3]
-
 	// the line itself; it has two points, so it carries caps and no join
-	segment := []vec.Vec2{{X: x1, Y: y1}, {X: x2, Y: y2}}
+	segment := lineEndpoints(a)
 	bbox, _ := strokeBounds([][]vec.Vec2{segment}, false, lw,
 		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+	p1, p2 := segment[0], segment[1]
 
 	// expand for line endings
 	le0 := normalizeLE(a.LineEndingStyle[0])
 	le1 := normalizeLE(a.LineEndingStyle[1])
 	if le0 != annotation.LineEndingStyleNone {
 		info := lineEndingInfo{
-			At:  vec.Vec2{X: x1, Y: y1},
-			Dir: vec.Vec2{X: x1 - x2, Y: y1 - y2},
+			At:  p1,
+			Dir: p1.Sub(p2),
 		}
 		lineEndingBBox(&bbox, le0, info, lw)
 	}
 	if le1 != annotation.LineEndingStyleNone {
 		info := lineEndingInfo{
-			At:  vec.Vec2{X: x2, Y: y2},
-			Dir: vec.Vec2{X: x2 - x1, Y: y2 - y1},
+			At:  p2,
+			Dir: p2.Sub(p1),
 		}
 		lineEndingBBox(&bbox, le1, info, lw)
 	}
@@ -88,8 +86,18 @@ func calculateLineBBox(a *annotation.Line, lw float64) pdf.Rectangle {
 		expandBBoxForLeaderLines(&bbox, a, lw)
 	}
 
-	bbox.IRound(2)
-	return bbox
+	// the line endings and leader lines are drawn with two decimals, which
+	// can carry them a little outside the exact geometry measured here
+	return roundOut(bbox.Grow(pathPrecision))
+}
+
+// lineEndpoints returns the two points of a line without leader lines,
+// rounded to the two decimals they are drawn with.
+func lineEndpoints(a *annotation.Line) []vec.Vec2 {
+	return roundPoints([]vec.Vec2{
+		{X: a.Coords[0], Y: a.Coords[1]},
+		{X: a.Coords[2], Y: a.Coords[3]},
+	})
 }
 
 // expandBBoxForLeaderLines expands the bounding box to include leader lines
@@ -126,10 +134,7 @@ func expandBBoxForLeaderLines(bbox *pdf.Rectangle, a *annotation.Line, lw float6
 
 // drawSimpleLineBuilder draws a line without leader lines
 func drawSimpleLineBuilder(b *builder.Builder, a *annotation.Line) {
-	points := []vec.Vec2{
-		{X: a.Coords[0], Y: a.Coords[1]},
-		{X: a.Coords[2], Y: a.Coords[3]},
-	}
+	points := lineEndpoints(a)
 	le0 := normalizeLE(a.LineEndingStyle[0])
 	le1 := normalizeLE(a.LineEndingStyle[1])
 	drawOpenPolyline(b, points, le0, le1, paint(a.FillColor))

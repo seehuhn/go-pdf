@@ -76,8 +76,9 @@ func (g *Generator) addCircleAppearance(a *annotation.Circle) (*form.Form, error
 	// round, and Rect grows to take them in
 	if isCloudy {
 		if verts := flattenEllipse(rect); verts != nil {
-			ink := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline)
-			return g.harvest(b, fitToInk(&a.Common, &a.Margin, outer, ink.Grow(pen/2)), a.GetCommon())
+			if ink, ok := drawCloudyBorder(b, verts, be.Intensity, lw, hasFill, hasOutline); ok {
+				return g.harvest(b, fitToInk(&a.Common, &a.Margin, outer, ink), a.GetCommon())
+			}
 		}
 	}
 

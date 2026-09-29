@@ -82,8 +82,9 @@ func (g *Generator) addSquareAppearance(a *annotation.Square) (*form.Form, error
 		// annotation rectangle grows to take them in and the margins record
 		// where the square's border ends: this is the case §12.5.6.8
 		// describes, where a border effect pushes Rect out beyond the square.
-		ink := drawCloudyBorder(b, squareVertices(rect), be.Intensity, lw, hasFill, hasOutline)
-		return g.harvest(b, fitToInk(&a.Common, &a.Margin, outer, ink.Grow(pen/2)), a.GetCommon())
+		if ink, ok := drawCloudyBorder(b, squareVertices(rect), be.Intensity, lw, hasFill, hasOutline); ok {
+			return g.harvest(b, fitToInk(&a.Common, &a.Margin, outer, ink), a.GetCommon())
+		}
 	}
 
 	b.Rectangle(rect.LLx, rect.LLy, rect.Dx(), rect.Dy())

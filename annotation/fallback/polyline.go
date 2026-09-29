@@ -18,7 +18,9 @@ package fallback
 
 import (
 	"seehuhn.de/go/geom/vec"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
 )
@@ -36,7 +38,7 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 		}, nil
 	}
 
-	points := polylineVertices(a)
+	points := roundPoints(polylineVertices(a))
 	if len(points) < 2 {
 		return &form.Form{
 			Content: nil,
@@ -48,7 +50,7 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 	startLE := normalizeLE(a.LineEndingStyle[0])
 	endLE := normalizeLE(a.LineEndingStyle[1])
 
-	bbox := openPolylineBBox(points, lw, startLE, endLE)
+	bbox := openPolylineBBox(points, lw, graphics.LineJoinMiter, startLE, endLE)
 	a.Rect = bbox
 
 	b := g.begin()
@@ -62,6 +64,24 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 	drawOpenPolyline(b, points, startLE, endLE, paint(a.FillColor))
 
 	return g.harvest(b, bbox, a.GetCommon())
+}
+
+// PolyLineRect returns the rectangle the fallback appearance of a PolyLine
+// annotation is drawn into: the bounds of the stroke along the vertices,
+// with its miter joins and line endings, rounded outwards to two decimals.
+// The generator sets Rect to this value when it draws the appearance; a
+// caller which edits the vertices or the border width can use it to keep
+// Rect valid until then.  The second result is false if the annotation has
+// fewer than two vertices.
+func PolyLineRect(a *annotation.PolyLine) (pdf.Rectangle, bool) {
+	points := roundPoints(polylineVertices(a))
+	if len(points) < 2 {
+		return pdf.Rectangle{}, false
+	}
+	lw := annotation.EffectiveBorderWidth(a)
+	startLE := normalizeLE(a.LineEndingStyle[0])
+	endLE := normalizeLE(a.LineEndingStyle[1])
+	return openPolylineBBox(points, lw, graphics.LineJoinMiter, startLE, endLE), true
 }
 
 // polylineVertices extracts the vertex list from a polyline annotation.
