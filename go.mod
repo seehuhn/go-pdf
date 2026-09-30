@@ -8,7 +8,7 @@ require (
 	golang.org/x/image v0.44.0
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.40.0
-	seehuhn.de/go/geom v0.7.5-0.20260921084206-b22179b8dfaa
+	seehuhn.de/go/geom v0.7.5-0.20260929191733-e984e09ea32e
 	seehuhn.de/go/icc v0.7.5-0.20260828074917-6f4ceb03c75b
 	seehuhn.de/go/membudget v0.7.4
 	seehuhn.de/go/postscript v0.7.5-0.20260915125511-cb1c60cfde12

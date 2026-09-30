@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/graphics"
 )
 
 // pathPrecision is how far a path written to the file can lie outside the
@@ -106,23 +105,14 @@ func roundDown(x float64) float64 {
 }
 
 // strokeBounds returns the rectangle covered by stroking the polylines in
-// subpaths with a line of width lw.  It is the bounding box an appearance
-// stream drawing them needs, and the annotation rectangle that appearance is
-// placed in.
+// subpaths with the given stroke options.  It is the bounding box an
+// appearance stream drawing them needs, and the annotation rectangle that
+// appearance is placed in.  With opt.Dashed set, the bounds hold for any
+// dash pattern and phase.
 //
-// The generators which use this stroke with a butt or a round cap, neither of
-// which reaches further than half the line width, so the bounds are taken
-// with a butt cap.  A projecting square cap reaches further, and needs
-// [path.PolylineStrokeBBox] called directly.
-//
-// The second result is false if no sub-path has a vertex, in which case there
-// is nothing to bound.
-func strokeBounds(subpaths [][]vec.Vec2, closed bool, lw float64, join graphics.LineJoinStyle, miterLimit float64) (pdf.Rectangle, bool) {
-	bbox, ok := path.PolylineStrokeBBox(subpaths, closed, path.StrokeOptions{
-		Width:      lw,
-		Cap:        path.CapButt,
-		Join:       join,
-		MiterLimit: miterLimit,
-	})
+// The second result is false if the stroke draws nothing, in which case
+// there is nothing to bound.
+func strokeBounds(subpaths [][]vec.Vec2, closed bool, opt path.StrokeOptions) (pdf.Rectangle, bool) {
+	bbox, ok := path.PolylineStrokeBBox(subpaths, closed, opt)
 	return pdf.RectangleFromRect(bbox), ok
 }

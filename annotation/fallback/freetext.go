@@ -21,6 +21,7 @@ import (
 	"slices"
 	"strconv"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -105,8 +106,11 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 			reversed[0] = co.trimToCloud(reversed[1], reversed[0])
 		}
 		callout = roundPoints(reversed)
-		clBBox := openPolylineBBox(callout, lw, graphics.LineJoinRound,
-			annotation.LineEndingStyleNone, a.LineEndingStyle)
+		clBBox := openPolylineBBox(callout, path.StrokeOptions{
+			Width: lw,
+			Cap:   graphics.LineCapRound,
+			Join:  graphics.LineJoinRound,
+		}, annotation.LineEndingStyleNone, a.LineEndingStyle)
 		outer.Extend(&clBBox)
 	}
 

@@ -36,8 +36,8 @@ golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 seehuhn.de/go/dag v1.0.0 h1:qlqylIiZvRbwxv3m2Z974iaa4pC79NGF72AXLv/HXV4=
 seehuhn.de/go/dag v1.0.0/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
-seehuhn.de/go/geom v0.7.5-0.20260921084206-b22179b8dfaa h1:Z9nmyGbFtnq/HhKztedHdr+x0H/GcyXs+wW7CWtZMQw=
-seehuhn.de/go/geom v0.7.5-0.20260921084206-b22179b8dfaa/go.mod h1:0diHpKsEzgxI6SC1YY7525/TXIkXj0W2EjBvDXXN+Vc=
+seehuhn.de/go/geom v0.7.5-0.20260929191733-e984e09ea32e h1:ubW5Mp8Rr3mB6aoUq+K6gu0apwi7OTBzGcp2yCsJLHg=
+seehuhn.de/go/geom v0.7.5-0.20260929191733-e984e09ea32e/go.mod h1:0diHpKsEzgxI6SC1YY7525/TXIkXj0W2EjBvDXXN+Vc=
 seehuhn.de/go/icc v0.7.5-0.20260828074917-6f4ceb03c75b h1:DlbHWYzS2JV9DPCybnCanZy/DxMiSajhZPt+/DUdbgE=
 seehuhn.de/go/icc v0.7.5-0.20260828074917-6f4ceb03c75b/go.mod h1:6p6oT2CHTrKhFlYwiNKoaK+VQrWFNJ6yLPNsff3IVLI=
 seehuhn.de/go/membudget v0.7.4 h1:G8f921Bi28xfPkuf3Kr425qE6P+NDP/i1jkVbcFCEa8=

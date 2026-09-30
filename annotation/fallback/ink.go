@@ -17,6 +17,7 @@
 package fallback
 
 import (
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -43,7 +44,7 @@ func (g *Generator) addInkAppearance(a *annotation.Ink) (*form.Form, error) {
 	// viewers for click hit-testing, not for the drawn line. The wording in
 	// Table 185 appears to conflate the two roles and is best ignored here.
 	paths := roundPaths(a.InkList)
-	bbox := inkBBox(paths, lw)
+	bbox := inkBBox(paths, lw, len(dashPattern) > 0)
 	a.Rect = bbox
 
 	b := g.begin()
@@ -89,11 +90,15 @@ func hasInkPoints(paths [][]vec.Vec2) bool {
 }
 
 // inkBBox returns the bounding box of the stroke drawn along every sub-path,
-// rounded outwards.  The joins are round, so no vertex reaches further than
-// half the line width.  The points must already have the two decimals they
+// rounded outwards.  The points must already have the two decimals they
 // are drawn with; see [roundPaths].  Empty sub-paths are skipped.
-func inkBBox(paths [][]vec.Vec2, lw float64) pdf.Rectangle {
-	bbox, ok := strokeBounds(paths, false, lw, graphics.LineJoinRound, graphics.DefaultMiterLimit)
+func inkBBox(paths [][]vec.Vec2, lw float64, dashed bool) pdf.Rectangle {
+	bbox, ok := strokeBounds(paths, false, path.StrokeOptions{
+		Width:  lw,
+		Cap:    graphics.LineCapRound,
+		Join:   graphics.LineJoinRound,
+		Dashed: dashed,
+	})
 	if !ok {
 		return pdf.Rectangle{}
 	}

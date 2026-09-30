@@ -20,6 +20,7 @@ import (
 	"math"
 	"testing"
 
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
@@ -51,9 +52,20 @@ func spikeTipX(lw float64) float64 {
 	return -lw / 2 / math.Sin(math.Atan2(spikeHalfWidth, 100))
 }
 
+// spikeCornerX is how far the outer corners of the two segments meeting at
+// the sharp corner of [spikeTriangle] reach to the left of it, for a stroke
+// of width lw.  This is where a bevel join or a butt cap there ends.
+func spikeCornerX(lw float64) float64 {
+	return -lw / 2 * spikeHalfWidth / math.Hypot(100, spikeHalfWidth)
+}
+
 func TestStrokeBoundsCap(t *testing.T) {
 	pts := []vec.Vec2{{X: 10, Y: 20}, {X: 30, Y: 20}}
-	got, ok := strokeBounds([][]vec.Vec2{pts}, false, 4, graphics.LineJoinRound, graphics.DefaultMiterLimit)
+	got, ok := strokeBounds([][]vec.Vec2{pts}, false, path.StrokeOptions{
+		Width: 4,
+		Cap:   graphics.LineCapRound,
+		Join:  graphics.LineJoinRound,
+	})
 	if !ok {
 		t.Fatal("no bounds for a two-point path")
 	}
@@ -64,10 +76,18 @@ func TestStrokeBoundsCap(t *testing.T) {
 }
 
 func TestStrokeBoundsEmpty(t *testing.T) {
-	if _, ok := strokeBounds(nil, false, 4, graphics.LineJoinRound, graphics.DefaultMiterLimit); ok {
+	if _, ok := strokeBounds(nil, false, path.StrokeOptions{
+		Width: 4,
+		Cap:   graphics.LineCapRound,
+		Join:  graphics.LineJoinRound,
+	}); ok {
 		t.Error("an empty path has bounds")
 	}
-	if _, ok := strokeBounds([][]vec.Vec2{{}}, false, 4, graphics.LineJoinRound, graphics.DefaultMiterLimit); ok {
+	if _, ok := strokeBounds([][]vec.Vec2{{}}, false, path.StrokeOptions{
+		Width: 4,
+		Cap:   graphics.LineCapRound,
+		Join:  graphics.LineJoinRound,
+	}); ok {
 		t.Error("a path with no points has bounds")
 	}
 }
@@ -78,8 +98,11 @@ func TestStrokeBoundsEmpty(t *testing.T) {
 func TestStrokeBoundsMiterSpike(t *testing.T) {
 	const lw = 4
 
-	miter, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, lw,
-		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+	miter, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, path.StrokeOptions{
+		Width: lw,
+		Cap:   graphics.LineCapButt,
+		Join:  graphics.LineJoinMiter,
+	})
 	if !ok {
 		t.Fatal("no bounds for the triangle")
 	}
@@ -88,8 +111,11 @@ func TestStrokeBoundsMiterSpike(t *testing.T) {
 			miter.LLx, tip)
 	}
 
-	round, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, lw,
-		graphics.LineJoinRound, graphics.DefaultMiterLimit)
+	round, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, path.StrokeOptions{
+		Width: lw,
+		Cap:   graphics.LineCapRound,
+		Join:  graphics.LineJoinRound,
+	})
 	if !ok {
 		t.Fatal("no bounds for the triangle")
 	}
@@ -99,29 +125,66 @@ func TestStrokeBoundsMiterSpike(t *testing.T) {
 }
 
 // TestStrokeBoundsMiterLimit checks that a corner too sharp for the miter
-// limit falls back to a bevel, which reaches no further than half the line
-// width.
+// limit falls back to a bevel, which reaches only to the outer corners of
+// the two segments.
 func TestStrokeBoundsMiterLimit(t *testing.T) {
 	const lw = 4
 
-	got, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, lw,
-		graphics.LineJoinMiter, 2)
+	got, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, path.StrokeOptions{
+		Width:      lw,
+		Cap:        graphics.LineCapButt,
+		Join:       graphics.LineJoinMiter,
+		MiterLimit: 2,
+	})
 	if !ok {
 		t.Fatal("no bounds for the triangle")
 	}
-	if want := -lw / 2.0; math.Abs(got.LLx-want) > 1e-6 {
+	if want := spikeCornerX(lw); math.Abs(got.LLx-want) > 1e-6 {
 		t.Errorf("bounds start at x = %g, want %g: the join has to be bevelled",
 			got.LLx, want)
 	}
 }
 
+// TestStrokeBoundsDashed checks that a dashed stroke allows for a dash ending
+// on a vertex.  At the bevelled sharp corner of [spikeTriangle] the undashed
+// stroke reaches only the outer corners of the two segments, but a round cap
+// on a dash ending there reaches half the line width.
+func TestStrokeBoundsDashed(t *testing.T) {
+	const lw = 4
+
+	for _, dashed := range []bool{false, true} {
+		got, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, true, path.StrokeOptions{
+			Width:      lw,
+			Cap:        graphics.LineCapRound,
+			Join:       graphics.LineJoinMiter,
+			MiterLimit: 2,
+			Dashed:     dashed,
+		})
+		if !ok {
+			t.Fatal("no bounds for the triangle")
+		}
+		want := spikeCornerX(lw)
+		if dashed {
+			want = -lw / 2.0
+		}
+		if math.Abs(got.LLx-want) > 1e-6 {
+			t.Errorf("dashed=%t: bounds start at x = %g, want %g",
+				dashed, got.LLx, want)
+		}
+	}
+}
+
 // TestStrokeBoundsOpenPathHasNoJoinAtEnds checks that the first and last
-// vertex of an open path carry a cap rather than a join.
+// vertex of an open path carry a cap rather than a join: a round cap reaches
+// half the line width, where the miter would reach much further.
 func TestStrokeBoundsOpenPathHasNoJoinAtEnds(t *testing.T) {
 	const lw = 4
 
-	got, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, false, lw,
-		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+	got, ok := strokeBounds([][]vec.Vec2{spikeTriangle}, false, path.StrokeOptions{
+		Width: lw,
+		Cap:   graphics.LineCapRound,
+		Join:  graphics.LineJoinMiter,
+	})
 	if !ok {
 		t.Fatal("no bounds for the path")
 	}
@@ -190,10 +253,13 @@ func TestAppearanceBoundsCoverMiterSpike(t *testing.T) {
 			}
 
 			// only a closed path has a join at the sharp corner; every other
-			// case caps it, and half the line width is all it needs
-			want := -lw/2.0 + 0.01
-			if name == "Polygon" {
+			// case caps it, with a round cap for ink and a butt cap otherwise
+			want := spikeCornerX(lw) + 0.01
+			switch name {
+			case "Polygon":
 				want = tip + 0.01
+			case "Ink":
+				want = -lw/2.0 + 0.01
 			}
 			if rect.LLx > want {
 				t.Errorf("rectangle starts at x = %g, want at most %g", rect.LLx, want)
@@ -204,7 +270,9 @@ func TestAppearanceBoundsCoverMiterSpike(t *testing.T) {
 
 // TestPolygonWithTwoVertices checks that a polygon with only two vertices,
 // which the file may legitimately carry, still gets a rectangle covering its
-// stroke.  Nothing about the path needs three points.
+// stroke.  Nothing about the path needs three points.  The closed path
+// doubles back at both vertices, too sharp a corner for a miter, so the
+// bevelled stroke ends flush with them.
 func TestPolygonWithTwoVertices(t *testing.T) {
 	const lw = 4
 	a := &annotation.Polygon{
@@ -220,7 +288,7 @@ func TestPolygonWithTwoVertices(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := pdf.Rectangle{LLx: 8, LLy: 18, URx: 62, URy: 22}
+	want := pdf.Rectangle{LLx: 10, LLy: 18, URx: 60, URy: 22}
 	if !a.Rect.NearlyEqual(&want, 0.01) {
 		t.Errorf("rect = %v, want %v", a.Rect, want)
 	}
@@ -277,22 +345,41 @@ func TestAppearanceBoundsRoundOutwards(t *testing.T) {
 			Border: &annotation.Border{Width: lw},
 		}
 	}
-	cases := map[string]annotation.Annotation{
-		"Polygon":  &annotation.Polygon{Common: common(), Vertices: verts},
-		"PolyLine": &annotation.PolyLine{Common: common(), Vertices: verts},
-		"Ink":      &annotation.Ink{Common: common(), InkList: [][]vec.Vec2{pts}},
-		"Line":     &annotation.Line{Common: common(), Coords: [4]float64{10, 10, 20, 20}},
+	// the stroke edges which lie half the line width from the path; the butt
+	// caps of the polyline and the line end flush with their end points
+	const lo, hi = 10 - lw/2, 20 + lw/2
+	cases := map[string]struct {
+		a      annotation.Annotation
+		stroke pdf.Rectangle
+	}{
+		"Polygon": {
+			&annotation.Polygon{Common: common(), Vertices: verts},
+			pdf.Rectangle{LLx: lo, LLy: lo, URx: hi, URy: hi},
+		},
+		"PolyLine": {
+			&annotation.PolyLine{Common: common(), Vertices: verts},
+			pdf.Rectangle{LLx: 10, LLy: lo, URx: hi, URy: 20},
+		},
+		"Ink": {
+			&annotation.Ink{Common: common(), InkList: [][]vec.Vec2{pts}},
+			pdf.Rectangle{LLx: lo, LLy: lo, URx: hi, URy: hi},
+		},
+		"Line": {
+			&annotation.Line{Common: common(), Coords: [4]float64{10, 10, 20, 10}},
+			pdf.Rectangle{LLx: 10, LLy: lo, URx: 20, URy: 10 + lw/2},
+		},
 	}
 
-	for name, a := range cases {
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			g := newGen(t, pdf.V2_0)
-			if err := g.AddAppearance(a); err != nil {
+			if err := g.AddAppearance(tc.a); err != nil {
 				t.Fatal(err)
 			}
-			rect := a.GetCommon().Rect
-			if rect.LLx > 10-lw/2 || rect.LLy > 10-lw/2 || rect.URx < 20+lw/2 || rect.URy < 20+lw/2 {
-				t.Errorf("rectangle %v does not hold the stroke", rect)
+			rect := tc.a.GetCommon().Rect
+			if rect.LLx > tc.stroke.LLx || rect.LLy > tc.stroke.LLy ||
+				rect.URx < tc.stroke.URx || rect.URy < tc.stroke.URy {
+				t.Errorf("rectangle %v does not hold the stroke %v", rect, tc.stroke)
 			}
 		})
 	}
@@ -336,8 +423,11 @@ func TestPolyLineMiterAfterRounding(t *testing.T) {
 	}
 
 	drawn := []vec.Vec2{{X: 1, Y: 0}, {X: 0, Y: 0}, {X: pdf.Round(c, 2), Y: pdf.Round(s, 2)}}
-	want, _ := strokeBounds([][]vec.Vec2{drawn}, false, lw,
-		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+	want, _ := strokeBounds([][]vec.Vec2{drawn}, false, path.StrokeOptions{
+		Width: lw,
+		Cap:   graphics.LineCapButt,
+		Join:  graphics.LineJoinMiter,
+	})
 	if want.LLx > -lw {
 		t.Fatalf("test case gives no miter spike: %v", want)
 	}
@@ -353,43 +443,50 @@ func TestPolyLineMiterAfterRounding(t *testing.T) {
 }
 
 // TestVertexRectMatchesGenerator checks that PolygonRect and PolyLineRect
-// give the rectangle the generator derives for the same annotation, and
-// report an annotation with too few vertices.
+// give the rectangle the generator derives for the same annotation, with and
+// without a dash pattern, and report an annotation with too few vertices.
 func TestVertexRectMatchesGenerator(t *testing.T) {
 	verts := []float64{10, 10, 20, 10.004, 10, 12.196}
-	common := func() annotation.Common {
-		return annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: 3},
+	for _, dash := range [][]float64{nil, {3, 2}} {
+		common := func() annotation.Common {
+			return annotation.Common{
+				Color:  color.DeviceRGB{1, 0, 0},
+				Border: &annotation.Border{Width: 3, DashArray: dash},
+			}
 		}
-	}
 
-	pg := &annotation.Polygon{Common: common(), Vertices: verts}
-	want, ok := PolygonRect(pg)
-	if !ok {
-		t.Fatal("PolygonRect found no vertices")
-	}
-	if err := newGen(t, pdf.V2_0).AddAppearance(pg); err != nil {
-		t.Fatal(err)
-	}
-	if pg.Rect != want {
-		t.Errorf("polygon: generator Rect = %v, PolygonRect = %v", pg.Rect, want)
-	}
+		pg := &annotation.Polygon{Common: common(), Vertices: verts}
+		want, ok := PolygonRect(pg)
+		if !ok {
+			t.Fatal("PolygonRect found no vertices")
+		}
+		if err := newGen(t, pdf.V2_0).AddAppearance(pg); err != nil {
+			t.Fatal(err)
+		}
+		if pg.Rect != want {
+			t.Errorf("polygon, dash %v: generator Rect = %v, PolygonRect = %v",
+				dash, pg.Rect, want)
+		}
 
-	pl := &annotation.PolyLine{
-		Common:          common(),
-		Vertices:        verts,
-		LineEndingStyle: [2]annotation.LineEndingStyle{annotation.LineEndingStyleClosedArrow, annotation.LineEndingStyleCircle},
-	}
-	want, ok = PolyLineRect(pl)
-	if !ok {
-		t.Fatal("PolyLineRect found no vertices")
-	}
-	if err := newGen(t, pdf.V2_0).AddAppearance(pl); err != nil {
-		t.Fatal(err)
-	}
-	if pl.Rect != want {
-		t.Errorf("polyline: generator Rect = %v, PolyLineRect = %v", pl.Rect, want)
+		pl := &annotation.PolyLine{
+			Common:   common(),
+			Vertices: verts,
+			LineEndingStyle: [2]annotation.LineEndingStyle{
+				annotation.LineEndingStyleClosedArrow,
+				annotation.LineEndingStyleCircle,
+			},
+		}
+		want, ok = PolyLineRect(pl)
+		if !ok {
+			t.Fatal("PolyLineRect found no vertices")
+		}
+		if err := newGen(t, pdf.V2_0).AddAppearance(pl); err != nil {
+			t.Fatal(err)
+		}
+		if pl.Rect != want {
+			t.Errorf("polyline, dash %v: generator Rect = %v, PolyLineRect = %v",
+				dash, pl.Rect, want)
+		}
 	}
 
 	if _, ok := PolygonRect(&annotation.Polygon{Vertices: []float64{1, 2}}); ok {
@@ -397,5 +494,46 @@ func TestVertexRectMatchesGenerator(t *testing.T) {
 	}
 	if _, ok := PolyLineRect(&annotation.PolyLine{Vertices: []float64{1, 2}}); ok {
 		t.Error("PolyLineRect accepted a single vertex")
+	}
+}
+
+// TestZeroLengthLineRect checks the rectangle of a line and a polyline whose
+// points coincide.  With butt caps the path draws no stroke, and the line
+// endings have no direction to be drawn in, so the rectangle is the zero one
+// which stands for no ink.
+func TestZeroLengthLineRect(t *testing.T) {
+	circle := [2]annotation.LineEndingStyle{
+		annotation.LineEndingStyleCircle, annotation.LineEndingStyleCircle,
+	}
+	common := func() annotation.Common {
+		return annotation.Common{
+			Color:  color.DeviceRGB{1, 0, 0},
+			Border: &annotation.Border{Width: 2},
+		}
+	}
+	cases := map[string]annotation.Annotation{
+		"Line": &annotation.Line{
+			Common:          common(),
+			Coords:          [4]float64{50, 60, 50, 60},
+			LineEndingStyle: circle,
+		},
+		"PolyLine": &annotation.PolyLine{
+			Common:          common(),
+			Vertices:        []float64{50, 60, 50, 60},
+			LineEndingStyle: circle,
+		},
+	}
+
+	for name, a := range cases {
+		t.Run(name, func(t *testing.T) {
+			g := newGen(t, pdf.V2_0)
+			if err := g.AddAppearance(a); err != nil {
+				t.Fatal(err)
+			}
+			rect := a.GetCommon().Rect
+			if !rect.IsZero() {
+				t.Errorf("rectangle %v, want the zero one", rect)
+			}
+		})
 	}
 }

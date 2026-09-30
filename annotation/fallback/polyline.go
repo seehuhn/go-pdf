@@ -17,6 +17,7 @@
 package fallback
 
 import (
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -51,7 +52,7 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 	startLE := normalizeLE(a.LineEndingStyle[0])
 	endLE := normalizeLE(a.LineEndingStyle[1])
 
-	bbox := openPolylineBBox(points, lw, graphics.LineJoinMiter, startLE, endLE)
+	bbox := openPolylineBBox(points, polyLineStroke(lw, len(dashPattern) > 0), startLE, endLE)
 	a.Rect = bbox
 
 	b := g.begin()
@@ -69,11 +70,12 @@ func (g *Generator) addPolyLineAppearance(a *annotation.PolyLine) (*form.Form, e
 
 // PolyLineRect returns the rectangle the fallback appearance of a PolyLine
 // annotation is drawn into: the bounds of the stroke along the vertices,
-// with its miter joins and line endings, rounded outwards to two decimals.
-// The generator sets Rect to this value when it draws the appearance; a
-// caller which edits the vertices or the border width can use it to keep
-// Rect valid until then.  The second result is false if the annotation has
-// fewer than two vertices.
+// with its butt caps, miter joins and line endings, rounded outwards to two
+// decimals.  The generator sets Rect to this value when it draws the
+// appearance; a caller which edits the vertices or the border width can use
+// it to keep Rect valid until then.  Where the stroke draws nothing, as when
+// all vertices coincide, the rectangle is the zero one.  The second result
+// is false if the annotation has fewer than two vertices.
 func PolyLineRect(a *annotation.PolyLine) (pdf.Rectangle, bool) {
 	points := roundPoints(polylineVertices(a))
 	if len(points) < 2 {
@@ -82,7 +84,19 @@ func PolyLineRect(a *annotation.PolyLine) (pdf.Rectangle, bool) {
 	lw := annotation.EffectiveBorderWidth(a)
 	startLE := normalizeLE(a.LineEndingStyle[0])
 	endLE := normalizeLE(a.LineEndingStyle[1])
-	return openPolylineBBox(points, lw, graphics.LineJoinMiter, startLE, endLE), true
+	dashed := len(annotation.EffectiveBorderDash(a)) > 0
+	return openPolylineBBox(points, polyLineStroke(lw, dashed), startLE, endLE), true
+}
+
+// polyLineStroke returns the stroke options a PolyLine annotation is drawn
+// with: butt caps and miter joins, as the graphics state starts out.
+func polyLineStroke(lw float64, dashed bool) path.StrokeOptions {
+	return path.StrokeOptions{
+		Width:  lw,
+		Cap:    graphics.LineCapButt,
+		Join:   graphics.LineJoinMiter,
+		Dashed: dashed,
+	}
 }
 
 // polylineVertices extracts the vertex list from a polyline annotation.

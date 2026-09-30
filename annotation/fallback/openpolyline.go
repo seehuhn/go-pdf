@@ -17,10 +17,10 @@
 package fallback
 
 import (
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
-	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 )
@@ -78,17 +78,18 @@ func drawOpenPolyline(b *builder.Builder, points []vec.Vec2, startLE, endLE anno
 	e1.drawShape(b)
 }
 
-// openPolylineBBox computes a bounding box for an open polyline with the
-// given line width, line join and optional line endings.  With miter joins,
-// which use the default miter limit, a sharp corner reaches beyond the line
-// width.  The points must be the rounded ones the polyline is drawn through;
-// see [roundPoints].
-func openPolylineBBox(points []vec.Vec2, lw float64, join graphics.LineJoinStyle, startLE, endLE annotation.LineEndingStyle) pdf.Rectangle {
-	bbox, ok := strokeBounds([][]vec.Vec2{points}, false, lw,
-		join, graphics.DefaultMiterLimit)
-	if !ok {
-		return pdf.Rectangle{}
-	}
+// openPolylineBBox computes a bounding box for an open polyline stroked
+// with the given options and optional line endings.  With miter joins, a
+// sharp corner reaches beyond the line width.  The points must be the
+// rounded ones the polyline is drawn through; see [roundPoints].  The
+// result is the zero rectangle if nothing is drawn.
+func openPolylineBBox(points []vec.Vec2, opt path.StrokeOptions,
+	startLE, endLE annotation.LineEndingStyle) pdf.Rectangle {
+	lw := opt.Width
+
+	// zero where the stroke draws nothing, which the line endings take as
+	// absent
+	bbox, _ := strokeBounds([][]vec.Vec2{points}, false, opt)
 
 	n := len(points)
 
@@ -108,6 +109,9 @@ func openPolylineBBox(points []vec.Vec2, lw float64, join graphics.LineJoinStyle
 			Dir: points[n-1].Sub(points[n-2]),
 		}
 		lineEndingBBox(&bbox, endLE, info, lw)
+	}
+	if bbox.IsZero() {
+		return bbox // nothing is drawn
 	}
 
 	// the line endings are drawn with two decimals, which can carry them a

@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"seehuhn.de/go/geom/matrix"
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 
 	"seehuhn.de/go/pdf"
@@ -37,7 +38,7 @@ func (g *Generator) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 	dashPattern := annotation.EffectiveBorderDash(a)
 	col := paint(a.Color)
 	geom := newLineGeometry(a)
-	bbox := calculateLineBBox(a, geom, lw)
+	bbox := calculateLineBBox(a, geom, lw, len(dashPattern) > 0)
 
 	// the border width is the thickness of the line itself, and a width of 0
 	// draws a hairline rather than nothing; only a file which names no ink
@@ -67,12 +68,20 @@ func (g *Generator) addLineAppearance(a *annotation.Line) (*form.Form, error) {
 	return g.harvest(b, bbox, a.GetCommon())
 }
 
-// calculateLineBBox calculates the bounding box for the line annotation
-func calculateLineBBox(a *annotation.Line, geom lineGeometry, lw float64) pdf.Rectangle {
+// calculateLineBBox returns the bounds of the line, its leader lines and its
+// line endings, rounded outwards.  The result is the zero rectangle if
+// nothing is drawn.
+func calculateLineBBox(a *annotation.Line, geom lineGeometry, lw float64, dashed bool) pdf.Rectangle {
 	// every piece is a single segment, so it carries caps and no join
 	segments := append([][]vec.Vec2{geom.main}, geom.leaders...)
-	bbox, _ := strokeBounds(segments, false, lw,
-		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+	// zero where the stroke draws nothing, which the line endings take as
+	// absent
+	bbox, _ := strokeBounds(segments, false, path.StrokeOptions{
+		Width:  lw,
+		Cap:    graphics.LineCapButt,
+		Join:   graphics.LineJoinMiter,
+		Dashed: dashed,
+	})
 
 	p1, p2 := geom.main[0], geom.main[1]
 	le0 := normalizeLE(a.LineEndingStyle[0])
@@ -82,6 +91,9 @@ func calculateLineBBox(a *annotation.Line, geom lineGeometry, lw float64) pdf.Re
 	}
 	if le1 != annotation.LineEndingStyleNone {
 		lineEndingBBox(&bbox, le1, lineEndingInfo{At: p2, Dir: p2.Sub(p1)}, lw)
+	}
+	if bbox.IsZero() {
+		return bbox // nothing is drawn
 	}
 
 	// the line endings are drawn with two decimals, which can carry them a

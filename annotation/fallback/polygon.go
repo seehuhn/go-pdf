@@ -17,6 +17,7 @@
 package fallback
 
 import (
+	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -40,7 +41,7 @@ func (g *Generator) addPolygonAppearance(a *annotation.Polygon) (*form.Form, err
 		// a file which leaves Rect out still says where the polygon is, in
 		// its vertices; without a rectangle the appearance would have no
 		// bounding box and could not be written back out
-		bbox = polygonPathBBox(pts, lw)
+		bbox = polygonPathBBox(pts, lw, len(dashPattern) > 0)
 		a.Rect = bbox
 		derived = true
 	}
@@ -113,17 +114,23 @@ func PolygonRect(a *annotation.Polygon) (pdf.Rectangle, bool) {
 	if len(pts) < 2 {
 		return pdf.Rectangle{}, false
 	}
-	return polygonPathBBox(pts, annotation.EffectiveBorderWidth(a)), true
+	return polygonPathBBox(pts, annotation.EffectiveBorderWidth(a),
+		len(annotation.EffectiveBorderDash(a)) > 0), true
 }
 
 // polygonPathBBox is the rectangle bounding the stroke drawn along a
 // polygon's vertices, rounded outwards.  The path is closed, so every vertex
 // carries a miter join, and a sharp corner reaches beyond the border width.
-// The vertices must be the rounded ones the polygon is drawn through; see
-// [roundPoints].
-func polygonPathBBox(verts []vec.Vec2, lw float64) pdf.Rectangle {
-	r, ok := strokeBounds([][]vec.Vec2{verts}, true, lw,
-		graphics.LineJoinMiter, graphics.DefaultMiterLimit)
+// With dashed set, a dash can also end at a vertex with a butt cap, and the
+// bounds hold for any dash pattern and phase.  The vertices must be the
+// rounded ones the polygon is drawn through; see [roundPoints].
+func polygonPathBBox(verts []vec.Vec2, lw float64, dashed bool) pdf.Rectangle {
+	r, ok := strokeBounds([][]vec.Vec2{verts}, true, path.StrokeOptions{
+		Width:  lw,
+		Cap:    graphics.LineCapButt,
+		Join:   graphics.LineJoinMiter,
+		Dashed: dashed,
+	})
 	if !ok {
 		return pdf.Rectangle{}
 	}
