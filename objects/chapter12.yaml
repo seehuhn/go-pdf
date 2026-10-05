@@ -5895,7 +5895,7 @@ types:
   - goName: DefaultAppearance
     pdfKey: DA
     pdfType: byte-string
-    required: false
+    required: true
     introduced: '1.2'
     goType: string
     inheritable: true
@@ -6094,7 +6094,7 @@ types:
     pdfType: dictionary
     required: false
     introduced: '1.3'
-    goType: pdf.Object
+    goType: "*opaque.Object"
     inheritable: true
     refTypes:
     - Signature
@@ -6105,7 +6105,7 @@ types:
     pdfType: dictionary
     required: false
     introduced: '1.3'
-    goType: pdf.Object
+    goType: "*opaque.Object"
     inheritable: true
     refTypes:
     - Signature
@@ -6384,7 +6384,7 @@ types:
     required: false
     introduced: '1.5'
     deprecated: '2.0'
-    goType: pdf.Object
+    goType: "*opaque.Object"
     refTypes:
     - Stream
 - name: Mac

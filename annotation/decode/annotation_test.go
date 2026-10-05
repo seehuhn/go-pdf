@@ -437,7 +437,11 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		// Make sure we can write the annotation, and read it back.
-		roundTripFile(t, pdf.GetVersion(r), annot)
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+		roundTripFile(t, version, annot)
 	})
 }
 

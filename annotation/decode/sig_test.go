@@ -213,3 +213,84 @@ func TestSigSeedValueTimeStampWithoutURL(t *testing.T) {
 		}
 	}
 }
+
+// Malformed array elements are skipped rather than read as empty values, and
+// an array without valid elements reads as absent.
+func TestSigArraysSkipMalformed(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+
+	sv, err := sigSeedValue(c, pdf.Dict{
+		"Reasons":   pdf.Array{pdf.TextString("a"), pdf.Integer(1), pdf.TextString(".")},
+		"SubFilter": pdf.Array{pdf.Integer(1), pdf.Integer(2)},
+		"Cert": pdf.Dict{
+			"Subject":   pdf.Array{pdf.Integer(1), pdf.String("s")},
+			"SubjectDN": pdf.Array{pdf.Dict{"CN": pdf.Integer(1)}, pdf.Integer(2)},
+			"KeyUsage":  pdf.Array{pdf.Name("x")},
+		},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{"a", "."}, sv.Reasons); diff != "" {
+		t.Errorf("Reasons (-want +got):\n%s", diff)
+	}
+	if sv.SubFilter != nil {
+		t.Errorf("SubFilter = %v, want nil", sv.SubFilter)
+	}
+	if diff := cmp.Diff([][]byte{[]byte("s")}, sv.Cert.Subject); diff != "" {
+		t.Errorf("Subject (-want +got):\n%s", diff)
+	}
+	if sv.Cert.SubjectDN != nil {
+		t.Errorf("SubjectDN = %v, want nil", sv.Cert.SubjectDN)
+	}
+	if sv.Cert.KeyUsage != nil {
+		t.Errorf("KeyUsage = %v, want nil", sv.Cert.KeyUsage)
+	}
+}
+
+// The signature policy entries are ignored without a policy OID.
+func TestSigCertPolicyWithoutOID(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+
+	cert, err := sigCertSeedValue(c, pdf.Dict{
+		"SignaturePolicyHashValue":      pdf.String("hash"),
+		"SignaturePolicyHashAlgorithm":  pdf.Name("SHA256"),
+		"SignaturePolicyCommitmentType": pdf.Array{pdf.String("1.2.3")},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cert.SignaturePolicyHashValue != nil || cert.SignaturePolicyHashAlgorithm != "" ||
+		cert.SignaturePolicyCommitmentType != nil {
+		t.Errorf("policy entries kept without OID: %+v", cert)
+	}
+}
+
+// A lock dictionary without a valid Action, or an Include / Exclude lock
+// without Fields, is dropped instead of being repaired.
+func TestSigFieldLockInvalid(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+
+	for _, dict := range []pdf.Dict{
+		{},
+		{"Action": pdf.Name("Bogus")},
+		{"Action": pdf.Name("Include")},
+		{"Action": pdf.Name("Exclude"), "Fields": pdf.Integer(1)},
+	} {
+		lock, err := pdf.DecodeOptional(c, dict, sigFieldLock)
+		if err != nil {
+			t.Errorf("%v: unexpected error %v", dict, err)
+		}
+		if lock != nil {
+			t.Errorf("%v: got %+v, want nil", dict, lock)
+		}
+	}
+
+	lock, err := sigFieldLock(c, pdf.Dict{"Action": pdf.Name("Exclude"), "Fields": pdf.Array{}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lock.Action != acroform.SigFieldLockExclude || lock.Fields != nil {
+		t.Errorf("got %+v, want an Exclude lock without fields", lock)
+	}
+}

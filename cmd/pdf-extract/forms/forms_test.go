@@ -63,6 +63,7 @@ func dump(t *testing.T, form *acroform.InteractiveForm) string {
 
 func textField(name, value string) *acroform.TextField {
 	f := acroform.NewTextField(name)
+	f.DefaultAppearance = "/Helv 0 Tf 0 g"
 	f.V = &pdf.StringOrStream{Value: value}
 	return f
 }
@@ -81,6 +82,7 @@ func TestListValues(t *testing.T) {
 	push.Flags = acroform.FieldPushbutton
 
 	choice := acroform.NewChoiceField("colors")
+	choice.DefaultAppearance = "/Helv 0 Tf 0 g"
 	choice.V = []string{"Red", "Green"}
 
 	sig := acroform.NewSignatureField("signature1")

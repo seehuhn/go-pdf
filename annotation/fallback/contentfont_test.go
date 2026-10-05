@@ -58,6 +58,7 @@ func fontsUsed(t *testing.T, f *form.Form) []font.Instance {
 func textFieldWidget(t *testing.T, value string) *annotation.Widget {
 	t.Helper()
 	f := acroform.NewTextField("t")
+	f.DefaultAppearance = "/Helv 0 Tf 0 g"
 	f.V = &pdf.StringOrStream{Value: value}
 	return annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 120, URy: 20})
 }

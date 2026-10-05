@@ -16,7 +16,10 @@
 
 package acroform
 
-import "seehuhn.de/go/pdf"
+import (
+	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/opaque"
+)
 
 // PDF 2.0 sections: 12.7.5.5
 
@@ -33,13 +36,13 @@ type SignatureField struct {
 	// value as opaque.
 	//
 	// This corresponds to the /V entry in the PDF field dictionary.
-	V pdf.Object
+	V *opaque.Object
 
 	// DV (optional) is the field's default value. The library treats this value
 	// as opaque.
 	//
 	// This corresponds to the /DV entry in the PDF field dictionary.
-	DV pdf.Object
+	DV *opaque.Object
 
 	// Lock (optional) specifies the form fields that are locked when this
 	// signature field is signed.
@@ -64,10 +67,18 @@ func (f *SignatureField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error 
 		return err
 	}
 	if f.V != nil {
-		dict["V"] = f.V
+		v, err := rm.Embed(f.V)
+		if err != nil {
+			return err
+		}
+		dict["V"] = v
 	}
 	if f.DV != nil {
-		dict["DV"] = f.DV
+		dv, err := rm.Embed(f.DV)
+		if err != nil {
+			return err
+		}
+		dict["DV"] = dv
 	}
 	if f.Lock != nil {
 		lock, err := rm.Embed(f.Lock)

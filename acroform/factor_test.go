@@ -79,7 +79,7 @@ func kidDicts(t *testing.T, w *pdf.Writer, group pdf.Dict) []pdf.Dict {
 // hoisted into the group; the children no longer carry them
 func TestFactorHoistUnanimous(t *testing.T) {
 	mk := func(name, da string) *TextField {
-		f := NewTextField(name)
+		f := textField(name)
 		f.DefaultAppearance = da
 		return f
 	}
@@ -114,7 +114,7 @@ func TestFactorHoistUnanimous(t *testing.T) {
 // the document-wide DA shared by all roots is hoisted into the form dictionary
 func TestFactorHoistFormDA(t *testing.T) {
 	mk := func(name string) *TextField {
-		f := NewTextField(name)
+		f := textField(name)
 		f.DefaultAppearance = "/Helv 0 Tf"
 		return f
 	}
@@ -134,7 +134,7 @@ func TestFactorHoistFormDA(t *testing.T) {
 // V and DV are never hoisted, even when every child shares them
 func TestFactorNeverHoistValue(t *testing.T) {
 	mk := func(name string) *TextField {
-		f := NewTextField(name)
+		f := textField(name)
 		f.V = &pdf.StringOrStream{Value: "same"}
 		return f
 	}
@@ -159,11 +159,11 @@ func TestFactorNeverHoistValue(t *testing.T) {
 // an explicit zero flag survives hoisting as an override when a non-zero flag is
 // hoisted into the group
 func TestFactorFlagsOverride(t *testing.T) {
-	a := NewTextField("a")
+	a := textField("a")
 	a.Flags = FieldReadOnly
-	b := NewTextField("b")
+	b := textField("b")
 	b.Flags = FieldReadOnly
-	c := NewTextField("c") // Ff == 0, must keep inheriting 0
+	c := textField("c") // Ff == 0, must keep inheriting 0
 	form := &InteractiveForm{
 		Fields: []Node{
 			&Group{Name: "g", Children: []Node{a, b, c}},
@@ -194,7 +194,7 @@ func TestEncodeEmptyGroup(t *testing.T) {
 func TestEncodeDuplicateNode(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
-	f := NewTextField("f")
+	f := textField("f")
 	form := &InteractiveForm{Fields: []Node{f, f}}
 	if _, err := form.Encode(rm); err == nil {
 		t.Error("expected error for a field used twice, got nil")
@@ -205,8 +205,8 @@ func TestEncodeCalculationOrderNotInTree(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 	form := &InteractiveForm{
-		Fields:           []Node{NewTextField("a")},
-		CalculationOrder: []Field{NewTextField("orphan")},
+		Fields:           []Node{textField("a")},
+		CalculationOrder: []Field{textField("orphan")},
 	}
 	if _, err := form.Encode(rm); err == nil {
 		t.Error("expected error for CO field not in the tree, got nil")

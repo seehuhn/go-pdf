@@ -29,7 +29,25 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/limits"
+	"seehuhn.de/go/pdf/opaque"
 )
+
+// testDA is a default appearance string for test fields.
+const testDA = "/Helv 0 Tf 0 g"
+
+// newTextField returns a new text field with a default appearance.
+func newTextField(name string) *acroform.TextField {
+	f := acroform.NewTextField(name)
+	f.DefaultAppearance = testDA
+	return f
+}
+
+// newChoiceField returns a new choice field with a default appearance.
+func newChoiceField(name string) *acroform.ChoiceField {
+	f := acroform.NewChoiceField(name)
+	f.DefaultAppearance = testDA
+	return f
+}
 
 // withAnnotAA attaches an annotation additional-actions dictionary to a widget.
 func withAnnotAA(w *annotation.Widget, aa *triggers.Annotation) *annotation.Widget {
@@ -43,7 +61,7 @@ func fieldTestCases() []struct {
 	root acroform.Node
 } {
 	tx := func(name string, setup ...func(*acroform.TextField)) *acroform.TextField {
-		f := acroform.NewTextField(name)
+		f := newTextField(name)
 		for _, s := range setup {
 			s(f)
 		}
@@ -57,7 +75,7 @@ func fieldTestCases() []struct {
 		return f
 	}
 	ch := func(name string, setup ...func(*acroform.ChoiceField)) *acroform.ChoiceField {
-		f := acroform.NewChoiceField(name)
+		f := newChoiceField(name)
 		for _, s := range setup {
 			s(f)
 		}
@@ -135,8 +153,8 @@ func fieldTestCases() []struct {
 			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: "event.value = 0;"}}}
 		})},
 		{"group of sub-fields", &acroform.Group{Name: "address", Children: []acroform.Node{
-			acroform.NewTextField("street"),
-			acroform.NewTextField("zip"),
+			newTextField("street"),
+			newTextField("zip"),
 		}}},
 		{"merged widget", func() acroform.Node {
 			f := btn("submitW")
@@ -286,20 +304,29 @@ func TestDecodeFieldNameStripsPeriod(t *testing.T) {
 }
 
 func TestIsWidgetKid(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+	subtypeRef := w.Alloc()
+	if err := w.Put(subtypeRef, pdf.Name("Widget")); err != nil {
+		t.Fatal(err)
+	}
+
 	cases := []struct {
 		name string
 		dict pdf.Dict
 		want bool
 	}{
 		{"plain widget", pdf.Dict{"Subtype": pdf.Name("Widget")}, true},
-		{"merged terminal field", pdf.Dict{"Subtype": pdf.Name("Widget"), "FT": pdf.Name("Tx")}, false},
+		{"unnamed with field type is a widget", pdf.Dict{"Subtype": pdf.Name("Widget"), "FT": pdf.Name("Tx")}, true},
 		{"named is a field", pdf.Dict{"Subtype": pdf.Name("Widget"), "T": pdf.String("x")}, false},
 		{"has kids is a field", pdf.Dict{"Subtype": pdf.Name("Widget"), "Kids": pdf.Array{}}, false},
 		{"no subtype is a field", pdf.Dict{"V": pdf.String("x")}, false},
 		{"other subtype is a field", pdf.Dict{"Subtype": pdf.Name("Link")}, false},
+		{"indirect subtype is resolved", pdf.Dict{"Subtype": subtypeRef}, true},
+		{"null name is absent", pdf.Dict{"Subtype": pdf.Name("Widget"), "T": nil}, true},
 	}
 	for _, tc := range cases {
-		if got := isWidgetKid(tc.dict); got != tc.want {
+		if got := isWidgetKid(c, tc.dict); got != tc.want {
 			t.Errorf("%s: isWidgetKid = %v, want %v", tc.name, got, tc.want)
 		}
 	}
@@ -620,5 +647,224 @@ func TestDecodeChoiceValueNormalises(t *testing.T) {
 				t.Errorf("V mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// An inheritable entry which is null or malformed reads as though it were
+// absent, so the value inherited from the parent stays in effect.
+func TestDecodeFieldInheritanceIgnoresInvalid(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	parentRef := w.Alloc()
+	kidRef := w.Alloc()
+	nullRef := w.Alloc() // never written, so it resolves to null
+	parent := pdf.Dict{
+		"FT":   pdf.Name("Tx"),
+		"T":    pdf.String("p"),
+		"Ff":   pdf.Integer(acroform.FieldRequired),
+		"DA":   pdf.String("/Helv 12 Tf 0 g"),
+		"V":    pdf.String("inherited"),
+		"Q":    pdf.Integer(pdf.TextAlignRight),
+		"Kids": pdf.Array{kidRef},
+	}
+	kid := pdf.Dict{
+		"T":      pdf.String("c"),
+		"Ff":     pdf.Name("bad"),
+		"DA":     pdf.Integer(1),
+		"V":      nullRef,
+		"Q":      nullRef,
+		"Parent": parentRef,
+	}
+	if err := w.Put(parentRef, parent); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(kidRef, kid); err != nil {
+		t.Fatal(err)
+	}
+
+	node, err := decodeRootField(x, parentRef)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	f := node.(*acroform.Group).Children[0].(*acroform.TextField)
+	if f.Flags != acroform.FieldRequired {
+		t.Errorf("Flags = %v, want %v", f.Flags, acroform.FieldRequired)
+	}
+	if f.DefaultAppearance != "/Helv 12 Tf 0 g" {
+		t.Errorf("DA = %q, want the inherited value", f.DefaultAppearance)
+	}
+	if f.V == nil || f.V.Value != "inherited" {
+		t.Errorf("V = %v, want \"inherited\"", f.V)
+	}
+	if f.Align != pdf.TextAlignRight {
+		t.Errorf("Align = %v, want the inherited value", f.Align)
+	}
+}
+
+// A text field value which is neither a string nor a stream is dropped,
+// rather than read as an empty string.
+func TestDecodeTextValueInvalid(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	ref := w.Alloc()
+	nullRef := w.Alloc() // never written, so it resolves to null
+	dict := pdf.Dict{
+		"FT": pdf.Name("Tx"),
+		"T":  pdf.String("f"),
+		"V":  pdf.Integer(42),
+		"DV": nullRef,
+		"RV": pdf.Name("x"),
+	}
+	if err := w.Put(ref, dict); err != nil {
+		t.Fatal(err)
+	}
+
+	node, err := decodeRootField(x, ref)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	f := node.(*acroform.TextField)
+	if f.V != nil || f.DV != nil || f.RichValue != nil {
+		t.Errorf("V, DV, RV = %v, %v, %v, want nil", f.V, f.DV, f.RichValue)
+	}
+}
+
+// The value of a signature field is kept as an opaque signature dictionary,
+// which survives a round trip; any other value is dropped.
+func TestDecodeSignatureValue(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	sigRef := w.Alloc()
+	sigDict := pdf.Dict{
+		"Type":   pdf.Name("Sig"),
+		"Filter": pdf.Name("Adobe.PPKLite"),
+		"Name":   pdf.TextString("A. Signer"),
+	}
+	if err := w.Put(sigRef, sigDict); err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	dict := pdf.Dict{
+		"FT": pdf.Name("Sig"),
+		"T":  pdf.String("s"),
+		"V":  sigRef,
+		"DV": pdf.Integer(1),
+	}
+	if err := w.Put(ref, dict); err != nil {
+		t.Fatal(err)
+	}
+
+	node, err := decodeRootField(x, ref)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	f := node.(*acroform.SignatureField)
+	if f.DV != nil {
+		t.Errorf("DV = %v, want nil", f.DV)
+	}
+	if !f.V.Equal(opaque.Direct(sigDict)) {
+		t.Errorf("V = %v, want the signature dictionary", f.V)
+	}
+
+	// the signature dictionary must be copied into a different output file
+	got := roundTripRoots(t, pdf.V1_7, f)[0].(*acroform.SignatureField)
+	if !got.V.Equal(opaque.Direct(sigDict)) {
+		t.Errorf("round trip V = %v, want the signature dictionary", got.V)
+	}
+}
+
+// A dictionary without a partial name is not a field: at the root it is
+// dropped, and as a kid with the Widget subtype it is a widget of its parent.
+func TestDecodeUnnamedField(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	rootRef := w.Alloc()
+	if err := w.Put(rootRef, pdf.Dict{"FT": pdf.Name("Tx"), "V": pdf.String("x")}); err != nil {
+		t.Fatal(err)
+	}
+	node, err := decodeRootField(x, rootRef)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if node != nil {
+		t.Errorf("unnamed root field decoded as %T, want nil", node)
+	}
+
+	parentRef := w.Alloc()
+	kidRef := w.Alloc()
+	parent := pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("p"), "Kids": pdf.Array{kidRef}}
+	kid := pdf.Dict{
+		"Subtype": pdf.Name("Widget"),
+		"FT":      pdf.Name("Tx"),
+		"Rect":    pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(10), pdf.Integer(10)},
+		"Parent":  parentRef,
+	}
+	if err := w.Put(parentRef, parent); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(kidRef, kid); err != nil {
+		t.Fatal(err)
+	}
+	node, err = decodeRootField(x, parentRef)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	f, ok := node.(*acroform.TextField)
+	if !ok {
+		t.Fatalf("got %T, want *acroform.TextField", node)
+	}
+	if n := len(f.Widgets); n != 1 {
+		t.Errorf("got %d widgets, want 1", n)
+	}
+}
+
+// A text or choice field without a default appearance gets one, and the value
+// of a password field is dropped.
+func TestDecodeFieldRepairs(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	txRef := w.Alloc()
+	tx := pdf.Dict{
+		"FT": pdf.Name("Tx"),
+		"T":  pdf.String("pw"),
+		"Ff": pdf.Integer(acroform.FieldPassword),
+		"V":  pdf.String("secret"),
+		"DV": pdf.String("default"),
+	}
+	chRef := w.Alloc()
+	ch := pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("ch")}
+	if err := w.Put(txRef, tx); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(chRef, ch); err != nil {
+		t.Fatal(err)
+	}
+
+	node, err := decodeRootField(x, txRef)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	f := node.(*acroform.TextField)
+	if f.V != nil {
+		t.Errorf("password V = %v, want nil", f.V)
+	}
+	if f.DV == nil || f.DV.Value != "default" {
+		t.Errorf("password DV = %v, want \"default\"", f.DV)
+	}
+	if f.DefaultAppearance == "" {
+		t.Error("text field without DA was not repaired")
+	}
+
+	node, err = decodeRootField(x, chRef)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if da := node.(*acroform.ChoiceField).DefaultAppearance; da == "" {
+		t.Error("choice field without DA was not repaired")
 	}
 }

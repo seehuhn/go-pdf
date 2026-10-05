@@ -31,6 +31,7 @@ func TestWidgetFieldConsistency(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	f := acroform.NewTextField("f0")
+	f.DefaultAppearance = "/Helv 0 Tf 0 g"
 	wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})
 
 	// break the link: the field no longer lists this widget
@@ -53,6 +54,7 @@ func TestWidgetReservation(t *testing.T) {
 		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(w)
 		f := acroform.NewTextField("f0")
+		f.DefaultAppearance = "/Helv 0 Tf 0 g"
 		wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})
 		if _, err := rm.Store(wid); err != nil {
 			t.Fatal(err)

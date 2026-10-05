@@ -35,6 +35,7 @@ func makeFormPDF(t *testing.T, path, fieldName string) {
 		t.Fatal(err)
 	}
 	f := acroform.NewTextField(fieldName)
+	f.DefaultAppearance = "/Helv 0 Tf 0 g"
 	w := annotation.AddWidget(f, pdf.Rectangle{LLx: 100, LLy: 700, URx: 300, URy: 720})
 	page.Page.AddAnnots(w)
 	form := &acroform.InteractiveForm{Fields: []acroform.Node{f}}

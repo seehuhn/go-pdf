@@ -16,7 +16,11 @@
 
 package acroform
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 12.7.5.4
 
@@ -74,6 +78,9 @@ var _ Field = (*ChoiceField)(nil)
 func (f *ChoiceField) FieldType() pdf.Name { return "Ch" }
 
 func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if f.DefaultAppearance == "" {
+		return errors.New("choice field without a default appearance")
+	}
 	if err := f.VariableText.fillVarTextDict(rm, dict); err != nil {
 		return err
 	}

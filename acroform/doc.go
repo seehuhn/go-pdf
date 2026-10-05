@@ -14,12 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package acroform implements PDF interactive forms (AcroForm), described in
-// the PDF specification chapter 12.7.
-//
-// A document's interactive form is an [InteractiveForm], referenced from the
-// AcroForm entry in the document catalog.  At most one form can be associated
-// with a PDF document.
+// Package acroform implements PDF interactive forms (AcroForm).
+// A PDF document can contain at most one interactive form, referenced from the
+// AcroForm entry in the document catalog. Interactive forms are represented by
+// the [InteractiveForm] type.
 //
 // Internally, the interactive form is structured as a tree. Internal nodes are
 // represented by the [*Group] type, while leaf nodes are represented by four

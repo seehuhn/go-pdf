@@ -28,10 +28,10 @@ import (
 // a group nesting terminal fields with values round-trips, with the field type
 // and value attributes flattened back onto each terminal
 func TestTreeRoundTrip(t *testing.T) {
-	text := acroform.NewTextField("text")
+	text := newTextField("text")
 	text.V = &pdf.StringOrStream{Value: "hello"}
 	text.DefaultAppearance = "/Helv 12 Tf 0 g"
-	other := acroform.NewTextField("note")
+	other := newTextField("note")
 	other.DefaultAppearance = "/Helv 12 Tf 0 g"
 
 	root := &acroform.Group{Name: "request", Children: []acroform.Node{text, other}}

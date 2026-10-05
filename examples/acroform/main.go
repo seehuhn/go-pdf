@@ -250,7 +250,6 @@ func (b *formBuilder) attach(field acroform.Field, rect pdf.Rectangle, mk *appea
 		return nil
 	}
 	w := annotation.AddWidget(field, rect)
-	w.Common.Flags = annotation.FlagPrint
 	w.Style = mk
 	w.BorderStyle = b.border
 	if err := b.appearances.AddAppearance(w); err != nil {

@@ -452,7 +452,7 @@ func writeRawForm(t *testing.T, version pdf.Version, withResources bool) (*pdf.W
 
 // TestExtractFormPre20MissingResources verifies that a pre-2.0 form XObject
 // without a /Resources entry extracts with Res == nil, allowing the renderer
-// to inherit from the page (PDF 2.0 Â§7.8.3 Note 3).
+// to inherit from the page (PDF 2.0 §7.8.3 Note 3).
 func TestExtractFormPre20MissingResources(t *testing.T) {
 	writer, ref := writeRawForm(t, pdf.V1_7, false)
 	x := pdf.NewExtractor(writer)
@@ -477,6 +477,36 @@ func TestExtractForm20MissingResources(t *testing.T) {
 	}
 	if f.Res == nil {
 		t.Errorf("expected non-nil empty Res for 2.0 form without /Resources, got nil")
+	}
+}
+
+// TestExtractForm20NullResources verifies that a 2.0 form XObject whose
+// /Resources entry refers to a null object is normalised to an empty
+// Resources, like a missing entry.
+func TestExtractForm20NullResources(t *testing.T) {
+	writer, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	ref := writer.Alloc()
+	nullRef := writer.Alloc() // never written, so it resolves to null
+	dict := pdf.Dict{
+		"Subtype":   pdf.Name("Form"),
+		"BBox":      &pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
+		"Resources": nullRef,
+	}
+	stm, err := writer.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(writer)
+	f, err := extract.Form(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Res == nil {
+		t.Error("expected non-nil empty Res for 2.0 form with null /Resources, got nil")
 	}
 }
 

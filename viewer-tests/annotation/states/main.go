@@ -162,7 +162,6 @@ func run() error {
 	button.Flags = acroform.FieldPushbutton
 	acro.Fields = append(acro.Fields, button)
 	widget := annotation.AddWidget(button, rect)
-	widget.Common.Flags = annotation.FlagPrint
 	widget.Common.Appearance = states(rect, F)
 	// a highlighting mode other than Push overrides the down appearance
 	// (§12.5.6.19); the default is Invert

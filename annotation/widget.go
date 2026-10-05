@@ -109,16 +109,17 @@ func (w *Widget) ParentField() acroform.Field { return w.Field }
 
 // AddWidget adds a widget annotation for the terminal field f at the given
 // rectangle and returns it. A field may correspond to several widgets, one per
-// place it appears.
+// place where it appears.
 //
-// The caller must add the returned widget to the annotation list of the page
-// it appears on.
+// The widget has [FlagPrint] set and uses [HighlightInvert].  Callers may
+// modify the returned widget, except for its Field.  Once the widget is
+// ready, it must be added to the annotation list of the page it appears on.
 func AddWidget(f acroform.Field, rect pdf.Rectangle) *Widget {
 	w := &Widget{
-		Common:    Common{Rect: rect},
+		Common:    Common{Rect: rect, Flags: FlagPrint},
 		Highlight: HighlightInvert,
+		Field:     f,
 	}
-	w.Field = f
 	c := f.GetCommon()
 	c.Widgets = append(c.Widgets, w)
 	return w

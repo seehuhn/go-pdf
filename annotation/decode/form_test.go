@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // testVersions lists the PDF versions exercised by the round-trip unit tests and
@@ -86,8 +87,8 @@ type nodeSnap struct {
 	AA       *triggers.Form
 	VT       acroform.VariableText
 	V, DV    *pdf.StringOrStream
-	SigV     pdf.Object
-	SigDV    pdf.Object
+	SigV     *opaque.Object
+	SigDV    *opaque.Object
 	MaxLen   int
 	BtnV     pdf.Name
 	BtnDV    pdf.Name
@@ -230,13 +231,13 @@ var formTestCases = []struct {
 	{
 		name: "minimal",
 		form: &acroform.InteractiveForm{
-			Fields: []acroform.Node{acroform.NewTextField("f0")},
+			Fields: []acroform.Node{newTextField("f0")},
 		},
 	},
 	{
 		name: "flags and defaults",
 		form: &acroform.InteractiveForm{
-			Fields:          []acroform.Node{acroform.NewTextField("f0"), acroform.NewTextField("f1")},
+			Fields:          []acroform.Node{newTextField("f0"), newTextField("f1")},
 			NeedAppearances: true,
 			SigFlags:        acroform.SignaturesExist | acroform.AppendOnly,
 		},
@@ -244,8 +245,8 @@ var formTestCases = []struct {
 	{
 		name: "calculation order",
 		form: func() *acroform.InteractiveForm {
-			f0 := acroform.NewTextField("calc0")
-			f1 := acroform.NewTextField("calc1")
+			f0 := newTextField("calc0")
+			f1 := newTextField("calc1")
 			return &acroform.InteractiveForm{
 				Fields:           []acroform.Node{f0, f1},
 				CalculationOrder: []acroform.Field{f1, f0},
@@ -255,14 +256,14 @@ var formTestCases = []struct {
 	{
 		name: "xfa",
 		form: &acroform.InteractiveForm{
-			Fields: []acroform.Node{acroform.NewTextField("f0")},
-			XFA:    pdf.Array{pdf.String("template"), pdf.String("<xdp/>")},
+			Fields: []acroform.Node{newTextField("f0")},
+			XFA:    opaque.Direct(pdf.Array{pdf.String("template"), pdf.String("<xdp/>")}),
 		},
 	},
 	{
 		name: "default resources",
 		form: &acroform.InteractiveForm{
-			Fields:           []acroform.Node{acroform.NewTextField("f0")},
+			Fields:           []acroform.Node{newTextField("f0")},
 			DefaultResources: &content.Resources{SingleUse: true},
 		},
 	},
@@ -272,6 +273,9 @@ func compareForms(t *testing.T, want, got *acroform.InteractiveForm) {
 	t.Helper()
 	if want.NeedAppearances != got.NeedAppearances {
 		t.Errorf("NeedAppearances = %v, want %v", got.NeedAppearances, want.NeedAppearances)
+	}
+	if !want.XFA.Equal(got.XFA) {
+		t.Errorf("XFA = %v, want %v", got.XFA, want.XFA)
 	}
 	if want.SigFlags != got.SigFlags {
 		t.Errorf("SigFlags = %d, want %d", got.SigFlags, want.SigFlags)
@@ -372,7 +376,11 @@ func FuzzFormRoundTrip(f *testing.F) {
 			t.Skip("no interactive form")
 		}
 
-		form2 := roundTripForm(t, pdf.GetVersion(r), form1)
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+		form2 := roundTripForm(t, version, form1)
 		if diff := cmp.Diff(snapNodes(form1.Fields), snapNodes(form2.Fields), fieldCmpOptions()...); diff != "" {
 			t.Errorf("not a fixed point (-first +second):\n%s", diff)
 		}
@@ -414,7 +422,7 @@ func TestFormFixedPoint(t *testing.T) {
 		}
 		// a deeper tree with shared inheritable attributes to hoist
 		mk := func(name, da string) *acroform.TextField {
-			f := acroform.NewTextField(name)
+			f := newTextField(name)
 			f.DefaultAppearance = da
 			f.Align = pdf.TextAlignCenter
 			return f
@@ -440,5 +448,164 @@ func TestFormFixedPoint(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// Undefined SigFlags bits are cleared, and an XFA entry which is neither a
+// stream nor an array is dropped.
+func TestDecodeFormRepairs(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	form, err := Form(pdf.CursorAt(x, nil), pdf.Dict{
+		"Fields":   pdf.Array{},
+		"SigFlags": pdf.Integer(-1),
+		"XFA":      pdf.Integer(1),
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := acroform.SignaturesExist | acroform.AppendOnly; form.SigFlags != want {
+		t.Errorf("SigFlags = %d, want %d", form.SigFlags, want)
+	}
+	if form.XFA != nil {
+		t.Errorf("XFA = %v, want nil", form.XFA)
+	}
+}
+
+// An XFA stream is copied into the output file.
+func TestFormXFAStreamRoundTrip(t *testing.T) {
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref := src.Alloc()
+	stm, err := src.OpenStream(ref, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte("<xdp/>")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	form, err := Form(pdf.CursorAt(pdf.NewExtractor(src), nil), pdf.Dict{
+		"Fields": pdf.Array{},
+		"XFA":    ref,
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if form.XFA == nil {
+		t.Fatal("XFA stream dropped")
+	}
+	form.Fields = []acroform.Node{newTextField("f")}
+
+	got := roundTripForm(t, pdf.V1_7, form)
+	if got.XFA == nil {
+		t.Fatal("XFA lost in round trip")
+	}
+	s, err := opaque.ObjectAs(got.XFA, nil, func(c pdf.Cursor, obj pdf.Object, _ bool) ([]byte, error) {
+		return c.ReadAll(obj, 1<<20)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(s) != "<xdp/>" {
+		t.Errorf("XFA stream = %q, want \"<xdp/>\"", s)
+	}
+}
+
+// Fields sharing a fully qualified name are made to agree: a later field of
+// the same type takes the value of the first, one of a different type is
+// dropped.
+func TestDecodeDuplicateNames(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	dicts := []pdf.Dict{
+		{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("first")},
+		{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("second")},
+		{"FT": pdf.Name("Ch"), "T": pdf.String("a")},
+	}
+	var fields pdf.Array
+	for _, d := range dicts {
+		ref := w.Alloc()
+		if err := w.Put(ref, d); err != nil {
+			t.Fatal(err)
+		}
+		fields = append(fields, ref)
+	}
+
+	form, err := Form(pdf.CursorAt(x, nil), pdf.Dict{"Fields": fields}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(form.Fields); n != 2 {
+		t.Fatalf("got %d fields, want 2", n)
+	}
+	for i, node := range form.Fields {
+		f, ok := node.(*acroform.TextField)
+		if !ok {
+			t.Fatalf("field %d is %T, want *acroform.TextField", i, node)
+		}
+		if f.V == nil || f.V.Value != "first" {
+			t.Errorf("field %d: V = %v, want \"first\"", i, f.V)
+		}
+	}
+
+	// the repaired form can be written
+	roundTripForm(t, pdf.V1_7, form)
+}
+
+// A password field never stores a value, so it cannot agree with a valued
+// field of the same name and is dropped; a valued field following a password
+// field takes the empty value.
+func TestDecodeDuplicateNamesPassword(t *testing.T) {
+	password := pdf.Integer(acroform.FieldPassword)
+	cases := []struct {
+		name  string
+		dicts []pdf.Dict
+		want  int
+	}{
+		{"valued first", []pdf.Dict{
+			{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("first")},
+			{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "Ff": password},
+		}, 1},
+		{"password first", []pdf.Dict{
+			{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "Ff": password},
+			{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("second")},
+		}, 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			x := pdf.NewExtractor(w)
+
+			var fields pdf.Array
+			for _, d := range tc.dicts {
+				ref := w.Alloc()
+				if err := w.Put(ref, d); err != nil {
+					t.Fatal(err)
+				}
+				fields = append(fields, ref)
+			}
+			form, err := Form(pdf.CursorAt(x, nil), pdf.Dict{"Fields": fields}, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n := len(form.Fields); n != tc.want {
+				t.Fatalf("got %d fields, want %d", n, tc.want)
+			}
+			for i, node := range form.Fields {
+				f, ok := node.(*acroform.TextField)
+				if !ok {
+					t.Fatalf("field %d is %T, want *acroform.TextField", i, node)
+				}
+				if f.Flags&acroform.FieldPassword != 0 && f.V != nil {
+					t.Errorf("field %d: password field has value %v", i, f.V)
+				}
+			}
+			roundTripForm(t, pdf.V1_7, form)
+		})
 	}
 }

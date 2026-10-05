@@ -44,6 +44,7 @@ func combWidget(value string, maxLen int, align pdf.TextAlign) *annotation.Widge
 // array asks for.
 func borderlessCombWidget(value string, maxLen int, align pdf.TextAlign) *annotation.Widget {
 	f := acroform.NewTextField("c")
+	f.DefaultAppearance = "/Helv 0 Tf 0 g"
 	f.Flags = acroform.FieldComb
 	f.MaxLen = maxLen
 	f.Align = align
@@ -195,6 +196,7 @@ func TestWidgetTransparentChrome(t *testing.T) {
 			switch shape {
 			case "text":
 				f := acroform.NewTextField("t")
+				f.DefaultAppearance = "/Helv 0 Tf 0 g"
 				w = annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 62, URy: 20})
 			case "radio":
 				w = toggleWidget(t, "Off", "On", true)

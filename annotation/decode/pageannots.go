@@ -21,17 +21,12 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 )
 
-// PageAnnotations reads a page's /Annots array, applying the repairs that
-// need the whole page rather than a single annotation:
-//
-//   - An IRT entry whose target is not an annotation on the same page is
-//     cleared.  Table 172 requires both annotations to be on the same page,
-//     and a reply whose parent is missing would be an annotation no renderer
-//     draws and no comment thread accounts for; clearing the entry makes it
-//     an ordinary annotation instead.
-//   - If the page carries widget annotations, the document's interactive
-//     form is read as well, which links each widget to its form field
-//     ([annotation.Widget.Field]).
+// PageAnnotations reads a page's /Annots array, applying the repair that
+// needs the whole page rather than a single annotation: an IRT entry whose
+// target is not an annotation on the same page is cleared.  Table 172 requires
+// both annotations to be on the same page, and a reply whose parent is missing
+// would be an annotation no renderer draws and no comment thread accounts for;
+// clearing the entry makes it an ordinary annotation instead.
 //
 // Array entries that are not indirect references are skipped, as are entries
 // that fail to decode.  The two slices are aligned: refs[i] is the reference
@@ -70,28 +65,12 @@ func PageAnnotations(c pdf.Cursor, obj pdf.Object) (refs []pdf.Reference, annots
 	}
 
 	// clear InReplyTo entries whose target is not on this page (table 172)
-	hasWidget := false
 	for _, a := range annots {
-		if _, ok := a.(*annotation.Widget); ok {
-			hasWidget = true
-		}
 		if m, ok := a.(annotation.MarkupAnnotation); ok {
 			markup := m.GetMarkup()
 			if markup.InReplyTo != 0 && !pageRefs[markup.InReplyTo] {
 				markup.InReplyTo = 0
 			}
-		}
-	}
-
-	// A widget annotation belongs to a form field.  Reading the interactive
-	// form links each widget to its field (annotation.Widget.Field); the
-	// page's widgets are already cached, so the form's top-down walk links
-	// them via cache hits without a cycle.  DecodeExclusive single-flights
-	// so concurrent page decodes share one field tree.  Errors are non-fatal:
-	// a malformed form must not break page decoding.
-	if hasWidget {
-		if m := c.Getter().GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
-			_, _ = pdf.DecodeExclusive(pdf.CursorAt(c.Extractor(), nil), m.Catalog.AcroForm, Form)
 		}
 	}
 

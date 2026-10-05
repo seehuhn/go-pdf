@@ -34,28 +34,30 @@ func sigFieldLock(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.SigFieldLock,
 
 	lock := &acroform.SigFieldLock{}
 
-	// Action; snap an unrecognised value to a safe default so the result stays
-	// writable
+	// Action and, for Include / Exclude, Fields are required; there is no
+	// repair which would not invent the set of locked fields, so a lock
+	// without them is dropped
 	action, err := pdf.Optional(c.Name(dict["Action"]))
 	if err != nil {
 		return nil, err
 	}
-	switch acroform.SigFieldLockAction(action) {
-	case acroform.SigFieldLockInclude:
-		lock.Action = acroform.SigFieldLockInclude
-	case acroform.SigFieldLockExclude:
-		lock.Action = acroform.SigFieldLockExclude
-	default:
-		lock.Action = acroform.SigFieldLockAll
-	}
-
-	// Fields applies only to Include / Exclude
-	if lock.Action != acroform.SigFieldLockAll {
-		if fields, err := readTextStringArray(c, dict["Fields"]); err != nil {
+	switch a := acroform.SigFieldLockAction(action); a {
+	case acroform.SigFieldLockAll:
+		lock.Action = a
+	case acroform.SigFieldLockInclude, acroform.SigFieldLockExclude:
+		lock.Action = a
+		fieldsObj, err := pdf.Optional(c.Resolve(dict["Fields"]))
+		if err != nil {
 			return nil, err
-		} else {
-			lock.Fields = fields
 		}
+		if _, ok := fieldsObj.(pdf.Array); !ok {
+			return nil, pdf.Error("missing signature field lock Fields entry")
+		}
+		if lock.Fields, err = readTextStringArray(c, fieldsObj); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, pdf.Error("invalid signature field lock Action entry")
 	}
 
 	if p, err := pdf.Optional(c.Integer(dict["P"])); err != nil {
@@ -231,100 +233,94 @@ func sigCertSeedValue(c pdf.Cursor, obj pdf.Object, isDirect bool) (*acroform.Si
 		return nil, err
 	}
 
+	// without a policy OID the other policy entries are to be ignored
+	if cert.SignaturePolicyOID == "" {
+		cert.SignaturePolicyHashValue = nil
+		cert.SignaturePolicyHashAlgorithm = ""
+		cert.SignaturePolicyCommitmentType = nil
+	}
+
 	return cert, nil
 }
 
 // readSubjectDN reads the /SubjectDN array of attribute dictionaries.
+// Attributes whose value is not a text string are dropped, as are dictionaries
+// left without attributes.
 func readSubjectDN(c pdf.Cursor, obj pdf.Object) ([]map[pdf.Name]string, error) {
-	arr, err := pdf.Optional(c.Array(obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]map[pdf.Name]string, 0, len(arr))
-	for _, el := range arr {
-		d, err := pdf.Optional(c.Dict(el))
+	return readArray(c, obj, func(el pdf.Object) (map[pdf.Name]string, error) {
+		d, err := c.Dict(el)
 		if err != nil {
 			return nil, err
 		}
-		if len(d) == 0 {
-			continue
-		}
 		attrs := make(map[pdf.Name]string, len(d))
 		for k, v := range d {
-			if s, err := pdf.Optional(c.TextString(v)); err != nil {
+			s, err := c.TextString(v)
+			if pdf.IsMalformed(err) {
+				continue
+			} else if err != nil {
 				return nil, err
-			} else {
-				attrs[k] = string(s)
 			}
+			attrs[k] = string(s)
 		}
-		out = append(out, attrs)
+		if len(attrs) == 0 {
+			return nil, pdf.Error("empty SubjectDN attribute dictionary")
+		}
+		return attrs, nil
+	})
+}
+
+// readArray reads an array whose elements are decoded by decode.  Elements
+// which are malformed are skipped.  The result is nil if obj is absent or not
+// an array, or if no element survives.
+func readArray[T any](c pdf.Cursor, obj pdf.Object, decode func(pdf.Object) (T, error)) ([]T, error) {
+	arr, err := pdf.Optional(c.Array(obj))
+	if err != nil {
+		return nil, err
+	}
+	var out []T
+	for _, el := range arr {
+		v, err := decode(el)
+		if pdf.IsMalformed(err) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
 	}
 	return out, nil
 }
 
-// shared array read helpers for the signature lock and seed value
-// dictionaries. each reader skips malformed elements.
-
+// readNameArray reads an array of names, skipping malformed and empty names.
 func readNameArray(c pdf.Cursor, obj pdf.Object) ([]pdf.Name, error) {
-	arr, err := pdf.Optional(c.Array(obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]pdf.Name, 0, len(arr))
-	for _, el := range arr {
-		if name, err := pdf.Optional(c.Name(el)); err != nil {
-			return nil, err
-		} else if name != "" {
-			out = append(out, name)
+	return readArray(c, obj, func(el pdf.Object) (pdf.Name, error) {
+		name, err := c.Name(el)
+		if err == nil && name == "" {
+			err = pdf.Error("empty name")
 		}
-	}
-	return out, nil
+		return name, err
+	})
 }
 
+// readTextStringArray reads an array of text strings.
 func readTextStringArray(c pdf.Cursor, obj pdf.Object) ([]string, error) {
-	arr, err := pdf.Optional(c.Array(obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]string, 0, len(arr))
-	for _, el := range arr {
-		if s, err := pdf.Optional(c.TextString(el)); err != nil {
-			return nil, err
-		} else {
-			out = append(out, string(s))
-		}
-	}
-	return out, nil
+	return readArray(c, obj, func(el pdf.Object) (string, error) {
+		s, err := c.TextString(el)
+		return string(s), err
+	})
 }
 
+// readASCIIStringArray reads an array of ASCII strings.
 func readASCIIStringArray(c pdf.Cursor, obj pdf.Object) ([]string, error) {
-	arr, err := pdf.Optional(c.Array(obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([]string, 0, len(arr))
-	for _, el := range arr {
-		if s, err := pdf.Optional(c.String(el)); err != nil {
-			return nil, err
-		} else {
-			out = append(out, string(s))
-		}
-	}
-	return out, nil
+	return readArray(c, obj, func(el pdf.Object) (string, error) {
+		s, err := c.String(el)
+		return string(s), err
+	})
 }
 
+// readByteStringArray reads an array of byte strings.
 func readByteStringArray(c pdf.Cursor, obj pdf.Object) ([][]byte, error) {
-	arr, err := pdf.Optional(c.Array(obj))
-	if err != nil || len(arr) == 0 {
-		return nil, err
-	}
-	out := make([][]byte, 0, len(arr))
-	for _, el := range arr {
-		if s, err := pdf.Optional(c.String(el)); err != nil {
-			return nil, err
-		} else {
-			out = append(out, []byte(s))
-		}
-	}
-	return out, nil
+	return readArray(c, obj, func(el pdf.Object) ([]byte, error) {
+		s, err := c.String(el)
+		return []byte(s), err
+	})
 }

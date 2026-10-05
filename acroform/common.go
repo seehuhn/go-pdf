@@ -22,8 +22,10 @@ import (
 
 // Common holds the attributes shared by all terminal field types.
 type Common struct {
-	// Name (optional) is the partial field name.  If Name is empty, the field
-	// does not contribute to fully qualified field names.
+	// Name is the partial field name.  It must be non-empty and must not
+	// contain a period.  Fields with the same fully qualified name are
+	// representations of one field, and must have the same type, value and
+	// default value.
 	//
 	// This corresponds to the /T entry in the PDF field dictionary.
 	Name string

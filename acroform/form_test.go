@@ -21,15 +21,31 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/opaque"
 )
 
-func textField(name string) *TextField { return NewTextField(name) }
+// testDA is a default appearance string for test fields.
+const testDA = "/Helv 0 Tf 0 g"
+
+// textField returns a new text field with a default appearance.
+func textField(name string) *TextField {
+	f := NewTextField(name)
+	f.DefaultAppearance = testDA
+	return f
+}
+
+// choiceField returns a new choice field with a default appearance.
+func choiceField(name string) *ChoiceField {
+	f := NewChoiceField(name)
+	f.DefaultAppearance = testDA
+	return f
+}
 
 func TestEncodeInvalidAlign(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	f := NewTextField("f")
+	f := textField("f")
 	f.Align = pdf.TextAlign(99)
 	form := &InteractiveForm{Fields: []Node{f}}
 
@@ -45,7 +61,7 @@ func TestEncodeVersionGating(t *testing.T) {
 
 	form := &InteractiveForm{
 		Fields: []Node{textField("f")},
-		XFA:    pdf.Array{pdf.String("x")},
+		XFA:    opaque.Direct(pdf.Array{pdf.String("x")}),
 	}
 
 	_, err := form.Encode(rm)
@@ -57,12 +73,25 @@ func TestEncodeVersionGating(t *testing.T) {
 func TestEncodeXFAStreamForm(t *testing.T) {
 	// the XFA stream form is valid from PDF 1.5, whereas the array form
 	// requires PDF 1.6, so a non-array XFA value must encode at PDF 1.5.
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
+	ref := src.Alloc()
+	stm, err := src.OpenStream(ref, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte("<xdp/>")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
 	rm := pdf.NewResourceManager(w)
 
 	form := &InteractiveForm{
 		Fields: []Node{textField("f")},
-		XFA:    rm.Out.Alloc(), // reference to a stream
+		XFA:    opaque.Extract(pdf.NewExtractor(src), ref),
 	}
 
 	if _, err := form.Encode(rm); err != nil {
@@ -95,7 +124,7 @@ func TestEncodeVersionGatingEntries(t *testing.T) {
 		{"XFA array requires 1.6", pdf.V1_5, func(rm *pdf.ResourceManager) *InteractiveForm {
 			return &InteractiveForm{
 				Fields: []Node{textField("f")},
-				XFA:    pdf.Array{pdf.String("template"), pdf.String("<xdp/>")},
+				XFA:    opaque.Direct(pdf.Array{pdf.String("template"), pdf.String("<xdp/>")}),
 			}
 		}},
 	}

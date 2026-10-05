@@ -87,12 +87,14 @@ func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 		"FT": f.FieldType(),
 	}
 
-	if b.Name != "" {
-		if strings.Contains(b.Name, ".") {
-			return nil, errors.New("field partial name must not contain a period")
-		}
-		dict["T"] = pdf.TextString(b.Name)
+	// a dictionary without /T is a widget annotation, not a field
+	if b.Name == "" {
+		return nil, errors.New("terminal field without a partial name")
 	}
+	if strings.Contains(b.Name, ".") {
+		return nil, errors.New("field partial name must not contain a period")
+	}
+	dict["T"] = pdf.TextString(b.Name)
 	if b.AltName != "" {
 		if err := pdf.CheckVersion(rm.Out, "field TU entry", pdf.V1_3); err != nil {
 			return nil, err

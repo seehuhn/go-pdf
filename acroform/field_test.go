@@ -47,13 +47,13 @@ func TestButtonFieldVariant(t *testing.T) {
 }
 
 func TestAllFields(t *testing.T) {
-	leaf := NewTextField("ZipCode")
+	leaf := textField("ZipCode")
 	form := &InteractiveForm{
 		Fields: []Node{
 			&Group{Name: "PersonalData", Children: []Node{
 				&Group{Name: "Address", Children: []Node{leaf}},
 				// an anonymous group contributes no name component
-				&Group{Children: []Node{NewTextField("Phone")}},
+				&Group{Children: []Node{textField("Phone")}},
 			}},
 		},
 	}
@@ -75,7 +75,7 @@ func TestEncodeFieldNameWithPeriod(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	field := NewTextField("a.b")
+	field := textField("a.b")
 	if _, err := terminalEntries(rm, field); err == nil {
 		t.Error("expected error for partial name containing a period, got nil")
 	}
@@ -83,7 +83,7 @@ func TestEncodeFieldNameWithPeriod(t *testing.T) {
 
 func TestEncodeFieldVersionGating(t *testing.T) {
 	tx := func(setup func(*TextField)) *TextField {
-		f := NewTextField("x")
+		f := textField("x")
 		setup(f)
 		return f
 	}
@@ -92,7 +92,7 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		version pdf.Version
 		field   Field
 	}{
-		{"field requires 1.2", pdf.V1_1, NewTextField("x")},
+		{"field requires 1.2", pdf.V1_1, textField("x")},
 		{"TU requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.AltName = "label" })},
 		{"TM requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.ExportName = "map" })},
 		{"AA requires 1.3", pdf.V1_2, tx(func(f *TextField) {
@@ -108,7 +108,7 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		{"DoNotSpellCheck flag requires 1.4", pdf.V1_3, tx(func(f *TextField) { f.Flags = FieldDoNotSpellCheck })},
 		{"DoNotScroll flag requires 1.4", pdf.V1_3, tx(func(f *TextField) { f.Flags = FieldDoNotScroll })},
 		{"MultiSelect flag requires 1.4", pdf.V1_3, func() Field {
-			f := NewChoiceField("x")
+			f := choiceField("x")
 			f.Flags = FieldMultiSelect
 			return f
 		}()},
@@ -120,7 +120,7 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 			return f
 		}()},
 		{"CommitOnSelChange flag requires 1.5", pdf.V1_4, func() Field {
-			f := NewChoiceField("x")
+			f := choiceField("x")
 			f.Flags = FieldCommitOnSelChange
 			return f
 		}()},
@@ -144,7 +144,7 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		{"FileSelect flag at 1.4", pdf.V1_4, tx(func(f *TextField) { f.Flags = FieldFileSelect })},
 		{"Comb flag at 1.5", pdf.V1_5, tx(func(f *TextField) { f.Flags = FieldComb; f.MaxLen = 6 })},
 		{"CommitOnSelChange flag at 1.5", pdf.V1_5, func() Field {
-			f := NewChoiceField("x")
+			f := choiceField("x")
 			f.Flags = FieldCommitOnSelChange
 			return f
 		}()},
@@ -162,7 +162,7 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 
 func TestEncodeCombValidation(t *testing.T) {
 	comb := func(extra FieldFlags, maxLen int) *TextField {
-		f := NewTextField("x")
+		f := textField("x")
 		f.Flags = FieldComb | extra
 		f.MaxLen = maxLen
 		return f
@@ -183,6 +183,82 @@ func TestEncodeCombValidation(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 			_, err := terminalEntries(rm, tc.field)
+			if tc.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestEncodeFieldValidation(t *testing.T) {
+	password := func(v, dv *pdf.StringOrStream) *TextField {
+		f := textField("pw")
+		f.Flags = FieldPassword
+		f.V, f.DV = v, dv
+		return f
+	}
+	value := &pdf.StringOrStream{Value: "secret"}
+	richPassword := password(nil, nil)
+	richPassword.RichValue = value
+	tests := []struct {
+		name    string
+		field   Field
+		wantErr bool
+	}{
+		{"text field", textField("x"), false},
+		{"unnamed field", textField(""), true},
+		{"text field without DA", NewTextField("x"), true},
+		{"choice field without DA", NewChoiceField("x"), true},
+		{"button field without DA", NewButtonField("x"), false},
+		{"password without value", password(nil, nil), false},
+		{"password with default value", password(nil, value), false},
+		{"password with value", password(value, nil), true},
+		{"password with rich value", richPassword, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+			_, err := terminalEntries(rm, tc.field)
+			if tc.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// Fields sharing a fully qualified name must agree on type and value.
+func TestEncodeDuplicateNames(t *testing.T) {
+	text := func(v string) *TextField {
+		f := textField("b")
+		f.V = &pdf.StringOrStream{Value: v}
+		return f
+	}
+	tests := []struct {
+		name    string
+		a, b    Field
+		wantErr bool
+	}{
+		{"same value", text("x"), text("x"), false},
+		{"different value", text("x"), text("y"), true},
+		{"different type", text("x"), choiceField("b"), true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+			form := &InteractiveForm{Fields: []Node{
+				&Group{Name: "a", Children: []Node{tc.a}},
+				// an unnamed group contributes nothing to the name
+				&Group{Children: []Node{&Group{Name: "a", Children: []Node{tc.b}}}},
+			}}
+			_, err := form.Encode(rm)
 			if tc.wantErr && err == nil {
 				t.Error("expected error, got nil")
 			}

@@ -28,12 +28,14 @@ import (
 // from a text value: the default appearance, justification, and rich-text
 // attributes. Terminal field types embed it.
 type VariableText struct {
-	// DefaultAppearance (optional) is the default appearance string used in
-	// formatting the field's variable text. It is a content stream fragment
-	// establishing the text font, size, and colour; at a minimum it sets the
-	// font and size with a Tf operator. A font size of zero requests automatic
-	// sizing. An empty value indicates that the field has no default appearance
-	// string.
+	// DefaultAppearance is the default appearance string used in formatting
+	// the field's variable text. It is a content stream fragment establishing
+	// the text font, size, and colour; at a minimum it sets the font and size
+	// with a Tf operator, which must name a font in the form's default
+	// resources. A font size of zero requests automatic sizing.
+	//
+	// Text and choice fields require a default appearance string. For button
+	// fields it is optional, and an empty value omits it.
 	//
 	// This corresponds to the /DA entry.
 	DefaultAppearance string

@@ -28,21 +28,50 @@ import (
 
 // Annotation reads an annotation from a PDF file.
 //
+// A widget annotation belongs to a form field.  Before a widget is decoded,
+// the document's interactive form is read, which links the widget to its
+// field ([annotation.Widget.Field]) and makes the form's view of a field
+// merged with its widget the one every reader sees.  Errors in the form are
+// not reported; a malformed form must not break annotation decoding.
+//
 // Always invoke this via [pdf.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
-func Annotation(c pdf.Cursor, obj pdf.Object, _ bool) (annotation.Annotation, error) {
+func Annotation(c pdf.Cursor, obj pdf.Object, isDirect bool) (annotation.Annotation, error) {
 	dict, err := c.DictTyped(obj, "Annot")
 	if err != nil {
 		return nil, err
 	}
 
-	a, err := decodeAnnotation(c, dict)
+	// A direct dictionary has no reference of its own: p.Ref names the
+	// enclosing object, which must not be re-decoded as an annotation.
+	p := c.Path()
+	if p == nil || isDirect || !isWidgetSubtype(c, dict) {
+		return annotationBody(c, dict, isDirect)
+	}
+
+	// The form's walk reads its widgets through annotationBody, never through
+	// this function, so decoding the form here cannot re-enter it.
+	// DecodeExclusive single-flights the form, so concurrent decoders share
+	// one field tree.
+	if m := c.Getter().GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
+		_, _ = pdf.DecodeExclusive(pdf.CursorAt(c.Extractor(), nil), m.Catalog.AcroForm, Form)
+	}
+
+	// If the form claimed this widget, this is a cache hit and returns the
+	// form's widget; otherwise the widget is an orphan and is decoded here.
+	// The path is rewound by one step, since p.Ref is the object being decoded.
+	return pdf.Decode(pdf.CursorAt(c.Extractor(), p.Parent), p.Ref, annotationBody)
+}
+
+// annotationBody decodes an annotation dictionary without first reading the
+// interactive form.  It has the same result type as [Annotation], so the two
+// share one cache entry per reference.
+func annotationBody(c pdf.Cursor, obj pdf.Object, _ bool) (annotation.Annotation, error) {
+	dict, err := c.DictTyped(obj, "Annot")
 	if err != nil {
 		return nil, err
 	}
-	repairMissingAppearance(a, pdf.GetVersion(c.Getter()))
-	repairMissingAppearanceState(c, a, dict)
-	return a, nil
+	return decodeAnnotation(c, dict)
 }
 
 // repairMissingAppearance supplies an empty appearance for an annotation which
@@ -162,11 +191,23 @@ func decodeAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error
 	// return the widget half, so the page's /Annots and the field tree's /Kids
 	// share one object. The field's inheritable attributes are flattened against
 	// the context reconstructed from its /Parent chain, matching the field tree.
-	if p := c.Path(); p != nil && isMergedFieldDict(dict) {
-		_, w, err := decodeMergedField(c, p.Ref, dict, inheritedFromChain(c, dict))
+	if p := c.Path(); p != nil && isMergedFieldDict(c, dict) {
+		_, w, err := decodeMergedField(c, p.Ref, dict, inheritedFromChain(c, dict), nil)
 		return w, err
 	}
 
+	a, err := decodeBySubtype(c, dict)
+	if err != nil {
+		return nil, err
+	}
+	repairMissingAppearance(a, pdf.GetVersion(c.Getter()))
+	repairMissingAppearanceState(c, a, dict)
+	return a, nil
+}
+
+// decodeBySubtype decodes an annotation which is not a merged field according
+// to its Subtype entry.
+func decodeBySubtype(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error) {
 	subtype, err := c.Name(dict["Subtype"])
 	if err != nil {
 		return nil, err

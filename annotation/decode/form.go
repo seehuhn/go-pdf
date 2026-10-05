@@ -19,9 +19,12 @@
 package decode
 
 import (
+	"slices"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/graphics/extract"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // Form reads an interactive form dictionary from a PDF file. The obj argument
@@ -68,7 +71,8 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.InteractiveForm, erro
 	if sf, err := pdf.Optional(c.Integer(dict["SigFlags"])); err != nil {
 		return nil, err
 	} else {
-		form.SigFlags = acroform.SignatureFlags(sf)
+		// bits not defined by the spec are cleared
+		form.SigFlags = acroform.SignatureFlags(sf) & (acroform.SignaturesExist | acroform.AppendOnly)
 	}
 
 	// CO (optional); each entry resolves to a field already in the tree, so the
@@ -88,8 +92,19 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.InteractiveForm, erro
 		}
 	}
 
-	// XFA (optional)
-	form.XFA = dict["XFA"]
+	// XFA (optional); either a stream or an array of packets
+	if xfa, err := pdf.Optional(c.Resolve(dict["XFA"])); err != nil {
+		return nil, err
+	} else {
+		switch xfa.(type) {
+		case *pdf.Stream:
+			// streams are indirect: keep the reference for the copier
+			form.XFA = opaque.Extract(c.Extractor(), dict["XFA"])
+		case pdf.Array:
+			// keep the array itself, so that the writer sees its type
+			form.XFA = opaque.Extract(c.Extractor(), xfa)
+		}
+	}
 
 	return form, nil
 }
@@ -113,4 +128,49 @@ func decodeCalculationOrder(c pdf.Cursor, obj pdf.Object, d *fieldTreeDecoder) (
 		}
 	}
 	return co, nil
+}
+
+// copyValue sets the value and default value of dst to those of src.  It
+// returns false, leaving dst unchanged, if the fields differ in type, or if
+// dst is a password field and src has a value: a password field never stores
+// a value, so the two cannot be made to agree.
+func copyValue(dst, src acroform.Field) bool {
+	switch dst := dst.(type) {
+	case *acroform.TextField:
+		src, ok := src.(*acroform.TextField)
+		if !ok || dst.Flags&acroform.FieldPassword != 0 && src.V != nil {
+			return false
+		}
+		dst.V, dst.DV = cloneText(src.V), cloneText(src.DV)
+	case *acroform.ButtonField:
+		src, ok := src.(*acroform.ButtonField)
+		if !ok {
+			return false
+		}
+		dst.V, dst.DV = src.V, src.DV
+	case *acroform.ChoiceField:
+		src, ok := src.(*acroform.ChoiceField)
+		if !ok {
+			return false
+		}
+		dst.V, dst.DV = slices.Clone(src.V), slices.Clone(src.DV)
+	case *acroform.SignatureField:
+		src, ok := src.(*acroform.SignatureField)
+		if !ok {
+			return false
+		}
+		dst.V, dst.DV = src.V, src.DV
+	default:
+		return false
+	}
+	return true
+}
+
+// cloneText returns a copy of a text value.
+func cloneText(v *pdf.StringOrStream) *pdf.StringOrStream {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }

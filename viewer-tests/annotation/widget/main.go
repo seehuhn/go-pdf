@@ -231,7 +231,6 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 		// The form is stored (see createDocument) before the page is closed, so
 		// the merge is in place when the page writes the widget.
 		widget := annotation.AddWidget(f, rect)
-		widget.Common.Flags = annotation.FlagPrint
 		widget.Style = mk
 		widget.BorderStyle = bs
 
@@ -252,6 +251,12 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 		}
 
 		wr.page.Page.AddAnnots(widget)
+	}
+
+	// a password field's value must not be stored in the file; the generated
+	// appearance above still shows it masked
+	if tx, ok := f.(*acroform.TextField); ok && tx.Flags&acroform.FieldPassword != 0 {
+		tx.V = nil
 	}
 	return nil
 }
@@ -282,6 +287,8 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		tx.DefaultAppearance = defaultDA
 		tx.Align = d.align
 		tx.MaxLen = d.maxLen
+		// for a password field the value feeds the appearance only and is
+		// cleared below, after the widgets are made
 		if d.value != "" {
 			tx.V = &pdf.StringOrStream{Value: d.value}
 		}

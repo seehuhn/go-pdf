@@ -33,7 +33,12 @@ type TextField struct {
 
 	VariableText
 
-	// V (optional) is the field's text value.
+	// V (optional) is the field's text value.  The value of a field with the
+	// [FieldPassword] flag set must not be stored in the file, so V and
+	// RichValue must be nil for such a field when the form is written, and
+	// are nil when such a field is read.  To generate a masked appearance
+	// for a password field, set V, add the appearances, and clear V again
+	// before the form is written.
 	//
 	// This corresponds to the /V entry in the PDF field dictionary.
 	V *pdf.StringOrStream
@@ -58,8 +63,15 @@ var _ Field = (*TextField)(nil)
 func (f *TextField) FieldType() pdf.Name { return "Tx" }
 
 func (f *TextField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if f.DefaultAppearance == "" {
+		return errors.New("text field without a default appearance")
+	}
 	if err := f.VariableText.fillVarTextDict(rm, dict); err != nil {
 		return err
+	}
+	// the value of a password field must never be stored in the file
+	if f.Flags&FieldPassword != 0 && (f.V != nil || f.RichValue != nil) {
+		return errors.New("password field must not have a value")
 	}
 	if f.V != nil {
 		obj, err := rm.Embed(*f.V)
@@ -79,7 +91,7 @@ func (f *TextField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	// Multiline, Password or FileSelect flags
 	if f.Flags&FieldComb != 0 {
 		if f.Flags&(FieldMultiline|FieldPassword|FieldFileSelect) != 0 {
-			return errors.New("Comb flag conflicts with Multiline, Password or FileSelect")
+			return errors.New("comb flag conflicts with Multiline, Password or FileSelect")
 		}
 		if f.MaxLen <= 0 {
 			return errors.New("text field with Comb flag requires MaxLen")

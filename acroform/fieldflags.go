@@ -48,7 +48,8 @@ const (
 	FieldMultiline FieldFlags = 1 << 12
 
 	// FieldPassword indicates that the field is intended for secure password
-	// entry; its value should not be echoed visibly or stored in cleartext.
+	// entry; its value is not echoed visibly.  The value (V and RV) of such a
+	// field is never stored in the file; the default value (DV) may be.
 	FieldPassword FieldFlags = 1 << 13
 
 	// FieldFileSelect indicates that the field's text represents the pathname

@@ -20,11 +20,13 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/internal/formhooks"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // PDF 2.0 sections: 12.7.3
@@ -73,7 +75,7 @@ type InteractiveForm struct {
 	// library treats this value as opaque.
 	//
 	// This entry is deprecated in PDF 2.0.
-	XFA pdf.Object
+	XFA *opaque.Object
 }
 
 // SignatureFlags is a set of document-level flags related to signature fields.
@@ -128,6 +130,17 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		roots = append(roots, n)
+	}
+
+	// fields sharing a fully qualified name are one field, so they must agree
+	// on type and value
+	byName := map[string]Field{}
+	for name, fld := range f.AllFields() {
+		if first, ok := byName[name]; !ok {
+			byName[name] = fld
+		} else if !sameTypeAndValue(first, fld) {
+			return nil, fmt.Errorf("fields named %q differ in type or value", name)
+		}
 	}
 
 	// phase 2: hoist inheritable entries into group nodes
@@ -196,17 +209,19 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if f.XFA != nil {
+		xfa, err := rm.Embed(f.XFA)
+		if err != nil {
+			return nil, err
+		}
 		// the stream form dates from PDF 1.5, the array form from PDF 1.6
-		// TODO(voss): an indirect reference resolving to an array is gated
-		// at 1.5 instead of 1.6 here, since we only inspect the direct value.
 		xfaVersion := pdf.V1_5
-		if _, ok := f.XFA.(pdf.Array); ok {
+		if _, ok := xfa.(pdf.Array); ok {
 			xfaVersion = pdf.V1_6
 		}
 		if err := pdf.CheckVersion(rm.Out, "interactive form XFA entry", xfaVersion); err != nil {
 			return nil, err
 		}
-		dict["XFA"] = f.XFA
+		dict["XFA"] = xfa
 	}
 
 	return dict, nil
@@ -424,4 +439,34 @@ func putNode(rm *pdf.ResourceManager, ref pdf.Reference, dict pdf.Dict, parentRe
 		dict["Parent"] = parentRef
 	}
 	return rm.Out.Put(ref, dict)
+}
+
+// sameTypeAndValue reports whether two fields have the same field type, value
+// and default value.
+func sameTypeAndValue(a, b Field) bool {
+	switch a := a.(type) {
+	case *TextField:
+		b, ok := b.(*TextField)
+		return ok && sameText(a.V, b.V) && sameText(a.DV, b.DV)
+	case *ButtonField:
+		b, ok := b.(*ButtonField)
+		return ok && a.V == b.V && a.DV == b.DV
+	case *ChoiceField:
+		b, ok := b.(*ChoiceField)
+		return ok && slices.Equal(a.V, b.V) && slices.Equal(a.DV, b.DV)
+	case *SignatureField:
+		b, ok := b.(*SignatureField)
+		return ok && a.V.Equal(b.V) && a.DV.Equal(b.DV)
+	default:
+		return false
+	}
+}
+
+// sameText reports whether two text values are equal, ignoring whether they
+// are stored as a string or a stream.
+func sameText(a, b *pdf.StringOrStream) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Value == b.Value
 }
