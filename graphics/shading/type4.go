@@ -19,7 +19,6 @@ package shading
 import (
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 
 	"seehuhn.de/go/membudget"
@@ -287,12 +286,7 @@ func parseType4Vertices(data []byte, s *Type4, budget *membudget.Budget) ([]Type
 		return result
 	}
 
-	// coordinate decoding helper
-	decodeCoord := func(encoded uint32, bits int, decodeMin, decodeMax float64) float64 {
-		maxVal := (1 << bits) - 1
-		t := float64(encoded) / float64(maxVal)
-		return decodeMin + t*(decodeMax-decodeMin)
-	}
+	xMap, yMap, cMaps := decodeMaps(s.Decode, s.BitsPerCoordinate, s.BitsPerComponent)
 
 	for i := range numVertices {
 		vertexData := data[i*vertexBytes : (i+1)*vertexBytes]
@@ -305,21 +299,19 @@ func parseType4Vertices(data []byte, s *Type4, budget *membudget.Budget) ([]Type
 
 		// Extract X coordinate
 		xEncoded := extractBits(vertexData, bitOffset, s.BitsPerCoordinate)
-		vertices[i].X = decodeCoord(xEncoded, s.BitsPerCoordinate, s.Decode[0], s.Decode[1])
+		vertices[i].X = xMap.Decode(xEncoded)
 		bitOffset += s.BitsPerCoordinate
 
 		// Extract Y coordinate
 		yEncoded := extractBits(vertexData, bitOffset, s.BitsPerCoordinate)
-		vertices[i].Y = decodeCoord(yEncoded, s.BitsPerCoordinate, s.Decode[2], s.Decode[3])
+		vertices[i].Y = yMap.Decode(yEncoded)
 		bitOffset += s.BitsPerCoordinate
 
 		// Extract color components
 		vertices[i].Color = make([]float64, numValues)
 		for j := 0; j < numValues; j++ {
 			colorEncoded := extractBits(vertexData, bitOffset, s.BitsPerComponent)
-			decodeMin := s.Decode[4+2*j]
-			decodeMax := s.Decode[4+2*j+1]
-			vertices[i].Color[j] = decodeCoord(colorEncoded, s.BitsPerComponent, decodeMin, decodeMax)
+			vertices[i].Color[j] = cMaps[j].Decode(colorEncoded)
 			bitOffset += s.BitsPerComponent
 		}
 	}
@@ -430,16 +422,7 @@ func (s *Type4) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 			bufBytePos++
 		}
 	}
-	coord := func(x, xMin, xMax float64, bits int) uint32 {
-		limit := int64(1) << bits
-		z := int64(math.Floor((x - xMin) / (xMax - xMin) * float64(limit)))
-		if z < 0 {
-			z = 0
-		} else if z >= limit {
-			z = limit - 1
-		}
-		return uint32(z)
-	}
+	xMap, yMap, cMaps := decodeMaps(s.Decode, s.BitsPerCoordinate, s.BitsPerComponent)
 
 	for _, v := range s.Vertices {
 		for i := range buf {
@@ -448,10 +431,10 @@ func (s *Type4) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		bufBytePos = 0
 		bufBitsFree = 8
 		addBits(uint32(v.Flag), s.BitsPerFlag)
-		addBits(coord(v.X, s.Decode[0], s.Decode[1], s.BitsPerCoordinate), s.BitsPerCoordinate)
-		addBits(coord(v.Y, s.Decode[2], s.Decode[3], s.BitsPerCoordinate), s.BitsPerCoordinate)
+		addBits(xMap.Encode(v.X), s.BitsPerCoordinate)
+		addBits(yMap.Encode(v.Y), s.BitsPerCoordinate)
 		for i, c := range v.Color {
-			addBits(coord(c, s.Decode[4+2*i], s.Decode[4+2*i+1], s.BitsPerComponent), s.BitsPerComponent)
+			addBits(cMaps[i].Encode(c), s.BitsPerComponent)
 		}
 		_, err := stm.Write(buf)
 		if err != nil {

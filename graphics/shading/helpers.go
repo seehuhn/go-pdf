@@ -20,6 +20,7 @@ import (
 	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/sample"
 )
 
 func toPDF(x []float64) pdf.Array {
@@ -58,4 +59,15 @@ func domainContains(functionDomain, shadingDomain []float64) bool {
 		}
 	}
 	return true
+}
+
+// decodeMaps returns the maps between codes and values for the X and Y
+// coordinates and for each colour value of a mesh shading.
+func decodeMaps(decode []float64, bitsPerCoordinate, bitsPerComponent int) (x, y sample.Map, c []sample.Map) {
+	x = sample.Map{Bits: bitsPerCoordinate, Min: decode[0], Max: decode[1]}
+	y = sample.Map{Bits: bitsPerCoordinate, Min: decode[2], Max: decode[3]}
+	for i := 4; i+1 < len(decode); i += 2 {
+		c = append(c, sample.Map{Bits: bitsPerComponent, Min: decode[i], Max: decode[i+1]})
+	}
+	return x, y, c
 }

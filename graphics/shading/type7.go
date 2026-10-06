@@ -19,7 +19,6 @@ package shading
 import (
 	"errors"
 	"fmt"
-	"math"
 	"slices"
 
 	"seehuhn.de/go/geom/vec"
@@ -225,16 +224,7 @@ func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 
-	coord := func(x, xMin, xMax float64, bits int) uint32 {
-		limit := int64(1) << bits
-		z := int64(math.Floor((x - xMin) / (xMax - xMin) * float64(limit)))
-		if z < 0 {
-			z = 0
-		} else if z >= limit {
-			z = limit - 1
-		}
-		return uint32(z)
-	}
+	xMap, yMap, cMaps := decodeMaps(s.Decode, s.BitsPerCoordinate, s.BitsPerComponent)
 
 	// Write all patches to one continuous buffer
 	for _, patch := range s.Patches {
@@ -244,25 +234,25 @@ func (s *Type7) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if patch.Flag == 0 {
 			// New patch: write all 16 control points in stream order
 			for i := range 16 {
-				addBits(coord(patch.ControlPoints[i].X, s.Decode[0], s.Decode[1], s.BitsPerCoordinate), s.BitsPerCoordinate)
-				addBits(coord(patch.ControlPoints[i].Y, s.Decode[2], s.Decode[3], s.BitsPerCoordinate), s.BitsPerCoordinate)
+				addBits(xMap.Encode(patch.ControlPoints[i].X), s.BitsPerCoordinate)
+				addBits(yMap.Encode(patch.ControlPoints[i].Y), s.BitsPerCoordinate)
 			}
 			// Write all 4 corner colors
 			for i := range 4 {
 				for j := 0; j < numValues; j++ {
-					addBits(coord(patch.CornerColors[i][j], s.Decode[4+2*j], s.Decode[4+2*j+1], s.BitsPerComponent), s.BitsPerComponent)
+					addBits(cMaps[j].Encode(patch.CornerColors[i][j]), s.BitsPerComponent)
 				}
 			}
 		} else {
 			// Connected patch: write explicit control points (stream indices 4-15)
 			for i := 4; i < 16; i++ {
-				addBits(coord(patch.ControlPoints[i].X, s.Decode[0], s.Decode[1], s.BitsPerCoordinate), s.BitsPerCoordinate)
-				addBits(coord(patch.ControlPoints[i].Y, s.Decode[2], s.Decode[3], s.BitsPerCoordinate), s.BitsPerCoordinate)
+				addBits(xMap.Encode(patch.ControlPoints[i].X), s.BitsPerCoordinate)
+				addBits(yMap.Encode(patch.ControlPoints[i].Y), s.BitsPerCoordinate)
 			}
 			// Write explicit corner colors (indices 2-3)
 			for i := 2; i < 4; i++ {
 				for j := 0; j < numValues; j++ {
-					addBits(coord(patch.CornerColors[i][j], s.Decode[4+2*j], s.Decode[4+2*j+1], s.BitsPerComponent), s.BitsPerComponent)
+					addBits(cMaps[j].Encode(patch.CornerColors[i][j]), s.BitsPerComponent)
 				}
 			}
 		}
@@ -554,12 +544,7 @@ func parseType7Patches(data []byte, s *Type7, budget *membudget.Budget) ([]Type7
 		return result
 	}
 
-	// coordinate decoding helper (same as Type4/5/6)
-	decodeCoord := func(encoded uint32, bits int, decodeMin, decodeMax float64) float64 {
-		maxVal := (1 << bits) - 1
-		t := float64(encoded) / float64(maxVal)
-		return decodeMin + t*(decodeMax-decodeMin)
-	}
+	xMap, yMap, cMaps := decodeMaps(s.Decode, s.BitsPerCoordinate, s.BitsPerComponent)
 
 	for bitOffset < len(data)*8 {
 		// Check if we have enough bits remaining for at least the flag
@@ -593,11 +578,11 @@ func parseType7Patches(data []byte, s *Type7, budget *membudget.Budget) ([]Type7
 			// Extract all 16 control points in stream order
 			for i := range 16 {
 				xEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
-				patch.ControlPoints[i].X = decodeCoord(xEncoded, s.BitsPerCoordinate, s.Decode[0], s.Decode[1])
+				patch.ControlPoints[i].X = xMap.Decode(xEncoded)
 				bitOffset += s.BitsPerCoordinate
 
 				yEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
-				patch.ControlPoints[i].Y = decodeCoord(yEncoded, s.BitsPerCoordinate, s.Decode[2], s.Decode[3])
+				patch.ControlPoints[i].Y = yMap.Decode(yEncoded)
 				bitOffset += s.BitsPerCoordinate
 			}
 
@@ -607,9 +592,7 @@ func parseType7Patches(data []byte, s *Type7, budget *membudget.Budget) ([]Type7
 				patch.CornerColors[i] = make([]float64, numColorValues)
 				for j := 0; j < numColorValues; j++ {
 					colorEncoded := extractBits(data, bitOffset, s.BitsPerComponent)
-					decodeMin := s.Decode[4+2*j]
-					decodeMax := s.Decode[4+2*j+1]
-					patch.CornerColors[i][j] = decodeCoord(colorEncoded, s.BitsPerComponent, decodeMin, decodeMax)
+					patch.CornerColors[i][j] = cMaps[j].Decode(colorEncoded)
 					bitOffset += s.BitsPerComponent
 				}
 			}
@@ -643,11 +626,11 @@ func parseType7Patches(data []byte, s *Type7, budget *membudget.Budget) ([]Type7
 			// Extract explicit control points (stream indices 4-15, which are 12 points)
 			for i := 4; i < 16; i++ {
 				xEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
-				patch.ControlPoints[i].X = decodeCoord(xEncoded, s.BitsPerCoordinate, s.Decode[0], s.Decode[1])
+				patch.ControlPoints[i].X = xMap.Decode(xEncoded)
 				bitOffset += s.BitsPerCoordinate
 
 				yEncoded := extractBits(data, bitOffset, s.BitsPerCoordinate)
-				patch.ControlPoints[i].Y = decodeCoord(yEncoded, s.BitsPerCoordinate, s.Decode[2], s.Decode[3])
+				patch.ControlPoints[i].Y = yMap.Decode(yEncoded)
 				bitOffset += s.BitsPerCoordinate
 			}
 
@@ -656,9 +639,7 @@ func parseType7Patches(data []byte, s *Type7, budget *membudget.Budget) ([]Type7
 				patch.CornerColors[i] = make([]float64, numColorValues)
 				for j := 0; j < numColorValues; j++ {
 					colorEncoded := extractBits(data, bitOffset, s.BitsPerComponent)
-					decodeMin := s.Decode[4+2*j]
-					decodeMax := s.Decode[4+2*j+1]
-					patch.CornerColors[i][j] = decodeCoord(colorEncoded, s.BitsPerComponent, decodeMin, decodeMax)
+					patch.CornerColors[i][j] = cMaps[j].Decode(colorEncoded)
 					bitOffset += s.BitsPerComponent
 				}
 			}
