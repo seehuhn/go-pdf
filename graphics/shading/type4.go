@@ -202,7 +202,8 @@ func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 	if fnObj, ok := d["Function"]; ok {
 		if fn, err := pdf.DecodeOptional(c, fnObj, function.Extract); err != nil {
 			return nil, err
-		} else if fn != nil {
+		} else if fn != nil && s.ColorSpace.Family() != color.FamilyIndexed {
+			// an Indexed colour space does not allow a function
 			s.F = fn
 		}
 	}
@@ -212,19 +213,22 @@ func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 	// - 4 elements for X,Y coordinates (xmin, xmax, ymin, ymax)
 	// - 2*n elements for color components (cmin1, cmax1, cmin2, cmax2, ...)
 	// where n is the number of color components in the vertex data
-	var numColorComponents int
+	numColorComponents := s.ColorSpace.Channels()
 	if s.F != nil {
-		// If function is present, color components are function inputs
-		m, _ := s.F.Shape()
-		numColorComponents = m
-	} else {
-		// If no function, color components are direct color space values
-		numColorComponents = s.ColorSpace.Channels()
+		if err := checkFunction(s.F, 1, numColorComponents); err != nil {
+			return nil, &pdf.MalformedFileError{Err: err}
+		}
+		numColorComponents = 1
 	}
 	expectedDecodeLength := 4 + 2*numColorComponents // 4 for X,Y + 2 per color component
 	if len(s.Decode) != expectedDecodeLength {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("invalid Decode array length: expected %d, got %d", expectedDecodeLength, len(s.Decode)),
+		}
+	}
+	if s.F != nil {
+		if err := checkMeshDomain(s.F, s.Decode); err != nil {
+			return nil, &pdf.MalformedFileError{Err: err}
 		}
 	}
 
@@ -259,10 +263,7 @@ func parseType4Vertices(data []byte, s *Type4, budget *membudget.Budget) ([]Type
 	}
 	vertexBytes := (vertexBits + 7) / 8
 
-	if len(data)%vertexBytes != 0 {
-		return nil, pdf.Errorf("invalid stream data length: %d bytes is not a multiple of %d", len(data), vertexBytes)
-	}
-
+	// trailing bytes which do not form a whole vertex are ignored
 	numVertices := len(data) / vertexBytes
 
 	// charge the in-memory vertex storage against the budget
@@ -293,7 +294,8 @@ func parseType4Vertices(data []byte, s *Type4, budget *membudget.Budget) ([]Type
 		bitOffset := 0
 
 		// Extract flag
-		flag := extractBits(vertexData, bitOffset, s.BitsPerFlag)
+		// only the two least significant bits of the flag are used
+		flag := extractBits(vertexData, bitOffset, s.BitsPerFlag) & 3
 		vertices[i].Flag = uint8(flag)
 		bitOffset += s.BitsPerFlag
 
@@ -316,7 +318,41 @@ func parseType4Vertices(data []byte, s *Type4, budget *membudget.Budget) ([]Type
 		}
 	}
 
-	return vertices, nil
+	return repairType4Mesh(vertices), nil
+}
+
+// repairType4Mesh removes vertices which do not form part of a triangle,
+// and sets the ignored flags of the second and third vertex of each new
+// triangle to 0.
+//
+// A vertex with flag 1 or 2 needs a preceding triangle, and flag 3 is
+// invalid.  Such a vertex is dropped, together with all following vertices
+// up to the next one with flag 0, since these would connect to the triangle
+// the dropped vertex was meant to form.  An incomplete triangle at the end
+// is dropped, too.
+func repairType4Mesh(vertices []Type4Vertex) []Type4Vertex {
+	out := vertices[:0]
+	haveTriangle := false
+	for i := 0; i < len(vertices); {
+		v := vertices[i]
+		switch {
+		case v.Flag == 0 && i+2 < len(vertices):
+			b, c := vertices[i+1], vertices[i+2]
+			b.Flag, c.Flag = 0, 0
+			out = append(out, v, b, c)
+			haveTriangle = true
+			i += 3
+		case v.Flag == 0:
+			i = len(vertices)
+		case v.Flag <= 2 && haveTriangle:
+			out = append(out, v)
+			i++
+		default:
+			haveTriangle = false
+			i++
+		}
+	}
+	return out
 }
 
 // Embed implements the [Shading] interface.
@@ -350,6 +386,9 @@ func (s *Type4) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	numValues := numComponents
 	if s.F != nil {
+		if err := checkFunction(s.F, 1, numComponents); err != nil {
+			return nil, err
+		}
 		numValues = 1
 	}
 	decodeLen := 4 + 2*numValues
@@ -357,14 +396,33 @@ func (s *Type4) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, fmt.Errorf("wrong number of decode values: expected %d, got %d",
 			decodeLen, have)
 	}
-	for i, v := range s.Vertices {
-		if v.Flag > 2 {
-			return nil, fmt.Errorf("vertex %d: invalid flag: %d", i, v.Flag)
+	if !allFinite(s.Decode...) {
+		return nil, errors.New("non-finite decode value")
+	}
+	if s.F != nil {
+		if err := checkMeshDomain(s.F, s.Decode); err != nil {
+			return nil, err
 		}
+	}
+	for i, v := range s.Vertices {
 		if have := len(v.Color); have != numValues {
 			return nil, fmt.Errorf("vertex %d: wrong number of color values: expected %d, got %d",
 				i, numValues, have)
 		}
+		if v.Flag > 2 {
+			return nil, fmt.Errorf("vertex %d: invalid flag: %d", i, v.Flag)
+		}
+		if !inDecodeRange(s.Decode, 0, v.X) || !inDecodeRange(s.Decode, 1, v.Y) {
+			return nil, fmt.Errorf("vertex %d: coordinates outside the Decode range", i)
+		}
+		for j, c := range v.Color {
+			if !inDecodeRange(s.Decode, 2+j, c) {
+				return nil, fmt.Errorf("vertex %d: color value outside the Decode range", i)
+			}
+		}
+	}
+	if err := checkType4Mesh(s.Vertices); err != nil {
+		return nil, err
 	}
 	if s.F != nil && s.ColorSpace.Family() == color.FamilyIndexed {
 		return nil, errors.New("Function not allowed for indexed color space")
@@ -447,4 +505,24 @@ func (s *Type4) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	return ref, nil
+}
+
+// checkType4Mesh checks that the edge flags, each 0, 1 or 2, describe a
+// sequence of whole triangles.  The flags of the second and third vertex
+// of a new triangle are ignored.
+func checkType4Mesh(vertices []Type4Vertex) error {
+	for i := 0; i < len(vertices); {
+		switch v := vertices[i]; {
+		case v.Flag == 0:
+			if i+2 >= len(vertices) {
+				return fmt.Errorf("vertex %d: incomplete triangle", i)
+			}
+			i += 3
+		case i == 0:
+			return errors.New("first vertex must have flag 0")
+		default:
+			i++
+		}
+	}
+	return nil
 }

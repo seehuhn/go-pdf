@@ -63,8 +63,8 @@ func TestShadingEqual(t *testing.T) {
 			Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
 			Vertices: []Type4Vertex{
 				{X: 0, Y: 0, Flag: 0, Color: []float64{1, 0, 0}},
-				{X: 100, Y: 0, Flag: 1, Color: []float64{0, 1, 0}},
-				{X: 50, Y: 100, Flag: 2, Color: []float64{0, 0, 1}},
+				{X: 100, Y: 0, Color: []float64{0, 1, 0}},
+				{X: 50, Y: 100, Color: []float64{0, 0, 1}},
 			},
 		},
 		&Type5{

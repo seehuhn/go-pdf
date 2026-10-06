@@ -181,8 +181,8 @@ var testCases = map[int][]testCase{
 				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
 				Vertices: []Type4Vertex{
 					{X: 0, Y: 0, Flag: 0, Color: []float64{1, 0, 0}},
-					{X: 50, Y: 0, Flag: 1, Color: []float64{0, 1, 0}},
-					{X: 25, Y: 50, Flag: 2, Color: []float64{0, 0, 1}},
+					{X: 50, Y: 0, Color: []float64{0, 1, 0}},
+					{X: 25, Y: 50, Color: []float64{0, 0, 1}},
 				},
 			},
 		},
@@ -202,8 +202,8 @@ var testCases = map[int][]testCase{
 				},
 				Vertices: []Type4Vertex{
 					{X: 10, Y: 10, Flag: 0, Color: []float64{0.2}},
-					{X: 90, Y: 10, Flag: 1, Color: []float64{0.8}},
-					{X: 50, Y: 90, Flag: 2, Color: []float64{0.5}},
+					{X: 90, Y: 10, Color: []float64{0.8}},
+					{X: 50, Y: 90, Color: []float64{0.5}},
 					{X: 10, Y: 90, Flag: 1, Color: []float64{0.1}},
 				},
 			},
@@ -613,8 +613,8 @@ func TestShadingEvaluation(t *testing.T) {
 				Decode:            []float64{0, 100, 0, 100, 0, 1, 0, 1, 0, 1},
 				Vertices: []Type4Vertex{
 					{X: 0, Y: 0, Flag: 0, Color: []float64{1, 0, 0}},
-					{X: 100, Y: 0, Flag: 1, Color: []float64{0, 1, 0}},
-					{X: 50, Y: 100, Flag: 2, Color: []float64{0, 0, 1}},
+					{X: 100, Y: 0, Color: []float64{0, 1, 0}},
+					{X: 50, Y: 100, Color: []float64{0, 0, 1}},
 				},
 			},
 		},

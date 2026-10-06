@@ -181,7 +181,8 @@ func parseType6Patches(data []byte, s *Type6, budget *membudget.Budget) ([]Type6
 		}
 
 		// Extract edge flag
-		flag := uint8(extractBits(data, bitOffset, s.BitsPerFlag))
+		// only the two least significant bits of the flag are used
+		flag := uint8(extractBits(data, bitOffset, s.BitsPerFlag)) & 3
 		bitOffset += s.BitsPerFlag
 
 		// Calculate required bits for this patch type
@@ -197,6 +198,12 @@ func parseType6Patches(data []byte, s *Type6, budget *membudget.Budget) ([]Type6
 		// Check if we have enough bits remaining for this patch
 		if bitOffset+requiredBits > len(data)*8 {
 			break
+		}
+
+		// a connected patch needs a previous patch to connect to
+		if flag != 0 && len(patches) == 0 {
+			bitOffset += requiredBits
+			continue
 		}
 
 		patch := Type6Patch{Flag: flag}
@@ -226,14 +233,7 @@ func parseType6Patches(data []byte, s *Type6, budget *membudget.Budget) ([]Type6
 			}
 		} else {
 			// Connected patch: read 16 coordinates (8 points) + 2 corner colors
-			if len(patches) == 0 {
-				return nil, pdf.Errorf("connected patch (flag=%d) with no previous patch", flag)
-			}
-
-			conn, ok := edgeConnections[flag]
-			if !ok {
-				return nil, pdf.Errorf("invalid edge flag: %d", flag)
-			}
+			conn := edgeConnections[flag]
 
 			prevPatch := patches[len(patches)-1]
 
@@ -372,7 +372,8 @@ func extractType6(c pdf.Cursor, stream *pdf.Stream) (*Type6, error) {
 	if fnObj, ok := d["Function"]; ok {
 		if fn, err := pdf.DecodeOptional(c, fnObj, function.Extract); err != nil {
 			return nil, err
-		} else if fn != nil {
+		} else if fn != nil && s.ColorSpace.Family() != color.FamilyIndexed {
+			// an Indexed colour space does not allow a function
 			s.F = fn
 		}
 	}
@@ -382,19 +383,22 @@ func extractType6(c pdf.Cursor, stream *pdf.Stream) (*Type6, error) {
 	// - 4 elements for X,Y coordinates (xmin, xmax, ymin, ymax)
 	// - 2*n elements for color components (cmin1, cmax1, cmin2, cmax2, ...)
 	// where n is the number of color components in the patch data
-	var numColorComponents int
+	numColorComponents := s.ColorSpace.Channels()
 	if s.F != nil {
-		// If function is present, color components are function inputs
-		m, _ := s.F.Shape()
-		numColorComponents = m
-	} else {
-		// If no function, color components are direct color space values
-		numColorComponents = s.ColorSpace.Channels()
+		if err := checkFunction(s.F, 1, numColorComponents); err != nil {
+			return nil, &pdf.MalformedFileError{Err: err}
+		}
+		numColorComponents = 1
 	}
 	expectedDecodeLength := 4 + 2*numColorComponents // 4 for X,Y + 2 per color component
 	if len(s.Decode) != expectedDecodeLength {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("invalid Decode array length: expected %d, got %d", expectedDecodeLength, len(s.Decode)),
+		}
+	}
+	if s.F != nil {
+		if err := checkMeshDomain(s.F, s.Decode); err != nil {
+			return nil, &pdf.MalformedFileError{Err: err}
 		}
 	}
 
@@ -446,6 +450,9 @@ func (s *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	numValues := numComponents
 	if s.F != nil {
+		if err := checkFunction(s.F, 1, numComponents); err != nil {
+			return nil, err
+		}
 		numValues = 1
 	}
 	decodeLen := 4 + 2*numValues
@@ -453,17 +460,55 @@ func (s *Type6) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, fmt.Errorf("wrong number of decode values: expected %d, got %d",
 			decodeLen, have)
 	}
+	if !allFinite(s.Decode...) {
+		return nil, errors.New("non-finite decode value")
+	}
+	if s.F != nil {
+		if err := checkMeshDomain(s.F, s.Decode); err != nil {
+			return nil, err
+		}
+	}
 	for i, patch := range s.Patches {
 		if patch.Flag > 3 {
 			return nil, fmt.Errorf("patch %d: invalid flag: %d", i, patch.Flag)
 		}
+		if i == 0 && patch.Flag != 0 {
+			return nil, errors.New("first patch must have flag 0")
+		}
 		if have := len(patch.CornerColors); have != 4 {
 			return nil, fmt.Errorf("patch %d: expected 4 corner colors, got %d", i, have)
+		}
+		for _, p := range patch.ControlPoints {
+			if !inDecodeRange(s.Decode, 0, p.X) || !inDecodeRange(s.Decode, 1, p.Y) {
+				return nil, fmt.Errorf("patch %d: control point outside the Decode range", i)
+			}
 		}
 		for j, corner := range patch.CornerColors {
 			if have := len(corner); have != numValues {
 				return nil, fmt.Errorf("patch %d corner %d: wrong number of color values: expected %d, got %d",
 					i, j, numValues, have)
+			}
+			for k, c := range corner {
+				if !inDecodeRange(s.Decode, 2+k, c) {
+					return nil, fmt.Errorf("patch %d corner %d: color value outside the Decode range", i, j)
+				}
+			}
+		}
+
+		// a connected patch takes some data from the previous patch, which
+		// is not written again
+		if patch.Flag != 0 && i > 0 {
+			prev := s.Patches[i-1]
+			conn := edgeConnections[patch.Flag]
+			for k, src := range conn.ImplicitPoints {
+				if patch.ControlPoints[k] != prev.ControlPoints[src] {
+					return nil, fmt.Errorf("patch %d: control point %d differs from previous patch", i, k)
+				}
+			}
+			for k, src := range conn.ImplicitColors {
+				if !slices.Equal(patch.CornerColors[k], prev.CornerColors[src]) {
+					return nil, fmt.Errorf("patch %d: corner color %d differs from previous patch", i, k)
+				}
 			}
 		}
 	}

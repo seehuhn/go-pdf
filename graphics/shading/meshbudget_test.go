@@ -112,7 +112,7 @@ func TestShadingBudgetSmallMeshAccepted(t *testing.T) {
 		BitsPerFlag:       2,
 		Decode:            []float64{0, 100, 0, 100, 0, 1},
 	}
-	for i := range 10 {
+	for i := range 9 {
 		s.Vertices = append(s.Vertices, Type4Vertex{X: float64(i), Y: float64(i), Color: []float64{0.5}})
 	}
 

@@ -95,15 +95,8 @@ func extractType1(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type1, error) {
 		return nil, err
 	}
 
-	// validate function has correct number of inputs
-	m, n := fn.Shape()
-	if m != 2 {
-		return nil, pdf.Errorf("function must have 2 inputs, not %d", m)
-	}
-
-	// validate function outputs match color space channels
-	if n != cs.Channels() {
-		return nil, pdf.Errorf("function outputs (%d) must match color space channels (%d)", n, cs.Channels())
+	if err := checkFunction(fn, 2, cs.Channels()); err != nil {
+		return nil, &pdf.MalformedFileError{Err: err}
 	}
 
 	// validate function domain is well-formed
@@ -161,10 +154,8 @@ func (s *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := validateCommon(&s.Common, false); err != nil {
 		return nil, err
 	}
-	if m, n := s.F.Shape(); m != 2 {
-		return nil, fmt.Errorf("function must have 2 inputs, not %d", m)
-	} else if n != s.ColorSpace.Channels() {
-		return nil, fmt.Errorf("function outputs (%d) must match color space channels (%d)", n, s.ColorSpace.Channels())
+	if err := checkFunction(s.F, 2, s.ColorSpace.Channels()); err != nil {
+		return nil, err
 	}
 
 	// Validate function domain contains shading domain

@@ -190,7 +190,8 @@ func extractType5(c pdf.Cursor, stream *pdf.Stream) (*Type5, error) {
 	if fnObj, ok := d["Function"]; ok {
 		if fn, err := pdf.DecodeOptional(c, fnObj, function.Extract); err != nil {
 			return nil, err
-		} else if fn != nil {
+		} else if fn != nil && s.ColorSpace.Family() != color.FamilyIndexed {
+			// an Indexed colour space does not allow a function
 			s.F = fn
 		}
 	}
@@ -200,19 +201,22 @@ func extractType5(c pdf.Cursor, stream *pdf.Stream) (*Type5, error) {
 	// - 4 elements for X,Y coordinates (xmin, xmax, ymin, ymax)
 	// - 2*n elements for color components (cmin1, cmax1, cmin2, cmax2, ...)
 	// where n is the number of color components in the vertex data
-	var numColorComponents int
+	numColorComponents := s.ColorSpace.Channels()
 	if s.F != nil {
-		// If function is present, color components are function inputs
-		m, _ := s.F.Shape()
-		numColorComponents = m
-	} else {
-		// If no function, color components are direct color space values
-		numColorComponents = s.ColorSpace.Channels()
+		if err := checkFunction(s.F, 1, numColorComponents); err != nil {
+			return nil, &pdf.MalformedFileError{Err: err}
+		}
+		numColorComponents = 1
 	}
 	expectedDecodeLength := 4 + 2*numColorComponents // 4 for X,Y + 2 per color component
 	if len(s.Decode) != expectedDecodeLength {
 		return nil, &pdf.MalformedFileError{
 			Err: fmt.Errorf("invalid Decode array length: expected %d, got %d", expectedDecodeLength, len(s.Decode)),
+		}
+	}
+	if s.F != nil {
+		if err := checkMeshDomain(s.F, s.Decode); err != nil {
+			return nil, &pdf.MalformedFileError{Err: err}
 		}
 	}
 
@@ -251,16 +255,9 @@ func parseType5Vertices(data []byte, s *Type5, budget *membudget.Budget) ([]Type
 	totalBits := len(data) * 8
 	numVertices := totalBits / vertexBits
 
-	if numVertices == 0 {
-		return nil, pdf.Errorf("insufficient data: need at least %d bits per vertex, got %d total bits", vertexBits, totalBits)
-	}
-
-	// Validate lattice completeness
-	if numVertices%s.VerticesPerRow != 0 {
-		return nil, pdf.Errorf("invalid lattice: %d vertices is not a multiple of %d vertices per row", numVertices, s.VerticesPerRow)
-	}
-
+	// an incomplete last row is ignored
 	numRows := numVertices / s.VerticesPerRow
+	numVertices = numRows * s.VerticesPerRow
 	if numRows < 2 {
 		return nil, pdf.Errorf("invalid lattice: need at least 2 rows for triangulation, got %d", numRows)
 	}
@@ -343,12 +340,23 @@ func (s *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	numValues := numComponents
 	if s.F != nil {
+		if err := checkFunction(s.F, 1, numComponents); err != nil {
+			return nil, err
+		}
 		numValues = 1
 	}
 	decodeLen := 4 + 2*numValues
 	if have := len(s.Decode); have != decodeLen {
 		return nil, fmt.Errorf("wrong number of decode values: expected %d, got %d",
 			decodeLen, have)
+	}
+	if !allFinite(s.Decode...) {
+		return nil, errors.New("non-finite decode value")
+	}
+	if s.F != nil {
+		if err := checkMeshDomain(s.F, s.Decode); err != nil {
+			return nil, err
+		}
 	}
 
 	// Validate lattice structure
@@ -365,6 +373,14 @@ func (s *Type5) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if have := len(v.Color); have != numValues {
 			return nil, fmt.Errorf("vertex %d: wrong number of color values: expected %d, got %d",
 				i, numValues, have)
+		}
+		if !inDecodeRange(s.Decode, 0, v.X) || !inDecodeRange(s.Decode, 1, v.Y) {
+			return nil, fmt.Errorf("vertex %d: coordinates outside the Decode range", i)
+		}
+		for j, c := range v.Color {
+			if !inDecodeRange(s.Decode, 2+j, c) {
+				return nil, fmt.Errorf("vertex %d: color value outside the Decode range", i)
+			}
 		}
 	}
 	if s.F != nil && s.ColorSpace.Family() == color.FamilyIndexed {
