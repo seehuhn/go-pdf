@@ -87,6 +87,11 @@ func run() error {
 		return err
 	}
 
+	err = showType6Pattern(doc, F)
+	if err != nil {
+		return err
+	}
+
 	err = doc.Close()
 	if err != nil {
 		return err
@@ -483,6 +488,57 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 	}
 
 	return nil
+}
+
+func showType6Pattern(doc *document.MultiPage, F font.Layouter) error {
+	shadingData := &shading.Type6{
+		Common: shading.Common{
+			ColorSpace: color.SpaceDeviceRGB,
+			Background: []float64{0.9, 0.9, 0.6},
+		},
+		BitsPerFlag:       8,
+		BitsPerCoordinate: 16,
+		BitsPerComponent:  8,
+		Decode:            []float64{0, 600, 0, 850, 0, 1, 0, 1, 0, 1},
+		Patches: []shading.Type6Patch{
+			{
+				ControlPoints: [12]vec.Vec2{
+					{X: 150, Y: 400}, {X: 250, Y: 450}, {X: 350, Y: 350}, {X: 450, Y: 400},
+					{X: 500, Y: 500}, {X: 400, Y: 600},
+					{X: 450, Y: 700}, {X: 350, Y: 650}, {X: 250, Y: 750}, {X: 150, Y: 700},
+					{X: 100, Y: 600}, {X: 200, Y: 500},
+				},
+				CornerColors: [][]float64{
+					{1, 0, 0},
+					{0, 1, 0},
+					{0, 0, 1},
+					{1, 1, 0},
+				},
+			},
+		},
+	}
+
+	dict := &pattern.Type2{
+		Shading:   shadingData,
+		SingleUse: true,
+	}
+	col := color.PatternColored(dict)
+
+	page := doc.AddPage()
+
+	page.PushGraphicsState()
+	page.SetFillColor(col)
+	page.Rectangle(50, 300, 500, 500)
+	page.FillAndStroke()
+	page.PopGraphicsState()
+
+	page.TextSetFont(F, 12)
+	page.TextBegin()
+	page.TextFirstLine(50, 230)
+	page.TextShow("A square filled with a Coons patch shading pattern; the shading’s /Background colour fills the rest.")
+	page.TextEnd()
+
+	return page.Close()
 }
 
 var black = color.DeviceGray(0.0)
