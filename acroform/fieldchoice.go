@@ -24,9 +24,9 @@ import (
 
 // PDF 2.0 sections: 12.7.5.4
 
-// ChoiceOption is a single selectable item of a [ChoiceField]. Export is the
-// value used when the form is submitted; Display is the text shown to the user.
-// When the two are equal, the option is stored as a single string.
+// ChoiceOption is a single selectable item of a [ChoiceField].
+// Export is the value used when the form is submitted; Display is the text
+// shown to the user.
 type ChoiceOption struct {
 	Export  string
 	Display string
@@ -58,15 +58,18 @@ type ChoiceField struct {
 	// This corresponds to the /I entry in the PDF field dictionary.
 	Selected []int
 
-	// V (optional) holds the display strings of the currently selected options.
-	// A single-selection field has at most one entry.
+	// V (optional) holds the display strings of the currently selected
+	// options.  For an editable combo box, this may contain a string that is
+	// not in Opt.
 	//
-	// This corresponds to the /V entry in the PDF field dictionary, which stores
-	// a bare text string for a single selection and an array of text strings for
-	// multiple selections.
+	// If both V and Selected are set, they must name the same options.
+	//
+	// On write, a nil V is treated as the display strings of the options
+	// listed in Selected.
 	V []string
 
 	// DV (optional) holds the default selection, used when the form is reset.
+	// A single-selection field has at most one entry.
 	//
 	// This corresponds to the /DV entry in the PDF field dictionary.
 	DV []string
@@ -95,8 +98,30 @@ func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		}
 		dict["Opt"] = arr
 	}
+	if f.TopIndex < 0 || (f.TopIndex > 0 && f.TopIndex >= len(f.Opt)) {
+		return errors.New("choice field TopIndex out of range")
+	}
 	if f.TopIndex > 0 {
 		dict["TI"] = pdf.Integer(f.TopIndex)
+	}
+	for i, idx := range f.Selected {
+		if idx < 0 || idx >= len(f.Opt) {
+			return errors.New("choice field selection index out of range")
+		}
+		if i > 0 && idx <= f.Selected[i-1] {
+			return errors.New("choice field selection indices must be ascending")
+		}
+	}
+	if f.Flags&FieldMultiSelect == 0 && (len(f.V) > 1 || len(f.DV) > 1 || len(f.Selected) > 1) {
+		return errors.New("multiple selections require the MultiSelect flag")
+	}
+	v := f.V
+	if v == nil {
+		for _, idx := range f.Selected {
+			v = append(v, f.Opt[idx].Display)
+		}
+	} else if len(f.Selected) > 0 && !f.SelectionAgrees() {
+		return errors.New("choice field V and Selected disagree")
 	}
 	if len(f.Selected) > 0 {
 		if err := pdf.CheckVersion(rm.Out, "choice field I entry", pdf.V1_4); err != nil {
@@ -108,13 +133,34 @@ func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		}
 		dict["I"] = arr
 	}
-	if v := choiceValueObject(f.V); v != nil {
+	if v := choiceValueObject(v); v != nil {
 		dict["V"] = v
 	}
 	if dv := choiceValueObject(f.DV); dv != nil {
 		dict["DV"] = dv
 	}
 	return nil
+}
+
+// SelectionAgrees reports whether V and Selected name the same options: the
+// display strings of the options at Selected, taken as a multiset, must equal
+// V.  The order of V is not significant, since Selected is kept ascending.
+func (f *ChoiceField) SelectionAgrees() bool {
+	if len(f.V) != len(f.Selected) {
+		return false
+	}
+	count := make(map[string]int, len(f.V))
+	for _, s := range f.V {
+		count[s]++
+	}
+	for _, idx := range f.Selected {
+		s := f.Opt[idx].Display
+		if count[s] == 0 {
+			return false
+		}
+		count[s]--
+	}
+	return true
 }
 
 // choiceValueObject converts a choice field's selection to its PDF

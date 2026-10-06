@@ -83,6 +83,7 @@ func TestListValues(t *testing.T) {
 
 	choice := acroform.NewChoiceField("colors")
 	choice.DefaultAppearance = "/Helv 0 Tf 0 g"
+	choice.Flags = acroform.FieldMultiSelect
 	choice.V = []string{"Red", "Green"}
 
 	sig := acroform.NewSignatureField("signature1")

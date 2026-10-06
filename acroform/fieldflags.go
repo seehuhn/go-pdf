@@ -16,7 +16,12 @@
 
 package acroform
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+	"fmt"
+
+	"seehuhn.de/go/pdf"
+)
 
 // FieldFlags is a set of flags describing characteristics of a form field.
 //
@@ -119,6 +124,82 @@ const FieldDoNotSpellCheck FieldFlags = 1 << 22
 // FieldRichText indicates that the text field's value is a rich text string.
 // It applies to text fields ([TextField]).
 const FieldRichText FieldFlags = 1 << 25
+
+// the flags defined for each field type
+const (
+	commonFlags = FieldReadOnly | FieldRequired | FieldNoExport
+	buttonFlags = commonFlags | FieldNoToggleToOff | FieldRadio | FieldPushbutton | FieldRadiosInUnison
+	textFlags   = commonFlags | FieldMultiline | FieldPassword | FieldFileSelect |
+		FieldDoNotSpellCheck | FieldDoNotScroll | FieldComb | FieldRichText
+	choiceFlags = commonFlags | FieldCombo | FieldEdit | FieldSort | FieldMultiSelect |
+		FieldDoNotSpellCheck | FieldCommitOnSelChange
+)
+
+// definedFlags returns the flags defined for the field type ft, one of "Btn",
+// "Tx", "Ch", or "Sig".
+func definedFlags(ft pdf.Name) FieldFlags {
+	switch ft {
+	case "Btn":
+		return buttonFlags
+	case "Tx":
+		return textFlags
+	case "Ch":
+		return choiceFlags
+	default:
+		return commonFlags
+	}
+}
+
+// Normalize returns the flags with every bit not defined for the field type ft
+// cleared and every forbidden combination resolved: Radio yields to
+// Pushbutton, NoToggleToOff and RadiosInUnison require Radio, Edit requires
+// Combo, and on a choice field DoNotSpellCheck requires Combo and Edit. The
+// field type is one of "Btn", "Tx", "Ch", or "Sig".
+func (ff FieldFlags) Normalize(ft pdf.Name) FieldFlags {
+	ff &= definedFlags(ft)
+	switch ft {
+	case "Btn":
+		if ff&FieldPushbutton != 0 {
+			ff &^= FieldRadio
+		}
+		if ff&FieldRadio == 0 {
+			ff &^= FieldNoToggleToOff | FieldRadiosInUnison
+		}
+	case "Ch":
+		if ff&FieldCombo == 0 {
+			ff &^= FieldEdit
+		}
+		if ff&FieldEdit == 0 {
+			ff &^= FieldDoNotSpellCheck
+		}
+	}
+	return ff
+}
+
+// checkFlags verifies that ff contains only flags defined for the field type
+// ft, in a combination the specification allows.
+func checkFlags(ft pdf.Name, ff FieldFlags) error {
+	if ff&^definedFlags(ft) != 0 {
+		return fmt.Errorf("undefined flag bits for %s field", ft)
+	}
+	switch ft {
+	case "Btn":
+		if ff&FieldRadio != 0 && ff&FieldPushbutton != 0 {
+			return errors.New("Radio and Pushbutton flags are mutually exclusive")
+		}
+		if ff&FieldRadio == 0 && ff&(FieldNoToggleToOff|FieldRadiosInUnison) != 0 {
+			return errors.New("NoToggleToOff and RadiosInUnison require the Radio flag")
+		}
+	case "Ch":
+		if ff&FieldEdit != 0 && ff&FieldCombo == 0 {
+			return errors.New("Edit flag requires the Combo flag")
+		}
+		if ff&FieldDoNotSpellCheck != 0 && ff&(FieldCombo|FieldEdit) != FieldCombo|FieldEdit {
+			return errors.New("DoNotSpellCheck on a choice field requires Combo and Edit")
+		}
+	}
+	return nil
+}
 
 // flagVersions lists the minimum PDF version of each field flag introduced
 // after the form fields themselves; unlisted flags carry no extra version

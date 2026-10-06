@@ -21,6 +21,9 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
+	"seehuhn.de/go/pdf/annotation/appearance"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
@@ -75,6 +78,139 @@ func TestWidgetReservation(t *testing.T) {
 		// the form is never encoded, so the widget reservation is never filled
 		if err := rm.Close(); err == nil {
 			t.Error("expected Close to report the unfilled widget reservation")
+		}
+	})
+}
+
+// a check box or radio button widget's appearance state must name one of its
+// normal appearances and agree with the field value
+func TestWidgetAppearanceStateConsistency(t *testing.T) {
+	blank := &form.Form{BBox: pdf.Rectangle{URx: 10, URy: 10}, Res: &content.Resources{}}
+	tests := []struct {
+		name    string
+		flags   acroform.FieldFlags
+		value   pdf.Name
+		state   pdf.Name
+		wantErr bool
+	}{
+		{"on and selected", 0, "Yes", "Yes", false},
+		{"off while selected", 0, "Yes", "Off", false},
+		{"off while unselected", 0, "Off", "Off", false},
+		{"off with no value", 0, "", "Off", false},
+		{"unknown state", 0, "Yes", "Maybe", true},
+		{"on while unselected", 0, "Off", "Yes", true},
+		{"on with no value", 0, "", "Yes", true},
+		{"radio on other value", acroform.FieldRadio, "A", "Yes", true},
+		{"push button unchecked", acroform.FieldPushbutton, "", "Yes", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+
+			f := acroform.NewButtonField("b")
+			f.Flags = tc.flags
+			f.V = tc.value
+			wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})
+			wid.Appearance = &appearance.Dict{
+				NormalMap: map[pdf.Name]*form.Form{"Yes": blank, "Off": blank},
+				SingleUse: true,
+			}
+			wid.AppearanceState = tc.state
+
+			_, err := wid.encodeOwnEntries(rm)
+			if tc.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// the off state needs no appearance stream, while any other state does
+func TestWidgetOffStateWithoutAppearance(t *testing.T) {
+	blank := &form.Form{BBox: pdf.Rectangle{URx: 10, URy: 10}, Res: &content.Resources{}}
+	for _, tc := range []struct {
+		state   pdf.Name
+		wantErr bool
+	}{
+		{"Off", false},
+		{"Maybe", true},
+	} {
+		t.Run(string(tc.state), func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+
+			f := acroform.NewButtonField("b")
+			f.V = "Off"
+			wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})
+			wid.Appearance = &appearance.Dict{
+				NormalMap: map[pdf.Name]*form.Form{"Yes": blank},
+				SingleUse: true,
+			}
+			wid.AppearanceState = tc.state
+
+			_, err := wid.encodeOwnEntries(rm)
+			if tc.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// a widget listed by one field but pointing at another is rejected when the
+// form is encoded
+func TestWidgetParentConsistency(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
+	a := acroform.NewButtonField("a")
+	b := acroform.NewButtonField("b")
+	wid := AddWidget(b, pdf.Rectangle{URx: 10, URy: 10})
+	// move the widget into a's list while it still points at b
+	b.Widgets = nil
+	a.Widgets = append(a.Widgets, wid)
+
+	form := &acroform.InteractiveForm{Fields: []acroform.Node{a, b}}
+	if _, err := form.Encode(rm); err == nil {
+		t.Error("expected an error when a widget's field is not the field listing it")
+	}
+}
+
+// a form widget which was never added to a page has no reference when the
+// form is encoded, and the form refuses to write it
+func TestWidgetMustBePlaced(t *testing.T) {
+	build := func(place bool) (*pdf.ResourceManager, *acroform.InteractiveForm) {
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		rm := pdf.NewResourceManager(w)
+		f := acroform.NewTextField("f0")
+		f.DefaultAppearance = "/Helv 0 Tf 0 g"
+		wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})
+		if place {
+			// a page write stores the widget, reserving its reference
+			if _, err := rm.Store(wid); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return rm, &acroform.InteractiveForm{Fields: []acroform.Node{f}}
+	}
+
+	t.Run("placed", func(t *testing.T) {
+		rm, form := build(true)
+		if _, err := form.Encode(rm); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("unplaced", func(t *testing.T) {
+		rm, form := build(false)
+		if _, err := form.Encode(rm); err == nil {
+			t.Error("expected an error for a widget on no page")
 		}
 	})
 }

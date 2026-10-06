@@ -108,6 +108,9 @@ func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 		dict["TM"] = pdf.TextString(b.ExportName)
 	}
 	if b.Flags != 0 {
+		if err := checkFlags(f.FieldType(), b.Flags); err != nil {
+			return nil, err
+		}
 		if err := checkFlagVersions(rm.Out, b.Flags); err != nil {
 			return nil, err
 		}

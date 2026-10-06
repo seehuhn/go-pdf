@@ -236,3 +236,34 @@ func TestWidgetTransparentChrome(t *testing.T) {
 		})
 	}
 }
+
+// the field value V names the selection; Selected is consulted only when V is
+// empty.
+func TestResolveWidgetFieldChoiceValue(t *testing.T) {
+	tests := []struct {
+		name     string
+		v        []string
+		selected []int
+		want     string
+	}{
+		{"V wins over Selected", []string{"A"}, []int{1}, "A"},
+		{"Selected alone", nil, []int{1}, "B"},
+		{"nothing selected", nil, nil, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := acroform.NewChoiceField("c")
+			f.Opt = []acroform.ChoiceOption{{Export: "a", Display: "A"}, {Export: "b", Display: "B"}}
+			f.V = tc.v
+			f.Selected = tc.selected
+			w := annotation.AddWidget(f, pdf.Rectangle{URx: 100, URy: 20})
+			fld := resolveWidgetField(w)
+			if fld == nil {
+				t.Fatal("expected a field context")
+			}
+			if fld.Value != tc.want {
+				t.Errorf("Value = %q, want %q", fld.Value, tc.want)
+			}
+		})
+	}
+}

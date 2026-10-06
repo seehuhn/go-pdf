@@ -30,7 +30,6 @@ import (
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/graphics/content"
-	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/opaque"
 )
@@ -60,19 +59,12 @@ func addWidget(f acroform.Field, llx, lly, urx, ury float64) *annotation.Widget 
 }
 
 // fieldCmpOptions configures cmp for the field-tree snapshots. A widget's
-// /Parent is a back-reference into the tree and is compared structurally
-// elsewhere, so it is ignored here.
+// Field points back to the field whose snapshot holds the widget, so it is
+// ignored here.
 func fieldCmpOptions() []cmp.Option {
 	return []cmp.Option{
-		cmp.AllowUnexported(language.Tag{}),
 		cmpopts.EquateComparable(language.Tag{}),
 		cmpopts.IgnoreFields(annotation.Widget{}, "Field"),
-		cmp.Comparer(func(a, b *form.Form) bool {
-			if a == nil || b == nil {
-				return a == b
-			}
-			return a.Equal(b)
-		}),
 	}
 }
 
@@ -104,46 +96,49 @@ type nodeSnap struct {
 	Kids     []nodeSnap
 }
 
-func snapNodes(nodes []acroform.Node) []nodeSnap {
+func snapNodes(t testing.TB, nodes []acroform.Node) []nodeSnap {
+	t.Helper()
 	out := make([]nodeSnap, len(nodes))
 	for i, n := range nodes {
-		out[i] = snapNode(n)
+		out[i] = snapNode(t, n)
 	}
 	return out
 }
 
-func snapNode(n acroform.Node) nodeSnap {
+func snapNode(t testing.TB, n acroform.Node) nodeSnap {
+	t.Helper()
 	s := nodeSnap{Name: n.PartialName()}
 	switch f := n.(type) {
 	case *acroform.Group:
 		s.Kind = "Group"
-		s.Kids = snapNodes(f.Children)
+		s.Kids = snapNodes(t, f.Children)
 	case *acroform.TextField:
 		s.Kind = "Tx"
 		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
 		s.VT, s.V, s.DV, s.MaxLen = f.VariableText, f.V, f.DV, f.MaxLen
-		s.Widgets = widgetsOf(f)
+		s.Widgets = widgetsOf(t, f)
 	case *acroform.ButtonField:
 		s.Kind = "Btn"
 		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
 		s.VT, s.BtnV, s.BtnDV, s.BtnOpt = f.VariableText, f.V, f.DV, f.Opt
-		s.Widgets = widgetsOf(f)
+		s.Widgets = widgetsOf(t, f)
 	case *acroform.ChoiceField:
 		s.Kind = "Ch"
 		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
 		s.VT, s.ChV, s.ChDV = f.VariableText, f.V, f.DV
 		s.ChOpt, s.TopIndex, s.Selected = f.Opt, f.TopIndex, f.Selected
-		s.Widgets = widgetsOf(f)
+		s.Widgets = widgetsOf(t, f)
 	case *acroform.SignatureField:
 		s.Kind = "Sig"
 		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
 		s.SigV, s.SigDV, s.Lock, s.SV = f.V, f.DV, f.Lock, f.SV
-		s.Widgets = widgetsOf(f)
+		s.Widgets = widgetsOf(t, f)
 	}
 	return s
 }
 
-func widgetsOf(f acroform.Field) []*annotation.Widget {
+func widgetsOf(t testing.TB, f acroform.Field) []*annotation.Widget {
+	t.Helper()
 	ws := f.GetCommon().Widgets
 	if len(ws) == 0 {
 		return nil
@@ -151,6 +146,9 @@ func widgetsOf(f acroform.Field) []*annotation.Widget {
 	out := make([]*annotation.Widget, len(ws))
 	for i, w := range ws {
 		out[i] = w.(*annotation.Widget)
+		if out[i].Field != f {
+			t.Errorf("widget %d of field %q does not link back to it", i, f.PartialName())
+		}
 	}
 	return out
 }
@@ -171,15 +169,20 @@ func roundTripForm(t *testing.T, version pdf.Version, want *acroform.Interactive
 	w, buf := memfile.NewPDFWriter(t, version, nil)
 
 	rm := pdf.NewResourceManager(w)
+	// the pages come first: writing them reserves the widgets' references,
+	// which the form fills in
+	if err := storeWidgets(rm, want.Fields); err != nil {
+		if pdf.IsWrongVersion(err) {
+			t.Skip("version not supported")
+		}
+		t.Fatalf("store widgets: %v", err)
+	}
 	ref, err := rm.Store(want)
 	if err != nil {
 		if pdf.IsWrongVersion(err) {
 			t.Skip("version not supported")
 		}
 		t.Fatalf("encode failed: %v", err)
-	}
-	if err := storeWidgets(rm, want.Fields); err != nil {
-		t.Fatalf("store widgets: %v", err)
 	}
 	w.GetMeta().Catalog.AcroForm = ref
 
@@ -283,7 +286,7 @@ func compareForms(t *testing.T, want, got *acroform.InteractiveForm) {
 	if len(want.CalculationOrder) != len(got.CalculationOrder) {
 		t.Errorf("CalculationOrder length = %d, want %d", len(got.CalculationOrder), len(want.CalculationOrder))
 	}
-	if diff := cmp.Diff(snapNodes(want.Fields), snapNodes(got.Fields), fieldCmpOptions()...); diff != "" {
+	if diff := cmp.Diff(snapNodes(t, want.Fields), snapNodes(t, got.Fields), fieldCmpOptions()...); diff != "" {
 		t.Errorf("fields round trip failed (-want +got):\n%s", diff)
 	}
 }
@@ -381,7 +384,7 @@ func FuzzFormRoundTrip(f *testing.F) {
 			t.Skip("version cannot be written")
 		}
 		form2 := roundTripForm(t, version, form1)
-		if diff := cmp.Diff(snapNodes(form1.Fields), snapNodes(form2.Fields), fieldCmpOptions()...); diff != "" {
+		if diff := cmp.Diff(snapNodes(t, form1.Fields), snapNodes(t, form2.Fields), fieldCmpOptions()...); diff != "" {
 			t.Errorf("not a fixed point (-first +second):\n%s", diff)
 		}
 	})
@@ -443,7 +446,7 @@ func TestFormFixedPoint(t *testing.T) {
 			t.Run(fmt.Sprintf("%d-%s", i, version), func(t *testing.T) {
 				got1 := roundTripForm(t, version, form)
 				got2 := roundTripForm(t, version, got1)
-				if diff := cmp.Diff(snapNodes(got1.Fields), snapNodes(got2.Fields), fieldCmpOptions()...); diff != "" {
+				if diff := cmp.Diff(snapNodes(t, got1.Fields), snapNodes(t, got2.Fields), fieldCmpOptions()...); diff != "" {
 					t.Errorf("not a fixed point (-first +second):\n%s", diff)
 				}
 			})

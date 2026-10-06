@@ -138,3 +138,17 @@ func TestEncodeVersionGatingEntries(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeSigFlagsUndefined(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
+	form := &InteractiveForm{
+		Fields:   []Node{textField("f")},
+		SigFlags: SignaturesExist | 1<<2,
+	}
+
+	if _, err := form.Encode(rm); err == nil {
+		t.Error("expected error for undefined SigFlags bit, got nil")
+	}
+}

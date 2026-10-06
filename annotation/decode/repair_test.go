@@ -19,6 +19,7 @@ package decode
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation"
@@ -242,4 +243,184 @@ func TestStampEncodeDefaultIntent(t *testing.T) {
 	if _, ok := out.(pdf.Dict)["IT"]; ok {
 		t.Error("expected no IT entry for the default intent")
 	}
+}
+
+// Where a button's value and its widget's appearance state disagree, the
+// appearance state wins: the field value follows it so that the pair can be
+// written back.
+func TestButtonValueFollowsAppearanceState(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rect := pdf.Rectangle{URx: 20, URy: 20}
+	apRef := w.Alloc()
+	err := w.Put(apRef, pdf.Dict{"N": pdf.Dict{
+		"Off": appearanceStream(t, w, rect),
+		"Yes": appearanceStream(t, w, rect),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("merged", func(t *testing.T) {
+		ref := w.Alloc()
+		err := w.Put(ref, pdf.Dict{
+			"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
+			"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"),
+			"V": pdf.Name("Yes"), "AS": pdf.Name("Off"), "AP": apRef,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		x := pdf.NewExtractor(w)
+		a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		btn := a.(*annotation.Widget).Field.(*acroform.ButtonField)
+		if btn.V != "Off" {
+			t.Errorf("V = %q, want %q", btn.V, "Off")
+		}
+	})
+
+	t.Run("unknown state", func(t *testing.T) {
+		ref := w.Alloc()
+		err := w.Put(ref, pdf.Dict{
+			"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
+			"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"),
+			"V": pdf.Name("Yes"), "AS": pdf.Name("Maybe"), "AP": apRef,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		x := pdf.NewExtractor(w)
+		a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := a.GetCommon().AppearanceState; got != "Yes" {
+			t.Errorf("appearance state = %q, want %q", got, "Yes")
+		}
+	})
+
+	t.Run("kid", func(t *testing.T) {
+		fieldRef, kidRef := w.Alloc(), w.Alloc()
+		err := w.Put(fieldRef, pdf.Dict{
+			"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"), "V": pdf.Name("Off"),
+			"Kids": pdf.Array{kidRef},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = w.Put(kidRef, pdf.Dict{
+			"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
+			"Parent": fieldRef, "AS": pdf.Name("Yes"), "AP": apRef,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		x := pdf.NewExtractor(w)
+		node, err := decodeRootField(x, fieldRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		btn := node.(*acroform.ButtonField)
+		if btn.V != "Yes" {
+			t.Errorf("V = %q, want %q", btn.V, "Yes")
+		}
+	})
+
+	// the off state needs no appearance stream, so a check box which is
+	// off stays off even when only its on appearance is stored
+	yesOnly := w.Alloc()
+	err = w.Put(yesOnly, pdf.Dict{"N": pdf.Dict{"Yes": appearanceStream(t, w, rect)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		as   pdf.Object
+	}{
+		{"off without Off appearance", pdf.Name("Off")},
+		{"unknown state while off", pdf.Name("Maybe")},
+		{"no state while off", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ref := w.Alloc()
+			dict := pdf.Dict{
+				"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
+				"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"),
+				"V": pdf.Name("Off"), "AP": yesOnly,
+			}
+			if tc.as != nil {
+				dict["AS"] = tc.as
+			}
+			if err := w.Put(ref, dict); err != nil {
+				t.Fatal(err)
+			}
+			x := pdf.NewExtractor(w)
+			a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wd := a.(*annotation.Widget)
+			if wd.AppearanceState != "Off" {
+				t.Errorf("appearance state = %q, want %q", wd.AppearanceState, "Off")
+			}
+			if btn := wd.Field.(*acroform.ButtonField); btn.V != "Off" {
+				t.Errorf("V = %q, want %q", btn.V, "Off")
+			}
+		})
+	}
+
+	// where two widgets are on in different states, the one the value
+	// names stays on and the other is switched off
+	t.Run("two kids on", func(t *testing.T) {
+		apA, apB := w.Alloc(), w.Alloc()
+		for ref, state := range map[pdf.Reference]pdf.Name{apA: "A", apB: "B"} {
+			err := w.Put(ref, pdf.Dict{"N": pdf.Dict{
+				state: appearanceStream(t, w, rect),
+				"Off": appearanceStream(t, w, rect),
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		fieldRef, kidA, kidB := w.Alloc(), w.Alloc(), w.Alloc()
+		err := w.Put(fieldRef, pdf.Dict{
+			"FT": pdf.Name("Btn"), "Ff": pdf.Integer(acroform.FieldRadio),
+			"T": pdf.TextString("rb"), "V": pdf.Name("B"),
+			"Kids": pdf.Array{kidA, kidB},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for ref, state := range map[pdf.Reference]pdf.Name{kidA: "A", kidB: "B"} {
+			ap := apA
+			if state == "B" {
+				ap = apB
+			}
+			err := w.Put(ref, pdf.Dict{
+				"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
+				"Parent": fieldRef, "AS": state, "AP": ap,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		x := pdf.NewExtractor(w)
+		node, err := decodeRootField(x, fieldRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		btn := node.(*acroform.ButtonField)
+		if btn.V != "B" {
+			t.Errorf("V = %q, want %q", btn.V, "B")
+		}
+		var states []pdf.Name
+		for _, wi := range btn.Widgets {
+			states = append(states, wi.(*annotation.Widget).AppearanceState)
+		}
+		if diff := cmp.Diff([]pdf.Name{"Off", "B"}, states); diff != "" {
+			t.Errorf("widget states mismatch (-want +got):\n%s", diff)
+		}
+	})
 }

@@ -264,11 +264,10 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 			return nil, err
 		}
 		if w, ok := a.(*annotation.Widget); ok && w != nil {
-			w.Field = f
-			fc := f.GetCommon()
-			fc.Widgets = append(fc.Widgets, w)
+			linkWidget(f, w)
 		}
 	}
+	reconcileButtonValue(f)
 	if p := c.Path(); p != nil {
 		d.byRef[p.Ref] = f
 	}
@@ -329,7 +328,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 	switch eff.ft {
 	case "Tx":
 		f := acroform.NewTextField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
 		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
 			return nil, err
 		}
@@ -358,7 +357,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 
 	case "Btn":
 		f := acroform.NewButtonField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
 		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
 			return nil, err
 		}
@@ -379,7 +378,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 
 	case "Ch":
 		f := acroform.NewChoiceField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
 		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
 			return nil, err
 		}
@@ -391,19 +390,24 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 			return nil, err
 		}
 		// the choice /Opt is not inheritable; read it from the field itself
+		var dropped []int // original indices of unusable /Opt elements
 		if arr, err := pdf.Optional(c.Array(dict["Opt"])); err != nil {
 			return nil, err
 		} else {
-			for _, el := range arr {
+			for i, el := range arr {
 				if opt, ok := decodeChoiceOption(c, el); ok {
 					f.Opt = append(f.Opt, opt)
+				} else {
+					dropped = append(dropped, i)
 				}
 			}
 		}
+		// /TI and /I index the original /Opt array; move them with the
+		// options that remain and drop those left without a target
 		if ti, err := pdf.Optional(c.Integer(dict["TI"])); err != nil {
 			return nil, err
-		} else if ti > 0 {
-			f.TopIndex = int(ti)
+		} else if idx, ok := remapOptIndex(int(ti), len(f.Opt), dropped); ok {
+			f.TopIndex = idx
 		}
 		if arr, err := pdf.Optional(c.Array(dict["I"])); err != nil {
 			return nil, err
@@ -411,16 +415,41 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 			for _, el := range arr {
 				if idx, err := pdf.Optional(c.Integer(el)); err != nil {
 					return nil, err
-				} else if idx >= 0 {
-					f.Selected = append(f.Selected, int(idx))
+				} else if idx, ok := remapOptIndex(int(idx), len(f.Opt), dropped); ok {
+					f.Selected = append(f.Selected, idx)
 				}
 			}
+			slices.Sort(f.Selected)
+			f.Selected = slices.Compact(f.Selected)
+		}
+		// several selections in a single-selection field leave the intended
+		// one unknown; a bad /V takes its /I along, which only restated it
+		if f.Flags&acroform.FieldMultiSelect == 0 {
+			if len(f.V) > 1 {
+				f.V, f.Selected = nil, nil
+			}
+			if len(f.Selected) > 1 {
+				f.Selected = nil
+			}
+			if len(f.DV) > 1 {
+				f.DV = nil
+			}
+		}
+		// where /V and /I disagree, /V is authoritative; without /V, /I is
+		// the only record of the selection
+		if len(f.V) == 0 {
+			f.V = nil
+			for _, idx := range f.Selected {
+				f.V = append(f.V, f.Opt[idx].Display)
+			}
+		} else if !f.SelectionAgrees() {
+			f.Selected = nil
 		}
 		return f, nil
 
 	case "Sig":
 		f := acroform.NewSignatureField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff, aa
+		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
 		f.V = sigValue(c, eff.v)
 		f.DV = sigValue(c, eff.dv)
 		if lock, err := pdf.DecodeOptional(c, dict["Lock"], sigFieldLock); err != nil {
@@ -589,6 +618,22 @@ func decodeChoiceOption(c pdf.Cursor, el pdf.Object) (acroform.ChoiceOption, boo
 	return acroform.ChoiceOption{}, false
 }
 
+// remapOptIndex translates an index into the original /Opt array to an index
+// into the decoded options, given the ascending original indices of the
+// elements that were dropped. It reports false if the index pointed at a
+// dropped element or lies outside the array.
+func remapOptIndex(idx, numOpt int, dropped []int) (int, bool) {
+	pos, found := slices.BinarySearch(dropped, idx)
+	if found {
+		return 0, false
+	}
+	idx -= pos
+	if idx < 0 || idx >= numOpt {
+		return 0, false
+	}
+	return idx, true
+}
+
 // choiceFieldValue reads a choice field's /V or /DV entry, which is a bare text
 // string for a single selection or an array of text strings for multiple
 // selections. A malformed length-one array is accepted as a single selection;
@@ -656,37 +701,37 @@ func acroFormDefaults(c pdf.Cursor) (da string, q pdf.TextAlign) {
 	return da, q
 }
 
-// inheritedFromChain reconstructs a field's inherited context by walking its
-// /Parent chain up to the root and seeding it with the interactive form
-// dictionary's /DA and /Q defaults. It is used on the page side to flatten a
-// merged field/widget reached from a page's /Annots, where the tree's top-down
-// context is unavailable. It computes the same values as the top-down walk, so
-// both directions produce identical flattened fields.
+// inheritedFromChain reconstructs a field's inherited context from its
+// /Parent chain, seeded with the interactive form dictionary's /DA and /Q
+// defaults. It is used on the page side to flatten a merged field/widget
+// reached from a page's /Annots, where the tree's top-down context is
+// unavailable. It computes the same values as the top-down walk, so both
+// directions produce identical flattened fields.
+//
+// Each ancestor's context is decoded through [pdf.Decode], so it is computed
+// once per ancestor and shared by every widget below it, the chain is bounded
+// by the extract depth limit, and a cycle ends the chain.
 func inheritedFromChain(c pdf.Cursor, dict pdf.Dict) inherited {
-	var chain []pdf.Dict
-	visited := map[pdf.Reference]bool{}
-	cur := dict
-	for {
-		ref, ok := cur["Parent"].(pdf.Reference)
-		if !ok || visited[ref] {
-			break
+	if ref, ok := dict["Parent"].(pdf.Reference); ok {
+		if ctx, err := pdf.Decode(c, ref, ancestorContext); err == nil {
+			return *ctx
 		}
-		visited[ref] = true
-		parent, err := c.Dict(ref)
-		if err != nil || parent == nil {
-			break
-		}
-		chain = append(chain, parent)
-		cur = parent
 	}
-
 	da, q := acroFormDefaults(c)
-	ctx := inherited{da: da, q: q}
-	// apply ancestors from the root down, so a nearer ancestor wins
-	for _, c0 := range slices.Backward(chain) {
-		ctx = applyOwnContext(ctx, c, c0)
+	return inherited{da: da, q: q}
+}
+
+// ancestorContext decodes the context a field dictionary passes on to its
+// descendants: its own inheritable entries applied over the context of its own
+// ancestors. A chain cut short by a cycle or the depth limit starts from the
+// form defaults at the cut, so the result is always a context and is cached.
+func ancestorContext(c pdf.Cursor, obj pdf.Object, _ bool) (*inherited, error) {
+	dict, err := c.Dict(obj)
+	if err != nil {
+		return nil, err
 	}
-	return ctx
+	ctx := applyOwnContext(inheritedFromChain(c, dict), c, dict)
+	return &ctx, nil
 }
 
 // decodeMergedField decodes one dictionary that is both a form field and its
@@ -718,9 +763,8 @@ func decodeMergedField(c pdf.Cursor, ref pdf.Reference, dict pdf.Dict, ctx inher
 	// link the pair before publishing: StoreOrLoadPair publishes both halves
 	// atomically, so the winner's already-linked f/w become the shared pair and
 	// a losing concurrent decoder adopts them without mutating shared state.
-	fcom := f.GetCommon()
-	fcom.Widgets = append(fcom.Widgets, w)
-	w.Field = f
+	linkWidget(f, w)
+	reconcileButtonValue(f)
 	fc, ac := pdf.StoreOrLoadPair[acroform.Field, annotation.Annotation](c.Extractor(), ref, f, w)
 	return fc, ac.(*annotation.Widget), nil
 }

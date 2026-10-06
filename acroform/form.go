@@ -172,6 +172,9 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if f.SigFlags != 0 {
+		if f.SigFlags&^(SignaturesExist|AppendOnly) != 0 {
+			return nil, errors.New("undefined SigFlags bits")
+		}
 		if err := pdf.CheckVersion(rm.Out, "interactive form SigFlags entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
@@ -265,6 +268,10 @@ func (f *InteractiveForm) buildEncNode(rm *pdf.ResourceManager, node Node, seenN
 				return nil, errors.New("widget appears more than once in the form")
 			}
 			seenWidget[w] = true
+			if p := w.ParentField(); p != t {
+				return nil, fmt.Errorf("widget of field %q lists field %q as its parent",
+					t.PartialName(), nodeName(p))
+			}
 		}
 		dict, err := terminalEntries(rm, t)
 		if err != nil {
@@ -387,6 +394,11 @@ func writeWidget(rm *pdf.ResourceManager, w Widget, fieldEntries pdf.Dict, paren
 	if formhooks.EncodeWidgetEntries == nil {
 		return 0, errors.New("annotation package not linked")
 	}
+	// a widget on a page reserved its reference when the page was written;
+	// one without a reference is on no page and would never be seen
+	if rm.Out.Origin(w) == 0 {
+		return 0, fmt.Errorf("widget of field %q is not on any page", nodeName(w.ParentField()))
+	}
 	dict, err := formhooks.EncodeWidgetEntries(rm, w)
 	if err != nil {
 		return 0, err
@@ -439,6 +451,15 @@ func putNode(rm *pdf.ResourceManager, ref pdf.Reference, dict pdf.Dict, parentRe
 		dict["Parent"] = parentRef
 	}
 	return rm.Out.Put(ref, dict)
+}
+
+// nodeName returns a field's partial name for an error message, or "<nil>"
+// for a missing field.
+func nodeName(f Field) string {
+	if f == nil {
+		return "<nil>"
+	}
+	return f.PartialName()
 }
 
 // sameTypeAndValue reports whether two fields have the same field type, value

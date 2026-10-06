@@ -123,6 +123,11 @@ func fieldTestCases() []struct {
 			f.Selected = []int{0, 2}
 			f.V = []string{"Red", "Blue"}
 		})},
+		{"list box selection", ch("sizes", func(f *acroform.ChoiceField) {
+			f.Opt = []acroform.ChoiceOption{{Export: "S", Display: "Small"}, {Export: "L", Display: "Large"}}
+			f.Selected = []int{1}
+			f.V = []string{"Large"}
+		})},
 		{"checkbox", btn("agree", func(f *acroform.ButtonField) { f.V = "Yes"; f.DV = "Off" })},
 		{"radio with export values", btn("size", func(f *acroform.ButtonField) {
 			f.Flags = acroform.FieldRadio
@@ -193,7 +198,7 @@ func TestFieldRoundTrip(t *testing.T) {
 		for _, tc := range fieldTestCases() {
 			t.Run(tc.name+"-"+version.String(), func(t *testing.T) {
 				got := roundTripRoots(t, version, tc.root)
-				if diff := cmp.Diff(snapNodes([]acroform.Node{tc.root}), snapNodes(got), fieldCmpOptions()...); diff != "" {
+				if diff := cmp.Diff(snapNodes(t, []acroform.Node{tc.root}), snapNodes(t, got), fieldCmpOptions()...); diff != "" {
 					t.Errorf("round trip failed (-want +got):\n%s", diff)
 				}
 			})
@@ -627,7 +632,7 @@ func TestDecodeChoiceValueNormalises(t *testing.T) {
 			x := pdf.NewExtractor(w)
 
 			ref := w.Alloc()
-			dict := pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("choice")}
+			dict := pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("choice"), "Ff": pdf.Integer(acroform.FieldMultiSelect)}
 			if tc.v != nil {
 				dict["V"] = tc.v
 			}
@@ -866,5 +871,297 @@ func TestDecodeFieldRepairs(t *testing.T) {
 	}
 	if da := node.(*acroform.ChoiceField).DefaultAppearance; da == "" {
 		t.Error("choice field without DA was not repaired")
+	}
+}
+
+// flag combinations the spec forbids are snapped to valid ones on read, so
+// that the field stays writable.
+func TestDecodeFlagSnap(t *testing.T) {
+	tests := []struct {
+		name string
+		ft   pdf.Name
+		ff   acroform.FieldFlags
+		want acroform.FieldFlags
+	}{
+		{"radio and pushbutton", "Btn", acroform.FieldRadio | acroform.FieldPushbutton, acroform.FieldPushbutton},
+		{"text flag on button", "Btn", acroform.FieldRadio | acroform.FieldMultiline, acroform.FieldRadio},
+		{"edit without combo", "Ch", acroform.FieldEdit | acroform.FieldMultiSelect, acroform.FieldMultiSelect},
+		{"reserved bit on text", "Tx", acroform.FieldMultiline | 1<<31, acroform.FieldMultiline},
+		{"button flag on signature", "Sig", acroform.FieldReadOnly | acroform.FieldPushbutton, acroform.FieldReadOnly},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			x := pdf.NewExtractor(w)
+			ref := w.Alloc()
+			dict := pdf.Dict{"FT": tc.ft, "T": pdf.String("x"), "Ff": pdf.Integer(tc.ff), "DA": pdf.String(testDA)}
+			if err := w.Put(ref, dict); err != nil {
+				t.Fatal(err)
+			}
+
+			node, err := decodeRootField(x, ref)
+			if err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
+			if got := node.(acroform.Field).GetCommon().Flags; got != tc.want {
+				t.Errorf("Flags = %#x, want %#x", uint32(got), uint32(tc.want))
+			}
+		})
+	}
+}
+
+// selection indices and the top index refer to positions in the /Opt array;
+// when an unusable /Opt element is dropped, the indices move with the options
+// that remain.
+func TestDecodeChoiceIndexRemap(t *testing.T) {
+	// elements 1 and 3 are unusable, leaving A, B, C at indices 0, 1, 2
+	opt := pdf.Array{
+		pdf.String("A"),
+		pdf.Integer(42),
+		pdf.String("B"),
+		pdf.Array{pdf.Integer(1), pdf.String("x")},
+		pdf.String("C"),
+	}
+	tests := []struct {
+		name         string
+		ff           acroform.FieldFlags
+		i            pdf.Array
+		ti           pdf.Object
+		v            pdf.Object
+		wantSelected []int
+		wantTopIndex int
+	}{
+		{"shifted indices", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(2), pdf.Integer(4)}, pdf.Integer(4), nil, []int{1, 2}, 2},
+		{"dropped option", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(1), pdf.Integer(2)}, pdf.Integer(1), nil, []int{1}, 0},
+		{"out of range", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(0), pdf.Integer(7)}, pdf.Integer(7), nil, []int{0}, 0},
+		{"unsorted duplicates", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(4), pdf.Integer(0), pdf.Integer(4)}, nil, nil, []int{0, 2}, 0},
+		{"single select drops several", 0, pdf.Array{pdf.Integer(0), pdf.Integer(2)}, nil, nil, nil, 0},
+		{"single select keeps duplicates of one", 0, pdf.Array{pdf.Integer(2), pdf.Integer(2)}, nil, nil, []int{1}, 0},
+		{"V wins over I", 0, pdf.Array{pdf.Integer(0)}, nil, pdf.String("B"), nil, 0},
+		{"V agrees with I", 0, pdf.Array{pdf.Integer(2)}, nil, pdf.String("B"), []int{1}, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			x := pdf.NewExtractor(w)
+			ref := w.Alloc()
+			dict := pdf.Dict{
+				"FT":  pdf.Name("Ch"),
+				"T":   pdf.String("c"),
+				"DA":  pdf.String(testDA),
+				"Ff":  pdf.Integer(tc.ff),
+				"Opt": opt,
+				"I":   tc.i,
+			}
+			if tc.ti != nil {
+				dict["TI"] = tc.ti
+			}
+			if tc.v != nil {
+				dict["V"] = tc.v
+			}
+			if err := w.Put(ref, dict); err != nil {
+				t.Fatal(err)
+			}
+
+			node, err := decodeRootField(x, ref)
+			if err != nil {
+				t.Fatalf("decode failed: %v", err)
+			}
+			ch := node.(*acroform.ChoiceField)
+			if diff := cmp.Diff(tc.wantSelected, ch.Selected); diff != "" {
+				t.Errorf("Selected mismatch (-want +got):\n%s", diff)
+			}
+			if ch.TopIndex != tc.wantTopIndex {
+				t.Errorf("TopIndex = %d, want %d", ch.TopIndex, tc.wantTopIndex)
+			}
+
+			// the repaired field must survive a write-read cycle unchanged
+			got := roundTripRoots(t, pdf.V1_7, node)
+			if diff := cmp.Diff(snapNodes(t, []acroform.Node{node}), snapNodes(t, got), fieldCmpOptions()...); diff != "" {
+				t.Errorf("round trip failed (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// a single-selection field with several values has no usable value, and
+// its /I goes with it; the same holds for several default values
+func TestDecodeChoiceSingleSelectValue(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+	ref := w.Alloc()
+	dict := pdf.Dict{
+		"FT":  pdf.Name("Ch"),
+		"T":   pdf.String("c"),
+		"DA":  pdf.String(testDA),
+		"Opt": pdf.Array{pdf.String("A"), pdf.String("B")},
+		"V":   pdf.Array{pdf.String("B"), pdf.String("A")},
+		"I":   pdf.Array{pdf.Integer(1)},
+		"DV":  pdf.Array{pdf.String("A"), pdf.String("B")},
+	}
+	if err := w.Put(ref, dict); err != nil {
+		t.Fatal(err)
+	}
+	node, err := decodeRootField(x, ref)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	ch := node.(*acroform.ChoiceField)
+	if ch.V != nil || ch.Selected != nil {
+		t.Errorf("V, Selected = %q, %v, want nil, nil", ch.V, ch.Selected)
+	}
+	if ch.DV != nil {
+		t.Errorf("DV = %q, want nil", ch.DV)
+	}
+}
+
+// /V need not list the selections in the order of /I
+func TestDecodeChoiceValueOrder(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+	ref := w.Alloc()
+	dict := pdf.Dict{
+		"FT":  pdf.Name("Ch"),
+		"Ff":  pdf.Integer(acroform.FieldMultiSelect),
+		"T":   pdf.String("c"),
+		"DA":  pdf.String(testDA),
+		"Opt": pdf.Array{pdf.String("A"), pdf.String("B")},
+		"V":   pdf.Array{pdf.String("B"), pdf.String("A")},
+		"I":   pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+	}
+	if err := w.Put(ref, dict); err != nil {
+		t.Fatal(err)
+	}
+	node, err := decodeRootField(x, ref)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	ch := node.(*acroform.ChoiceField)
+	if diff := cmp.Diff([]string{"B", "A"}, ch.V); diff != "" {
+		t.Errorf("V mismatch (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff([]int{0, 1}, ch.Selected); diff != "" {
+		t.Errorf("Selected mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// countingGetter counts the indirect objects loaded through it.
+type countingGetter struct {
+	pdf.Getter
+	loads int
+}
+
+func (g *countingGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
+	g.loads++
+	return g.Getter.Get(ref, canObjStm)
+}
+
+// parentChain writes a chain of depth field dictionaries linked by /Parent and
+// returns their references, the root first. Every node carries the entries
+// needed to recognise a field, so that a truncated chain still yields one.
+func parentChain(t *testing.T, w *pdf.Writer, depth int) []pdf.Reference {
+	t.Helper()
+	refs := make([]pdf.Reference, depth)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i, ref := range refs {
+		d := pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String(fmt.Sprintf("p%d", i)), "DA": pdf.String(testDA)}
+		if i > 0 {
+			d["Parent"] = refs[i-1]
+		}
+		if err := w.Put(ref, d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return refs
+}
+
+func mergedWidget(parent pdf.Reference, name string) pdf.Dict {
+	return pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"),
+		"Rect": &pdf.Rectangle{URx: 10, URy: 10},
+		"T":    pdf.String(name), "Parent": parent,
+	}
+}
+
+// Many page-side widgets sharing one /Parent chain load each ancestor once,
+// not once per widget.
+func TestDecodeParentChainShared(t *testing.T) {
+	const depth, numWidgets = 50, 50
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	chain := parentChain(t, w, depth)
+	widgets := make([]pdf.Reference, numWidgets)
+	for i := range widgets {
+		widgets[i] = w.Alloc()
+		if err := w.Put(widgets[i], mergedWidget(chain[depth-1], fmt.Sprintf("w%d", i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	g := &countingGetter{Getter: w}
+	x := pdf.NewExtractor(g)
+	for _, ref := range widgets {
+		a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx, ok := a.(*annotation.Widget).Field.(*acroform.TextField)
+		if !ok {
+			t.Fatalf("widget field = %T, want *acroform.TextField", a.(*annotation.Widget).Field)
+		}
+		if tx.DefaultAppearance != testDA {
+			t.Errorf("DefaultAppearance = %q, want %q", tx.DefaultAppearance, testDA)
+		}
+	}
+	// a few loads per widget and per ancestor, far below the product
+	if limit := 4 * (depth + numWidgets); g.loads > limit {
+		t.Errorf("loaded %d objects, want at most %d", g.loads, limit)
+	}
+}
+
+// A /Parent chain deeper than the extract limit is cut off rather than
+// followed to the end; the widget still decodes to a field.
+func TestDecodeParentChainDeepBounded(t *testing.T) {
+	depth := limits.MaxExtractDepth + 10
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	chain := parentChain(t, w, depth)
+	ref := w.Alloc()
+	if err := w.Put(ref, mergedWidget(chain[depth-1], "w")); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.(*annotation.Widget).Field == nil {
+		t.Error("widget has no field")
+	}
+}
+
+// A /Parent cycle terminates and still yields a field.
+func TestDecodeParentChainCycle(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	a, b := w.Alloc(), w.Alloc()
+	if err := w.Put(a, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "DA": pdf.String(testDA), "Parent": b}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(b, pdf.Dict{"T": pdf.String("b"), "Parent": a}); err != nil {
+		t.Fatal(err)
+	}
+	ref := w.Alloc()
+	if err := w.Put(ref, mergedWidget(a, "w")); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	an, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := an.(*annotation.Widget).Field.(*acroform.TextField); !ok {
+		t.Errorf("widget field = %T, want *acroform.TextField", an.(*annotation.Widget).Field)
 	}
 }

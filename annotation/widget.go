@@ -18,6 +18,7 @@ package annotation
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	"seehuhn.de/go/pdf"
@@ -157,6 +158,9 @@ func (w *Widget) encodeOwnEntries(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	if w.BorderStyle != nil && w.Common.Border != nil {
 		return nil, errors.New("Border and BorderStyle are mutually exclusive")
 	}
+	if err := w.checkButtonState(); err != nil {
+		return nil, err
+	}
 
 	dict := pdf.Dict{
 		"Subtype": pdf.Name("Widget"),
@@ -212,6 +216,30 @@ func (w *Widget) encodeOwnEntries(rm *pdf.ResourceManager) (pdf.Dict, error) {
 	}
 
 	return dict, nil
+}
+
+// checkButtonState verifies that a check box or radio button widget's
+// appearance state agrees with the field value and, unless it is "Off",
+// names one of its normal appearances: a widget is either off, which needs
+// no appearance stream, or on with the state the value names.
+func (w *Widget) checkButtonState() error {
+	btn, ok := w.Field.(*acroform.ButtonField)
+	if !ok || btn.Variant() == acroform.ButtonPush || w.AppearanceState == "" {
+		return nil
+	}
+	as := w.AppearanceState
+	if as == "Off" {
+		return nil
+	}
+	if w.Appearance != nil && len(w.Appearance.NormalMap) > 0 {
+		if _, ok := w.Appearance.NormalMap[as]; !ok {
+			return fmt.Errorf("appearance state %q has no normal appearance", as)
+		}
+	}
+	if as != btn.V {
+		return fmt.Errorf("appearance state %q disagrees with field value %q", as, btn.V)
+	}
+	return nil
 }
 
 // fieldHasWidget reports whether f lists w among its widget annotations. A

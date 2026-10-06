@@ -155,15 +155,17 @@ func buttonValue(f acroform.Field) pdf.Name {
 }
 
 // choiceValue returns the display text of a choice field's current selection.
+// The field value names the selection; the selection indices are consulted
+// only when the value is empty.
 func choiceValue(x *acroform.ChoiceField) string {
+	if len(x.V) > 0 {
+		return x.V[0]
+	}
 	if len(x.Selected) > 0 {
 		i := x.Selected[0]
 		if i >= 0 && i < len(x.Opt) {
 			return x.Opt[i].Display
 		}
-	}
-	if len(x.V) > 0 {
-		return x.V[0]
 	}
 	return ""
 }

@@ -5998,7 +5998,6 @@ types:
     required: false
     introduced: '1.2'
     goType: '[]acroform.ChoiceOption'
-    inheritable: true
     notes: Table 234
   - goName: TopIndex
     pdfKey: TI
@@ -6007,14 +6006,12 @@ types:
     default: '0'
     introduced: '1.2'
     goType: int
-    inheritable: true
   - goName: Selected
     pdfKey: I
     pdfType: array
     required: false
     introduced: '1.4'
     goType: '[]int'
-    inheritable: true
   - goName: V
     pdfKey: V
     pdfType: array;text-string
@@ -6346,7 +6343,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.3'
-    goType: '[]pdf.Reference'
+    goType: '[]acroform.Field'
     refTypes:
     - type: Field
       collection: array

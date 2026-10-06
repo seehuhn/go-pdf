@@ -37,7 +37,7 @@ func TestTreeRoundTrip(t *testing.T) {
 	root := &acroform.Group{Name: "request", Children: []acroform.Node{text, other}}
 
 	got := roundTripRoots(t, pdf.V1_7, root)
-	if diff := cmp.Diff(snapNodes([]acroform.Node{root}), snapNodes(got), fieldCmpOptions()...); diff != "" {
+	if diff := cmp.Diff(snapNodes(t, []acroform.Node{root}), snapNodes(t, got), fieldCmpOptions()...); diff != "" {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }

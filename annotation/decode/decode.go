@@ -100,10 +100,19 @@ func repairMissingAppearance(a annotation.Annotation, v pdf.Version) {
 // else falls back to [appearance.Dict.AnyState].
 func repairMissingAppearanceState(c pdf.Cursor, a annotation.Annotation, dict pdf.Dict) {
 	common := a.GetCommon()
+	w, isWidget := a.(*annotation.Widget)
 	if common.AppearanceState != "" {
-		return
+		// a widget whose state names no appearance is treated as though it
+		// named none; other annotations keep the state they name
+		if !isWidget || common.Appearance == nil || len(common.Appearance.NormalMap) == 0 {
+			return
+		}
+		if _, ok := common.Appearance.NormalMap[common.AppearanceState]; ok {
+			return
+		}
+		common.AppearanceState = ""
 	}
-	if w, ok := a.(*annotation.Widget); ok {
+	if isWidget {
 		if state, ok := buttonAppearanceState(c, w, dict); ok {
 			common.AppearanceState = state
 			return
@@ -112,16 +121,65 @@ func repairMissingAppearanceState(c pdf.Cursor, a annotation.Annotation, dict pd
 	common.AppearanceState = common.Appearance.AnyState()
 }
 
+// linkWidget attaches a widget to its field.
+func linkWidget(f acroform.Field, w *annotation.Widget) {
+	w.Field = f
+	fc := f.GetCommon()
+	fc.Widgets = append(fc.Widgets, w)
+}
+
+// reconcileButtonValue makes a check box or radio button's value agree with
+// the appearance states of its widgets, once all of them are linked. Where
+// the two disagree the appearance state wins, as the specification directs:
+// the value becomes the state of a widget which is on, or "Off" when every
+// widget names a state and none is on.  Where widgets are on in different
+// states, the state the value names wins, else the first; the others are
+// switched off, since a field holds one value.
+func reconcileButtonValue(f acroform.Field) {
+	btn, ok := f.(*acroform.ButtonField)
+	if !ok || btn.Variant() == acroform.ButtonPush || len(btn.Widgets) == 0 {
+		return
+	}
+	allNamed := true
+	var on pdf.Name
+	for _, wi := range btn.Widgets {
+		w, ok := wi.(*annotation.Widget)
+		if !ok {
+			continue
+		}
+		switch as := w.AppearanceState; as {
+		case "":
+			allNamed = false
+		case "Off":
+		default:
+			if on == "" || as == btn.V {
+				on = as
+			}
+		}
+	}
+	switch {
+	case on != "":
+		btn.V = on
+		for _, wi := range btn.Widgets {
+			if w, ok := wi.(*annotation.Widget); ok && w.AppearanceState != "" && w.AppearanceState != on {
+				w.AppearanceState = "Off"
+			}
+		}
+	case allNamed && btn.V != "" && btn.V != "Off":
+		btn.V = "Off"
+	}
+}
+
 // buttonAppearanceState returns the appearance state a check box or radio
 // button widget shows, taken from the value of its field.  The second return
-// value is false if the annotation is not such a widget, or if neither the
-// value nor "Off" names one of the widget's normal appearances.
+// value is false if the annotation is not such a widget.
 //
 // A button field's value and the appearance states of its widgets say the same
 // thing, so a widget whose file names no state takes one from the value rather
 // than from the appearance dictionary alone: a check box which is on must not
-// come out unchecked.  A widget the value does not name is off, which is also
-// where a radio button other than the selected one ends up.
+// come out unchecked, and one which is off must not come out checked.  A
+// widget the value does not name is off, which is also where a radio button
+// other than the selected one ends up.
 //
 // The field of a widget read on its own is not known yet, so the value is
 // reconstructed from the /Parent chain the way the field tree does it.  The
@@ -154,10 +212,8 @@ func buttonAppearanceState(c pdf.Cursor, w *annotation.Widget, dict pdf.Dict) (p
 			return value, true
 		}
 	}
-	if _, ok := ap.NormalMap["Off"]; ok {
-		return "Off", true
-	}
-	return "", false
+	// the off state needs no appearance stream
+	return "Off", true
 }
 
 // emptyAppearance builds an appearance dictionary which draws nothing over the
