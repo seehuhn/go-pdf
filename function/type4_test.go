@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"strconv"
 	"testing"
 
 	"seehuhn.de/go/postscript"
@@ -751,6 +752,141 @@ func TestType4ApplyOutputAliasesInputs(t *testing.T) {
 	for i := range want {
 		if buf[i] != want[i] {
 			t.Errorf("aliased Apply[%d] = %v, want %v", i, buf[i], want[i])
+		}
+	}
+}
+
+// A result which is not a finite number is an undefinedresult error, so
+// the outputs are those of a failed evaluation rather than NaN or Inf.
+func TestType4NonFiniteResult(t *testing.T) {
+	programs := []string{
+		"pop -1 0.5 exp",            // NaN: negative base, fractional exponent
+		"pop 1e200 dup mul",         // Inf: overflow
+		"pop 1e200 dup mul dup sub", // NaN: Inf - Inf
+		"pop 1e200 dup mul 0 mul",   // NaN: Inf * 0
+		"pop 1e308 1e308 add",       // Inf: overflow
+		"pop 1e308 neg 1e308 sub",   // -Inf: overflow
+		"pop 1e300 1e-300 div",      // Inf: overflow
+		"pop 10 400 exp",            // Inf: overflow
+	}
+	for _, prog := range programs {
+		t.Run(prog, func(t *testing.T) {
+			f := &Type4{Domain: []float64{0, 1}, Range: []float64{0.25, 1}, Program: prog}
+			out := []float64{math.NaN()}
+			f.Apply(out, []float64{0.5})
+			if out[0] != 0.25 {
+				t.Errorf("got %v, want the range minimum 0.25", out[0])
+			}
+		})
+	}
+}
+
+// Number literals follow the PostScript syntax.  Go-only forms such as NaN,
+// Inf, hex floats or underscores are names, which are not valid operators.
+func TestType4NumberLiterals(t *testing.T) {
+	valid := []struct {
+		prog string
+		want float64
+	}{
+		{"pop 7", 7},
+		{"pop -.5", -0.5},
+		{"pop 1.5e-1", 0.15},
+		{"pop 2E1", 20},
+		{"pop 16#FF", 255},
+		{"pop 2#101", 5},
+	}
+	for _, tc := range valid {
+		t.Run(tc.prog, func(t *testing.T) {
+			f := &Type4{Domain: []float64{0, 1}, Range: []float64{-1000, 1000}, Program: tc.prog}
+			out := []float64{0}
+			f.Apply(out, []float64{0.5})
+			if math.Abs(out[0]-tc.want) > 1e-12 {
+				t.Errorf("got %v, want %v", out[0], tc.want)
+			}
+		})
+	}
+
+	invalid := []string{
+		"pop NaN",
+		"pop Inf",
+		"pop -Inf",
+		"pop infinity",
+		"pop 0x1p3",
+		"pop 1_0.5",
+		"pop 1e400",
+	}
+	for _, prog := range invalid {
+		t.Run(prog, func(t *testing.T) {
+			if _, err := compile(prog); err == nil {
+				t.Error("expected an error")
+			}
+		})
+	}
+}
+
+// Integer overflow and real-to-integer conversion at the limits of int.
+func TestType4IntegerLimits(t *testing.T) {
+	minInt := strconv.Itoa(math.MinInt)
+	tests := []struct {
+		prog string
+		want value // zero value: an error is expected
+	}{
+		{"0 " + minInt + " sub", realVal(-float64(math.MinInt))},
+		{"-1 " + minInt + " sub", intVal(math.MaxInt)},
+		{"1 " + minInt + " sub", realVal(1 - float64(math.MinInt))},
+		{"-1 " + minInt + " mul", realVal(-float64(math.MinInt))},
+		{minInt + " -1 mul", realVal(-float64(math.MinInt))},
+		{minInt + " -1 idiv", value{}},
+		{minInt + " 1 idiv", intVal(math.MinInt)},
+		{"9223372036854775807.0 cvi", value{}}, // rounds to 2^63
+		{"-9223372036854775808.0 cvi", intVal(math.MinInt)},
+		{"9223372036854774784.0 cvi", intVal(9223372036854774784)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.prog, func(t *testing.T) {
+			code, err := compile(tc.prog)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stack, err := execute(code, nil)
+			if tc.want == (value{}) {
+				if err == nil {
+					t.Errorf("expected an error, got %v", stack)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(stack) != 1 || stack[0] != tc.want {
+				t.Errorf("got %v, want %v", stack, tc.want)
+			}
+		})
+	}
+}
+
+func TestType4Round(t *testing.T) {
+	tests := []struct{ in, want float64 }{
+		{0.49999999999999994, 0},
+		{0.5, 1},
+		{-0.5, 0},
+		{-6.5, -6},
+		{-6.6, -7},
+		{2.5, 3},
+		{1<<52 + 1, 1<<52 + 1},
+		{-(1<<52 + 1), -(1<<52 + 1)},
+	}
+	code, err := compile("round")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range tests {
+		stack, err := execute(code, []value{realVal(tc.in)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := stack[0].fval; got != tc.want {
+			t.Errorf("%v round: got %v, want %v", tc.in, got, tc.want)
 		}
 	}
 }

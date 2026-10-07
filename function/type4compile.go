@@ -18,7 +18,8 @@ package function
 
 import (
 	"fmt"
-	"strconv"
+
+	"seehuhn.de/go/postscript"
 )
 
 // operator name → opcode for the allowed Type 4 operators (PDF spec Table 42)
@@ -108,15 +109,16 @@ func tokenize(src string) ([]token, error) {
 		}
 		word := src[start:i]
 
-		// try integer
-		if iv, err := strconv.ParseInt(word, 10, 64); err == nil {
-			tokens = append(tokens, token{typ: tokInt, ival: int(iv)})
-			continue
+		num, err := postscript.ParseNumber([]byte(word))
+		if err != nil {
+			return nil, err
 		}
-
-		// try real
-		if fv, err := strconv.ParseFloat(word, 64); err == nil {
-			tokens = append(tokens, token{typ: tokReal, fval: fv})
+		switch num := num.(type) {
+		case postscript.Integer:
+			tokens = append(tokens, token{typ: tokInt, ival: int(num)})
+			continue
+		case postscript.Real:
+			tokens = append(tokens, token{typ: tokReal, fval: float64(num)})
 			continue
 		}
 

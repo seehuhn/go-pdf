@@ -218,8 +218,12 @@ func execute(code []instruction, stack []value) ([]value, error) {
 				if fv == 0 {
 					return nil, errDivByZero
 				}
+				r, err := realResult(a.asFloat() / fv)
+				if err != nil {
+					return nil, err
+				}
 				stack = stack[:len(stack)-1]
-				stack[len(stack)-1] = realVal(a.asFloat() / fv)
+				stack[len(stack)-1] = r
 			} else {
 				return nil, errTypeMismatch
 			}
@@ -235,6 +239,9 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			}
 			if b.ival == 0 {
 				return nil, errDivByZero
+			}
+			if a.ival == math.MinInt && b.ival == -1 {
+				return nil, errUndefinedResult
 			}
 			stack = stack[:len(stack)-1]
 			stack[len(stack)-1] = intVal(a.ival / b.ival)
@@ -309,18 +316,13 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			case tagInt:
 				// no-op
 			case tagReal:
-				val := v.fval
-				if val >= 0 {
-					v.fval = math.Floor(val + 0.5)
-				} else {
-					floor := math.Floor(val)
-					ceil := math.Ceil(val)
-					if math.Abs(val-floor) == math.Abs(val-ceil) {
-						v.fval = ceil
-					} else {
-						v.fval = math.Round(val)
-					}
+				// Ties go to the greater integer.  The subtraction is exact,
+				// unlike val+0.5, which can round up before the floor is taken.
+				f := math.Floor(v.fval)
+				if v.fval-f >= 0.5 {
+					f++
 				}
+				v.fval = f
 			default:
 				return nil, errTypeMismatch
 			}
@@ -349,7 +351,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			}
 			f := v.asFloat()
 			if f < 0 {
-				return nil, errors.New("sqrt of negative number")
+				return nil, errRangeCheck
 			}
 			*v = realVal(math.Sqrt(f))
 
@@ -362,9 +364,13 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			if !numTag(base.tag) || !numTag(exp.tag) {
 				return nil, errTypeMismatch
 			}
-			r := math.Pow(base.asFloat(), exp.asFloat())
+			// NaN for a negative base with a fractional exponent, Inf on overflow
+			r, err := realResult(math.Pow(base.asFloat(), exp.asFloat()))
+			if err != nil {
+				return nil, err
+			}
 			stack = stack[:len(stack)-1]
-			stack[len(stack)-1] = realVal(r)
+			stack[len(stack)-1] = r
 
 		case opLn:
 			if len(stack) < 1 {
@@ -376,7 +382,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			}
 			f := v.asFloat()
 			if f <= 0 {
-				return nil, errors.New("ln of non-positive number")
+				return nil, errRangeCheck
 			}
 			*v = realVal(math.Log(f))
 
@@ -390,7 +396,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			}
 			f := v.asFloat()
 			if f <= 0 {
-				return nil, errors.New("log of non-positive number")
+				return nil, errRangeCheck
 			}
 			*v = realVal(math.Log10(f))
 
@@ -429,7 +435,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			nf := num.asFloat()
 			df := den.asFloat()
 			if nf == 0 && df == 0 {
-				return nil, errors.New("atan: both arguments zero")
+				return nil, errUndefinedResult
 			}
 			deg := math.Atan2(nf, df) * 180 / math.Pi
 			if deg < 0 {
@@ -448,8 +454,9 @@ func execute(code []instruction, stack []value) ([]value, error) {
 				// no-op
 			case tagReal:
 				t := math.Trunc(v.fval)
-				if t > math.MaxInt64 || t < math.MinInt64 {
-					return nil, errors.New("cvi: value out of integer range")
+				// the limits are powers of two and so exact as float64 values
+				if !(t >= math.MinInt && t < -math.MinInt) {
+					return nil, errRangeCheck
 				}
 				*v = intVal(int(t))
 			default:
@@ -732,7 +739,7 @@ func vmAdd(a, b value) (value, error) {
 		return value{}, errTypeMismatch
 	}
 	if a.tag == tagReal || b.tag == tagReal {
-		return realVal(a.asFloat() + b.asFloat()), nil
+		return realResult(a.asFloat() + b.asFloat())
 	}
 	c := a.ival + b.ival
 	if (a.ival < 0 && b.ival < 0 && c >= 0) || (a.ival > 0 && b.ival > 0 && c <= 0) {
@@ -747,10 +754,10 @@ func vmSub(a, b value) (value, error) {
 		return value{}, errTypeMismatch
 	}
 	if a.tag == tagReal || b.tag == tagReal {
-		return realVal(a.asFloat() - b.asFloat()), nil
+		return realResult(a.asFloat() - b.asFloat())
 	}
 	c := a.ival - b.ival
-	if (a.ival < 0 && b.ival > 0 && c >= 0) || (a.ival > 0 && b.ival < 0 && c <= 0) {
+	if (a.ival < 0 && b.ival > 0 && c >= 0) || (a.ival >= 0 && b.ival < 0 && c < 0) {
 		return realVal(float64(a.ival) - float64(b.ival)), nil
 	}
 	return intVal(c), nil
@@ -762,10 +769,10 @@ func vmMul(a, b value) (value, error) {
 		return value{}, errTypeMismatch
 	}
 	if a.tag == tagReal || b.tag == tagReal {
-		return realVal(a.asFloat() * b.asFloat()), nil
+		return realResult(a.asFloat() * b.asFloat())
 	}
 	c := a.ival * b.ival
-	if a.ival != 0 && c/a.ival != b.ival {
+	if (a.ival == -1 && b.ival == math.MinInt) || (a.ival != 0 && c/a.ival != b.ival) {
 		return realVal(float64(a.ival) * float64(b.ival)), nil
 	}
 	return intVal(c), nil
@@ -794,8 +801,19 @@ func vmBoolOrBitwise(a, b value, boolFn func(bool, bool) bool, intFn func(int, i
 }
 
 var (
-	errStackUnderflow = errors.New("stack underflow")
-	errStackOverflow  = errors.New("stack overflow")
-	errTypeMismatch   = errors.New("type mismatch")
-	errDivByZero      = errors.New("division by zero")
+	errStackUnderflow  = errors.New("stack underflow")
+	errStackOverflow   = errors.New("stack overflow")
+	errTypeMismatch    = errors.New("type mismatch")
+	errDivByZero       = errors.New("division by zero")
+	errRangeCheck      = errors.New("argument out of range")
+	errUndefinedResult = errors.New("undefined result")
 )
+
+// realResult returns r as a real value, or errUndefinedResult where r is not
+// a finite number.
+func realResult(r float64) (value, error) {
+	if math.IsInf(r, 0) || math.IsNaN(r) {
+		return value{}, errUndefinedResult
+	}
+	return realVal(r), nil
+}
