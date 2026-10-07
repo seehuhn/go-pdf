@@ -407,7 +407,7 @@ func TestFunctionEvaluation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := make([]float64, len(tt.expected))
-			tt.function.Apply(result, tt.inputs...)
+			tt.function.Apply(result, tt.inputs)
 			for i, expected := range tt.expected {
 				if math.Abs(result[i]-expected) > tt.tolerance {
 					t.Errorf("output[%d]: expected %f, got %f (diff: %e)",
@@ -606,7 +606,7 @@ func TestDomainRangeClipping(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := make([]float64, len(tt.expected))
-			tt.function.Apply(result, tt.inputs...)
+			tt.function.Apply(result, tt.inputs)
 			for i, expected := range tt.expected {
 				if math.Abs(result[i]-expected) > 1e-10 {
 					t.Errorf("output[%d]: expected %f, got %f", i, expected, result[i])
@@ -678,7 +678,7 @@ func FuzzRoundTrip(f *testing.F) {
 				inputs[i] = 0.5
 			}
 			outputs := make([]float64, n)
-			function.Apply(outputs, inputs...)
+			function.Apply(outputs, inputs)
 		}
 	})
 }
@@ -720,7 +720,7 @@ func FuzzApply(f *testing.F) {
 		}
 
 		outputs := make([]float64, n)
-		fn.Apply(outputs, inputs...)
+		fn.Apply(outputs, inputs)
 
 		// Test that all outputs are finite numbers
 		for i, output := range outputs {

@@ -131,12 +131,24 @@ func execute(code []instruction, stack []value) ([]value, error) {
 		switch inst.op {
 		case opPushInt:
 			stack = append(stack, intVal(inst.ival))
+			if len(stack) > maxStackDepth {
+				return nil, errStackOverflow
+			}
 		case opPushReal:
 			stack = append(stack, realVal(inst.fval))
+			if len(stack) > maxStackDepth {
+				return nil, errStackOverflow
+			}
 		case opPushTrue:
 			stack = append(stack, boolVal(true))
+			if len(stack) > maxStackDepth {
+				return nil, errStackOverflow
+			}
 		case opPushFalse:
 			stack = append(stack, boolVal(false))
+			if len(stack) > maxStackDepth {
+				return nil, errStackOverflow
+			}
 
 		case opAbs:
 			if len(stack) < 1 {
@@ -598,6 +610,9 @@ func execute(code []instruction, stack []value) ([]value, error) {
 				return nil, errStackUnderflow
 			}
 			stack = append(stack, stack[len(stack)-1])
+			if len(stack) > maxStackDepth {
+				return nil, errStackOverflow
+			}
 
 		case opExch:
 			n := len(stack)
@@ -626,6 +641,9 @@ func execute(code []instruction, stack []value) ([]value, error) {
 				return nil, fmt.Errorf("index %d out of range (stack depth %d)", i, len(stack))
 			}
 			stack = append(stack, stack[len(stack)-1-i])
+			if len(stack) > maxStackDepth {
+				return nil, errStackOverflow
+			}
 
 		case opCopy:
 			if len(stack) < 1 {
@@ -641,6 +659,9 @@ func execute(code []instruction, stack []value) ([]value, error) {
 				return nil, fmt.Errorf("copy count %d out of range (stack depth %d)", n, len(stack))
 			}
 			stack = append(stack, stack[len(stack)-n:]...)
+			if len(stack) > maxStackDepth {
+				return nil, errStackOverflow
+			}
 
 		case opRoll:
 			if len(stack) < 2 {
@@ -691,10 +712,6 @@ func execute(code []instruction, stack []value) ([]value, error) {
 
 		default:
 			return nil, fmt.Errorf("unknown opcode %d", inst.op)
-		}
-
-		if len(stack) > maxStackDepth {
-			return nil, errStackOverflow
 		}
 	}
 

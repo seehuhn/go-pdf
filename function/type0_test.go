@@ -217,7 +217,7 @@ func TestType0BitDepthFunction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.function.repair()
 			result := make([]float64, len(tt.expected))
-			tt.function.Apply(result, tt.inputs...)
+			tt.function.Apply(result, tt.inputs)
 			for i, expected := range tt.expected {
 				if math.Abs(result[i]-expected) > tt.tolerance {
 					t.Errorf("output[%d]: expected %f, got %f (diff: %e)",
@@ -352,7 +352,7 @@ func TestType0CatmullRomSpline(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("input_%.2f", tt.input), func(t *testing.T) {
 			result := make([]float64, 1)
-			function.Apply(result, tt.input)
+			function.Apply(result, []float64{tt.input})
 			actual := result[0]
 			if math.Abs(actual-tt.expected) > 1e-6 {
 				t.Errorf("expected %.6f, got %.6f", tt.expected, actual)
@@ -377,7 +377,7 @@ func TestType0Empty(t *testing.T) {
 		t.Errorf("expected shape (0, 0), got (%d, %d)", m, n)
 	}
 	result := make([]float64, 0)
-	f.Apply(result)
+	f.Apply(result, nil)
 	if len(result) != 0 {
 		t.Errorf("expected no output, got %d", len(result))
 	}
@@ -401,7 +401,7 @@ func TestType0Constant(t *testing.T) {
 		t.Errorf("expected shape (0, 1), got (%d, %d)", m, n)
 	}
 	result := make([]float64, 1)
-	f.Apply(result)
+	f.Apply(result, nil)
 	if len(result) != 1 {
 		t.Errorf("expected 1 output, got %d", len(result))
 	}

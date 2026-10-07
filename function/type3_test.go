@@ -159,7 +159,7 @@ func TestType3BoundaryHandling(t *testing.T) {
 
 			for _, tc := range tt.inputs {
 				out := make([]float64, 2)
-				f.Apply(out, tc.input)
+				f.Apply(out, []float64{tc.input})
 
 				if got := int(out[0]); got != tc.expectedFunc {
 					t.Errorf("input %.3f: selected function %d, want %d",

@@ -221,7 +221,7 @@ func (f *Type2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Apply applies the function to the given input value
 // and writes the output values into out.
-func (f *Type2) Apply(out []float64, inputs ...float64) {
+func (f *Type2) Apply(out []float64, inputs []float64) {
 	if len(inputs) != 1 {
 		panic(fmt.Sprintf("Type 2 function expects 1 input, got %d", len(inputs)))
 	}
@@ -279,9 +279,9 @@ func (f *Type2) Equal(other *Type2) bool {
 }
 
 // Identity is the identity function f(x) = x for the domain [0, 1].
-// This sentinel value corresponds to the name /Identity in PDF dictionaries,
-// used for transfer functions (graphics state TR/TR2) and halftone
-// TransferFunction entries.
+//
+// This sentinel value stands for the name /Identity where a transfer function
+// is expected (graphics state TR/TR2, halftone TransferFunction).
 var Identity = &Type2{
 	XMin: 0,
 	XMax: 1,

@@ -419,7 +419,9 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 func (s *SpaceSeparation) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
 	_, n := s.Transform.Shape()
 	alt := ws.Scratch(slotAlt, n)
-	s.Transform.Apply(alt, clip01(values[0]))
+	tint := ws.Scratch(slotTint, 1)
+	tint[0] = clip01(values[0])
+	s.Transform.Apply(alt, tint)
 	return s.Alternate.ToXYZ(alt, ws)
 }
 
@@ -658,7 +660,7 @@ func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float
 		tint[i] = clip01(values[i])
 	}
 	alt := ws.Scratch(slotAlt, n)
-	s.Transform.Apply(alt, tint...)
+	s.Transform.Apply(alt, tint)
 	return s.Alternate.ToXYZ(alt, ws)
 }
 

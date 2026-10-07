@@ -363,7 +363,7 @@ func (f *Type0) isDefaultDecode() bool {
 
 // Apply applies the function to the given input values
 // and writes the output values into out.
-func (f *Type0) Apply(out []float64, inputs ...float64) {
+func (f *Type0) Apply(out []float64, inputs []float64) {
 	m, n := f.Shape()
 	if len(inputs) != m {
 		panic(fmt.Sprintf("expected %d inputs, got %d", m, len(inputs)))

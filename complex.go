@@ -386,7 +386,7 @@ type Function interface {
 	//
 	// The out slice may share storage with in; an implementation must read
 	// all of in before writing any element of out.
-	Apply(out []float64, in ...float64)
+	Apply(out []float64, in []float64)
 }
 
 // NumberTree represents a PDF number tree.

@@ -18,8 +18,9 @@ package function
 
 import "fmt"
 
-// InvalidFunctionError is returned when a function's configuration is invalid
-// according to the PDF specification.
+// InvalidFunctionError is returned when the fields of a function object
+// do not satisfy the constraints for its function type, for example
+// when a Domain array has the wrong length or Bounds are out of order.
 type InvalidFunctionError struct {
 	FunctionType int
 	Field        string

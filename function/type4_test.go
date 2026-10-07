@@ -230,7 +230,7 @@ func TestType4NewOperators(t *testing.T) {
 			}
 
 			result := make([]float64, len(tt.expected))
-			fn.Apply(result, tt.inputs...)
+			fn.Apply(result, tt.inputs)
 
 			for i, expected := range tt.expected {
 				tolerance := 1e-10
@@ -274,7 +274,7 @@ func TestType4DoubleDotSpotFunction(t *testing.T) {
 
 	for _, tc := range testCases {
 		result := make([]float64, 1)
-		fn.Apply(result, tc.x, tc.y)
+		fn.Apply(result, []float64{tc.x, tc.y})
 
 		tolerance := 1e-10
 		if math.Abs(result[0]-tc.expected) > tolerance {
@@ -353,7 +353,7 @@ func TestType4PDFSpecExamples(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := make([]float64, len(tt.expected))
-			tt.function.Apply(result, tt.inputs...)
+			tt.function.Apply(result, tt.inputs)
 
 			for i, expected := range tt.expected {
 				tolerance := 1e-10
@@ -379,7 +379,7 @@ func TestType4Constant(t *testing.T) {
 	}
 
 	result := make([]float64, 1)
-	fn.Apply(result)
+	fn.Apply(result, nil)
 	if result[0] != 42 {
 		t.Errorf("expected output 42, got %f", result[0])
 	}
@@ -588,7 +588,7 @@ func TestType4VsReference(t *testing.T) {
 				}
 
 				got := make([]float64, p.nOut)
-				fn.Apply(got, inputs...)
+				fn.Apply(got, inputs)
 
 				ref, err := referenceApply(p.program, inputs, p.nOut)
 				if err != nil {
@@ -689,7 +689,7 @@ func FuzzType4(f *testing.F) {
 				fn.Range[2*i+1] = 1e7
 			}
 			vmOut := make([]float64, nOut)
-			fn.Apply(vmOut, in...)
+			fn.Apply(vmOut, in)
 
 			for i := range nOut {
 				// clip reference to same range
@@ -719,7 +719,7 @@ func TestType4StackOverflow(t *testing.T) {
 	}
 
 	result := make([]float64, 1)
-	fn.Apply(result, 0.5)
+	fn.Apply(result, []float64{0.5})
 
 	if result[0] != 0 {
 		t.Errorf("stack-bomb output = %v, want 0 (overflow should be caught)", result[0])
@@ -742,11 +742,11 @@ func TestType4ApplyOutputAliasesInputs(t *testing.T) {
 	in := []float64{0.25, 0.75}
 
 	want := make([]float64, 3)
-	f.Apply(want, in...)
+	f.Apply(want, in)
 
 	// aliased call: out and inputs are views into one backing array
 	buf := []float64{0.25, 0.75, 0}
-	f.Apply(buf[:3], buf[:2]...)
+	f.Apply(buf[:3], buf[:2])
 
 	for i := range want {
 		if buf[i] != want[i] {

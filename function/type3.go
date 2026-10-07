@@ -238,7 +238,7 @@ func (f *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // Apply applies the function to the given input value
 // and writes the output values into out.
-func (f *Type3) Apply(out []float64, inputs ...float64) {
+func (f *Type3) Apply(out []float64, inputs []float64) {
 	if len(inputs) != 1 {
 		panic(fmt.Sprintf("Type 3 function expects 1 input, got %d", len(inputs)))
 	}
@@ -249,9 +249,13 @@ func (f *Type3) Apply(out []float64, inputs ...float64) {
 	subdomainIndex, a, b := f.findSubdomain(x)
 	encodeMin := f.Encode[2*subdomainIndex]
 	encodeMax := f.Encode[2*subdomainIndex+1]
-	encodedInput := interpolate(x, a, b, encodeMin, encodeMax)
 
-	f.Functions[subdomainIndex].Apply(out, encodedInput)
+	// The encoded input is passed in out[0], to avoid allocating a slice.
+	if len(out) == 0 {
+		return
+	}
+	out[0] = interpolate(x, a, b, encodeMin, encodeMax)
+	f.Functions[subdomainIndex].Apply(out, out[:1])
 
 	if f.Range != nil {
 		for i := range out {
