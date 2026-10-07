@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/graphics/form"
@@ -38,14 +39,14 @@ func TestMaskRoundTrip(t *testing.T) {
 			name: "Alpha",
 			mask: &softclip.Mask{
 				S: softclip.Alpha,
-				G: makeTransparencyGroup(),
+				G: makeTransparencyGroup(nil),
 			},
 		},
 		{
 			name: "Luminosity",
 			mask: &softclip.Mask{
 				S:  softclip.Luminosity,
-				G:  makeTransparencyGroup(),
+				G:  makeTransparencyGroup(color.SpaceDeviceRGB),
 				BC: []float64{0.5, 0.5, 0.5},
 			},
 		},
@@ -81,11 +82,37 @@ func TestMaskRoundTrip(t *testing.T) {
 	}
 }
 
-func makeTransparencyGroup() *form.Form {
+// TestMaskBCInvalid checks that Embed rejects a backdrop color which does
+// not match the group color space.
+func TestMaskBCInvalid(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cs   color.Space
+		bc   []float64
+	}{
+		{"wrong length", color.SpaceDeviceRGB, []float64{0.5}},
+		{"no color space", nil, []float64{0.5}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writer, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
+			rm := pdf.NewResourceManager(writer)
+			m := &softclip.Mask{
+				S:  softclip.Luminosity,
+				G:  makeTransparencyGroup(tc.cs),
+				BC: tc.bc,
+			}
+			if _, err := rm.Embed(m); err == nil {
+				t.Error("invalid BC accepted")
+			}
+		})
+	}
+}
+
+func makeTransparencyGroup(cs color.Space) *form.Form {
 	return &form.Form{
 		BBox:   pdf.Rectangle{URx: 100, URy: 100},
 		Matrix: matrix.Identity,
 		Res:    &content.Resources{},
-		Group:  &group.TransparencyAttributes{SingleUse: true},
+		Group:  &group.TransparencyAttributes{CS: cs, SingleUse: true},
 	}
 }

@@ -18,10 +18,16 @@ package extract_test
 
 import (
 	"bytes"
+	"slices"
 	"testing"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
+	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/graphics/group"
 	"seehuhn.de/go/pdf/graphics/softclip"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -106,5 +112,61 @@ func TestSoftMaskTRProvenance(t *testing.T) {
 
 	if n := bytes.Count(f.Data[len(orig):], []byte("/FunctionType 2")); n != 0 {
 		t.Errorf("function written again: found %d copies in the update", n)
+	}
+}
+
+// TestSoftMaskBC checks that the reader drops a backdrop color which is
+// malformed, does not match the group color space, or belongs to an Alpha
+// mask, and keeps the rest of the mask.
+func TestSoftMaskBC(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		s      pdf.Name
+		cs     color.Space
+		bc     pdf.Object
+		wantBC []float64
+	}{
+		{"valid", "Luminosity", color.SpaceDeviceGray, pdf.Array{pdf.Number(0.5)}, []float64{0.5}},
+		{"wrong length", "Luminosity", color.SpaceDeviceGray, pdf.Array{pdf.Number(0.5), pdf.Number(0.5)}, nil},
+		{"non-numeric", "Luminosity", color.SpaceDeviceGray, pdf.Array{pdf.Name("X")}, nil},
+		{"not an array", "Luminosity", color.SpaceDeviceGray, pdf.Integer(1), nil},
+		{"no color space", "Luminosity", nil, pdf.Array{pdf.Number(0.5)}, nil},
+		{"alpha mask", "Alpha", color.SpaceDeviceGray, pdf.Array{pdf.Number(0.5)}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writer, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
+			rm := pdf.NewResourceManager(writer)
+			gRef, err := rm.Embed(transparencyGroup(tc.cs))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatal(err)
+			}
+			dict := pdf.Dict{
+				"S":  tc.s,
+				"G":  gRef,
+				"BC": tc.bc,
+			}
+
+			x := pdf.NewExtractor(writer)
+			got, err := extract.SoftMaskDict(pdf.CursorAt(x, nil), dict, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			m := got.(*softclip.Mask)
+			if !slices.Equal(m.BC, tc.wantBC) {
+				t.Errorf("BC = %v, want %v", m.BC, tc.wantBC)
+			}
+		})
+	}
+}
+
+func transparencyGroup(cs color.Space) *form.Form {
+	return &form.Form{
+		BBox:   pdf.Rectangle{URx: 100, URy: 100},
+		Matrix: matrix.Identity,
+		Res:    &content.Resources{},
+		Group:  &group.TransparencyAttributes{CS: cs, SingleUse: true},
 	}
 }

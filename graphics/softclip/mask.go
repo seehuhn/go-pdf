@@ -51,7 +51,8 @@ type Mask struct {
 	G *form.Form
 
 	// BC is the backdrop color for Luminosity masks (optional).
-	// Length must match the number of color space components in G.
+	// If set, G.Group.CS must be non-nil and BC must have one entry per
+	// component of that color space.  BC is not written for Alpha masks.
 	BC []float64
 
 	// TR is the transfer function (optional).
@@ -96,6 +97,9 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// BC - backdrop color (optional, Luminosity only)
 	if m.S == Luminosity && len(m.BC) > 0 {
+		if cs := m.G.Group.CS; cs == nil || len(m.BC) != cs.Channels() {
+			return nil, errors.New("soft mask: BC does not match the group color space")
+		}
 		bc := make(pdf.Array, len(m.BC))
 		for i, v := range m.BC {
 			bc[i] = pdf.Number(v)

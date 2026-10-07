@@ -86,19 +86,14 @@ func SoftMaskDict(c pdf.Cursor, obj pdf.Object, _ bool) (graphics.SoftClip, erro
 	}
 	m.G = g
 
-	// BC - backdrop color (optional)
-	if bcObj := dict["BC"]; bcObj != nil {
-		bcArray, err := c.Array(bcObj)
-		if err != nil {
+	// BC - backdrop color (optional, Luminosity only)
+	if m.S == softclip.Luminosity {
+		bc, err := c.FloatArray(dict["BC"])
+		if err != nil && !pdf.IsMalformed(err) {
 			return nil, err
 		}
-		m.BC = make([]float64, len(bcArray))
-		for i, v := range bcArray {
-			num, err := c.Number(v)
-			if err != nil {
-				return nil, err
-			}
-			m.BC[i] = num
+		if cs := g.Group.CS; cs != nil && len(bc) == cs.Channels() {
+			m.BC = bc
 		}
 	}
 
