@@ -17,6 +17,7 @@
 package color
 
 import (
+	"errors"
 	stdcolor "image/color"
 
 	"seehuhn.de/go/icc"
@@ -82,7 +83,7 @@ func (s spacePatternColored) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // Default returns a pattern which causes nothing to be drawn.
 // This implements the [Space] interface.
 func (s spacePatternColored) Default() Color {
-	return colorColoredPattern{Pat: nil}
+	return colorPatternColored{Pat: nil}
 }
 
 // Convert returns the default color (nil pattern) since a color cannot be
@@ -90,7 +91,7 @@ func (s spacePatternColored) Default() Color {
 // This implements the [stdcolor.Model] interface.
 func (s spacePatternColored) Convert(c stdcolor.Color) stdcolor.Color {
 	// patterns cannot be derived from other colors
-	if cp, ok := c.(colorColoredPattern); ok {
+	if cp, ok := c.(colorPatternColored); ok {
 		return cp
 	}
 	return s.Default()
@@ -103,7 +104,7 @@ func (s spacePatternColored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z
 	return srgbToXYZ(0.5, 0.5, 0.5)
 }
 
-type colorColoredPattern struct {
+type colorPatternColored struct {
 	Pat Pattern
 }
 
@@ -113,10 +114,10 @@ func PatternColored(p Pattern) Color {
 	if p.PaintType() != 1 {
 		panic("pattern is not colored")
 	}
-	return colorColoredPattern{Pat: p}
+	return colorPatternColored{Pat: p}
 }
 
-func (colorColoredPattern) ColorSpace() Space {
+func (colorPatternColored) ColorSpace() Space {
 	return spacePatternColored{}
 }
 
@@ -124,14 +125,14 @@ func (colorColoredPattern) ColorSpace() Space {
 // adapted to the Profile Connection Space white point.
 // For colored patterns, returns a neutral mid-gray since the actual color
 // depends on the pattern content which is not available here.
-func (colorColoredPattern) ToXYZ() (X, Y, Z float64) {
+func (colorPatternColored) ToXYZ() (X, Y, Z float64) {
 	return srgbToXYZ(0.5, 0.5, 0.5)
 }
 
 // RGBA implements the color.Color interface.
 // For colored patterns, returns a neutral gray since the actual color
 // depends on the pattern content which is not available here.
-func (colorColoredPattern) RGBA() (r, g, b, a uint32) {
+func (colorPatternColored) RGBA() (r, g, b, a uint32) {
 	return 0x8000, 0x8000, 0x8000, 0xffff
 }
 
@@ -139,42 +140,42 @@ func (colorColoredPattern) RGBA() (r, g, b, a uint32) {
 
 // PDF 2.0 sections: 8.6.6.2
 
-// spacePatternUncolored represents the color space for uncolored patterns
+// SpacePatternUncolored represents the color space for monochrome patterns
 // (where the color is specified separately).
 //
-// The underlying color space is never itself a Pattern color space:
-// both [PatternUncolored] and the PDF reader reject that configuration
-// because the scn operand grammar cannot supply more than one pattern
-// name per call (PDF 2.0 §8.7.3.3).
-type spacePatternUncolored struct {
-	base Space
+// The underlying base color space is never itself a Pattern color space.
+type SpacePatternUncolored struct {
+	Base Space
 }
 
 // Family returns /Pattern.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) Family() pdf.Name {
+func (s SpacePatternUncolored) Family() pdf.Name {
 	return FamilyPattern
 }
 
 // Channels returns the number of color channels in the base color space.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) Channels() int {
-	return s.base.Channels()
+func (s SpacePatternUncolored) Channels() int {
+	return s.Base.Channels()
 }
 
 // ComponentRange delegates to the underlying color space.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) ComponentRange(i int) (lo, hi float64) {
-	return s.base.ComponentRange(i)
+func (s SpacePatternUncolored) ComponentRange(i int) (lo, hi float64) {
+	return s.Base.ComponentRange(i)
 }
 
 // Embed adds the pattern color space to the PDF file.
 // This implements the [Space] interface.
-func (s spacePatternUncolored) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+func (s SpacePatternUncolored) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "Pattern color space", pdf.V1_2); err != nil {
 		return nil, err
 	}
-	base, err := rm.Embed(s.base)
+	if IsPattern(s.Base) {
+		return nil, errPatternBase
+	}
+	base, err := rm.Embed(s.Base)
 	if err != nil {
 		return nil, err
 	}
@@ -182,38 +183,38 @@ func (s spacePatternUncolored) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return pdf.Array{pdf.Name("Pattern"), base}, nil
 }
 
+var errPatternBase = errors.New("uncolored pattern base cannot be a Pattern color space")
+
 // Default returns a pattern which causes nothing to be drawn.
-func (s spacePatternUncolored) Default() Color {
-	return colorUncoloredPattern{Pat: nil, Col: s.base.Default()}
+func (s SpacePatternUncolored) Default() Color {
+	return colorPatternUncolored{Pat: nil, Col: s.Base.Default()}
 }
 
 // Convert converts the base colour and returns it with a nil pattern.
 // This implements the [stdcolor.Model] interface.
-func (s spacePatternUncolored) Convert(c stdcolor.Color) stdcolor.Color {
-	if up, ok := c.(colorUncoloredPattern); ok {
-		// if it's already an uncolored pattern with same base space, return as-is
-		if _, ok := up.Col.ColorSpace().(interface{ Family() pdf.Name }); ok {
-			if up.Col.ColorSpace().Family() == s.base.Family() {
-				return up
-			}
+func (s SpacePatternUncolored) Convert(c stdcolor.Color) stdcolor.Color {
+	if up, ok := c.(colorPatternUncolored); ok {
+		// already an uncolored pattern over the same base space
+		if SpacesEqual(up.Col.ColorSpace(), s.Base) {
+			return up
 		}
 	}
 
 	// convert the colour to the base space
-	baseColor := s.base.Convert(c)
+	baseColor := s.Base.Convert(c)
 	if bc, ok := baseColor.(Color); ok {
-		return colorUncoloredPattern{Pat: nil, Col: bc}
+		return colorPatternUncolored{Pat: nil, Col: bc}
 	}
 	return s.Default()
 }
 
 // ToXYZ converts the base color values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
-func (s spacePatternUncolored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	return s.base.ToXYZ(values, ws)
+func (s SpacePatternUncolored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+	return s.Base.ToXYZ(values, ws)
 }
 
-type colorUncoloredPattern struct {
+type colorPatternUncolored struct {
 	Pat Pattern
 	Col Color
 }
@@ -230,23 +231,23 @@ func PatternUncolored(p Pattern, col Color) Color {
 		panic("pattern is colored")
 	}
 	if IsPattern(col.ColorSpace()) {
-		panic("uncolored pattern base cannot be a Pattern color space")
+		panic(errPatternBase)
 	}
-	return colorUncoloredPattern{Pat: p, Col: col}
+	return colorPatternUncolored{Pat: p, Col: col}
 }
 
-func (c colorUncoloredPattern) ColorSpace() Space {
-	return spacePatternUncolored{base: c.Col.ColorSpace()}
+func (c colorPatternUncolored) ColorSpace() Space {
+	return SpacePatternUncolored{Base: c.Col.ColorSpace()}
 }
 
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
-func (c colorUncoloredPattern) ToXYZ() (X, Y, Z float64) {
+func (c colorPatternUncolored) ToXYZ() (X, Y, Z float64) {
 	return c.Col.ToXYZ()
 }
 
 // RGBA implements the color.Color interface.
 // Returns the RGBA values of the underlying color.
-func (c colorUncoloredPattern) RGBA() (r, g, b, a uint32) {
+func (c colorPatternUncolored) RGBA() (r, g, b, a uint32) {
 	return c.Col.RGBA()
 }

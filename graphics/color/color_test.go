@@ -36,8 +36,8 @@ var (
 	_ Color = colorLab{}
 	_ Color = colorICCBased{}
 	_ Color = colorSRGB{}
-	_ Color = colorColoredPattern{}
-	_ Color = colorUncoloredPattern{}
+	_ Color = colorPatternColored{}
+	_ Color = colorPatternUncolored{}
 	_ Color = colorIndexed{}
 	_ Color = colorSeparation{}
 	_ Color = colorDeviceN{}
@@ -131,17 +131,17 @@ func TestValues(t *testing.T) {
 		},
 		{
 			name:  "ColoredPattern",
-			color: colorColoredPattern{Pat: nil},
+			color: colorPatternColored{Pat: nil},
 			want:  nil,
 		},
 		{
 			name:  "UncoloredPattern",
-			color: colorUncoloredPattern{Pat: nil, Col: DeviceGray(0.25)},
+			color: colorPatternUncolored{Pat: nil, Col: DeviceGray(0.25)},
 			want:  []float64{0.25},
 		},
 		{
 			name:  "UncoloredPattern/RGB",
-			color: colorUncoloredPattern{Pat: nil, Col: DeviceRGB{0.1, 0.2, 0.3}},
+			color: colorPatternUncolored{Pat: nil, Col: DeviceRGB{0.1, 0.2, 0.3}},
 			want:  []float64{0.1, 0.2, 0.3},
 		},
 		{

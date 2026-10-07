@@ -306,7 +306,7 @@ func TestToXYZRGBAConsistency(t *testing.T) {
 		SRGB(0.4, 0.5, 0.6),
 		mustColor(iccSpace.New([]float64{0.3, 0.6, 0.9})),
 		mustColor(iccSpace.New([]float64{1, 1, 1})),
-		colorColoredPattern{Pat: nil},
+		colorPatternColored{Pat: nil},
 	}
 
 	for _, c := range testColors {

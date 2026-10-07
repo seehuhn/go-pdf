@@ -53,7 +53,7 @@ var (
 	_ Space = (*SpaceICCBased)(nil)
 	_ Space = spaceSRGB{} // a special case of ICCBased (built-in profiles)
 	_ Space = spacePatternColored{}
-	_ Space = spacePatternUncolored{}
+	_ Space = SpacePatternUncolored{}
 	_ Space = (*SpaceIndexed)(nil)
 	_ Space = (*SpaceSeparation)(nil)
 	_ Space = (*SpaceDeviceN)(nil)
@@ -81,8 +81,8 @@ var testColorSpaces = []Space{
 
 	spacePatternColored{},
 
-	spacePatternUncolored{base: spaceDeviceGray{}},
-	spacePatternUncolored{base: must(CalGray(WhitePointD65, nil, 1.2))},
+	SpacePatternUncolored{Base: spaceDeviceGray{}},
+	SpacePatternUncolored{Base: must(CalGray(WhitePointD65, nil, 1.2))},
 
 	must(Indexed([]Color{DeviceRGB{0, 0, 0}, DeviceRGB{1, 1, 1}})),
 
@@ -455,12 +455,12 @@ func TestPatternUncoloredPanicsOnPatternBase(t *testing.T) {
 	}{
 		{
 			name: "base-is-colored-pattern",
-			col:  spacePatternColored{}.Default(), // colorColoredPattern, ColorSpace() == spacePatternColored
+			col:  spacePatternColored{}.Default(), // colorPatternColored, ColorSpace() == spacePatternColored
 		},
 		{
 			name: "base-is-uncolored-pattern",
 			// Build a legal uncolored-pattern color (base = DeviceRGB),
-			// then feed it as a base — its ColorSpace() is spacePatternUncolored.
+			// then feed it as a base — its ColorSpace() is SpacePatternUncolored.
 			col: PatternUncolored(pat, DeviceRGB{0, 0, 0}),
 		},
 	}
@@ -474,6 +474,41 @@ func TestPatternUncoloredPanicsOnPatternBase(t *testing.T) {
 			}()
 			_ = PatternUncolored(pat, tc.col)
 		})
+	}
+}
+
+// TestSpacePatternUncoloredEmbedRejectsPatternBase verifies that Embed
+// refuses to write a Pattern color space over a Pattern base.
+func TestSpacePatternUncoloredEmbedRejectsPatternBase(t *testing.T) {
+	bases := []Space{
+		spacePatternColored{},
+		SpacePatternUncolored{Base: spaceDeviceGray{}},
+	}
+	for i, base := range bases {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
+			if _, err := rm.Embed(SpacePatternUncolored{Base: base}); err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+// TestSpacePatternUncoloredConvertDifferentBase verifies that Convert
+// does not pass through a colour whose base space differs from the
+// target's base, even when both bases belong to the same family.
+func TestSpacePatternUncoloredConvertDifferentBase(t *testing.T) {
+	target := SpacePatternUncolored{Base: must(CalGray(WhitePointD65, nil, 1.2))}
+	other := must(CalGray(WhitePointD50, nil, 2.2))
+	in := colorPatternUncolored{Col: other.Default()}
+
+	got, ok := target.Convert(in).(Color)
+	if !ok {
+		t.Fatalf("Convert returned non-Color %T", got)
+	}
+	if !SpacesEqual(got.ColorSpace(), target) {
+		t.Errorf("wrong color space: got %#v, want %#v", got.ColorSpace(), target)
 	}
 }
 

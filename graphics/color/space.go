@@ -148,8 +148,8 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 				// uncolored pattern the base colour space travels inside
 				// the colour-space array itself; the /Pattern resource
 				// subdictionary holds only the pattern dictionaries.
-				res = spacePatternUncolored{
-					base: base,
+				res = SpacePatternUncolored{
+					Base: base,
 				}
 			}
 		}
@@ -614,9 +614,9 @@ func SpacesEqual(a, b Space) bool {
 				pdf.NearlyEqual(va.Attributes, vb.Attributes, floatEpsilon)
 		}
 
-	case spacePatternUncolored:
-		if vb, ok := b.(spacePatternUncolored); ok {
-			return SpacesEqual(va.base, vb.base)
+	case SpacePatternUncolored:
+		if vb, ok := b.(SpacePatternUncolored); ok {
+			return SpacesEqual(va.Base, vb.Base)
 		}
 	}
 

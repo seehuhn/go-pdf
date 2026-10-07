@@ -1100,9 +1100,10 @@ types:
     - SpectralData
 - name: PatternColorSpace
   purpose: "pattern color space"
-  goType:
+  goType: graphics/color.SpacePatternUncolored
   pdfRepr: dict
   introduced: '1.2'
+  notes: the bare /Pattern name (no base space) is the unexported spacePatternColored, exported as SpacePatternColored variable
   fields:
   - goName:
     pdfKey: '0'
@@ -1112,7 +1113,7 @@ types:
     possibleValues:
     - Pattern
     notes: Clause 8.7.3.3
-  - goName:
+  - goName: Base
     pdfKey: '1'
     pdfType: array;name
     required: false

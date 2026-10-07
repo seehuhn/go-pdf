@@ -81,10 +81,10 @@ func FromValues(cs Space, values []float64, pat Pattern) Color {
 		copy(c[:], values)
 		return c
 	case spacePatternColored:
-		return colorColoredPattern{Pat: pat}
-	case spacePatternUncolored:
-		col := FromValues(cs.base, values, nil)
-		return colorUncoloredPattern{Col: col, Pat: pat}
+		return colorPatternColored{Pat: pat}
+	case SpacePatternUncolored:
+		col := FromValues(cs.Base, values, nil)
+		return colorPatternUncolored{Col: col, Pat: pat}
 	case *SpaceIndexed:
 		if len(values) >= 1 {
 			return cs.New(int(math.Round(values[0])))
@@ -126,9 +126,9 @@ func Values(c Color) ([]float64, Pattern) {
 		return c.Values[:c.Space.N], nil
 	case colorSRGB:
 		return c[:], nil
-	case colorColoredPattern:
+	case colorPatternColored:
 		return nil, c.Pat
-	case colorUncoloredPattern:
+	case colorPatternUncolored:
 		v, _ := Values(c.Col)
 		return v, c.Pat
 	case colorIndexed:
@@ -163,9 +163,9 @@ func Operator(c Color) string {
 		return "SCN"
 	case colorSRGB:
 		return "SCN"
-	case colorColoredPattern:
+	case colorPatternColored:
 		return "SCN"
-	case colorUncoloredPattern:
+	case colorPatternUncolored:
 		return "SCN"
 	case colorIndexed:
 		return "SC"
