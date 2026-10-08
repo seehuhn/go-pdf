@@ -125,6 +125,10 @@ type State struct {
 	// SoftMask specifies mask shape or opacity values for transparency.
 	SoftMask SoftClip
 
+	// SoftMaskCTM is the CTM in effect when the soft mask was established.
+	// It is meaningful only while SoftMask is non-nil.
+	SoftMaskCTM matrix.Matrix
+
 	// StrokeAlpha is the constant opacity for stroking operations.
 	// The value must be in the range 0 (transparent) to 1 (opaque).
 	StrokeAlpha float64
@@ -315,6 +319,7 @@ func (s *State) ApplyTo(other *State) {
 	}
 	if set&StateSoftMask != 0 {
 		other.SoftMask = s.SoftMask
+		other.SoftMaskCTM = s.SoftMaskCTM
 	}
 	if set&StateStrokeAlpha != 0 {
 		other.StrokeAlpha = s.StrokeAlpha

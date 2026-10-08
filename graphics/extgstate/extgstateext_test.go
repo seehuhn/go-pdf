@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/function"
@@ -535,5 +536,22 @@ func TestDashPatternOnWrite(t *testing.T) {
 				t.Error("expected an error, got none")
 			}
 		})
+	}
+}
+
+func TestSoftMaskCTM(t *testing.T) {
+	m := matrix.Translate(10, 20)
+
+	s := graphics.NewState()
+	s.CTM = m
+	(&extgstate.ExtGState{Set: graphics.StateSoftMask}).ApplyTo(&s)
+	if s.SoftMaskCTM != m {
+		t.Errorf("SoftMaskCTM: got %v, want %v", s.SoftMaskCTM, m)
+	}
+
+	s.CTM = matrix.Translate(30, 40).Mul(m)
+	(&extgstate.ExtGState{Set: graphics.StateBlendMode}).ApplyTo(&s)
+	if s.SoftMaskCTM != m {
+		t.Errorf("SoftMaskCTM changed without StateSoftMask: got %v, want %v", s.SoftMaskCTM, m)
 	}
 }

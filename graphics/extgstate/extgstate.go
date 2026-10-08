@@ -717,6 +717,7 @@ func (e *ExtGState) ApplyTo(s *graphics.State) {
 	}
 	if set&graphics.StateSoftMask != 0 {
 		s.SoftMask = e.SoftMask
+		s.SoftMaskCTM = s.CTM
 	}
 	if set&graphics.StateStrokeAlpha != 0 {
 		s.StrokeAlpha = e.StrokeAlpha
