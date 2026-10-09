@@ -27,6 +27,7 @@ import (
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/limits"
+	"seehuhn.de/go/pdf/internal/sample"
 )
 
 // == Indexed ================================================================
@@ -40,66 +41,6 @@ type SpaceIndexed struct {
 
 	// lookup contains the color palette data as encoded bytes.
 	lookup pdf.String
-}
-
-// ParseInlineDeviceName returns the device colour space matching one of the
-// device-space names or inline abbreviations permitted in inline images per
-// PDF 2.0 §8.9.7: G, RGB, CMYK and the corresponding full forms DeviceGray,
-// DeviceRGB, DeviceCMYK.  It returns nil for any other name.
-func ParseInlineDeviceName(name pdf.Name) Space {
-	switch name {
-	case "G", "DeviceGray":
-		return SpaceDeviceGray
-	case "RGB", "DeviceRGB":
-		return SpaceDeviceRGB
-	case "CMYK", "DeviceCMYK":
-		return SpaceDeviceCMYK
-	}
-	return nil
-}
-
-// ParseInlineIndexed parses the limited Indexed array form
-// [/Indexed base hival lookup-string] permitted in inline images per PDF
-// 2.0 §8.9.7.  The base entry must be one of the inline device names
-// recognised by [ParseInlineDeviceName].  Returns nil if the array is
-// malformed.
-func ParseInlineIndexed(arr pdf.Array) Space {
-	if len(arr) != 4 {
-		return nil
-	}
-	name, ok := arr[0].(pdf.Name)
-	if !ok || (name != "Indexed" && name != "I") {
-		return nil
-	}
-	baseName, ok := arr[1].(pdf.Name)
-	if !ok {
-		return nil
-	}
-	base := ParseInlineDeviceName(baseName)
-	if base == nil {
-		return nil
-	}
-	var hival int
-	switch h := arr[2].(type) {
-	case pdf.Integer:
-		hival = int(h)
-	case pdf.Real:
-		hival = int(h)
-	default:
-		return nil
-	}
-	if hival < 0 || hival > 255 {
-		return nil
-	}
-	lookup, ok := arr[3].(pdf.String)
-	if !ok {
-		return nil
-	}
-	return &SpaceIndexed{
-		Base:   base,
-		NumCol: hival + 1,
-		lookup: lookup,
-	}
 }
 
 // Indexed returns a new indexed color space.
@@ -122,14 +63,9 @@ func Indexed(colors []Color) (*SpaceIndexed, error) {
 		}
 		v, _ := Values(color)
 		for i, x := range v {
-			min, max := space.ComponentRange(i)
-			b := int(math.Floor((x - min) / (max - min) * 256))
-			if b < 0 {
-				b = 0
-			} else if b > 255 {
-				b = 255
-			}
-			lookup = append(lookup, byte(b))
+			lo, hi := space.ComponentRange(i)
+			m := sample.Map{Bits: 8, Min: lo, Max: hi}
+			lookup = append(lookup, byte(m.Encode(x)))
 		}
 	}
 
@@ -158,6 +94,26 @@ func (s *SpaceIndexed) ComponentRange(i int) (lo, hi float64) {
 	return 0, float64(s.NumCol - 1)
 }
 
+// Default returns color 0 in the indexed color space.
+// This implements the [Space] interface.
+func (s *SpaceIndexed) Default() Color {
+	return colorIndexed{Space: s, Index: 0}
+}
+
+// ToXYZ converts an indexed color value to CIE XYZ tristimulus values
+// adapted to the Profile Connection Space white point.
+// An index outside [0, NumCol-1] is adjusted to the nearest valid value.
+func (s *SpaceIndexed) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+	index := int(math.Round(values[0]))
+	if index < 0 {
+		index = 0
+	} else if index >= s.NumCol {
+		index = s.NumCol - 1
+	}
+	baseVals := s.lookupValues(index, ws)
+	return s.Base.ToXYZ(baseVals, ws)
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s *SpaceIndexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -178,20 +134,6 @@ func (s *SpaceIndexed) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	return data, nil
-}
-
-// Default returns color 0 in the indexed color space.
-// This implements the [Space] interface.
-func (s *SpaceIndexed) Default() Color {
-	return colorIndexed{Space: s, Index: 0}
-}
-
-// New returns a new indexed color.
-func (s *SpaceIndexed) New(idx int) Color {
-	if idx < 0 || idx >= s.NumCol {
-		return nil
-	}
-	return colorIndexed{Space: s, Index: idx}
 }
 
 // Convert converts a color to the indexed color space by finding the
@@ -230,6 +172,22 @@ func (s *SpaceIndexed) Convert(c stdcolor.Color) stdcolor.Color {
 	return colorIndexed{Space: s, Index: bestIdx}
 }
 
+// New returns a new indexed color.
+func (s *SpaceIndexed) New(idx int) Color {
+	if idx < 0 || idx >= s.NumCol {
+		return nil
+	}
+	return colorIndexed{Space: s, Index: idx}
+}
+
+// Lookup returns the colour values of palette entry idx in the base colour
+// space.  An index outside [0, NumCol-1] is adjusted to the nearest valid
+// value.
+func (s *SpaceIndexed) Lookup(idx int) []float64 {
+	idx = min(max(idx, 0), s.NumCol-1)
+	return slices.Clone(s.lookupValues(idx, &icc.Workspace{}))
+}
+
 // lookupValues decodes the palette entry at the given index into color values
 // for the base color space.
 func (s *SpaceIndexed) lookupValues(index int, ws *icc.Workspace) []float64 {
@@ -246,24 +204,10 @@ func (s *SpaceIndexed) lookupValues(index int, ws *icc.Workspace) []float64 {
 	vals := ws.Scratch(slotIdx, n)
 	for i := range n {
 		lo, hi := base.ComponentRange(i)
-		b := float64(s.lookup[offset+i])
-		vals[i] = lo + (b/255.0)*(hi-lo)
+		m := sample.Map{Bits: 8, Min: lo, Max: hi}
+		vals[i] = m.Decode(uint32(s.lookup[offset+i]))
 	}
 	return vals
-}
-
-// ToXYZ converts an indexed color value to CIE XYZ tristimulus values
-// adapted to the Profile Connection Space white point.
-// An index outside [0, NumCol-1] is adjusted to the nearest valid value.
-func (s *SpaceIndexed) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	index := int(math.Round(values[0]))
-	if index < 0 {
-		index = 0
-	} else if index >= s.NumCol {
-		index = s.NumCol - 1
-	}
-	baseVals := s.lookupValues(index, ws)
-	return s.Base.ToXYZ(baseVals, ws)
 }
 
 type colorIndexed struct {
@@ -361,6 +305,23 @@ func (s *SpaceSeparation) ComponentRange(i int) (lo, hi float64) {
 	return 0, 1
 }
 
+// Default returns the default color of the color space, with tint 1.
+func (s *SpaceSeparation) Default() Color {
+	return s.New(1)
+}
+
+// ToXYZ converts a separation tint value to CIE XYZ tristimulus values
+// adapted to the Profile Connection Space white point.
+// A tint outside [0, 1] is adjusted to the nearest valid value.
+func (s *SpaceSeparation) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+	_, n := s.Transform.Shape()
+	alt := ws.Scratch(slotAlt, n)
+	tint := ws.Scratch(slotTint, 1)
+	tint[0] = clip01(values[0])
+	s.Transform.Apply(alt, tint)
+	return s.Alternate.ToXYZ(alt, ws)
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [pdf.Embedder] interface.
 func (s *SpaceSeparation) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -378,17 +339,6 @@ func (s *SpaceSeparation) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	return pdf.Array{FamilySeparation, s.Colorant, alt, trfm}, nil
-}
-
-// New returns a new color in the separation color space.
-// Tint must be between 0 (no ink, lightest) and 1 (full ink, darkest).
-func (s *SpaceSeparation) New(tint float64) Color {
-	return colorSeparation{Space: s, Tint: tint}
-}
-
-// Default returns the default color of the color space.
-func (s *SpaceSeparation) Default() Color {
-	return s.New(1)
 }
 
 // Convert converts a color to the separation color space.
@@ -413,16 +363,10 @@ func (s *SpaceSeparation) Convert(c stdcolor.Color) stdcolor.Color {
 	return colorSeparation{Space: s, Tint: tint}
 }
 
-// ToXYZ converts a separation tint value to CIE XYZ tristimulus values
-// adapted to the Profile Connection Space white point.
-// A tint outside [0, 1] is adjusted to the nearest valid value.
-func (s *SpaceSeparation) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	_, n := s.Transform.Shape()
-	alt := ws.Scratch(slotAlt, n)
-	tint := ws.Scratch(slotTint, 1)
-	tint[0] = clip01(values[0])
-	s.Transform.Apply(alt, tint)
-	return s.Alternate.ToXYZ(alt, ws)
+// New returns a new color in the separation color space.
+// Tint must be between 0 (no ink, lightest) and 1 (full ink, darkest).
+func (s *SpaceSeparation) New(tint float64) Color {
+	return colorSeparation{Space: s, Tint: tint}
 }
 
 type colorSeparation struct {
@@ -485,8 +429,6 @@ type SpaceDeviceN struct {
 	// If Subtype is "NChannel", additional entries are required.
 	Attributes pdf.Dict
 }
-
-// DeviceN returns a new DeviceN color space.
 
 // DeviceN returns a new DeviceN color space with the given component names,
 // alternate color space, tint transformation function, and attributes
@@ -561,6 +503,30 @@ func (s *SpaceDeviceN) ComponentRange(i int) (lo, hi float64) {
 	return 0, 1
 }
 
+// Default returns the default color of the color space, with all tints
+// equal to 1.
+func (s *SpaceDeviceN) Default() Color {
+	x := make([]float64, s.Channels())
+	for i := range x {
+		x[i] = 1
+	}
+	return s.New(x)
+}
+
+// ToXYZ converts DeviceN tint values to CIE XYZ tristimulus values
+// adapted to the Profile Connection Space white point.
+// Tints outside [0, 1] are adjusted to the nearest valid value.
+func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+	nIn, n := s.Transform.Shape()
+	tint := ws.Scratch(slotTint, nIn)
+	for i := range nIn {
+		tint[i] = clip01(values[i])
+	}
+	alt := ws.Scratch(slotAlt, n)
+	s.Transform.Apply(alt, tint)
+	return s.Alternate.ToXYZ(alt, ws)
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [pdf.Embedder] interface.
 func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -601,11 +567,6 @@ func (s *SpaceDeviceN) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 	return res, nil
-}
-
-// Default returns the default color of the color space.
-func (s *SpaceDeviceN) Default() Color {
-	return s.New(make([]float64, s.Channels()))
 }
 
 // Convert converts a color to the DeviceN color space.
@@ -650,20 +611,6 @@ func (s *SpaceDeviceN) New(x []float64) Color {
 	return colorDeviceN{Space: s, data: string(buf)}
 }
 
-// ToXYZ converts DeviceN tint values to CIE XYZ tristimulus values
-// adapted to the Profile Connection Space white point.
-// Tints outside [0, 1] are adjusted to the nearest valid value.
-func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	nIn, n := s.Transform.Shape()
-	tint := ws.Scratch(slotTint, nIn)
-	for i := range nIn {
-		tint[i] = clip01(values[i])
-	}
-	alt := ws.Scratch(slotAlt, n)
-	s.Transform.Apply(alt, tint)
-	return s.Alternate.ToXYZ(alt, ws)
-}
-
 type colorDeviceN struct {
 	Space *SpaceDeviceN
 
@@ -684,6 +631,13 @@ func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
 	return c.Space.ToXYZ(c.get(), &icc.Workspace{})
 }
 
+// RGBA implements the color.Color interface.
+func (c colorDeviceN) RGBA() (r, g, b, a uint32) {
+	X, Y, Z := c.ToXYZ()
+	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
+}
+
 func (c colorDeviceN) get() []float64 {
 	n := c.Space.Channels()
 	x := make([]float64, n)
@@ -694,9 +648,64 @@ func (c colorDeviceN) get() []float64 {
 	return x
 }
 
-// RGBA implements the color.Color interface.
-func (c colorDeviceN) RGBA() (r, g, b, a uint32) {
-	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
-	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
+// == Inline images ==========================================================
+
+// ParseInlineDeviceName returns the device colour space matching one of the
+// device-space names or inline abbreviations permitted in inline images per
+// PDF 2.0 §8.9.7: G, RGB, CMYK and the corresponding full forms DeviceGray,
+// DeviceRGB, DeviceCMYK.  It returns nil for any other name.
+func ParseInlineDeviceName(name pdf.Name) Space {
+	switch name {
+	case "G", "DeviceGray":
+		return SpaceDeviceGray
+	case "RGB", "DeviceRGB":
+		return SpaceDeviceRGB
+	case "CMYK", "DeviceCMYK":
+		return SpaceDeviceCMYK
+	}
+	return nil
+}
+
+// ParseInlineIndexed parses the limited Indexed array form
+// [/Indexed base hival lookup-string] permitted in inline images per PDF
+// 2.0 §8.9.7.  The base entry must be one of the inline device names
+// recognised by [ParseInlineDeviceName].  Returns nil if the array is
+// malformed.
+func ParseInlineIndexed(arr pdf.Array) Space {
+	if len(arr) != 4 {
+		return nil
+	}
+	name, ok := arr[0].(pdf.Name)
+	if !ok || (name != "Indexed" && name != "I") {
+		return nil
+	}
+	baseName, ok := arr[1].(pdf.Name)
+	if !ok {
+		return nil
+	}
+	base := ParseInlineDeviceName(baseName)
+	if base == nil {
+		return nil
+	}
+	var hival int
+	switch h := arr[2].(type) {
+	case pdf.Integer:
+		hival = int(h)
+	case pdf.Real:
+		hival = int(h)
+	default:
+		return nil
+	}
+	if hival < 0 || hival > 255 {
+		return nil
+	}
+	lookup, ok := arr[3].(pdf.String)
+	if !ok {
+		return nil
+	}
+	return &SpaceIndexed{
+		Base:   base,
+		NumCol: hival + 1,
+		lookup: lookup,
+	}
 }
