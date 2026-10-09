@@ -24,6 +24,65 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
+// colorOps holds the operators which are ignored where colour operators are
+// forbidden (§8.6.8).
+var colorOps = map[OpName]bool{
+	OpSetStrokeColorSpace: true,
+	OpSetFillColorSpace:   true,
+	OpSetStrokeColor:      true,
+	OpSetStrokeColorN:     true,
+	OpSetFillColor:        true,
+	OpSetFillColorN:       true,
+	OpSetStrokeGray:       true,
+	OpSetFillGray:         true,
+	OpSetStrokeRGB:        true,
+	OpSetFillRGB:          true,
+	OpSetStrokeCMYK:       true,
+	OpSetFillCMYK:         true,
+	OpSetRenderingIntent:  true,
+}
+
+// ColorExtGStateBits holds the graphics state parameters whose entries in an
+// ExtGState dictionary are ignored where colour operators are forbidden
+// (see [State.ColorOpsForbidden] and §8.6.8).
+const ColorExtGStateBits = graphics.StateTransferFunction | graphics.StateBlackGeneration |
+	graphics.StateUndercolorRemoval | graphics.StateHalftone |
+	graphics.StateBlackPointCompensation
+
+// Ignored reports whether an operator is to be ignored because colour
+// operators are forbidden in the current content stream (§8.6.8).  This
+// applies to the colour operators, "ri" and "sh", and to "Do" and "BI" unless
+// they paint an image mask.  A "Do" naming a form XObject is not ignored: the
+// restriction applies inside the form instead.  A "gs" operator is not
+// ignored either; only its colour-related entries are, see
+// [ColorExtGStateBits].
+func (s *State) Ignored(name OpName, args []pdf.Object) bool {
+	if !s.ColorOpsForbidden {
+		return false
+	}
+	if colorOps[name] {
+		return true
+	}
+	switch name {
+	case OpShading:
+		return true
+	case OpXObject:
+		xName, ok := getName(args, 0)
+		if !ok || s.Resources == nil {
+			return false
+		}
+		obj := s.Resources.XObject[xName]
+		return obj != nil && obj.Subtype() == "Image" && !graphics.IsImageMask(obj)
+	case OpInlineImage:
+		if len(args) == 0 {
+			return false
+		}
+		dict, _ := args[0].(pdf.Dict)
+		return !IsInlineImageMask(dict)
+	}
+	return false
+}
+
 // applyOperatorToParams updates the graphics state parameters based on the
 // operator. This is called by [State.ApplyStateChanges] after structural state
 // changes (q/Q, BT/ET, etc.) have been handled.
@@ -118,6 +177,12 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		if dictName, ok := getName(args, 0); ok {
 			if s.Resources != nil && s.Resources.ExtGState != nil {
 				if extGState := s.Resources.ExtGState[dictName]; extGState != nil {
+					if s.ColorOpsForbidden && extGState.Set&ColorExtGStateBits != 0 {
+						// ignored in uncoloured glyphs and patterns (§8.6.8)
+						filtered := *extGState
+						filtered.Set &^= ColorExtGStateBits
+						extGState = &filtered
+					}
 					extGState.ApplyTo(s.GState)
 					s.Usable |= s.GState.Set
 				}

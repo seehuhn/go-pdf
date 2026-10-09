@@ -747,15 +747,13 @@ func (s *scanner) readInlineImage() (Operator, error) {
 			return Operator{}, err
 		}
 	} else {
-		// no Length key: read until we find [\r\n]EI pattern
+		// no Length key: the data ends at a white-space byte followed by
+		// "EI" and a delimiter (§8.9.7)
 		var prevByte byte
 		for len(imageData) < maxInlineImageBytes {
-			// check for EI pattern: previous byte is \r or \n, followed by "EI" + delimiter
-			if (prevByte == '\r' || prevByte == '\n') && s.checkEI() {
-				// remove the trailing newline from image data
-				if len(imageData) > 0 {
-					imageData = imageData[:len(imageData)-1]
-				}
+			if len(imageData) > 0 && class[prevByte] == space && s.checkEI() {
+				// remove the white-space byte before EI from the image data
+				imageData = imageData[:len(imageData)-1]
 				break
 			}
 

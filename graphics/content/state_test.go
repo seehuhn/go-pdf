@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 )
 
 func TestNewState_Page(t *testing.T) {
@@ -584,5 +585,119 @@ func TestColorOperandsClippedStroking(t *testing.T) {
 	got, _ := color.Values(s.GState.StrokeColor)
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("stroke colour not clipped (-want +got):\n%s", diff)
+	}
+}
+
+// TestColorOpsForbidden checks that colour operators and the colour-related
+// entries of an ExtGState are ignored after d1 (§8.6.8), while other
+// operators still apply.
+func TestColorOpsForbidden(t *testing.T) {
+	res := &Resources{
+		ExtGState: map[pdf.Name]*extgstate.ExtGState{
+			"G": {
+				Set:                    graphics.StateLineWidth | graphics.StateBlackPointCompensation,
+				LineWidth:              7,
+				BlackPointCompensation: "ON",
+			},
+		},
+	}
+	s := NewState(Glyph, res)
+	s.GState.FillColor = color.DeviceGray(0.5)
+	s.GState.StrokeColor = color.DeviceGray(0.5)
+	s.GState.RenderingIntent = graphics.RelativeColorimetric
+
+	ops := []Operator{
+		{Name: OpType3UncoloredGlyph, Args: []pdf.Object{
+			pdf.Integer(1), pdf.Integer(0),
+			pdf.Integer(0), pdf.Integer(0), pdf.Integer(1), pdf.Integer(1),
+		}},
+		{Name: OpSetFillRGB, Args: []pdf.Object{pdf.Integer(1), pdf.Integer(0), pdf.Integer(0)}},
+		{Name: OpSetStrokeGray, Args: []pdf.Object{pdf.Integer(0)}},
+		{Name: OpSetFillColorSpace, Args: []pdf.Object{pdf.Name("DeviceCMYK")}},
+		{Name: OpSetStrokeColor, Args: []pdf.Object{pdf.Integer(1)}},
+		{Name: OpSetRenderingIntent, Args: []pdf.Object{pdf.Name("Saturation")}},
+		{Name: OpSetExtGState, Args: []pdf.Object{pdf.Name("G")}},
+	}
+	for _, op := range ops {
+		_ = s.ApplyStateChanges(op.Name, op.Args)
+	}
+
+	g := s.GState
+	if g.FillColor != color.DeviceGray(0.5) {
+		t.Errorf("fill colour changed to %v", g.FillColor)
+	}
+	if g.StrokeColor != color.DeviceGray(0.5) {
+		t.Errorf("stroke colour changed to %v", g.StrokeColor)
+	}
+	if g.RenderingIntent != graphics.RelativeColorimetric {
+		t.Errorf("rendering intent changed to %v", g.RenderingIntent)
+	}
+	if g.Set&(graphics.StateFillColor|graphics.StateStrokeColor|graphics.StateRenderingIntent) != 0 {
+		t.Error("ignored parameters marked as set")
+	}
+	if g.Set&graphics.StateBlackPointCompensation != 0 {
+		t.Error("black point compensation marked as set")
+	}
+	if g.LineWidth != 7 {
+		t.Errorf("line width = %g, want 7", g.LineWidth)
+	}
+}
+
+// testXObject is a minimal XObject for tests which only inspect the subtype
+// and the image mask flag.
+type testXObject struct {
+	subtype pdf.Name
+	mask    bool
+}
+
+func (x testXObject) Subtype() pdf.Name                          { return x.subtype }
+func (x testXObject) ResourceName() pdf.Name                     { return "" }
+func (x testXObject) IsImageMask() bool                          { return x.mask }
+func (x testXObject) Embed(*pdf.EmbedHelper) (pdf.Native, error) { return nil, nil }
+
+// TestIgnored checks which operators are ignored where colour operators are
+// forbidden (§8.6.8).
+func TestIgnored(t *testing.T) {
+	res := &Resources{
+		XObject: map[pdf.Name]graphics.XObject{
+			"Im":   testXObject{subtype: "Image"},
+			"Mask": testXObject{subtype: "Image", mask: true},
+			"Fm":   testXObject{subtype: "Form"},
+		},
+	}
+	imageDict := pdf.Dict{"W": pdf.Integer(1), "H": pdf.Integer(1)}
+	maskDict := pdf.Dict{"W": pdf.Integer(1), "H": pdf.Integer(1), "IM": pdf.Boolean(true)}
+
+	cases := []struct {
+		name OpName
+		args []pdf.Object
+		want bool
+	}{
+		{OpSetFillRGB, []pdf.Object{pdf.Integer(1), pdf.Integer(0), pdf.Integer(0)}, true},
+		{OpSetRenderingIntent, []pdf.Object{pdf.Name("Saturation")}, true},
+		{OpSetExtGState, []pdf.Object{pdf.Name("G")}, false},
+		{OpShading, []pdf.Object{pdf.Name("Sh")}, true},
+		{OpXObject, []pdf.Object{pdf.Name("Im")}, true},
+		{OpXObject, []pdf.Object{pdf.Name("Mask")}, false},
+		{OpXObject, []pdf.Object{pdf.Name("Fm")}, false},
+		{OpXObject, []pdf.Object{pdf.Name("Missing")}, false},
+		{OpInlineImage, []pdf.Object{imageDict, pdf.String("")}, true},
+		{OpInlineImage, []pdf.Object{maskDict, pdf.String("")}, false},
+		{OpFill, nil, false},
+	}
+	for _, ct := range []Type{Glyph, PatternUncolored, Page} {
+		s := NewState(ct, res)
+		if ct == Glyph {
+			_ = s.ApplyStateChanges(OpType3UncoloredGlyph, []pdf.Object{
+				pdf.Integer(1), pdf.Integer(0),
+				pdf.Integer(0), pdf.Integer(0), pdf.Integer(1), pdf.Integer(1),
+			})
+		}
+		for _, c := range cases {
+			want := c.want && ct != Page
+			if got := s.Ignored(c.name, c.args); got != want {
+				t.Errorf("%v: Ignored(%s, %v) = %t, want %t", ct, c.name, c.args, got, want)
+			}
+		}
 	}
 }

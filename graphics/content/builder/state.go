@@ -182,11 +182,11 @@ func (b *Builder) SetExtGState(gs *extgstate.ExtGState) {
 	if b.Err != nil {
 		return
 	}
+	if b.State.ColorOpsForbidden && gs.Set&content.ColorExtGStateBits != 0 {
+		b.Err = ErrColorForbidden
+		return
+	}
 	name := b.getExtGStateName(gs)
-
-	// Apply the ExtGState to our GState
-	gs.ApplyTo(b.State.GState)
-
 	b.emit(content.OpSetExtGState, name)
 }
 

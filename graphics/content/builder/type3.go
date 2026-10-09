@@ -17,8 +17,6 @@
 package builder
 
 import (
-	"errors"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/content"
 )
@@ -40,11 +38,4 @@ func (b *Builder) Type3UncoloredGlyph(wx, wy, llx, lly, urx, ury float64) {
 		pdf.Number(wx), pdf.Number(wy),
 		pdf.Number(llx), pdf.Number(lly),
 		pdf.Number(urx), pdf.Number(ury))
-}
-
-func (b *Builder) checkColorAllowed() error {
-	if b.State.ColorOpsForbidden {
-		return errors.New("color operators not allowed")
-	}
-	return nil
 }

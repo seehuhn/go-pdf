@@ -17,11 +17,14 @@
 package builder
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/extgstate"
 )
 
 func TestBuilder_Type3SetWidthOnly(t *testing.T) {
@@ -61,7 +64,7 @@ func TestBuilder_Type3ColorRestriction(t *testing.T) {
 
 	// Color should fail in d1 mode
 	b.SetFillColor(color.DeviceGray(0.5))
-	if b.Err == nil {
+	if !errors.Is(b.Err, ErrColorForbidden) {
 		t.Error("SetFillColor should fail in d1 mode")
 	}
 }
@@ -92,5 +95,48 @@ func TestBuilder_Type3D0AllowsColor(t *testing.T) {
 	b.SetFillColor(color.DeviceGray(0.5))
 	if b.Err != nil {
 		t.Errorf("SetFillColor should work in d0 mode: %v", b.Err)
+	}
+}
+
+// TestBuilder_Type3ExtGStateRestriction checks that colour-related ExtGState
+// entries are rejected after d1, while other entries are accepted.
+func TestBuilder_Type3ExtGStateRestriction(t *testing.T) {
+	b := New(content.Glyph, nil, pdf.V2_0)
+	b.Type3UncoloredGlyph(600, 0, 0, 0, 500, 700)
+	b.SetExtGState(&extgstate.ExtGState{
+		Set:       graphics.StateLineWidth,
+		LineWidth: 2,
+	})
+	if b.Err != nil {
+		t.Fatalf("unexpected error: %v", b.Err)
+	}
+
+	b.SetExtGState(&extgstate.ExtGState{
+		Set:                    graphics.StateBlackPointCompensation,
+		BlackPointCompensation: "ON",
+	})
+	if !errors.Is(b.Err, ErrColorForbidden) {
+		t.Errorf("got error %v, want ErrColorForbidden", b.Err)
+	}
+}
+
+// TestBuilder_Type3InlineImageMask checks that inline image masks are
+// accepted after d1, while other inline images are rejected.
+func TestBuilder_Type3InlineImageMask(t *testing.T) {
+	b := New(content.Glyph, nil, pdf.V2_0)
+	b.Type3UncoloredGlyph(600, 0, 0, 0, 500, 700)
+	b.DrawInlineImageRaw(pdf.Dict{
+		"W": pdf.Integer(1), "H": pdf.Integer(1), "IM": pdf.Boolean(true),
+	}, []byte{0})
+	if b.Err != nil {
+		t.Fatalf("unexpected error: %v", b.Err)
+	}
+
+	b.DrawInlineImageRaw(pdf.Dict{
+		"W": pdf.Integer(1), "H": pdf.Integer(1),
+		"CS": pdf.Name("G"), "BPC": pdf.Integer(8),
+	}, []byte{0})
+	if !errors.Is(b.Err, ErrColorForbidden) {
+		t.Errorf("got error %v, want ErrColorForbidden", b.Err)
 	}
 }

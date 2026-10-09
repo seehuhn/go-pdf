@@ -17,8 +17,6 @@
 package builder
 
 import (
-	"errors"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -34,7 +32,7 @@ func (b *Builder) DrawXObject(obj graphics.XObject) {
 	// In uncolored patterns and Type 3 glyphs with d1, images are forbidden
 	// but image masks are allowed.
 	if b.State.ColorOpsForbidden && obj.Subtype() == "Image" && !graphics.IsImageMask(obj) {
-		b.Err = errors.New("images not allowed (only image masks)")
+		b.Err = ErrColorForbidden
 		return
 	}
 	name := b.getXObjectName(obj)
@@ -53,8 +51,8 @@ func (b *Builder) DrawInlineImageRaw(dict pdf.Dict, data []byte) {
 	if b.Err != nil {
 		return
 	}
-	if b.State.ColorOpsForbidden {
-		b.Err = errors.New("inline images not allowed in this context")
+	if b.State.ColorOpsForbidden && !content.IsInlineImageMask(dict) {
+		b.Err = ErrColorForbidden
 		return
 	}
 	if err := content.ValidateInlineImageFilter(dict); err != nil {

@@ -17,6 +17,7 @@
 package builder
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -25,6 +26,20 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 )
+
+// ErrColorForbidden is returned when content which specifies colour is
+// added where colour operators are forbidden: in a Type 3 glyph after "d1",
+// or in an uncolored tiling pattern (see section 8.6.8 of the PDF
+// specification).  This covers the colour operators, "ri", "sh",
+// colour-related ExtGState entries, and images other than image masks.
+var ErrColorForbidden = errors.New("color not allowed in uncolored glyph or pattern")
+
+func (b *Builder) checkColorAllowed() error {
+	if b.State.ColorOpsForbidden {
+		return ErrColorForbidden
+	}
+	return nil
+}
 
 // SetStrokeColor sets the color to use for stroking operations.
 func (b *Builder) SetStrokeColor(c color.Color) {

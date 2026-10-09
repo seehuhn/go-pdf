@@ -424,6 +424,9 @@ func isStrokeOp(name OpName) bool {
 // should instead use [State.ApplyOperator], which runs the context and
 // required-state checks first.
 func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
+	if s.Ignored(name, args) {
+		return nil
+	}
 	if info := operators[name]; info != nil && info.Sets != 0 {
 		s.Usable |= info.Sets
 		s.GState.Set |= info.Sets

@@ -245,7 +245,7 @@ func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
 
 	// byte-count refinement when ColorSpace and BPC are known
 	channels, bpc := 0, 0
-	if isImageMask(dict) {
+	if IsInlineImageMask(dict) {
 		channels, bpc = 1, 1
 	} else {
 		var present bool
@@ -297,7 +297,7 @@ func inlineImageSizeLimit(dict pdf.Dict, res *Resources) int64 {
 	}
 
 	// image masks are always 1 bpc, 1 channel
-	if isImageMask(dict) {
+	if IsInlineImageMask(dict) {
 		return limits.ImageDataLimit(width, height, 1, 1)
 	}
 
@@ -319,8 +319,9 @@ func inlineImageSizeLimit(dict pdf.Dict, res *Resources) int64 {
 	return limits.ImageDataLimit(width, height, channels, bpc)
 }
 
-// isImageMask reports whether the dict describes an image mask.
-func isImageMask(dict pdf.Dict) bool {
+// IsInlineImageMask reports whether the parameter dictionary of an inline
+// image describes an image mask.
+func IsInlineImageMask(dict pdf.Dict) bool {
 	var val pdf.Object
 	if v, ok := dict["IM"]; ok {
 		val = v

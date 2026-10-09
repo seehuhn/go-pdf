@@ -993,3 +993,22 @@ func TestScannerReadError(t *testing.T) {
 		}
 	})
 }
+
+// TestInlineImageWhiteSpaceBeforeEI checks that any white-space byte before
+// EI ends the image data, not only a line break (§8.9.7).
+func TestInlineImageWhiteSpaceBeforeEI(t *testing.T) {
+	for _, sep := range []string{"\n", "\r", " ", "\t", "\f", "\x00"} {
+		raw := "BI /W 1 /H 1 /CS /G /BPC 8 ID \x80" + sep + "EI\n2 w\n"
+		stream, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("%q: collectStream error: %v", sep, err)
+		}
+		if len(stream) != 2 || stream[0].Name != OpInlineImage || stream[1].Name != OpSetLineWidth {
+			t.Errorf("%q: got %v, want inline image followed by w", sep, stream)
+			continue
+		}
+		if diff := cmp.Diff(pdf.String("\x80"), stream[0].Args[1]); diff != "" {
+			t.Errorf("%q: wrong image data (-want +got):\n%s", sep, diff)
+		}
+	}
+}

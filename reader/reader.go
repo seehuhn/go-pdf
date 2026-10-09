@@ -56,7 +56,9 @@ type Reader struct {
 
 	TextEvent func(event TextEvent, arg float64)
 
-	// EveryOp is called for every operator after all other processing.
+	// EveryOp is called for every operator after all other processing,
+	// except for operators which are ignored because colour operators are
+	// forbidden (see [content.State.Ignored]).
 	// To act only on operators that the reader does not handle itself, gate
 	// the callback on [content.Known].  The args slice may be transient
 	// (shared with scanner buffers); callers that need to retain args must
@@ -209,8 +211,13 @@ func (r *Reader) ProcessIter(it content.Iter) error {
 // directly (bypassing [content.State.CheckOperatorAllowed] and the
 // required-state check) so that every operator advances state and every
 // callback fires, matching how real-world viewers tolerate malformed
-// content streams.
+// content streams.  The exception are operators which §8.6.8 says to ignore,
+// see [content.State.Ignored]: these are dropped entirely.
 func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
+	if r.State.Ignored(name, args) {
+		return nil
+	}
+
 	// Pre-state-change peek: EMC will pop the top BMC frame from State.
 	// Capture its attached MC payload now so we can fire MarkedContentEnd.
 	var endingMC *graphics.MarkedContent

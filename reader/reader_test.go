@@ -296,3 +296,62 @@ func writeOps(out io.Writer, ops []content.Operator) error {
 	}
 	return nil
 }
+
+// TestReader_ColorOpsForbidden checks that colour operators, shadings and
+// images other than image masks are skipped after d1 (§8.6.8).
+func TestReader_ColorOpsForbidden(t *testing.T) {
+	rawStream := "1 0 0 0 1 1 d1\n1 0 0 rg\n/Saturation ri\n2 w\n" +
+		"/Sh sh\n/Im Do\n/Mask Do\n" +
+		"BI /W 1 /H 1 /CS /G /BPC 8 ID \x00\nEI\n" +
+		"BI /W 1 /H 1 /IM true ID \x00\nEI\n"
+
+	x := pdf.NewExtractor(noopGetter{})
+	reader := New(x)
+	reader.State = content.NewState(content.Glyph, &content.Resources{
+		XObject: map[pdf.Name]graphics.XObject{
+			"Im":   testXObject{mask: false},
+			"Mask": testXObject{mask: true},
+		},
+	})
+
+	var saw []string
+	reader.EveryOp = func(op string, args []pdf.Object) error {
+		saw = append(saw, op)
+		return nil
+	}
+	var xObjects, inlineImages int
+	reader.XObject = func(graphics.XObject, matrix.Matrix) error {
+		xObjects++
+		return nil
+	}
+	reader.InlineImage = func(content.Operator, matrix.Matrix) error {
+		inlineImages++
+		return nil
+	}
+
+	open := func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader([]byte(rawStream))), nil }
+	if err := reader.ProcessIter(content.NewScanner(open).NewIter()); err != nil {
+		t.Fatalf("ProcessIter: %v", err)
+	}
+
+	want := []string{"d1", "w", "Do", string(content.OpInlineImage)}
+	if diff := cmp.Diff(want, saw); diff != "" {
+		t.Errorf("ops (-want +got):\n%s", diff)
+	}
+	if xObjects != 1 {
+		t.Errorf("XObject called %d times, want 1", xObjects)
+	}
+	if inlineImages != 1 {
+		t.Errorf("InlineImage called %d times, want 1", inlineImages)
+	}
+}
+
+// testXObject is a minimal image XObject for tests.
+type testXObject struct {
+	mask bool
+}
+
+func (x testXObject) Subtype() pdf.Name                          { return "Image" }
+func (x testXObject) ResourceName() pdf.Name                     { return "" }
+func (x testXObject) IsImageMask() bool                          { return x.mask }
+func (x testXObject) Embed(*pdf.EmbedHelper) (pdf.Native, error) { return nil, nil }
