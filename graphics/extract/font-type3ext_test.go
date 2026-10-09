@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
@@ -375,4 +376,79 @@ var type3Dicts = []*dict.Type3{
 		FontBBox:   &pdf.Rectangle{LLx: 0, LLy: 0, URx: 500, URy: 700},
 		FontMatrix: matrix.Scale(0.001, 0.001),
 	},
+}
+
+// Entries which cannot be written at the version of the file are dropped on
+// read: font Resources before PDF 1.2, glyph Resources before PDF 2.0.
+func TestType3VersionRepair(t *testing.T) {
+	res := &content.Resources{
+		Font: map[pdf.Name]font.Instance{
+			"F1": font.Must(standard.Helvetica.New()),
+		},
+	}
+	d1 := &dict.Type3{
+		Name:       "F",
+		Descriptor: &font.Descriptor{},
+		CharProcs: map[pdf.Name]*dict.CharProc{
+			"A": {Content: testCharProcs["filledRect"].Content, Resources: res},
+		},
+		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+		Resources:  res,
+	}
+	d1.Encoding = func(code byte) string {
+		if code == 'A' {
+			return "A"
+		}
+		return ""
+	}
+	d1.Width['A'] = 500
+
+	// cycle writes d at version wv and reads it back as if from a file of
+	// version rv
+	cycle := func(t *testing.T, d *dict.Type3, wv, rv pdf.Version) *dict.Type3 {
+		t.Helper()
+		w, _ := memfile.NewPDFWriter(t, wv, nil)
+		rm := pdf.NewResourceManager(w)
+		ref, err := rm.Embed(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rm.Close(); err != nil {
+			t.Fatal(err)
+		}
+		w.GetMeta().Version = rv
+		obj, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(w), nil), ref, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return obj.(*dict.Type3)
+	}
+
+	for _, tc := range []struct {
+		version  pdf.Version
+		fontRes  bool
+		glyphRes bool
+	}{
+		{pdf.V1_1, false, false},
+		{pdf.V1_2, true, false},
+		{pdf.V1_7, true, false},
+		{pdf.V2_0, true, true},
+	} {
+		t.Run(tc.version.String(), func(t *testing.T) {
+			d2 := cycle(t, d1, pdf.V2_0, tc.version)
+			if got := d2.Resources != nil; got != tc.fontRes {
+				t.Errorf("font Resources present = %t, want %t", got, tc.fontRes)
+			}
+			if got := d2.CharProcs["A"].Resources != nil; got != tc.glyphRes {
+				t.Errorf("glyph Resources present = %t, want %t", got, tc.glyphRes)
+			}
+
+			d3 := cycle(t, d2, tc.version, tc.version)
+			d2.Encoding = nil
+			d3.Encoding = nil
+			if diff := cmp.Diff(d2, d3, contentStreamOpt); diff != "" {
+				t.Errorf("round trip failed (-want +got):\n%s", diff)
+			}
+		})
+	}
 }

@@ -18,7 +18,6 @@ package dict
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"iter"
 	"maps"
@@ -43,8 +42,10 @@ type CharProc struct {
 	// operators of the glyph procedure.
 	Content content.Stream
 
-	// Resources (optional) holds named resources used by this glyph's content
-	// stream. If nil, resources are looked up from the font's Resources field.
+	// Resources (optional; PDF 2.0) holds named resources used by this
+	// glyph's content stream. If nil, resources are looked up in the font's
+	// Resources field, or, if that is nil too, in the resources of the page
+	// where the font is used (§7.8.3).
 	Resources *content.Resources
 }
 
@@ -79,8 +80,8 @@ type Type3 struct {
 	// The FontMatrix maps glyph space to text space.
 	FontMatrix matrix.Matrix
 
-	// Resources (optional) holds named resources shared by all glyph content
-	// streams that don't have their own resource dictionary.
+	// Resources (optional; PDF 1.2) holds named resources shared by all glyph
+	// content streams that don't have their own resource dictionary.
 	Resources *content.Resources
 }
 
@@ -101,6 +102,20 @@ func (d *Type3) validate(w *pdf.Writer) error {
 
 	if d.FontMatrix.IsZero() {
 		return errors.New("invalid FontMatrix")
+	}
+
+	if d.Resources != nil {
+		if err := pdf.CheckVersion(w, "Type 3 font Resources", pdf.V1_2); err != nil {
+			return err
+		}
+	}
+	for _, cp := range d.CharProcs {
+		if cp != nil && cp.Resources != nil {
+			if err := pdf.CheckVersion(w, "Type 3 glyph Resources", pdf.V2_0); err != nil {
+				return err
+			}
+			break
+		}
 	}
 
 	return nil
@@ -156,9 +171,9 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		// Build stream dictionary with per-glyph resources if present
 		var streamDict pdf.Dict
 		if cp.Resources != nil {
-			resObj, err := cp.Resources.Embed(rm)
+			resObj, err := rm.Embed(cp.Resources)
 			if err != nil {
-				return nil, fmt.Errorf("glyph %q resources: %w", name, err)
+				return nil, err
 			}
 			streamDict = pdf.Dict{"Resources": resObj}
 		}
@@ -171,13 +186,13 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		rc, err := cp.Content.RawBytes()
 		if err != nil {
 			stm.Close()
-			return nil, fmt.Errorf("glyph %q: %w", name, err)
+			return nil, err
 		}
 		_, err = io.Copy(stm, rc)
 		rc.Close()
 		if err != nil {
 			stm.Close()
-			return nil, fmt.Errorf("glyph %q: %w", name, err)
+			return nil, err
 		}
 
 		err = stm.Close()
@@ -196,7 +211,7 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	encodingObj, err := d.Encoding.AsPDFType3(w.GetOptions())
 	if err != nil {
-		return nil, fmt.Errorf("/Encoding: %w", err)
+		return nil, err
 	}
 	encodingRef := w.Alloc()
 	fontDict["Encoding"] = encodingRef
@@ -231,16 +246,16 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if d.Resources != nil {
-		resObj, err := d.Resources.Embed(rm)
+		resObj, err := rm.Embed(d.Resources)
 		if err != nil {
-			return nil, fmt.Errorf("font resources: %w", err)
+			return nil, err
 		}
 		fontDict["Resources"] = resObj
 	}
 
 	err = w.WriteCompressed(compressedRefs, compressedObjects...)
 	if err != nil {
-		return nil, fmt.Errorf("type 3 font dict: %w", err)
+		return nil, err
 	}
 
 	return ref, nil

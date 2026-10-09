@@ -111,7 +111,7 @@ func (p *Type1) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// embed resources
 	res := *p.Res
 	res.SingleUse = true
-	resObj, err := res.Embed(rm)
+	resObj, err := rm.Embed(&res)
 	if err != nil {
 		return nil, err
 	}

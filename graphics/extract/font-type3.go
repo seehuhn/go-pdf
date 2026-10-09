@@ -78,9 +78,9 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 		return nil, pdf.Wrap(err, "CharProcs")
 	}
 
-	// font-level resources (PDF spec 7.8 search order: glyph stream,
-	// font dict, page dict — the last is unavailable here).  Stored on
-	// d.Resources below, and used as the per-glyph fallback in the loop.
+	// font-level resources; the per-glyph fallback (§7.8.3) is left to
+	// the consumer, so that glyph streams without a Resources entry
+	// still have none when the font is written back
 	if fontDict["Resources"] != nil {
 		d.Resources, _ = pdf.Decode(c, fontDict["Resources"], Resources)
 	}
@@ -95,13 +95,9 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 			continue
 		}
 
-		// glyph resources (spec 7.8): glyph stream wins, otherwise fall
-		// back to the font-level dict; nil when neither is present.
-		var foundRes *content.Resources
+		var glyphRes *content.Resources
 		if stm.Dict["Resources"] != nil {
-			foundRes, _ = pdf.Decode(c, stm.Dict["Resources"], Resources)
-		} else if d.Resources != nil {
-			foundRes = d.Resources
+			glyphRes, _ = pdf.Decode(c, stm.Dict["Resources"], Resources)
 		}
 
 		// store a reader factory closure so each iteration re-opens the PDF stream
@@ -129,7 +125,7 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 
 		charProcs[name] = &dict.CharProc{
 			Content:   stream,
-			Resources: foundRes, // nil if no resources found in PDF
+			Resources: glyphRes,
 		}
 	}
 	d.CharProcs = charProcs
@@ -148,9 +144,23 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 
 // repairType3 fixes invalid data in a Type3 font dictionary after extraction.
 func repairType3(d *dict.Type3, r pdf.Getter) {
-	if v := pdf.GetVersion(r); v == pdf.V1_0 {
+	v := pdf.GetVersion(r)
+	if v == pdf.V1_0 {
 		if d.Name == "" {
 			d.Name = "Font"
+		}
+	}
+
+	// Drop entries which cannot be written at this PDF version, so that
+	// everything we read can be written back.  Each case mirrors a version
+	// check in [dict.Type3.Embed].  Readers of the time ignored these
+	// entries, so dropping them also matches how such files were displayed.
+	if v < pdf.V1_2 {
+		d.Resources = nil
+	}
+	if v < pdf.V2_0 {
+		for _, cp := range d.CharProcs {
+			cp.Resources = nil
 		}
 	}
 	// Unlike Type 1 / TrueType, Name is preserved in PDF 2.0 for Type 3 fonts

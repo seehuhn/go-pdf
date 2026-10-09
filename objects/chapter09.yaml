@@ -2550,9 +2550,9 @@ types:
     refTypes:
     - Resource
     goType: '*content.Resources'
-    purpose: 'Resources (optional) holds named resources shared by all glyph content
+    purpose: 'Resources (optional; PDF 1.2) holds named resources shared by all glyph
 
-      streams that don''t have their own resource dictionary.'
+      content streams that don''t have their own resource dictionary.'
   - goName: ToUnicode
     pdfKey: ToUnicode
     pdfType: stream

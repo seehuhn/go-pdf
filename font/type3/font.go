@@ -49,9 +49,9 @@ type Font struct {
 	// to replace the ".notdef" glyph.
 	Glyphs []*Glyph
 
-	// Resources (optional) holds named resources shared by all glyph content
-	// streams that don't have their own resource dictionary. This is embedded
-	// in the Type 3 font dictionary.
+	// Resources (optional; PDF 1.2) holds named resources shared by all glyph
+	// content streams that don't have their own resource dictionary. This is
+	// embedded in the Type 3 font dictionary.
 	Resources *content.Resources
 
 	// FontMatrix transforms glyph space units to text space units.
@@ -105,8 +105,8 @@ type Glyph struct {
 	// methods return a [*content.Operators] that satisfies [content.Stream].
 	Content content.Stream
 
-	// Resources (optional) holds named resources used by this glyph's content
-	// stream. If set, the resources are embedded in the glyph's stream
+	// Resources (optional; PDF 2.0) holds named resources used by this glyph's
+	// content stream. If set, the resources are embedded in the glyph's stream
 	// dictionary. If nil, resources are looked up from the font's resource
 	// dictionary or inherited from the page.
 	Resources *content.Resources
