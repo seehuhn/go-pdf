@@ -593,7 +593,13 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("malformed destination")
 		}
 
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
 		// round-trip test
-		testRoundTrip(t, pdf.GetVersion(r), dest)
+		testRoundTrip(t, version, dest)
 	})
 }

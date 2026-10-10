@@ -667,8 +667,14 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("malformed PDF object")
 		}
 
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
 		// Make sure we can write the function, and read it back.
-		roundTripTest(t, pdf.GetVersion(r), function)
+		roundTripTest(t, version, function)
 
 		// Test function evaluation doesn't panic
 		m, n := function.Shape()

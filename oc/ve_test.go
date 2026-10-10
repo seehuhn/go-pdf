@@ -546,6 +546,12 @@ func FuzzVisibilityExpression(f *testing.F) {
 			t.Skip("malformed visibility expression")
 		}
 
-		testVisibilityExpressionRoundTrip(t, pdf.GetVersion(r), ve)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testVisibilityExpressionRoundTrip(t, version, ve)
 	})
 }

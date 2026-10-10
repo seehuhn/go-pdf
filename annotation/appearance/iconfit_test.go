@@ -117,6 +117,12 @@ func FuzzIconFitRoundTrip(f *testing.F) {
 			t.Skip("no icon fit dictionary")
 		}
 
-		roundTripIconFit(t, pdf.GetVersion(r), objGo)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		roundTripIconFit(t, version, objGo)
 	})
 }

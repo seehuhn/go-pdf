@@ -724,7 +724,13 @@ func FuzzRoundTrip(f *testing.F) {
 			first.Data = inlineSourceWith(firstSamples)
 		}
 
-		w, _ := memfile.NewPDFWriter(t, pdf.GetVersion(r), nil)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		w, _ := memfile.NewPDFWriter(t, version, nil)
 		rm := pdf.NewResourceManager(w)
 		obj, err := rm.Embed(first)
 		if err != nil {

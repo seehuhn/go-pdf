@@ -284,6 +284,12 @@ func FuzzItemDictRoundTrip(f *testing.F) {
 			t.Skip("malformed collection item")
 		}
 
-		roundTripTest(t, pdf.GetVersion(r), item1)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		roundTripTest(t, version, item1)
 	})
 }

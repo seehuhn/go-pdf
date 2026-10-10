@@ -395,6 +395,12 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("malformed action")
 		}
 
-		testActionRoundTrip(t, pdf.GetVersion(r), action)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testActionRoundTrip(t, version, action)
 	})
 }

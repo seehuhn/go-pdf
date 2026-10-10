@@ -163,6 +163,12 @@ func FuzzFixedPrintRoundTrip(f *testing.F) {
 			t.Skip("malformed object")
 		}
 
-		fixedPrintRoundTrip(t, pdf.GetVersion(r), data)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		fixedPrintRoundTrip(t, version, data)
 	})
 }

@@ -165,7 +165,13 @@ func FuzzAnnotationRoundTrip(f *testing.F) {
 			t.Skip("nil annotation AA")
 		}
 
-		testAnnotationRoundTrip(t, pdf.GetVersion(r), aa)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testAnnotationRoundTrip(t, version, aa)
 	})
 }
 
@@ -270,7 +276,13 @@ func FuzzPageRoundTrip(f *testing.F) {
 			t.Skip("nil page AA")
 		}
 
-		testPageRoundTrip(t, pdf.GetVersion(r), aa)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testPageRoundTrip(t, version, aa)
 	})
 }
 
@@ -379,7 +391,13 @@ func FuzzFormRoundTrip(f *testing.F) {
 			t.Skip("nil form AA")
 		}
 
-		testFormRoundTrip(t, pdf.GetVersion(r), aa)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testFormRoundTrip(t, version, aa)
 	})
 }
 
@@ -498,6 +516,12 @@ func FuzzCatalogRoundTrip(f *testing.F) {
 			t.Skip("nil catalog AA")
 		}
 
-		testCatalogRoundTrip(t, pdf.GetVersion(r), aa)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testCatalogRoundTrip(t, version, aa)
 	})
 }

@@ -351,8 +351,12 @@ func FuzzViewportRoundTrip(f *testing.F) {
 			t.Skip("malformed viewport")
 		}
 
-		// Use the reader's version for round-trip
+		// reading accepts versions the writer cannot reproduce
 		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
 		viewportRoundTripTest(t, version, vp)
 	})
 }
@@ -444,7 +448,13 @@ func FuzzViewPortArrayRoundTrip(f *testing.F) {
 			t.Skip("no data")
 		}
 
-		viewportArrayRoundTripTest(t, pdf.GetVersion(r), data)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		viewportArrayRoundTripTest(t, version, data)
 	})
 }
 

@@ -183,7 +183,13 @@ func FuzzType1Dict(f *testing.F) {
 		}
 
 		// Make sure we can write the dict, and read it back.
-		checkRoundTripT1(t, d, pdf.GetVersion(r))
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		checkRoundTripT1(t, d, version)
 	})
 }
 

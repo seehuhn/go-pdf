@@ -336,7 +336,13 @@ func FuzzPropertiesRoundTrip(f *testing.F) {
 			t.Skip("malformed object")
 		}
 
-		testPropertiesRoundTrip(t, pdf.GetVersion(r), data)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testPropertiesRoundTrip(t, version, data)
 	})
 }
 

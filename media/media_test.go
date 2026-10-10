@@ -380,6 +380,12 @@ func FuzzRoundTrip(f *testing.F) {
 		if err != nil {
 			t.Skip("malformed rendition")
 		}
-		roundTrip(t, pdf.GetVersion(r), first, adapt(ExtractRendition))
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		roundTrip(t, version, first, adapt(ExtractRendition))
 	})
 }

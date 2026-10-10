@@ -230,6 +230,12 @@ func FuzzInfoRoundTrip(f *testing.F) {
 			t.Skip("nil info")
 		}
 
-		infoRoundTripTest(t, pdf.GetVersion(r), info)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		infoRoundTripTest(t, version, info)
 	})
 }

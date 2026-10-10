@@ -164,9 +164,15 @@ func FuzzType3Dict(f *testing.F) {
 			t.Skip("not a Type3 font")
 		}
 
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
 		// Write the Type3Dict back to a new PDF file.
 		// Make sure we can write arbitrary Type3Dicts.
-		w, _ := memfile.NewPDFWriter(t, pdf.GetVersion(r), nil)
+		w, _ := memfile.NewPDFWriter(t, version, nil)
 		rm := pdf.NewResourceManager(w)
 
 		fontDictRef, err := rm.Embed(d1)

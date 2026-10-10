@@ -146,6 +146,12 @@ func FuzzCharacteristicsRoundTrip(f *testing.F) {
 			t.Skip("no characteristics dictionary")
 		}
 
-		roundTripCharacteristics(t, pdf.GetVersion(r), objGo)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		roundTripCharacteristics(t, version, objGo)
 	})
 }

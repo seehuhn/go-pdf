@@ -815,7 +815,13 @@ func FuzzSpaceRoundTrip(f *testing.F) {
 			t.Skip("malformed color space")
 		}
 
-		spaceRoundTrip(t, pdf.GetVersion(r), space)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		spaceRoundTrip(t, version, space)
 	})
 }
 

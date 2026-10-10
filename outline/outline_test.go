@@ -288,7 +288,13 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("no outline")
 		}
 
-		testRoundTrip(t, pdf.GetVersion(r), outline)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		testRoundTrip(t, version, outline)
 	})
 }
 

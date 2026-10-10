@@ -296,7 +296,13 @@ func FuzzRoundTrip(f *testing.F) {
 			t.Skip("no printer's mark entries")
 		}
 
-		roundTripTest(t, pdf.GetVersion(r), attrs)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		roundTripTest(t, version, attrs)
 	})
 }
 

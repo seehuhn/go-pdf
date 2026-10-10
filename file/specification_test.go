@@ -642,7 +642,13 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 			}
 		}
 
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
 		// Make sure we can write the specification, and read it back.
-		roundTripTest(t, pdf.GetVersion(r), specification)
+		roundTripTest(t, version, specification)
 	})
 }

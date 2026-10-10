@@ -512,6 +512,12 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 			t.Skip("thumbnail data not readable")
 		}
 
-		roundTripThumbnail(t, pdf.GetVersion(r), thumb)
+		// reading accepts versions the writer cannot reproduce
+		version := pdf.GetVersion(r)
+		if !version.IsSupported() {
+			t.Skip("version cannot be written")
+		}
+
+		roundTripThumbnail(t, version, thumb)
 	})
 }
