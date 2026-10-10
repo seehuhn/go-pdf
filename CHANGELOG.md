@@ -5,6 +5,203 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.7.5] (2026-10-10)
+
+### Added
+- Variable fonts can be embedded: OpenType and CFF2 variable fonts are
+  instantiated at the design coordinates given by the new `Variations`
+  option of `embed.Options` (and of the `truetype`, `cff` and
+  `opentype` options), and Multiple Master Type 1 fonts via
+  `embed.Type1Options`.  Static CFF2 fonts can now be embedded too, and
+  `dict.Type1.MultipleMaster` reads and writes `MMType1` dictionaries.
+- Existing files can be edited by incremental update: `pdf.Update`,
+  `pdf.NewUpdater` and `pdf.NewUpdaterTo`, configured by
+  `UpdateOptions`, append changes to a file instead of rewriting it, and
+  `Writer.Free` frees an object.  Values decoded through a `Writer`
+  embed as their original objects (`Writer.Origin` reports the
+  reference), `ResourceManager.Replace` writes a modified copy under
+  the original object number, and the catalog and `Info` dictionary
+  are rewritten only when they changed.
+- New `printprep` package, which turns a document into a simplified
+  copy for printing: page selection, removal of hidden optional content,
+  annotation flattening with synthesised appearances, font
+  normalisation and removal of structure, metadata and navigation.
+- Composite fonts select their encoding by CMap, through new `CMap`
+  and `GIDToCID` options, the `cmap.UTF8H` and `cmap.UTF8V` templates
+  and `cmap.NewGIDToCIDFromMap`.
+- `font.IncludeGlyphs` adds glyphs to a subset without drawing them,
+  with predefined sets such as `font.GlyphsWinAnsi`.
+- The `font.Outliner` interface, implemented by all font instances,
+  gives access to glyph outlines.  `font/standard` gains `ByName`,
+  `Font.Style`, `Font.Face` and `Font.Program`.
+- New `graphics/printermark` and `graphics/trapnet` packages for the
+  printer's mark and trap network entries of form XObjects, held in
+  the new `form.Form` fields `PrinterMark` and `TrapNet`.  `form.Form`
+  also gains `StructParents`.
+- Annotation visibility and appearance helpers: `annotation.Resolve`,
+  `HasAppearance`, `HasRolloverAppearance`, `ShouldSynthesizeFallback`,
+  `EffectiveFlags`, `Suppressed`, `NeverShown`, `IsReply`,
+  `AppearanceRequired`, `EffectiveBorderWidth`, `EffectiveBorderStyle`
+  and `EffectiveBorderDash`; `appearance.Dict.Resolve`, `Clone` and
+  `SetNormal`; `appearance.ToRect` and `XObjectToRect`; and
+  `decode.PageAnnotations` for the page-scoped annotation repairs.
+- Fallback appearances for Line annotations draw leader lines,
+  captions and hairlines.  New `fallback.CloudOutline`, `PolygonRect`,
+  `PolyLineRect`, `Style.Lines` and `ErrNoFallback`, and a
+  configurable `Style.LineBreaker`.
+- `text.WrapWith` takes a pluggable `text.LineBreaker`, and the
+  `Ranges` method reports line breaks as byte ranges.
+- `oc.ViewState` holds the configured optional-content visibility
+  together with pinned manual changes; `Switch` applies radio-button
+  semantics, and `Effective` and `EffectiveForPrint` derive the
+  `GroupStates` snapshot a view uses.
+- `content.Resources.FontFallback` supplies a font when `Tf` names one
+  missing from the resources; the `extract` package installs a
+  standard 14 substitute (`extract.StandardFontFallback`).
+- `pdf.Cursor.AtRef`, `Stream.Length`, `Version.IsSupported`,
+  `Reader.XRefOffsets`, `EmbedHelper.Store`, `pdf.RectangleFromRect`,
+  `pdf.RectangleFromPoints`, `Rectangle.ToRect` and `Rectangle.Grow`.
+- `graphics.CheckDashArray`, `CheckDashPattern`, `RepairDashArray` and
+  `RepairDashPattern`; `graphics.State.SoftMaskCTM`;
+  `color.ClipComponent`, `ClipComponents`, `SpaceIndexed.Lookup` and
+  an exported `color.SpacePatternUncolored`; `builder.Builder.DrawPath`;
+  `image.NewFlateSource` and `image.NewCCITTFaxSource`, which choose
+  the predictor or mode from the image; `page.Page.AddAnnots` and
+  `page.RotationFromDegrees`; `acroform.FieldFlags.Normalize`.
+
+### Changed
+- `pdf.Version` values are now `100*major+minor`.  `ParseVersion`
+  accepts any well-formed version, and files declaring a version the
+  library cannot write are read rather than rejected.
+- Stream dictionaries no longer hold `/Length` after reading:
+  `NewStream` drops a caller-supplied entry, `Stream.Length` reports
+  the recovered extent, and `Writer.OpenStream` accepts `/Length` only
+  as a direct integer which must match the data written.
+- `Cursor.Integer` and `Cursor.Number` report a null object as a
+  `MalformedFileError` instead of 0.  `Cursor.Real` is removed.
+- `Function.Apply` takes its inputs as a slice rather than as variadic
+  arguments.  `Rectangle.ExtendVec` is removed.
+- `page.Page.Annots` is now a `*page.Annots` with `List` and
+  `SingleUse` fields.  `Page.MediaBox` is nil for an inherited box; the
+  US Letter fallback moves to the `pagetree` iterator and `GetPage`,
+  and `pagetree.Writer` rejects pages without a `MediaBox`.
+- `pagelabel.New` takes `...pagelabel.Entry`, and the ranges are
+  exposed as `Labels.Ranges`, replacing `NumRanges` and `GetRange`.
+- Optional content: `Configuration.DefaultState` takes and returns an
+  `*oc.ViewState` and drops its event argument, and `ApplyViewUsage` is
+  replaced by `ViewState.Effective` and `EffectiveForPrint`.
+  `action.SetOCGState.State` is now a typed `[]OCGStateChange` with
+  `OCGOperation` constants, and `SetOCGState.Apply` takes the view
+  state and the effective `*oc.GroupStates`.
+- Annotations: `PrinterMark.MN` is renamed `MarkName`,
+  `TrapNet.LastModified` is a `time.Time`, and `FixedPrint.Matrix` is a
+  `matrix.Matrix`, with a new `SingleUse` field and the `pdf.Embedder`
+  idiom (`ExtractFixedPrint`).  `FreeText.BorderWidth` is removed in
+  favour of `EffectiveBorderWidth`.  `QuadPoints` of `TextMarkup` and
+  `Link` run upper-left, upper-right, lower-left, lower-right.  An
+  empty colour array reads as `colorenc.Transparent`, and `/R` and
+  `/D` appearances default to `/N` on read.
+- `annotation/fallback`: a `Style` describes only the look of the
+  appearances.  `NewStyle` takes no arguments, and `Style.New(version)`
+  returns a per-document `Generator`, which provides `AddAppearance`
+  and `ContentFont()` (formerly the `Style.ContentFont` field).
+- `graphics/color`: `Space.ComponentRanges` is replaced by
+  `ComponentRange(i)`, and `FromXYZ` writes into a caller-supplied
+  slice using an `icc.Workspace`.  Colour operators clip components
+  into range on read, and the content builder rejects out-of-range
+  values.  The sRGB conversions are derived so that white maps onto
+  white exactly, `WhitePointD65` is computed from its chromaticity,
+  and RGB to grey uses the 0.3/0.59/0.11 weights of the PDF
+  specification.
+- `graphics.LineCapStyle` and `LineJoinStyle` are aliases of the
+  go-geom `path` types.  Common shading entries move into the embedded
+  `graphics.ShadingCommon` (`shading.Common`), reached through
+  `Shading.GetShadingCommon`.
+- `graphics/image`: `Data.Pix` and the `SampleNearest` and
+  `SampleBilinear` buffers are `[]float32`, `FlateSource.Predictor` is
+  a `pdf.FlatePredictor`, and `Indexed.Name` is removed.
+- Font instances carry a `Descriptor` derived from the font design
+  rather than from the subset.  It replaces the per-backend metric
+  fields and the `IsSerif`, `IsScript`, `IsAllCap` and `IsSmallCap`
+  fields of `type1.Instance`, whose font program and metrics are no
+  longer exported; the `cff`, `truetype` and `opentype` instances no
+  longer promote methods of the embedded font.  `font.Geometry` gains
+  `CapHeight` and `XHeight`, and `GetGeometry` no longer modifies its
+  receiver.
+- Composite font options take a `CMap` in place of `WritingMode`.
+  `cmap.NewGIDToCIDFromROS` is replaced by `NewGIDToCIDFromCMap`,
+  `GIDToCID.CID` takes a string, and the `GIDToCID.GIDToCID` method,
+  the `cmap.CID` alias and `cidenc.NewCompositeIdentity` are removed.
+- Fonts can be read while another goroutine allocates codes.  `Encode`
+  returns the existing code for a glyph instead of failing, and
+  `ErrDuplicateCode` is removed from `simpleenc` and `cidenc`.
+- `embed.Type1File` and `embed.Type1Font` take a `*Type1Options`.
+- Font dictionaries and embedded font programs now agree on the font
+  name.  `subset.TagRegexp` is replaced by `subset.Split`, `Retag` and
+  related helpers, and `simpleenc.Simple.ToUnicode` takes no argument.
+- Interactive forms: fields sharing a fully qualified name are unified,
+  text and choice fields require `/DA`, password fields never store a
+  value, and button states, field flags and choice selections are
+  reconciled on read and validated on write.  Signature `V` and `DV`
+  and the form's `XFA` are now `*opaque.Object`.
+- Colour operators, `ri`, `sh` and colour-related ExtGState entries
+  are ignored after `d1` and in uncoloured tiling patterns
+  (`content.State.Ignored`); the builder reports `ErrColorForbidden`.
+- Type 3 resource dictionaries are shared and version-checked, and
+  glyphs without their own `/Resources` no longer receive a copy of
+  the font's.
+- Object numbers are allocated in a fixed order, so output is
+  reproducible.
+- The reader caches decoded object streams.  Images with 8 bits per
+  component decode through lookup tables, PNG predictor 15 chooses the
+  filter per row, and the fallback icon fonts are loaded on first use.
+
+### Fixed
+- Damaged files: the sequential scan locates objects inside object
+  streams and synthesises a trailer when none survives, a header
+  mismatch is an error instead of a panic, and the off-by-one xref
+  repair no longer drops objects.  `Root`, `Encrypt` and `ID` are
+  merged across the `/Prev` chain.
+- Optional-content groups reached through an `/OC` entry are now the
+  same `*oc.Group` as in the document's group list, so annotations
+  no longer stay visible under every configuration.
+- More permissive reading: unusable halftone spot functions and
+  colorants, malformed mesh shadings, `FontDescriptor` entries,
+  `FontBBox`, tiling pattern `BBox`, `MediaBox` and soft-mask `BC` are
+  repaired or dropped, out-of-range ExtGState and annotation values are
+  snapped into range, and an invalid border-effect intensity is
+  dropped instead of being replaced by 1.  `IsTagged` resolves an
+  indirect `/MarkInfo`, CCITT 2D decoding handles malformed EOL
+  markers, and inline image data ends at any white space before `EI`.
+- Stricter writing: non-finite numbers, invalid dash arrays and mesh
+  shadings, mismatched soft-mask `BC` and out-of-version ExtGState
+  entries are rejected.  Type 4 functions follow PostScript number
+  syntax and detect overflow.
+- Read-write-read stability: predictor padding bits, OCG names,
+  signature timestamps, absent versus empty `Order`, `RBGroups` and
+  `Intent`, and mesh shading `Decode` values now survive a round trip.
+  The initial colour of a `DeviceN` space is 1 in every component.
+- Fonts: Type 1 stem widths honour the font matrix, Type 1 descriptors
+  carry `MissingWidth`, Type 3 `MissingWidth` uses glyph space, missing
+  AFM heights are measured from the font, `/Ascent` and `/Descent` are
+  always written, and two CFF2 panics in `sfntglyphs` are fixed.
+- Fallback appearances apply transparency as a group, fit shapes to
+  `/Rect` less `/RD`, measure strokes with their real caps, joins and
+  dashes, honour the `/DA` colour and size and `/Q` in FreeText, draw
+  carets, squiggles and text markup as fixed-width pen strokes, and
+  reset the graphics state in a way valid at every PDF version.
+- Text positions reported to reader callbacks tolerate unset
+  text-state fields.
+- Annotation opacity, horizontal scaling (`Tz`), underline metrics in
+  font descriptors and the rotation matrices of `printprep` are written
+  as rounded numbers.
+
+### Security
+- Decoded object streams are capped at 64 MiB, the size of a
+  `CIDToGIDMap` is bounded, cloud borders and ellipses are sampled at
+  most 20000 times, and an out-of-range `Indexed` colour index no
+  longer causes a crash.
+
 ## [v0.7.4] (2026-06-25)
 
 ### Added
