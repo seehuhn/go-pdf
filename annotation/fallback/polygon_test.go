@@ -29,10 +29,8 @@ import (
 // where it lies, and a form with a zero bounding box cannot be embedded.
 func TestPolygonWithoutRect(t *testing.T) {
 	a := &annotation.Polygon{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: 1},
-		},
+		Color:    color.DeviceRGB{1, 0, 0},
+		Border:   &annotation.Border{Width: 1},
 		Vertices: []float64{10, 10, 60, 10, 35, 50},
 	}
 

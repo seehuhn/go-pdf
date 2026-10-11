@@ -367,7 +367,7 @@ func showShadingPattern(doc *document.MultiPage, F font.Layouter) error {
 	}
 
 	shadingData := &shading.Type3{
-		Common:      shading.Common{ColorSpace: color.SpaceDeviceRGB},
+		ColorSpace:  color.SpaceDeviceRGB,
 		Center1:     vec.Vec2{X: 100, Y: 350},
 		R1:          10,
 		Center2:     vec.Vec2{X: 500, Y: 750},
@@ -457,7 +457,7 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 		return err
 	}
 	shadingData := &shading.Type4{
-		Common:            shading.Common{ColorSpace: cs},
+		ColorSpace:        cs,
 		BitsPerFlag:       2,
 		BitsPerCoordinate: 8,
 		BitsPerComponent:  4,
@@ -492,10 +492,8 @@ func showShading(doc *document.MultiPage, F font.Layouter) error {
 
 func showType6Pattern(doc *document.MultiPage, F font.Layouter) error {
 	shadingData := &shading.Type6{
-		Common: shading.Common{
-			ColorSpace: color.SpaceDeviceRGB,
-			Background: []float64{0.9, 0.9, 0.6},
-		},
+		ColorSpace:        color.SpaceDeviceRGB,
+		Background:        []float64{0.9, 0.9, 0.6},
 		BitsPerFlag:       8,
 		BitsPerCoordinate: 16,
 		BitsPerComponent:  8,

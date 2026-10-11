@@ -117,7 +117,7 @@ func (w *Widget) ParentField() acroform.Field { return w.Field }
 // ready, it must be added to the annotation list of the page it appears on.
 func AddWidget(f acroform.Field, rect pdf.Rectangle) *Widget {
 	w := &Widget{
-		Common:    Common{Rect: rect, Flags: FlagPrint},
+		Rect: rect, Flags: FlagPrint,
 		Highlight: HighlightInvert,
 		Field:     f,
 	}

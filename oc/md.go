@@ -75,7 +75,7 @@ func ExtractMembership(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Membership
 	// reference, or a single inline OCG dict.  Detect the array case via
 	// Cursor.Array (which resolves but returns nil for non-array values), and
 	// fall through to the single-OCG case otherwise — passing the original
-	// dict["OCGs"] preserves the reference so [pdf.Decode] can hit
+	// dict["OCGs"] preserves the reference so [pdf.Cursor.Decode] can hit
 	// the cache and return the same *Group as other extraction paths.
 	ocgsRaw := dict["OCGs"]
 	arr, err := pdf.Optional(c.Array(ocgsRaw))
@@ -84,14 +84,14 @@ func ExtractMembership(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Membership
 	}
 	if arr != nil {
 		for _, item := range arr {
-			if group, err := pdf.DecodeOptional(c, item, ExtractGroup); err != nil {
+			if group, err := c.DecodeOptional(item, ExtractGroup); err != nil {
 				return nil, err
 			} else if group != nil {
 				m.OCGs = append(m.OCGs, group)
 			}
 		}
 	} else if ocgsRaw != nil {
-		if group, err := pdf.DecodeOptional(c, ocgsRaw, ExtractGroup); err != nil {
+		if group, err := c.DecodeOptional(ocgsRaw, ExtractGroup); err != nil {
 			return nil, err
 		} else if group != nil {
 			m.OCGs = []*Group{group}
@@ -109,7 +109,7 @@ func ExtractMembership(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Membership
 		}
 	}
 
-	if ve, err := pdf.DecodeOptional(c, dict["VE"], ExtractVisibilityExpression); err != nil {
+	if ve, err := c.DecodeOptional(dict["VE"], ExtractVisibilityExpression); err != nil {
 		return nil, err
 	} else {
 		m.VE = ve

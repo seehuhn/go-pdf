@@ -130,7 +130,7 @@ func ExtractAttributes(c pdf.Cursor, dict pdf.Dict) (*Attributes, error) {
 		return nil, err
 	}
 	for name, obj := range colorants {
-		space, err := pdf.DecodeOptional(c, obj, color.ExtractSpace)
+		space, err := c.DecodeOptional(obj, color.ExtractSpace)
 		if err != nil {
 			return nil, err
 		}

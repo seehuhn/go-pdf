@@ -157,7 +157,7 @@ func infoRoundTripTest(t *testing.T, version pdf.Version, original *pdf.Info) {
 	}
 
 	x := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, pdf.ExtractInfo)
+	extracted, err := pdf.CursorAt(x, nil).Decode(embedded, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func infoRoundTripTest(t *testing.T, version pdf.Version, original *pdf.Info) {
 
 func TestExtractInfoNil(t *testing.T) {
 	x := pdf.NewExtractor(mock.Getter)
-	info, err := pdf.Decode(pdf.CursorAt(x, nil), nil, pdf.ExtractInfo)
+	info, err := pdf.CursorAt(x, nil).Decode(nil, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +222,7 @@ func FuzzInfoRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		info, err := pdf.Decode(pdf.CursorAt(x, nil), obj, pdf.ExtractInfo)
+		info, err := pdf.CursorAt(x, nil).Decode(obj, pdf.ExtractInfo)
 		if err != nil {
 			t.Skip("malformed info")
 		}

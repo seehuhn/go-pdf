@@ -234,9 +234,9 @@ func TestExtract(t *testing.T) {
 	}
 
 	want := []Entry{
-		{FirstPage: 0, Range: Range{Style: LowerRoman, Start: 1}},
-		{FirstPage: 4, Range: Range{Style: Decimal, Start: 1}},
-		{FirstPage: 7, Range: Range{Style: Decimal, Prefix: "A-", Start: 8}},
+		{FirstPage: 0, Style: LowerRoman, Start: 1},
+		{FirstPage: 4, Style: Decimal, Start: 1},
+		{FirstPage: 7, Style: Decimal, Prefix: "A-", Start: 8},
 	}
 	if diff := cmp.Diff(want, labels.Ranges); diff != "" {
 		t.Errorf("wrong ranges (-want +got):\n%s", diff)
@@ -292,8 +292,8 @@ func TestExtractNegativeKey(t *testing.T) {
 	}
 
 	want := []Entry{
-		{FirstPage: 0, Range: Range{Style: Decimal, Start: 1}},
-		{FirstPage: 3, Range: Range{Style: LowerRoman, Start: 1}},
+		{FirstPage: 0, Style: Decimal, Start: 1},
+		{FirstPage: 3, Style: LowerRoman, Start: 1},
 	}
 	if diff := cmp.Diff(want, labels.Ranges); diff != "" {
 		t.Errorf("wrong ranges (-want +got):\n%s", diff)

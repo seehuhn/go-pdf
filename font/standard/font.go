@@ -124,9 +124,9 @@ func (f Font) data() (*pstype1.Font, *afm.Metrics, error) {
 	family, _, _ := strings.Cut(name, "-")
 	psFont.FontName = name
 	psFont.FamilyName = family
-	psFont.Encoding = restrictGlyphList(f, psFont.Glyphs)
+	psFont.Encoding = f.restrictGlyphList(psFont.Glyphs)
 	metrics.FontName = name
-	metrics.Encoding = restrictGlyphList(f, metrics.Glyphs)
+	metrics.Encoding = f.restrictGlyphList(metrics.Glyphs)
 	metrics.Kern = restrictKern(metrics.Kern, metrics.Glyphs)
 
 	bundled.FixUpMetrics(metrics)
@@ -149,7 +149,7 @@ var isSerif = map[Font]bool{
 
 // Restrict the font to the character set guaranteed by the spec,
 // and return the corresponding encoding.
-func restrictGlyphList[T any](f Font, glyphs map[string]T) []string {
+func (f Font) restrictGlyphList[T any](glyphs map[string]T) []string {
 	var charset map[string]bool
 	var encoding []string
 	switch f {

@@ -92,11 +92,9 @@ func TestFlattenEllipseSampleLimit(t *testing.T) {
 func TestCircleCloudyLargeRect(t *testing.T) {
 	for _, size := range []float64{1e5, 1e10, 1e30, 1e100} {
 		a := &annotation.Circle{
-			Common: annotation.Common{
-				Rect:   pdf.Rectangle{URx: size, URy: size},
-				Color:  color.DeviceRGB{1, 0, 0},
-				Border: &annotation.Border{Width: 1},
-			},
+			Rect:         pdf.Rectangle{URx: size, URy: size},
+			Color:        color.DeviceRGB{1, 0, 0},
+			Border:       &annotation.Border{Width: 1},
 			BorderEffect: &annotation.BorderEffect{Style: "C", Intensity: 1},
 		}
 

@@ -18,7 +18,7 @@ package pdf
 
 // This file holds low-level accessors that bundle and unbundle the two values
 // a [Cursor] carries.  Most code should use the typed [Cursor] methods and
-// [Decode] instead.  These accessors are for the few places that need to step
+// [Cursor.Decode] instead.  These accessors are for the few places that need to step
 // the resolution path by hand (the linked-structure decoders in "outline",
 // "navnode", "opaque" and "oc"), that stash an extractor for deferred
 // re-extraction, or that reach the underlying [Getter] for document metadata.
@@ -37,7 +37,7 @@ func (c Cursor) Extractor() *Extractor { return c.x }
 // Path returns the cursor's current cycle-detection path.
 func (c Cursor) Path() *CycleCheck { return c.path }
 
-// AtRef undoes the reference resolution [Decode] performs before it calls a
+// AtRef undoes the reference resolution [Cursor.Decode] performs before it calls a
 // decode function.  If obj was reached through a reference, AtRef returns that
 // reference together with a cursor anchored just above it; otherwise c and obj
 // come back unchanged.  isDirect is the flag the decode function received.

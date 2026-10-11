@@ -164,7 +164,7 @@ func extractScreenEntries(c pdf.Cursor, obj pdf.Object) (*MediaScreenEntries, er
 	} else if MonitorSpecifier(m).isValid() {
 		s.Monitor = MonitorSpecifier(m)
 	}
-	if f, err := pdf.DecodeOptional(c, dict["F"], ExtractFloatingWindowParameters); err != nil {
+	if f, err := c.DecodeOptional(dict["F"], ExtractFloatingWindowParameters); err != nil {
 		return nil, err
 	} else {
 		s.FloatingWindow = f

@@ -29,7 +29,7 @@ func decodeWatermark(c pdf.Cursor, dict pdf.Dict) (*annotation.Watermark, error)
 	}
 
 	// FixedPrint (optional)
-	if fp, err := pdf.DecodeOptional(c, dict["FixedPrint"], annotation.ExtractFixedPrint); err != nil {
+	if fp, err := c.DecodeOptional(dict["FixedPrint"], annotation.ExtractFixedPrint); err != nil {
 		return nil, err
 	} else {
 		watermark.FixedPrint = fp

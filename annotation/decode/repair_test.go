@@ -182,7 +182,7 @@ func TestMissingAppearanceStateFromFieldValue(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+			a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -271,7 +271,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 			t.Fatal(err)
 		}
 		x := pdf.NewExtractor(w)
-		a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+		a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,7 +292,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 			t.Fatal(err)
 		}
 		x := pdf.NewExtractor(w)
-		a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+		a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -357,7 +357,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 				t.Fatal(err)
 			}
 			x := pdf.NewExtractor(w)
-			a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+			a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -46,7 +46,7 @@ func decodeLine(c pdf.Cursor, dict pdf.Dict) (*annotation.Line, error) {
 	}
 
 	// BS (optional)
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		line.BorderStyle = bs
@@ -122,7 +122,7 @@ func decodeLine(c pdf.Cursor, dict pdf.Dict) (*annotation.Line, error) {
 	}
 
 	// Measure (optional)
-	if m, err := pdf.DecodeOptional(c, dict["Measure"], measure.Extract); err != nil {
+	if m, err := c.DecodeOptional(dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		line.Measure = m

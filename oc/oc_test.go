@@ -86,7 +86,7 @@ func TestExtractConditionalInferType(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cond, err := pdf.Decode(pdf.NewCursor(w), ref, ExtractConditional)
+			cond, err := pdf.NewCursor(w).Decode(ref, ExtractConditional)
 			if err != nil {
 				t.Fatalf("extract: %v", err)
 			}
@@ -118,11 +118,11 @@ func TestExtractConditionalInferTypeIdentity(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	group, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractGroup)
+	group, err := pdf.CursorAt(x, nil).Decode(ref, ExtractGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cond, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractConditional)
+	cond, err := pdf.CursorAt(x, nil).Decode(ref, ExtractConditional)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestExtractConditionalBadType(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = pdf.Decode(pdf.NewCursor(w), ref, ExtractConditional)
+	_, err = pdf.NewCursor(w).Decode(ref, ExtractConditional)
 	if err == nil {
 		t.Error("no error for a dictionary of the wrong type")
 	}
@@ -183,7 +183,7 @@ func TestExtractConditionalInferTypeRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cond, err := pdf.Decode(pdf.NewCursor(w), mdRef, ExtractConditional)
+	cond, err := pdf.NewCursor(w).Decode(mdRef, ExtractConditional)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestExtractConditionalInferTypeRoundTrip(t *testing.T) {
 		t.Errorf("embedded as %v, want the original object %v", embedded, mdRef)
 	}
 
-	back, err := pdf.Decode(pdf.NewCursor(w), embedded, ExtractConditional)
+	back, err := pdf.NewCursor(w).Decode(embedded, ExtractConditional)
 	if err != nil {
 		t.Fatal(err)
 	}

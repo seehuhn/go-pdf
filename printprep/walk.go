@@ -201,7 +201,7 @@ func (c *converter) ocOff(ocObj pdf.Object) bool {
 	if ocObj == nil || c.ocState == nil {
 		return false
 	}
-	cond, err := pdf.Decode(pdf.CursorAt(c.x, nil), ocObj, oc.ExtractConditional)
+	cond, err := pdf.CursorAt(c.x, nil).Decode(ocObj, oc.ExtractConditional)
 	if err != nil || cond == nil {
 		return false
 	}

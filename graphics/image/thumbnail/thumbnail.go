@@ -115,7 +115,7 @@ func ExtractThumbnail(c pdf.Cursor, obj pdf.Object, _ bool) (*Thumbnail, error) 
 	}
 
 	// color space (required)
-	cs, err := pdf.Decode(c, dict["ColorSpace"], color.ExtractSpace)
+	cs, err := c.Decode(dict["ColorSpace"], color.ExtractSpace)
 	if err != nil {
 		return nil, err
 	} else if cs == nil {

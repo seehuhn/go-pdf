@@ -86,7 +86,7 @@ func decodeHide(c pdf.Cursor, dict pdf.Dict) (*Hide, error) {
 		h = bool(hVal)
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

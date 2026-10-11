@@ -281,7 +281,7 @@ func TestSpecificationRoundTrip(t *testing.T) {
 
 			// Extract it back
 			x := pdf.NewExtractor(w)
-			decoded, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractSpecification)
+			decoded, err := pdf.CursorAt(x, nil).Decode(obj, ExtractSpecification)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -567,7 +567,7 @@ func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {
 
 	// read back
 	x := pdf.NewExtractor(buf)
-	spec2, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractSpecification)
+	spec2, err := pdf.CursorAt(x, nil).Decode(obj, ExtractSpecification)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -614,7 +614,7 @@ func FuzzSpecificationRoundTrip(f *testing.F) {
 			t.Skip("missing specification")
 		}
 		x := pdf.NewExtractor(r)
-		specification, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractSpecification)
+		specification, err := pdf.CursorAt(x, nil).Decode(obj, ExtractSpecification)
 		if err != nil {
 			t.Skip("broken specification")
 		}

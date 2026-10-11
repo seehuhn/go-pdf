@@ -100,17 +100,15 @@ func createDocument(filename string) error {
 
 	for _, style := range lineEndingStyles {
 		line := &annotation.Line{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: pdf.Round(leftColStart-10, 2),
-					LLy: pdf.Round(w.yPos-10, 2),
-					URx: pdf.Round(leftColEnd+10, 2),
-					URy: pdf.Round(w.yPos+10, 2),
-				},
-				Contents: string(style),
-				Color:    color.Black,
-				Flags:    annotation.FlagPrint,
+			Rect: pdf.Rectangle{
+				LLx: pdf.Round(leftColStart-10, 2),
+				LLy: pdf.Round(w.yPos-10, 2),
+				URx: pdf.Round(leftColEnd+10, 2),
+				URy: pdf.Round(w.yPos+10, 2),
 			},
+			Contents: string(style),
+			Color:    color.Black,
+			Flags:    annotation.FlagPrint,
 			Coords: [4]float64{
 				pdf.Round(leftColStart, 2),
 				pdf.Round(w.yPos, 2),
@@ -136,18 +134,16 @@ func createDocument(filename string) error {
 
 	// line with Common.Border
 	borderLine1 := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-10, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+10, 2),
-			},
-			Contents: "Common.Border with dash",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 2, DashArray: []float64{10, 2}, SingleUse: true},
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-10, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+10, 2),
 		},
+		Contents: "Common.Border with dash",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
+		Border:   &annotation.Border{Width: 2, DashArray: []float64{10, 2}, SingleUse: true},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -164,17 +160,15 @@ func createDocument(filename string) error {
 
 	// line with BorderStyle
 	borderLine2 := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-10, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+10, 2),
-			},
-			Contents: "BorderStyle with dash",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-10, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+10, 2),
 		},
+		Contents: "BorderStyle with dash",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -192,19 +186,17 @@ func createDocument(filename string) error {
 
 	// line with no border or border style
 	borderLine3 := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-10, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+10, 2),
-			},
-			Contents: "no line style specified",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
-			// the PDF default, which is written by leaving Border out
-			Border: annotation.PDFDefaultBorder,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-10, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+10, 2),
 		},
+		Contents: "no line style specified",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
+		// the PDF default, which is written by leaving Border out
+		Border: annotation.PDFDefaultBorder,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -222,17 +214,15 @@ func createDocument(filename string) error {
 	// line with width 0, which asks for a hairline; a nil Border is written
 	// as [0 0 0]
 	borderLine4 := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-10, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+10, 2),
-			},
-			Contents: "Border width 0",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-10, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+10, 2),
 		},
+		Contents: "Border width 0",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -252,17 +242,15 @@ func createDocument(filename string) error {
 
 	// caption inline
 	captionInline := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-15, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+15, 2),
-			},
-			Contents: "inline caption",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-15, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+15, 2),
 		},
+		Contents: "inline caption",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -281,17 +269,15 @@ func createDocument(filename string) error {
 
 	// shifted inline caption
 	captionInline = &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-30, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+30, 2),
-			},
-			Contents: "shifted inline caption",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-30, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+30, 2),
 		},
+		Contents: "shifted inline caption",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -311,17 +297,15 @@ func createDocument(filename string) error {
 
 	// caption on top
 	captionTop := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-10, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+20, 2),
-			},
-			Contents: "top caption",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-10, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+20, 2),
 		},
+		Contents: "top caption",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -352,17 +336,15 @@ func createDocument(filename string) error {
 	for _, c := range moreCaptions {
 		w.yPos -= 2 * captionTestStep
 		line := &annotation.Line{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: pdf.Round(leftColStart-10, 2),
-					LLy: pdf.Round(w.yPos-30, 2),
-					URx: pdf.Round(leftColEnd+10, 2),
-					URy: pdf.Round(w.yPos+30, 2),
-				},
-				Contents: c.contents,
-				Color:    color.Black,
-				Flags:    annotation.FlagPrint,
+			Rect: pdf.Rectangle{
+				LLx: pdf.Round(leftColStart-10, 2),
+				LLy: pdf.Round(w.yPos-30, 2),
+				URx: pdf.Round(leftColEnd+10, 2),
+				URy: pdf.Round(w.yPos+30, 2),
 			},
+			Contents: c.contents,
+			Color:    color.Black,
+			Flags:    annotation.FlagPrint,
 			Coords: [4]float64{
 				pdf.Round(c.x0, 2),
 				pdf.Round(w.yPos+c.dy0, 2),
@@ -395,17 +377,15 @@ func createDocument(filename string) error {
 	w.drawGuide()
 
 	leaderPos := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-30, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+30, 2),
-			},
-			Contents: "LL=24 (positive)",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-30, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+30, 2),
 		},
+		Contents: "LL=24 (positive)",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -426,17 +406,15 @@ func createDocument(filename string) error {
 	w.drawGuide()
 
 	leaderNeg := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-30, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+30, 2),
-			},
-			Contents: "LL=-24 (negative)",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-30, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+30, 2),
 		},
+		Contents: "LL=-24 (negative)",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -457,17 +435,15 @@ func createDocument(filename string) error {
 	w.drawGuide()
 
 	leaderCombo := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-30, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+75, 2),
-			},
-			Contents: "LL=50, LLE=10, LLO=10",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-30, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+75, 2),
 		},
+		Contents: "LL=50, LLE=10, LLO=10",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -490,17 +466,15 @@ func createDocument(filename string) error {
 	// caption on a line with leader lines
 	w.drawGuide()
 	leaderCaption := &annotation.Line{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: pdf.Round(leftColStart-10, 2),
-				LLy: pdf.Round(w.yPos-10, 2),
-				URx: pdf.Round(leftColEnd+10, 2),
-				URy: pdf.Round(w.yPos+40, 2),
-			},
-			Contents: "LL=24 with caption",
-			Color:    color.Black,
-			Flags:    annotation.FlagPrint,
+		Rect: pdf.Rectangle{
+			LLx: pdf.Round(leftColStart-10, 2),
+			LLy: pdf.Round(w.yPos-10, 2),
+			URx: pdf.Round(leftColEnd+10, 2),
+			URy: pdf.Round(w.yPos+40, 2),
 		},
+		Contents: "LL=24 with caption",
+		Color:    color.Black,
+		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),
@@ -597,12 +571,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

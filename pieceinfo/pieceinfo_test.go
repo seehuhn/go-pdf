@@ -30,7 +30,7 @@ func TestExtract(t *testing.T) {
 	x := pdf.NewExtractor(mock.Getter)
 
 	// test with nil object
-	info, err := pdf.DecodeOptional(pdf.CursorAt(x, nil), nil, Extract)
+	info, err := pdf.CursorAt(x, nil).DecodeOptional(nil, Extract)
 	if err != nil {
 		t.Errorf("Extract(x, nil) returned error: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestExtract(t *testing.T) {
 
 	// test with empty dictionary
 	emptyDict := pdf.Dict{}
-	info, err = pdf.Decode(pdf.CursorAt(x, nil), emptyDict, Extract)
+	info, err = pdf.CursorAt(x, nil).Decode(emptyDict, Extract)
 	if err != nil {
 		t.Errorf("Extract with empty dict returned error: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(mock.Getter)
-	info, err := pdf.Decode(pdf.CursorAt(x, nil), pieceDict, Extract)
+	info, err := pdf.CursorAt(x, nil).Decode(pieceDict, Extract)
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestExtractWithValidData(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(mock.Getter)
-	info, err := pdf.Decode(pdf.CursorAt(x, nil), pieceDict, Extract)
+	info, err := pdf.CursorAt(x, nil).Decode(pieceDict, Extract)
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestExtractMissingPrivate(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(mock.Getter)
-	info, err := pdf.Decode(pdf.CursorAt(x, nil), pieceDict, Extract)
+	info, err := pdf.CursorAt(x, nil).Decode(pieceDict, Extract)
 	if err != nil {
 		t.Fatalf("Extract: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestErrDiscard(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(mock.Getter)
-	info, err := pdf.Decode(pdf.CursorAt(x, nil), pieceDict, Extract)
+	info, err := pdf.CursorAt(x, nil).Decode(pieceDict, Extract)
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestSingleUse(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(mock.Getter)
-	info, err := pdf.Decode(pdf.CursorAt(x, nil), pieceDict, Extract)
+	info, err := pdf.CursorAt(x, nil).Decode(pieceDict, Extract)
 	if err != nil {
 		t.Fatalf("Extract with direct dict returned error: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestSingleUse(t *testing.T) {
 	}
 
 	x2 := pdf.NewExtractor(w2)
-	info2, err := pdf.Decode(pdf.CursorAt(x2, nil), ref, Extract)
+	info2, err := pdf.CursorAt(x2, nil).Decode(ref, Extract)
 	if err != nil {
 		t.Fatalf("Extract with reference returned error: %v", err)
 	}

@@ -126,11 +126,9 @@ func (w *writer) drawLabel(x, y float64, text string) {
 
 func (w *writer) addCloudySquare(rect pdf.Rectangle, lw, intensity float64, strokeCol, fillCol color.Color) {
 	a := &annotation.Square{
-		Common: annotation.Common{
-			Rect:  rect,
-			Flags: annotation.FlagPrint,
-			Color: strokeCol,
-		},
+		Rect:      rect,
+		Flags:     annotation.FlagPrint,
+		Color:     strokeCol,
 		FillColor: fillCol,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     lw,
@@ -148,11 +146,9 @@ func (w *writer) addCloudySquare(rect pdf.Rectangle, lw, intensity float64, stro
 
 	// overlay: thin gray outline of the original rectangle
 	outline := &annotation.Square{
-		Common: annotation.Common{
-			Rect:  rect,
-			Flags: annotation.FlagPrint,
-			Color: gray,
-		},
+		Rect:  rect,
+		Flags: annotation.FlagPrint,
+		Color: gray,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     0.5,
 			Style:     "S",
@@ -165,11 +161,9 @@ func (w *writer) addCloudySquare(rect pdf.Rectangle, lw, intensity float64, stro
 
 func (w *writer) addCloudyCircle(rect pdf.Rectangle, lw, intensity float64, strokeCol, fillCol color.Color) {
 	a := &annotation.Circle{
-		Common: annotation.Common{
-			Rect:  rect,
-			Flags: annotation.FlagPrint,
-			Color: strokeCol,
-		},
+		Rect:      rect,
+		Flags:     annotation.FlagPrint,
+		Color:     strokeCol,
 		FillColor: fillCol,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     lw,
@@ -187,11 +181,9 @@ func (w *writer) addCloudyCircle(rect pdf.Rectangle, lw, intensity float64, stro
 
 	// overlay: thin gray outline of the original ellipse
 	outline := &annotation.Circle{
-		Common: annotation.Common{
-			Rect:  rect,
-			Flags: annotation.FlagPrint,
-			Color: gray,
-		},
+		Rect:  rect,
+		Flags: annotation.FlagPrint,
+		Color: gray,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     0.5,
 			Style:     "S",
@@ -204,11 +196,9 @@ func (w *writer) addCloudyCircle(rect pdf.Rectangle, lw, intensity float64, stro
 
 func (w *writer) addCloudyPolygon(rect pdf.Rectangle, verts []float64, lw, intensity float64, strokeCol, fillCol color.Color) {
 	a := &annotation.Polygon{
-		Common: annotation.Common{
-			Rect:  rect,
-			Flags: annotation.FlagPrint,
-			Color: strokeCol,
-		},
+		Rect:      rect,
+		Flags:     annotation.FlagPrint,
+		Color:     strokeCol,
 		Vertices:  verts,
 		FillColor: fillCol,
 		BorderStyle: &annotation.BorderStyle{
@@ -227,11 +217,9 @@ func (w *writer) addCloudyPolygon(rect pdf.Rectangle, verts []float64, lw, inten
 
 	// overlay: thin gray outline of the original polygon
 	outline := &annotation.Polygon{
-		Common: annotation.Common{
-			Rect:  rect,
-			Flags: annotation.FlagPrint,
-			Color: gray,
-		},
+		Rect:     rect,
+		Flags:    annotation.FlagPrint,
+		Color:    gray,
 		Vertices: verts,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     0.5,

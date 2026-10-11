@@ -91,7 +91,7 @@ func borderEffectRoundTrip(t *testing.T, version pdf.Version, data *BorderEffect
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, ExtractBorderEffect)
+	decoded, err := pdf.CursorAt(x, nil).Decode(embedded, ExtractBorderEffect)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestBorderEffectInvalidIntensity(t *testing.T) {
 	x := pdf.NewExtractor(mock.Getter)
 	for _, intensity := range []pdf.Object{pdf.Number(-0.5), pdf.Number(2.5), pdf.Name("x")} {
 		dict := pdf.Dict{"S": pdf.Name("C"), "I": intensity}
-		got, err := pdf.Decode(pdf.CursorAt(x, nil), dict, ExtractBorderEffect)
+		got, err := pdf.CursorAt(x, nil).Decode(dict, ExtractBorderEffect)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -173,7 +173,7 @@ func FuzzBorderEffectRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractBorderEffect)
+		data, err := pdf.CursorAt(x, nil).Decode(obj, ExtractBorderEffect)
 		if err != nil {
 			t.Skip("malformed object")
 		}

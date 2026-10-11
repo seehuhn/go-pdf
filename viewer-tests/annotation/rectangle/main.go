@@ -234,17 +234,15 @@ func (w *writer) text(x, y float64, f font.Layouter, size float64, s string) {
 
 func newSquare(cx, cy float64, p probe) *annotation.Square {
 	a := &annotation.Square{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: cx - annotSize/2,
-				LLy: cy - annotSize/2,
-				URx: cx + annotSize/2,
-				URy: cy + annotSize/2,
-			},
-			Contents: p.dict,
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
+		Rect: pdf.Rectangle{
+			LLx: cx - annotSize/2,
+			LLy: cy - annotSize/2,
+			URx: cx + annotSize/2,
+			URy: cy + annotSize/2,
 		},
+		Contents: p.dict,
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     lineWidth,
 			Style:     "S",

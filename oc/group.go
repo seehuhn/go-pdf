@@ -89,7 +89,7 @@ func ExtractGroup(c pdf.Cursor, obj pdf.Object, _ bool) (*Group, error) {
 		group.Intent = []pdf.Name{"View"}
 	}
 
-	if usage, err := pdf.DecodeOptional(c, dict["Usage"], ExtractUsage); err != nil {
+	if usage, err := c.DecodeOptional(dict["Usage"], ExtractUsage); err != nil {
 		return nil, err
 	} else {
 		group.Usage = usage

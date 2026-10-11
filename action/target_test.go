@@ -242,7 +242,7 @@ func TestDecodeTargetCycleSelf(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, DecodeTarget)
+	_, err = pdf.CursorAt(x, nil).Decode(ref, DecodeTarget)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -266,7 +266,7 @@ func TestDecodeTargetCycleMutual(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.Decode(pdf.CursorAt(x, nil), refA, DecodeTarget)
+	_, err := pdf.CursorAt(x, nil).Decode(refA, DecodeTarget)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -296,7 +296,7 @@ func TestDecodeTargetDeepChainBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := pdf.Decode(pdf.CursorAt(x, nil), refs[0], DecodeTarget); !pdf.IsMalformed(err) {
+	if _, err := pdf.CursorAt(x, nil).Decode(refs[0], DecodeTarget); !pdf.IsMalformed(err) {
 		t.Errorf("err = %v, want malformed", err)
 	}
 }

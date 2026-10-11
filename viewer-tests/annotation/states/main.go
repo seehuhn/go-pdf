@@ -121,11 +121,9 @@ func run() error {
 	rect := rowRect(y)
 	writeRowLabel(doc, F, B, y, "Link", "/AP is often ignored for links.")
 	link := &annotation.Link{
-		Common: annotation.Common{
-			Rect:       rect,
-			Flags:      annotation.FlagPrint,
-			Appearance: states(rect, F),
-		},
+		Rect:       rect,
+		Flags:      annotation.FlagPrint,
+		Appearance: states(rect, F),
 		// A link's Push mode (§12.5.6.5) is described as a push-down effect
 		// and does not mention /D, so the down appearance is not promised
 		// here.  The default is Invert.
@@ -140,15 +138,13 @@ func run() error {
 	rect = rowRect(y)
 	writeRowLabel(doc, F, B, y, "FreeText", "Markup: hidden by hide-markup.")
 	freeText := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:  rect,
-			Flags: annotation.FlagPrint | annotation.FlagLocked | annotation.FlagLockedContents,
-			// Locked so that a viewer does not offer to edit the annotation:
-			// editing regenerates the normal appearance and discards the
-			// other two.
-			Contents:   "Appearance states",
-			Appearance: states(rect, F),
-		},
+		Rect:  rect,
+		Flags: annotation.FlagPrint | annotation.FlagLocked | annotation.FlagLockedContents,
+		// Locked so that a viewer does not offer to edit the annotation:
+		// editing regenerates the normal appearance and discards the
+		// other two.
+		Contents:          "Appearance states",
+		Appearance:        states(rect, F),
 		DefaultAppearance: fmt.Sprintf("/Helv %g Tf 0 g", fontSize),
 	}
 	doc.Page.AddAnnots(freeText)

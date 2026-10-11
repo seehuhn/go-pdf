@@ -361,12 +361,10 @@ func writePage(doc *document.MultiPage, F, B font.Instance, rotate page.Rotation
 		// as the NoRotate box above
 		rect := f.anchorRect(x, iconY+20, 20, 20)
 		p.Page.AddAnnots(&annotation.Text{
-			Common: annotation.Common{
-				Rect:     rect,
-				Flags:    annotation.FlagPrint,
-				Contents: string(icon),
-			},
-			Icon: icon,
+			Rect:     rect,
+			Flags:    annotation.FlagPrint,
+			Contents: string(icon),
+			Icon:     icon,
 		})
 		u, v := f.point(rect.LLx, rect.URy)
 		drawCross(p, u, v)

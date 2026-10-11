@@ -6,10 +6,6 @@ weight = 100
 
 # TODO List
 
-## Next Steps
-
-- Get rid of `ResourceManagerEmbedFunc` and `EmbedHelperEmbedFunc`.
-
 ## API
 
 - Finalise the font API.

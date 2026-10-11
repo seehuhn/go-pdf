@@ -155,7 +155,7 @@ func extractEntry(c pdf.Cursor, obj pdf.Object) (*form.Form, map[pdf.Name]*form.
 			if state == "" {
 				continue
 			}
-			f, err := pdf.DecodeOptional(c, stateObj, extract.Form)
+			f, err := c.DecodeOptional(stateObj, extract.Form)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -169,7 +169,7 @@ func extractEntry(c pdf.Cursor, obj pdf.Object) (*form.Form, map[pdf.Name]*form.
 		return nil, byState, nil
 
 	case *pdf.Stream:
-		f, err := pdf.DecodeOptional(c, obj, extract.Form)
+		f, err := c.DecodeOptional(obj, extract.Form)
 		if err != nil {
 			return nil, nil, err
 		}

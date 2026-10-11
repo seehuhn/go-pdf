@@ -78,14 +78,14 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 
 	// Group (optional)
-	if g, err := pdf.DecodeOptional(c, dict["Group"], group.ExtractTransparencyAttributes); err != nil {
+	if g, err := c.DecodeOptional(dict["Group"], group.ExtractTransparencyAttributes); err != nil {
 		return nil, err
 	} else {
 		f.Group = g
 	}
 
 	// Ref (optional)
-	if r, err := pdf.DecodeOptional(c, dict["Ref"], reference.ExtractDict); err != nil {
+	if r, err := c.DecodeOptional(dict["Ref"], reference.ExtractDict); err != nil {
 		return nil, err
 	} else {
 		f.Ref = r
@@ -106,21 +106,21 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 
 	// OPI (optional)
-	if o, err := pdf.DecodeOptional(c, dict["OPI"], opi.Extract); err != nil {
+	if o, err := c.DecodeOptional(dict["OPI"], opi.Extract); err != nil {
 		return nil, err
 	} else {
 		f.OPI = o
 	}
 
 	// Metadata (optional)
-	if meta, err := pdf.DecodeOptional(c, dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
+	if meta, err := c.DecodeOptional(dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
 		return nil, err
 	} else {
 		f.Metadata = meta
 	}
 
 	// PieceInfo (optional)
-	if piece, err := pdf.DecodeOptional(c, dict["PieceInfo"], pieceinfo.Extract); err != nil {
+	if piece, err := c.DecodeOptional(dict["PieceInfo"], pieceinfo.Extract); err != nil {
 		return nil, err
 	} else {
 		f.PieceInfo = piece
@@ -134,21 +134,21 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 
 	// OC (optional)
-	if ocObj, err := pdf.DecodeOptional(c, dict["OC"], oc.ExtractConditional); err != nil {
+	if ocObj, err := c.DecodeOptional(dict["OC"], oc.ExtractConditional); err != nil {
 		return nil, err
 	} else {
 		f.OptionalContent = ocObj
 	}
 
 	// Measure (optional)
-	if m, err := pdf.DecodeOptional(c, dict["Measure"], measure.Extract); err != nil {
+	if m, err := c.DecodeOptional(dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		f.Measure = m
 	}
 
 	// PtData (optional)
-	if ptData, err := pdf.DecodeOptional(c, dict["PtData"], measure.ExtractPtData); err != nil {
+	if ptData, err := c.DecodeOptional(dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		f.PtData = ptData
@@ -169,7 +169,7 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 	} else if afArray != nil {
 		f.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.DecodeOptional(c, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
 				return nil, err
 			} else if spec != nil {
 				f.AssociatedFiles = append(f.AssociatedFiles, spec)
@@ -180,7 +180,7 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 	// extract resources
 	version := c.Version()
 	if resObj := dict["Resources"]; resObj != nil {
-		res, err := pdf.Decode(c, resObj, Resources)
+		res, err := c.Decode(resObj, Resources)
 		if err != nil {
 			return nil, err
 		}

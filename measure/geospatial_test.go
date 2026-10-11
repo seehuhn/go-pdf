@@ -134,7 +134,7 @@ func geospatialRoundTripTest(t *testing.T, data *GeospatialMeasure) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, Extract)
+	decoded, err := pdf.CursorAt(x, nil).Decode(embedded, Extract)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -195,7 +195,7 @@ func FuzzGeospatialRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := pdf.Decode(pdf.CursorAt(x, nil), objPDF, Extract)
+		objGo, err := pdf.CursorAt(x, nil).Decode(objPDF, Extract)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}

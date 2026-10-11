@@ -112,12 +112,10 @@ func createDocument(filename string) error {
 	// different ways of setting the border width
 
 	a := &annotation.Link{
-		Common: annotation.Common{
-			Contents: "default border width",
-			Flags:    annotation.FlagPrint,
-			Color:    w.LinkCol,
-			Border:   &annotation.Border{Width: 1, SingleUse: true},
-		},
+		Contents:  "default border width",
+		Flags:     annotation.FlagPrint,
+		Color:     w.LinkCol,
+		Border:    &annotation.Border{Width: 1, SingleUse: true},
 		Action:    &action.URI{URI: "https://www.example.com/"},
 		Highlight: annotation.HighlightInvert,
 	}
@@ -127,13 +125,11 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Common: annotation.Common{
-			Contents: "Common.Border.Width=2",
-			Flags:    annotation.FlagPrint,
-			Color:    w.LinkCol,
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-		},
-		Action: &action.URI{URI: "https://www.example.com/"},
+		Contents: "Common.Border.Width=2",
+		Flags:    annotation.FlagPrint,
+		Color:    w.LinkCol,
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
+		Action:   &action.URI{URI: "https://www.example.com/"},
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -141,11 +137,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Common: annotation.Common{
-			Contents: "BorderStyle.Width=2",
-			Flags:    annotation.FlagPrint,
-			Color:    w.LinkCol,
-		},
+		Contents:    "BorderStyle.Width=2",
+		Flags:       annotation.FlagPrint,
+		Color:       w.LinkCol,
 		Action:      &action.URI{URI: "https://www.example.com/"},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
@@ -155,10 +149,8 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Common: annotation.Common{
-			Contents: "default border color",
-			Flags:    annotation.FlagPrint,
-		},
+		Contents:    "default border color",
+		Flags:       annotation.FlagPrint,
 		Action:      &action.URI{URI: "https://www.example.com/"},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
@@ -168,11 +160,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Common: annotation.Common{
-			Contents: "transparent border",
-			Flags:    annotation.FlagPrint,
-			Color:    nil,
-		},
+		Contents:    "transparent border",
+		Flags:       annotation.FlagPrint,
+		Color:       nil,
 		Action:      &action.URI{URI: "https://www.example.com/"},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
@@ -194,11 +184,9 @@ func createDocument(filename string) error {
 		}
 
 		a := &annotation.Link{
-			Common: annotation.Common{
-				Contents: "frame style " + string(style),
-				Flags:    annotation.FlagPrint,
-				Color:    w.LinkCol,
-			},
+			Contents:    "frame style " + string(style),
+			Flags:       annotation.FlagPrint,
+			Color:       w.LinkCol,
 			Action:      &action.URI{URI: "https://www.example.com/"},
 			Highlight:   annotation.HighlightInvert,
 			BorderStyle: bs,
@@ -471,10 +459,8 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 	}
 
 	link := &annotation.Link{
-		Common: annotation.Common{
-			Contents: title,
-			Flags:    annotation.FlagPrint,
-		},
+		Contents:    title,
+		Flags:       annotation.FlagPrint,
 		Action:      &action.URI{URI: url},
 		Highlight:   annotation.HighlightInvert,
 		BorderStyle: bs,

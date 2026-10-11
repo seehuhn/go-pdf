@@ -28,14 +28,12 @@ import (
 func TestBorderDefaults(t *testing.T) {
 	// Test that default border values are not written to PDF
 	annotation := &Text{
-		Common: Common{
-			Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
-			Border: &Border{
-				HCornerRadius: 0,
-				VCornerRadius: 0,
-				Width:         1, // PDF default
-				DashArray:     nil,
-			},
+		Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+		Border: &Border{
+			HCornerRadius: 0,
+			VCornerRadius: 0,
+			Width:         1, // PDF default
+			DashArray:     nil,
 		},
 	}
 

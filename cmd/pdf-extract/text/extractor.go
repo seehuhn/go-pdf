@@ -198,7 +198,7 @@ func (e *TextExtractor) ExtractPage(pageDict pdf.Dict) error {
 	e.lastWasWhitespace = true
 	e.lastWasNewline = true
 
-	pg, err := pdf.Decode(pdf.CursorAt(e.x, nil), pageDict, page.Decode)
+	pg, err := pdf.CursorAt(e.x, nil).Decode(pageDict, page.Decode)
 	if err != nil {
 		return err
 	}

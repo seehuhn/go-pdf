@@ -223,7 +223,7 @@ func TestGivenUpCloudLeavesTheRectangleAlone(t *testing.T) {
 // edge of the border, so the margin on that side is zero.
 func TestCloudRecordsNoMarginOnAFlatSide(t *testing.T) {
 	a := &annotation.Square{
-		Common:       annotation.Common{Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200}, Color: color.DeviceRGB{1, 0, 0}},
+		Rect: pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200}, Color: color.DeviceRGB{1, 0, 0},
 		BorderStyle:  &annotation.BorderStyle{Width: 2},
 		BorderEffect: &annotation.BorderEffect{Style: "C", Intensity: 1},
 	}

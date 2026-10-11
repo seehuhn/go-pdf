@@ -104,7 +104,7 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeGoToE(c pdf.Cursor, dict pdf.Dict) (*GoToE, error) {
-	dest, err := pdf.Decode(c, dict["D"], destination.Decode)
+	dest, err := c.Decode(dict["D"], destination.Decode)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func decodeGoToE(c pdf.Cursor, dict pdf.Dict) (*GoToE, error) {
 		return nil, pdf.Error("GoToE action missing D entry")
 	}
 
-	f, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
+	f, err := c.Decode(dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
@@ -129,13 +129,13 @@ func decodeGoToE(c pdf.Cursor, dict pdf.Dict) (*GoToE, error) {
 
 	var target Target
 	if dict["T"] != nil {
-		target, err = pdf.Decode(c, dict["T"], DecodeTarget)
+		target, err = c.Decode(dict["T"], DecodeTarget)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

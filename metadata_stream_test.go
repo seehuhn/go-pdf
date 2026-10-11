@@ -580,8 +580,8 @@ func TestMetadataPlaintextRequiresVersion(t *testing.T) {
 			Data:      packet,
 			Plaintext: true,
 		})
-		var verErr *pdf.VersionError
-		if !errors.As(err, &verErr) {
+		verErr, ok := errors.AsType[*pdf.VersionError](err)
+		if !ok {
 			t.Fatalf("rm.Embed: got %v, want *VersionError", err)
 		}
 		if verErr.Earliest != pdf.V1_5 {
@@ -603,8 +603,8 @@ func TestMetadataPlaintextRequiresVersion(t *testing.T) {
 			},
 		}
 		_, err := pdf.NewWriter(io.Discard, pdf.V1_5, opt)
-		var verErr *pdf.VersionError
-		if !errors.As(err, &verErr) {
+		verErr, ok := errors.AsType[*pdf.VersionError](err)
+		if !ok {
 			t.Fatalf("NewWriter: got %v, want *VersionError", err)
 		}
 		if verErr.Earliest != pdf.V1_6 {

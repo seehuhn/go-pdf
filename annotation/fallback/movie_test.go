@@ -40,8 +40,8 @@ func TestMoviePoster(t *testing.T) {
 	s := newGen(t, pdf.V2_0)
 	poster := stubImage{}
 	a := &annotation.Movie{
-		Common: annotation.Common{Rect: mediaRect},
-		Movie:  &movie.Movie{Poster: poster},
+		Rect:  mediaRect,
+		Movie: &movie.Movie{Poster: poster},
 	}
 
 	f, err := s.addMovieAppearance(a)
@@ -72,8 +72,8 @@ func TestMoviePlaceholder(t *testing.T) {
 	for name, m := range cases {
 		t.Run(name, func(t *testing.T) {
 			a := &annotation.Movie{
-				Common: annotation.Common{Rect: mediaRect},
-				Movie:  m,
+				Rect:  mediaRect,
+				Movie: m,
 			}
 			f, err := s.addMovieAppearance(a)
 			if err != nil {
@@ -96,7 +96,7 @@ func TestMoviePlaceholder(t *testing.T) {
 func TestMovieZeroRect(t *testing.T) {
 	s := newGen(t, pdf.V2_0)
 	zero := pdf.Rectangle{LLx: 5, LLy: 5, URx: 5, URy: 5}
-	a := &annotation.Movie{Common: annotation.Common{Rect: zero}}
+	a := &annotation.Movie{Rect: zero}
 
 	f, err := s.addMovieAppearance(a)
 	if err != nil {

@@ -937,8 +937,7 @@ func endstreamAt(r io.ReaderAt, pos int64) bool {
 func (s *scanner) ReadHeaderVersion() (Version, error) {
 	err := s.SkipString("%PDF-")
 	if err != nil {
-		var e *MalformedFileError
-		if errors.As(err, &e) {
+		if e, ok := errors.AsType[*MalformedFileError](err); ok {
 			e.Err = errNoPDF
 		}
 		return 0, err

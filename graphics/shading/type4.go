@@ -200,7 +200,7 @@ func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 
 	// Read optional Function
 	if fnObj, ok := d["Function"]; ok {
-		if fn, err := pdf.DecodeOptional(c, fnObj, function.Extract); err != nil {
+		if fn, err := c.DecodeOptional(fnObj, function.Extract); err != nil {
 			return nil, err
 		} else if fn != nil && s.ColorSpace.Family() != color.FamilyIndexed {
 			// an Indexed colour space does not allow a function

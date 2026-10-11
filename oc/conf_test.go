@@ -18,6 +18,7 @@ package oc
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -324,7 +325,7 @@ func testConfigurationRoundTrip(t *testing.T, version pdf.Version, data *Configu
 	}
 
 	extractor := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(extractor, nil), obj, ExtractConfiguration)
+	extracted, err := pdf.CursorAt(extractor, nil).Decode(obj, ExtractConfiguration)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -424,7 +425,7 @@ func TestConfigurationONOFFOverlap(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	cfg, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractConfiguration)
+	cfg, err := pdf.CursorAt(x, nil).Decode(ref, ExtractConfiguration)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -465,7 +466,7 @@ func TestConfigurationONOFFOverlapAll(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	cfg, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractConfiguration)
+	cfg, err := pdf.CursorAt(x, nil).Decode(ref, ExtractConfiguration)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -502,7 +503,7 @@ func TestConfigurationRBGroupsCap(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	cfg, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractConfiguration)
+	cfg, err := pdf.CursorAt(x, nil).Decode(ref, ExtractConfiguration)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -587,7 +588,7 @@ func FuzzConfigurationRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractConfiguration)
+		data, err := pdf.CursorAt(x, nil).Decode(obj, ExtractConfiguration)
 		if err != nil {
 			t.Skip("malformed object")
 		}
@@ -600,4 +601,51 @@ func FuzzConfigurationRoundTrip(f *testing.F) {
 
 		testConfigurationRoundTrip(t, version, data)
 	})
+}
+
+// failingGetter wraps a [pdf.Getter] and fails to read the object bad with
+// an I/O error, which is not a sign of a malformed file.
+type failingGetter struct {
+	pdf.Getter
+	bad pdf.Reference
+}
+
+func (g failingGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
+	if ref == g.bad {
+		return nil, errors.New("I/O error")
+	}
+	return g.Getter.Get(ref, canObjStm)
+}
+
+// TestGroupArrayReadError checks that an I/O error while reading a group
+// array element is reported, while a malformed element is skipped.
+func TestGroupArrayReadError(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	good := w.Alloc()
+	if err := w.Put(good, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Layer")}); err != nil {
+		t.Fatal(err)
+	}
+	broken := w.Alloc()
+	if err := w.Put(broken, pdf.Integer(1)); err != nil {
+		t.Fatal(err)
+	}
+	unreadable := w.Alloc()
+	if err := w.Put(unreadable, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Other")}); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(failingGetter{Getter: w, bad: unreadable})
+	c := pdf.CursorAt(x, nil)
+
+	groups, err := extractGroupArray(c, pdf.Array{broken, good})
+	if err != nil {
+		t.Fatalf("malformed element: unexpected error %v", err)
+	}
+	if len(groups) != 1 || groups[0].Name != "Layer" {
+		t.Errorf("malformed element: got %v, want only the good group", groups)
+	}
+
+	if _, err := extractGroupArray(c, pdf.Array{good, unreadable}); err == nil {
+		t.Error("I/O error was not reported")
+	}
 }

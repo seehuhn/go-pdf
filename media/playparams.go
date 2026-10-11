@@ -143,7 +143,7 @@ func ExtractMediaPlayParameters(c pdf.Cursor, obj pdf.Object, isDirect bool) (*M
 
 	p := &MediaPlayParameters{SingleUse: isDirect}
 
-	if pl, err := pdf.DecodeOptional(c, dict["PL"], ExtractMediaPlayers); err != nil {
+	if pl, err := c.DecodeOptional(dict["PL"], ExtractMediaPlayers); err != nil {
 		return nil, err
 	} else {
 		p.Players = pl
@@ -190,7 +190,7 @@ func extractPlayEntries(c pdf.Cursor, obj pdf.Object) (*MediaPlayEntries, error)
 			p.Fit = fitFromPDF(f)
 		}
 	}
-	if d, err := pdf.DecodeOptional(c, dict["D"], ExtractMediaDuration); err != nil {
+	if d, err := c.DecodeOptional(dict["D"], ExtractMediaDuration); err != nil {
 		return nil, err
 	} else {
 		p.Duration = d
@@ -335,7 +335,7 @@ func ExtractMediaDuration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaDu
 	case DurationIntrinsic, DurationInfinity:
 		d.Kind = DurationKind(s)
 	case DurationExplicit:
-		t, err := pdf.Decode(c, dict["T"], ExtractTimespan)
+		t, err := c.Decode(dict["T"], ExtractTimespan)
 		if err != nil {
 			return nil, err
 		} else if t == nil {

@@ -156,7 +156,7 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 
 // DecodeTarget reads a target dictionary from a PDF object.
 //
-// Always invoke this via [pdf.Decode] so that indirect references are
+// Always invoke this via [pdf.Cursor.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func DecodeTarget(c pdf.Cursor, obj pdf.Object, _ bool) (Target, error) {
 	if obj == nil {
@@ -176,7 +176,7 @@ func DecodeTarget(c pdf.Cursor, obj pdf.Object, _ bool) (Target, error) {
 	// recursively decode nested target
 	var next Target
 	if dict["T"] != nil {
-		next, err = pdf.Decode(c, dict["T"], DecodeTarget)
+		next, err = c.Decode(dict["T"], DecodeTarget)
 		if err != nil {
 			return nil, err
 		}

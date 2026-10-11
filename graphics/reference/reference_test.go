@@ -91,7 +91,7 @@ func roundTripTest(t *testing.T, version pdf.Version, d1 *Dict) {
 	}
 
 	x := pdf.NewExtractor(w)
-	d2, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractDict)
+	d2, err := pdf.CursorAt(x, nil).Decode(obj, ExtractDict)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}

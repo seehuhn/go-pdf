@@ -97,10 +97,8 @@ func TestLeaderLineShortLine(t *testing.T) {
 // lines are measured where they are drawn, on the line proper.
 func TestLeaderLineEndingsInRect(t *testing.T) {
 	a := &annotation.Line{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: 1},
-		},
+		Color:  color.DeviceRGB{1, 0, 0},
+		Border: &annotation.Border{Width: 1},
 		Coords: [4]float64{0, 0, 100, 0},
 		LL:     20,
 		LineEndingStyle: [2]annotation.LineEndingStyle{
@@ -132,10 +130,8 @@ func TestLeaderLineEndingsInRect(t *testing.T) {
 // checks that the appearance draws them and stays inside the rectangle.
 func TestLineWithLeaders(t *testing.T) {
 	a := &annotation.Line{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{0, 0, 1},
-			Border: &annotation.Border{Width: 2},
-		},
+		Color:  color.DeviceRGB{0, 0, 1},
+		Border: &annotation.Border{Width: 2},
 		Coords: [4]float64{20, 20, 120, 60},
 		LL:     15,
 		LLO:    4,
@@ -168,10 +164,8 @@ func TestLineWithLeaders(t *testing.T) {
 // falls back to the plain line rather than dividing by its length.
 func TestLineWithShortLeaders(t *testing.T) {
 	a := &annotation.Line{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{0, 0, 1},
-			Border: &annotation.Border{Width: 1},
-		},
+		Color:  color.DeviceRGB{0, 0, 1},
+		Border: &annotation.Border{Width: 1},
 		Coords: [4]float64{30, 30, 30.01, 30},
 		LL:     15,
 	}
@@ -189,11 +183,9 @@ func TestLineWithShortLeaders(t *testing.T) {
 // (300, 100), with a caption.
 func captionLine(above bool, offset []float64) *annotation.Line {
 	return &annotation.Line{
-		Common: annotation.Common{
-			Color:    color.DeviceRGB{0, 0, 1},
-			Border:   &annotation.Border{Width: 1},
-			Contents: "caption",
-		},
+		Color:         color.DeviceRGB{0, 0, 1},
+		Border:        &annotation.Border{Width: 1},
+		Contents:      "caption",
 		Coords:        [4]float64{100, 100, 300, 100},
 		Caption:       true,
 		CaptionAbove:  above,

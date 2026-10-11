@@ -109,7 +109,7 @@ func roundTripTest(t *testing.T, original *TransparencyAttributes) {
 	}
 
 	x := pdf.NewExtractor(buf)
-	readAttrs, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, ExtractTransparencyAttributes)
+	readAttrs, err := pdf.CursorAt(x, nil).Decode(embedded, ExtractTransparencyAttributes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		attrs, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractTransparencyAttributes)
+		attrs, err := pdf.CursorAt(x, nil).Decode(obj, ExtractTransparencyAttributes)
 		if err != nil {
 			t.Skip("malformed group attributes")
 		}

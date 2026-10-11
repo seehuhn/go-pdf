@@ -90,7 +90,7 @@ func extractType1(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type1, error) {
 			Err: fmt.Errorf("missing /Function entry"),
 		}
 	}
-	fn, err := pdf.Decode(c, fnObj, function.Extract)
+	fn, err := c.Decode(fnObj, function.Extract)
 	if err != nil {
 		return nil, err
 	}

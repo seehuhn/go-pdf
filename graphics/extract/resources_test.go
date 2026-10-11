@@ -163,7 +163,7 @@ func TestRoundTrip(t *testing.T) {
 
 			// extract it back
 			x := pdf.NewExtractor(w)
-			extracted, err := pdf.Decode(pdf.CursorAt(x, nil), obj, Resources)
+			extracted, err := pdf.CursorAt(x, nil).Decode(obj, Resources)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -206,7 +206,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
+						ColorSpace: color.SpaceDeviceGray,
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},
@@ -225,7 +225,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
+						ColorSpace: color.SpaceDeviceGray,
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},
@@ -244,7 +244,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
+						ColorSpace: color.SpaceDeviceGray,
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},
@@ -349,7 +349,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Shading: map[pdf.Name]graphics.Shading{
 					"Sh1": &shading.Type1{
-						Common: shading.Common{ColorSpace: color.SpaceDeviceGray},
+						ColorSpace: color.SpaceDeviceGray,
 						F: &function.Type4{
 							Domain:  []float64{0, 1, 0, 1},
 							Range:   []float64{0, 1},
@@ -534,7 +534,7 @@ func TestProcSetConversion(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			extracted, err := pdf.Decode(pdf.CursorAt(x, nil), obj, Resources)
+			extracted, err := pdf.CursorAt(x, nil).Decode(obj, Resources)
 			if err != nil {
 				t.Fatalf("extract failed: %v", err)
 			}
@@ -575,7 +575,7 @@ func TestProcSetUnknownNames(t *testing.T) {
 
 	// extract and verify only known names are preserved
 	x := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Resources)
+	extracted, err := pdf.CursorAt(x, nil).Decode(ref, Resources)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -674,7 +674,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// first extraction - permissive
 		x1 := pdf.NewExtractor(r)
-		resource1, err := pdf.Decode(pdf.CursorAt(x1, nil), objPDF, Resources)
+		resource1, err := pdf.CursorAt(x1, nil).Decode(objPDF, Resources)
 		if err != nil {
 			t.Skip("extraction failed (permissive)")
 		}
@@ -700,7 +700,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// second extraction
 		x2 := pdf.NewExtractor(w)
-		resource2, err := pdf.Decode(pdf.CursorAt(x2, nil), embedded, Resources)
+		resource2, err := pdf.CursorAt(x2, nil).Decode(embedded, Resources)
 		if err != nil {
 			t.Fatalf("second extraction failed: %v", err)
 		}

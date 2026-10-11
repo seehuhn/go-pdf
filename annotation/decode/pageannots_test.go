@@ -188,7 +188,7 @@ func TestAnnotationReadsFormFirst(t *testing.T) {
 
 	x := pdf.NewExtractor(w)
 	for _, ref := range refs {
-		a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+		a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -205,7 +205,7 @@ func TestAnnotationReadsFormFirst(t *testing.T) {
 		}
 	}
 
-	form, err := pdf.DecodeExclusive(pdf.CursorAt(x, nil), formRef, Form)
+	form, err := pdf.CursorAt(x, nil).DecodeExclusive(formRef, Form)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestDecodeUnnamedMergedWidgetAppearance(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+	a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,9 +269,9 @@ func TestAnnotationDirectWidget(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		return pdf.Decode(c, annots[0], Annotation)
+		return c.Decode(annots[0], Annotation)
 	}
-	a, err := pdf.Decode(pdf.CursorAt(x, nil), pageRef, first)
+	a, err := pdf.CursorAt(x, nil).Decode(pageRef, first)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -36,7 +36,7 @@ func decodeCircle(c pdf.Cursor, dict pdf.Dict) (*annotation.Circle, error) {
 
 	// Extract circle-specific fields
 	// BS (optional)
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		circle.BorderStyle = bs
@@ -48,7 +48,7 @@ func decodeCircle(c pdf.Cursor, dict pdf.Dict) (*annotation.Circle, error) {
 
 	// BE (optional): a border effect is meaningful only together with a
 	// border style, so drop it when BS is absent (the writer requires BS)
-	if be, err := pdf.DecodeOptional(c, dict["BE"], annotation.ExtractBorderEffect); err != nil {
+	if be, err := c.DecodeOptional(dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
 	} else if circle.BorderStyle != nil {
 		circle.BorderEffect = be

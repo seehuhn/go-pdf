@@ -138,7 +138,7 @@ func ExtractMediaOffset(c pdf.Cursor, obj pdf.Object, isDirect bool) (MediaOffse
 
 	switch s {
 	case "T":
-		t, err := pdf.Decode(c, dict["T"], ExtractTimespan)
+		t, err := c.Decode(dict["T"], ExtractTimespan)
 		if err != nil {
 			return nil, err
 		} else if t == nil {

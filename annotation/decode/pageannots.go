@@ -39,7 +39,7 @@ import (
 // disagree with the others about the same annotation.
 //
 // The IRT repair writes to those shared annotation values without
-// synchronization.  The page decoder is safe because [pdf.DecodeExclusive]
+// synchronization.  The page decoder is safe because [pdf.Cursor.DecodeExclusive]
 // single-flights it, but callers invoking this function directly must not run
 // it concurrently with other users of the same extractor.
 func PageAnnotations(c pdf.Cursor, obj pdf.Object) (refs []pdf.Reference, annots []annotation.Annotation, err error) {
@@ -54,7 +54,7 @@ func PageAnnotations(c pdf.Cursor, obj pdf.Object) (refs []pdf.Reference, annots
 		if !ok {
 			continue
 		}
-		a, err := pdf.Decode(c, item, Annotation)
+		a, err := c.Decode(item, Annotation)
 		if err != nil {
 			// permissive: skip invalid annotations
 			continue

@@ -304,8 +304,7 @@ func TestGetFromObjStmTooLarge(t *testing.T) {
 	if err == nil {
 		t.Fatal("oversized object stream resolved without error")
 	}
-	var mfe *MalformedFileError
-	if !errors.As(err, &mfe) {
+	if _, ok := errors.AsType[*MalformedFileError](err); !ok {
 		t.Errorf("got %T, want *MalformedFileError", err)
 	}
 }

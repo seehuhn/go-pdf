@@ -116,13 +116,13 @@ func extractMediaClipData(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaCli
 	}
 	switch resolved.(type) {
 	case *pdf.Stream:
-		f, err := pdf.Decode(c, dict["D"], extract.Form)
+		f, err := c.Decode(dict["D"], extract.Form)
 		if err != nil {
 			return nil, err
 		}
 		clip.DataForm = f
 	case pdf.Dict:
-		spec, err := pdf.Decode(c, dict["D"], file.ExtractSpecification)
+		spec, err := c.Decode(dict["D"], file.ExtractSpecification)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +140,7 @@ func extractMediaClipData(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaCli
 		}
 	}
 
-	if p, err := pdf.DecodeOptional(c, dict["P"], ExtractMediaPermissions); err != nil {
+	if p, err := c.DecodeOptional(dict["P"], ExtractMediaPermissions); err != nil {
 		return nil, err
 	} else {
 		clip.Permissions = p
@@ -150,7 +150,7 @@ func extractMediaClipData(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaCli
 		return nil, err
 	}
 
-	if pl, err := pdf.DecodeOptional(c, dict["PL"], ExtractMediaPlayers); err != nil {
+	if pl, err := c.DecodeOptional(dict["PL"], ExtractMediaPlayers); err != nil {
 		return nil, err
 	} else {
 		clip.Players = pl
@@ -280,7 +280,7 @@ func extractMediaClipSection(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Media
 		sec.Name = string(n)
 	}
 
-	next, err := pdf.Decode(c, dict["D"], ExtractMediaClip)
+	next, err := c.Decode(dict["D"], ExtractMediaClip)
 	if err != nil {
 		return nil, err
 	} else if next == nil {
@@ -309,10 +309,10 @@ func extractSectionOffsets(c pdf.Cursor, obj pdf.Object) (begin, end MediaOffset
 	if err != nil || dict == nil {
 		return nil, nil, err
 	}
-	if begin, err = pdf.DecodeOptional(c, dict["B"], ExtractMediaOffset); err != nil {
+	if begin, err = c.DecodeOptional(dict["B"], ExtractMediaOffset); err != nil {
 		return nil, nil, err
 	}
-	if end, err = pdf.DecodeOptional(c, dict["E"], ExtractMediaOffset); err != nil {
+	if end, err = c.DecodeOptional(dict["E"], ExtractMediaOffset); err != nil {
 		return nil, nil, err
 	}
 	return begin, end, nil

@@ -221,7 +221,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *extgstate.ExtGState)
 
 	// Extract the ExtGState
 	x := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, extract.ExtGState)
+	extracted, err := pdf.CursorAt(x, nil).Decode(embedded, extract.ExtGState)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -294,7 +294,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, err := pdf.Decode(pdf.CursorAt(x, nil), objPDF, extract.ExtGState)
+		objGo, err := pdf.CursorAt(x, nil).Decode(objPDF, extract.ExtGState)
 		if err != nil {
 			t.Skip("malformed PDF object")
 		}
@@ -381,7 +381,7 @@ func TestRangeOnRead(t *testing.T) {
 				}
 
 				x := pdf.NewExtractor(w)
-				e, err := pdf.Decode(pdf.CursorAt(x, nil), dict, extract.ExtGState)
+				e, err := pdf.CursorAt(x, nil).Decode(dict, extract.ExtGState)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -487,7 +487,7 @@ func TestDashPatternOnRead(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			e, err := pdf.Decode(pdf.CursorAt(x, nil), dict, extract.ExtGState)
+			e, err := pdf.CursorAt(x, nil).Decode(dict, extract.ExtGState)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -76,7 +76,7 @@ func decodeJavaScript(c pdf.Cursor, dict pdf.Dict) (*JavaScript, error) {
 		return nil, err
 	}
 
-	next, err := pdf.DecodeOptional(c, dict["Next"], DecodeActionList)
+	next, err := c.DecodeOptional(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

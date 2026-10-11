@@ -101,7 +101,7 @@ func newFieldTreeDecoder() *fieldTreeDecoder {
 }
 
 // treeResult wraps a decoded tree node. The wrapper lets the node itself be nil
-// (a dropped field) while keeping the value passed through [pdf.Decode] a
+// (a dropped field) while keeping the value passed through [pdf.Cursor.Decode] a
 // non-nil concrete pointer, which its cache requires.
 type treeResult struct {
 	node acroform.Node
@@ -134,7 +134,7 @@ func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherit
 			continue
 		}
 		d.seen[ref] = true
-		res, err := pdf.DecodeOptional(c, ref, d.nodeFunc(ctx))
+		res, err := c.DecodeOptional(ref, d.nodeFunc(ctx))
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +149,7 @@ func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherit
 // [acroform.Group], or a terminal field as a concrete [acroform.Field]. A node
 // whose effective field type is unknown is dropped (nil is returned).
 //
-// Always invoke this through [fieldTreeDecoder.nodeFunc] and [pdf.Decode]
+// Always invoke this through [fieldTreeDecoder.nodeFunc] and [pdf.Cursor.Decode]
 // so that indirect references are resolved, the depth is bounded, and cycle
 // detection covers the field hierarchy.
 func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherited) (acroform.Node, error) {
@@ -227,7 +227,7 @@ func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherite
 			continue
 		}
 		d.seen[ref] = true
-		res, err := pdf.DecodeOptional(c, ref, d.nodeFunc(childCtx))
+		res, err := c.DecodeOptional(ref, d.nodeFunc(childCtx))
 		if err != nil {
 			return nil, err
 		}
@@ -259,7 +259,7 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 		d.seen[ref] = true
 		// annotationBody rather than Annotation: the latter reads the form,
 		// which is what is being decoded here
-		a, err := pdf.Optional(pdf.Decode(c, ref, annotationBody))
+		a, err := pdf.Optional(c.Decode(ref, annotationBody))
 		if err != nil {
 			return nil, err
 		}
@@ -452,12 +452,12 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
 		f.V = sigValue(c, eff.v)
 		f.DV = sigValue(c, eff.dv)
-		if lock, err := pdf.DecodeOptional(c, dict["Lock"], sigFieldLock); err != nil {
+		if lock, err := c.DecodeOptional(dict["Lock"], sigFieldLock); err != nil {
 			return nil, err
 		} else {
 			f.Lock = lock
 		}
-		if sv, err := pdf.DecodeOptional(c, dict["SV"], sigSeedValue); err != nil {
+		if sv, err := c.DecodeOptional(dict["SV"], sigSeedValue); err != nil {
 			return nil, err
 		} else {
 			f.SV = sv
@@ -473,7 +473,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 // dictionary. In a merged field/widget the entry is shared with the widget half
 // (E/X/Fo/Bl/…); the empty result of the split is dropped.
 func decodeFieldAA(c pdf.Cursor, dict pdf.Dict) (*triggers.Form, error) {
-	aa, err := pdf.DecodeOptional(c, dict["AA"], triggers.DecodeForm)
+	aa, err := c.DecodeOptional(dict["AA"], triggers.DecodeForm)
 	if err != nil {
 		return nil, err
 	}
@@ -708,12 +708,12 @@ func acroFormDefaults(c pdf.Cursor) (da string, q pdf.TextAlign) {
 // unavailable. It computes the same values as the top-down walk, so both
 // directions produce identical flattened fields.
 //
-// Each ancestor's context is decoded through [pdf.Decode], so it is computed
+// Each ancestor's context is decoded through [pdf.Cursor.Decode], so it is computed
 // once per ancestor and shared by every widget below it, the chain is bounded
 // by the extract depth limit, and a cycle ends the chain.
 func inheritedFromChain(c pdf.Cursor, dict pdf.Dict) inherited {
 	if ref, ok := dict["Parent"].(pdf.Reference); ok {
-		if ctx, err := pdf.Decode(c, ref, ancestorContext); err == nil {
+		if ctx, err := c.Decode(ref, ancestorContext); err == nil {
 			return *ctx
 		}
 	}
@@ -765,7 +765,7 @@ func decodeMergedField(c pdf.Cursor, ref pdf.Reference, dict pdf.Dict, ctx inher
 	// a losing concurrent decoder adopts them without mutating shared state.
 	linkWidget(f, w)
 	reconcileButtonValue(f)
-	fc, ac := pdf.StoreOrLoadPair[acroform.Field, annotation.Annotation](c.Extractor(), ref, f, w)
+	fc, ac := c.Extractor().StoreOrLoadPair[acroform.Field, annotation.Annotation](ref, f, w)
 	return fc, ac.(*annotation.Widget), nil
 }
 

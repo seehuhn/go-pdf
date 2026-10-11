@@ -209,7 +209,7 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 	} else if efDict != nil {
 		spec.EmbeddedFiles = make(map[string]*Stream)
 		for key, value := range efDict {
-			if stream, err := pdf.DecodeOptional(c, value, ExtractStream); err != nil {
+			if stream, err := c.DecodeOptional(value, ExtractStream); err != nil {
 				return nil, err
 			} else if stream != nil {
 				spec.EmbeddedFiles[string(key)] = stream
@@ -238,14 +238,14 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 	}
 
 	// CollectionItem (CI)
-	if ci, err := pdf.DecodeOptional(c, dict["CI"], collection.ExtractItemDict); err != nil {
+	if ci, err := c.DecodeOptional(dict["CI"], collection.ExtractItemDict); err != nil {
 		return nil, err
 	} else {
 		spec.CollectionItem = ci
 	}
 
 	// Thumbnail
-	if thumb, err := pdf.DecodeOptional(c, dict["Thumb"], thumbnail.ExtractThumbnail); err != nil {
+	if thumb, err := c.DecodeOptional(dict["Thumb"], thumbnail.ExtractThumbnail); err != nil {
 		return nil, err
 	} else {
 		spec.Thumbnail = thumb
@@ -253,7 +253,7 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 
 	// EncryptedPayload (EP)
 	if epObj := dict["EP"]; epObj != nil {
-		ep, err := pdf.Decode(c, epObj, ExtractEncryptedPayload)
+		ep, err := c.Decode(epObj, ExtractEncryptedPayload)
 		if err != nil {
 			return nil, err
 		}
@@ -457,7 +457,7 @@ func extractRelatedFiles(c pdf.Cursor, rfDict pdf.Dict) (map[string][]RelatedFil
 				continue
 			}
 
-			if stream, err := pdf.DecodeOptional(c, array[i+1], ExtractStream); err != nil {
+			if stream, err := c.DecodeOptional(array[i+1], ExtractStream); err != nil {
 				continue // skip malformed stream
 			} else if stream != nil {
 				relatedFiles = append(relatedFiles, RelatedFile{

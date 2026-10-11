@@ -95,7 +95,7 @@ func extractCommon(c pdf.Cursor, d pdf.Dict, out *Common, allowIndexed bool) err
 			Err: fmt.Errorf("missing /ColorSpace entry"),
 		}
 	}
-	cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
+	cs, err := c.Decode(csObj, color.ExtractSpace)
 	if err != nil {
 		return err
 	}

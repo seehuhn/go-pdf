@@ -48,7 +48,7 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 	// extract ExtGState subdictionary
 	if extGStateDict, err := c.Dict(dict["ExtGState"]); err == nil && extGStateDict != nil {
 		for name, obj := range extGStateDict {
-			gs, err := pdf.Decode(c, obj, ExtGState)
+			gs, err := c.Decode(obj, ExtGState)
 			if err != nil {
 				continue // permissive
 			}
@@ -62,7 +62,7 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 	// extract ColorSpace subdictionary
 	if colorSpaceDict, err := c.Dict(dict["ColorSpace"]); err == nil && colorSpaceDict != nil {
 		for name, obj := range colorSpaceDict {
-			cs, err := pdf.Decode(c, obj, ColorSpace)
+			cs, err := c.Decode(obj, ColorSpace)
 			if err != nil {
 				continue // permissive
 			}
@@ -76,7 +76,7 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 	// extract Pattern subdictionary
 	if patternDict, err := c.Dict(dict["Pattern"]); err == nil && patternDict != nil {
 		for name, obj := range patternDict {
-			pat, err := pdf.Decode(c, obj, Pattern)
+			pat, err := c.Decode(obj, Pattern)
 			if err != nil {
 				continue // permissive
 			}
@@ -90,7 +90,7 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 	// extract Shading subdictionary
 	if shadingDict, err := c.Dict(dict["Shading"]); err == nil && shadingDict != nil {
 		for name, obj := range shadingDict {
-			sh, err := pdf.Decode(c, obj, Shading)
+			sh, err := c.Decode(obj, Shading)
 			if err != nil {
 				continue // permissive
 			}
@@ -104,7 +104,7 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 	// extract XObject subdictionary
 	if xobjectDict, err := c.Dict(dict["XObject"]); err == nil && xobjectDict != nil {
 		for name, obj := range xobjectDict {
-			xobj, err := pdf.Decode(c, obj, XObject)
+			xobj, err := c.Decode(obj, XObject)
 			if err != nil {
 				continue // permissive
 			}
@@ -118,7 +118,7 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 	// extract Font subdictionary
 	if fontDict, err := c.Dict(dict["Font"]); err == nil && fontDict != nil {
 		for name, obj := range fontDict {
-			f, err := pdf.Decode(c, obj, Font)
+			f, err := c.Decode(obj, Font)
 			if err != nil {
 				continue // permissive
 			}
@@ -132,7 +132,7 @@ func Resources(c pdf.Cursor, obj pdf.Object, isDirect bool) (*content.Resources,
 	// extract Properties subdictionary
 	if propertiesDict, err := c.Dict(dict["Properties"]); err == nil && propertiesDict != nil {
 		for name, obj := range propertiesDict {
-			props, err := pdf.Decode(c, obj, property.ExtractList)
+			props, err := c.Decode(obj, property.ExtractList)
 			if err != nil {
 				continue // permissive
 			}

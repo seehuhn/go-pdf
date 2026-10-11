@@ -187,7 +187,7 @@ func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
 
 	v := &V20{SingleUse: isDirect}
 
-	fs, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
+	fs, err := c.Decode(dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	} else if fs == nil {

@@ -253,11 +253,9 @@ var rtCases = []rtCase{
 	{
 		name: "media-rendition",
 		obj: &MediaRendition{
-			RenditionCommon: RenditionCommon{
-				Name:               "video",
-				MustHonourCriteria: &MediaCriteria{Bandwidth: optional.NewUInt(1000000), SingleUse: true},
-			},
-			Clip: &MediaClipData{DataFile: spec(), SingleUse: true},
+			Name:               "video",
+			MustHonourCriteria: &MediaCriteria{Bandwidth: optional.NewUInt(1000000), SingleUse: true},
+			Clip:               &MediaClipData{DataFile: spec(), SingleUse: true},
 			Play: &MediaPlayParameters{
 				MustHonour: &MediaPlayEntries{Volume: optional.NewUInt(80)},
 				SingleUse:  true,
@@ -272,7 +270,7 @@ var rtCases = []rtCase{
 	{
 		name: "selector-rendition",
 		obj: &SelectorRendition{
-			RenditionCommon: RenditionCommon{Name: "choices"},
+			Name: "choices",
 			Renditions: []Rendition{
 				&MediaRendition{Clip: &MediaClipData{DataFile: spec(), SingleUse: true}, SingleUse: true},
 				&SelectorRendition{SingleUse: true},

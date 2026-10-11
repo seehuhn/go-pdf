@@ -276,10 +276,8 @@ func TestAppearanceBoundsCoverMiterSpike(t *testing.T) {
 func TestPolygonWithTwoVertices(t *testing.T) {
 	const lw = 4
 	a := &annotation.Polygon{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: lw},
-		},
+		Color:    color.DeviceRGB{1, 0, 0},
+		Border:   &annotation.Border{Width: lw},
 		Vertices: []float64{10, 20, 60, 20},
 	}
 
@@ -390,10 +388,8 @@ func TestAppearanceBoundsRoundOutwards(t *testing.T) {
 // edges that holds the stroke.
 func TestInkBoundsAreTight(t *testing.T) {
 	a := &annotation.Ink{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: 0.75},
-		},
+		Color:   color.DeviceRGB{1, 0, 0},
+		Border:  &annotation.Border{Width: 0.75},
 		InkList: [][]vec.Vec2{{{X: 10, Y: 10}, {X: 20, Y: 10}, {X: 20, Y: 20}}},
 	}
 	g := newGen(t, pdf.V2_0)
@@ -415,10 +411,8 @@ func TestPolyLineMiterAfterRounding(t *testing.T) {
 	s := 0.1985 // rounds to 0.2
 	c := math.Sqrt(1 - s*s)
 	a := &annotation.PolyLine{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: lw},
-		},
+		Color:    color.DeviceRGB{1, 0, 0},
+		Border:   &annotation.Border{Width: lw},
 		Vertices: []float64{1, 0, 0, 0, c, s},
 	}
 

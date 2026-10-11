@@ -265,11 +265,9 @@ func addFileAttachment(page *document.Page, name string, data []byte) {
 	}
 
 	annot := &annotation.FileAttachment{
-		Common: annotation.Common{
-			Rect:     pdf.Rectangle{LLx: 10, LLy: paper.URy - 30, URx: 20, URy: paper.URy - 20},
-			Contents: name,
-		},
-		FS: spec,
+		Rect:     pdf.Rectangle{LLx: 10, LLy: paper.URy - 30, URx: 20, URy: paper.URy - 20},
+		Contents: name,
+		FS:       spec,
 	}
 
 	page.Page.AddAnnots(annot)
@@ -397,7 +395,7 @@ func drawTextAt(page *document.Page, font font.Layouter, x, y, size float64, tex
 }
 
 func addPageLink(page *document.Page, fromDoc, toDoc string, toPage int, rect pdf.Rectangle, pageRefs []pdf.Reference, nav *navInfo) error {
-	link := &annotation.Link{Common: annotation.Common{Rect: rect}}
+	link := &annotation.Link{Rect: rect}
 
 	isInternalLink := fromDoc == toDoc && pageRefs != nil
 	if isInternalLink {

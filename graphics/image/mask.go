@@ -259,7 +259,7 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 		return nil, err
 	} else if len(alts) <= limits.MaxAlternates {
 		for i, altObj := range alts {
-			alt, err := pdf.DecodeOptional(c, altObj, ExtractAlternate)
+			alt, err := c.DecodeOptional(altObj, ExtractAlternate)
 			if err != nil {
 				return nil, fmt.Errorf("invalid Alternates[%d]: %w", i, err)
 			}
@@ -277,14 +277,14 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 
 	// Extract Metadata
 	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := pdf.Decode(c, metaObj, pdf.ExtractMetadataStream)
+		meta, err := c.Decode(metaObj, pdf.ExtractMetadataStream)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Metadata: %w", err)
 		}
 		mask.Metadata = meta
 	}
 
-	if oc, err := pdf.DecodeOptional(c, dict["OC"], oc.ExtractConditional); err != nil {
+	if oc, err := c.DecodeOptional(dict["OC"], oc.ExtractConditional); err != nil {
 		return nil, err
 	} else {
 		mask.OptionalContent = oc
@@ -292,7 +292,7 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 
 	// Extract Measure
 	if measureObj, ok := dict["Measure"]; ok {
-		m, err := pdf.Decode(c, measureObj, measure.Extract)
+		m, err := c.Decode(measureObj, measure.Extract)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Measure: %w", err)
 		}
@@ -300,7 +300,7 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	}
 
 	// Extract PtData
-	if ptData, err := pdf.DecodeOptional(c, dict["PtData"], measure.ExtractPtData); err != nil {
+	if ptData, err := c.DecodeOptional(dict["PtData"], measure.ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		mask.PtData = ptData
@@ -313,7 +313,7 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	} else if afArray != nil && len(afArray) <= limits.MaxAssociatedFiles {
 		mask.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.DecodeOptional(c, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
 				return nil, err
 			} else if spec != nil {
 				mask.AssociatedFiles = append(mask.AssociatedFiles, spec)
@@ -322,7 +322,7 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	}
 
 	// Extract WebCaptureID (ID)
-	if webID, err := pdf.DecodeOptional(c, dict["ID"], webcapture.ExtractIdentifier); err != nil {
+	if webID, err := c.DecodeOptional(dict["ID"], webcapture.ExtractIdentifier); err != nil {
 		return nil, err
 	} else if webID != nil {
 		mask.WebCaptureID = webID

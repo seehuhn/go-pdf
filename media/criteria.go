@@ -102,12 +102,12 @@ func ExtractMediaCriteria(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaCr
 		}
 	}
 
-	if d, err := pdf.DecodeOptional(c, dict["D"], ExtractMinBitDepth); err != nil {
+	if d, err := c.DecodeOptional(dict["D"], ExtractMinBitDepth); err != nil {
 		return nil, err
 	} else {
 		crit.MinBitDepth = d
 	}
-	if z, err := pdf.DecodeOptional(c, dict["Z"], ExtractMinScreenSize); err != nil {
+	if z, err := c.DecodeOptional(dict["Z"], ExtractMinScreenSize); err != nil {
 		return nil, err
 	} else {
 		crit.MinScreenSize = z
@@ -117,7 +117,7 @@ func ExtractMediaCriteria(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaCr
 		return nil, err
 	} else {
 		for _, elem := range v {
-			id, err := pdf.DecodeOptional(c, elem, ExtractSoftwareIdentifier)
+			id, err := c.DecodeOptional(elem, ExtractSoftwareIdentifier)
 			if err != nil {
 				return nil, err
 			}

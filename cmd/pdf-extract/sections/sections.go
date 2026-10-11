@@ -55,7 +55,7 @@ func Pages(r pdf.Getter, pattern string) (*PageRange, error) {
 		return nil, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
-	tree, err := pdf.Decode(pdf.NewCursor(r), r.GetMeta().Catalog.Outlines, outline.Decode)
+	tree, err := pdf.NewCursor(r).Decode(r.GetMeta().Catalog.Outlines, outline.Decode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read outline: %w", err)
 	}
@@ -281,7 +281,7 @@ func resolveNamedDest(r pdf.Getter, name pdf.String) (destination.Destination, e
 		destsDict, err := pdf.CursorAt(x, nil).Dict(meta.Catalog.Dests)
 		if err == nil && destsDict != nil {
 			if obj := destsDict[pdf.Name(name)]; obj != nil {
-				dest, err := pdf.Decode(pdf.CursorAt(x, nil), obj, destination.Decode)
+				dest, err := pdf.CursorAt(x, nil).Decode(obj, destination.Decode)
 				if err == nil {
 					return dest, nil
 				}
@@ -298,7 +298,7 @@ func resolveNamedDest(r pdf.Getter, name pdf.String) (destination.Destination, e
 				if err == nil {
 					obj, err := tree.Lookup(pdf.Name(name))
 					if err == nil {
-						return pdf.Decode(pdf.CursorAt(x, nil), obj, destination.Decode)
+						return pdf.CursorAt(x, nil).Decode(obj, destination.Decode)
 					}
 				}
 			}
@@ -395,7 +395,7 @@ func findNextAtLevel(items []*outline.Item, target *outline.Item, targetLevel, c
 // ListAll returns a list of all outline entries in the document.
 // Each entry is formatted with dotted-line padding and a page number.
 func ListAll(r pdf.Getter) ([]string, error) {
-	tree, err := pdf.Decode(pdf.NewCursor(r), r.GetMeta().Catalog.Outlines, outline.Decode)
+	tree, err := pdf.NewCursor(r).Decode(r.GetMeta().Catalog.Outlines, outline.Decode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read outline: %w", err)
 	}
@@ -450,7 +450,7 @@ func FindNext(r pdf.Getter, pattern string) (string, error) {
 		return "", fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
-	tree, err := pdf.Decode(pdf.NewCursor(r), r.GetMeta().Catalog.Outlines, outline.Decode)
+	tree, err := pdf.NewCursor(r).Decode(r.GetMeta().Catalog.Outlines, outline.Decode)
 	if err != nil {
 		return "", fmt.Errorf("failed to read outline: %w", err)
 	}

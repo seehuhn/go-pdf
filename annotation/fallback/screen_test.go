@@ -29,8 +29,8 @@ func TestScreenIcon(t *testing.T) {
 	s := newGen(t, pdf.V2_0)
 	icon := &form.Form{BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 32, URy: 32}}
 	a := &annotation.Screen{
-		Common: annotation.Common{Rect: mediaRect},
-		Style:  &appearance.Characteristics{Icon: icon},
+		Rect:  mediaRect,
+		Style: &appearance.Characteristics{Icon: icon},
 	}
 
 	f, err := s.addScreenAppearance(a)
@@ -60,8 +60,8 @@ func TestScreenPlaceholder(t *testing.T) {
 	for name, mk := range cases {
 		t.Run(name, func(t *testing.T) {
 			a := &annotation.Screen{
-				Common: annotation.Common{Rect: mediaRect},
-				Style:  mk,
+				Rect:  mediaRect,
+				Style: mk,
 			}
 			f, err := s.addScreenAppearance(a)
 			if err != nil {
@@ -84,7 +84,7 @@ func TestScreenPlaceholder(t *testing.T) {
 func TestScreenZeroRect(t *testing.T) {
 	s := newGen(t, pdf.V2_0)
 	zero := pdf.Rectangle{LLx: 5, LLy: 5, URx: 5, URy: 5}
-	a := &annotation.Screen{Common: annotation.Common{Rect: zero}}
+	a := &annotation.Screen{Rect: zero}
 
 	f, err := s.addScreenAppearance(a)
 	if err != nil {

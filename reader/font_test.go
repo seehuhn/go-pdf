@@ -79,7 +79,7 @@ func TestExtractText(t *testing.T) {
 				t.Fatal(err)
 			}
 			x := pdf.NewExtractor(r)
-			pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageDict, page.Decode)
+			pg, err := pdf.CursorAt(x, nil).Decode(pageDict, page.Decode)
 			if err != nil {
 				t.Fatal(err)
 			}

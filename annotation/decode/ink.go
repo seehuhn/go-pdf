@@ -59,7 +59,7 @@ func decodeInk(c pdf.Cursor, dict pdf.Dict) (*annotation.Ink, error) {
 	ink.InkList = paths
 
 	// BS (optional)
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		ink.BorderStyle = bs

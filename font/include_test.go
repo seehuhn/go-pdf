@@ -58,8 +58,8 @@ func TestIncludeGlyphsAllFonts(t *testing.T) {
 
 			err := font.IncludeGlyphs(F, font.GlyphsASCII)
 			if err != nil {
-				var ge *font.GlyphsError
-				if !errors.As(err, &ge) {
+				ge, ok := errors.AsType[*font.GlyphsError](err)
+				if !ok {
 					t.Fatalf("unexpected error type: %v", err)
 				}
 				if len(ge.Overflow) > 0 {
@@ -69,8 +69,7 @@ func TestIncludeGlyphsAllFonts(t *testing.T) {
 
 			before := F.CodesRemaining()
 			if err := font.IncludeGlyphs(F, font.GlyphsASCII); err != nil {
-				var ge *font.GlyphsError
-				if !errors.As(err, &ge) || len(ge.Overflow) > 0 {
+				if ge, ok := errors.AsType[*font.GlyphsError](err); !ok || len(ge.Overflow) > 0 {
 					t.Fatalf("unexpected error: %v", err)
 				}
 			}
@@ -95,8 +94,8 @@ func TestIncludeGlyphsOverflow(t *testing.T) {
 	}
 
 	err := font.IncludeGlyphs(F, sb.String())
-	var ge *font.GlyphsError
-	if !errors.As(err, &ge) {
+	ge, ok := errors.AsType[*font.GlyphsError](err)
+	if !ok {
 		t.Fatalf("want *GlyphsError, got %v", err)
 	}
 	if len(ge.Overflow) == 0 {
@@ -112,8 +111,8 @@ func TestIncludeGlyphsMissing(t *testing.T) {
 	F := font.Must(gofont.Regular.NewSimple(nil))
 
 	err := font.IncludeGlyphs(F, "中") // CJK, not in the Go font
-	var ge *font.GlyphsError
-	if !errors.As(err, &ge) {
+	ge, ok := errors.AsType[*font.GlyphsError](err)
+	if !ok {
 		t.Fatalf("want *GlyphsError, got %v", err)
 	}
 	if !slices.Contains(ge.Missing, '中') {

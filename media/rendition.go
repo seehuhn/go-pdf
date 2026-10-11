@@ -67,7 +67,7 @@ func extractCriteria(c pdf.Cursor, obj pdf.Object) (*MediaCriteria, error) {
 	if err != nil || dict == nil {
 		return nil, err
 	}
-	return pdf.DecodeOptional(c, dict["C"], ExtractMediaCriteria)
+	return c.DecodeOptional(dict["C"], ExtractMediaCriteria)
 }
 
 func (c *RenditionCommon) fillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
@@ -140,13 +140,13 @@ func extractMediaRendition(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaRe
 	}
 
 	var err error
-	if r.Clip, err = pdf.DecodeOptional(c, dict["C"], ExtractMediaClip); err != nil {
+	if r.Clip, err = c.DecodeOptional(dict["C"], ExtractMediaClip); err != nil {
 		return nil, err
 	}
-	if r.Play, err = pdf.DecodeOptional(c, dict["P"], ExtractMediaPlayParameters); err != nil {
+	if r.Play, err = c.DecodeOptional(dict["P"], ExtractMediaPlayParameters); err != nil {
 		return nil, err
 	}
-	if r.Screen, err = pdf.DecodeOptional(c, dict["SP"], ExtractMediaScreenParameters); err != nil {
+	if r.Screen, err = c.DecodeOptional(dict["SP"], ExtractMediaScreenParameters); err != nil {
 		return nil, err
 	}
 
@@ -226,7 +226,7 @@ func extractSelectorRendition(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Sele
 		return nil, err
 	}
 	for _, elem := range arr {
-		child, err := pdf.DecodeOptional(c, elem, ExtractRendition)
+		child, err := c.DecodeOptional(elem, ExtractRendition)
 		if err != nil {
 			return nil, err
 		}

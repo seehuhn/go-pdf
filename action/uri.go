@@ -87,7 +87,7 @@ func decodeURI(c pdf.Cursor, dict pdf.Dict) (*URI, error) {
 
 	isMap, _ := pdf.Optional(c.Boolean(dict["IsMap"]))
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

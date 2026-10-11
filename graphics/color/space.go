@@ -136,7 +136,7 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 		if len(d.args) == 0 {
 			res = spacePatternColored{}
 		} else {
-			base, err := pdf.Decode(c, d.args[0], ExtractSpace)
+			base, err := c.Decode(d.args[0], ExtractSpace)
 			if err != nil {
 				d.SetError(pdf.Wrap(err, "base color space"))
 			} else if IsPattern(base) {
@@ -188,7 +188,7 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 	case FamilyICCBased:
 		var meta *pdf.MetadataStream
 		if ref, ok := d.dict["Metadata"]; ok {
-			meta, err = pdf.DecodeOptional(c, ref, pdf.ExtractMetadataStream)
+			meta, err = c.DecodeOptional(ref, pdf.ExtractMetadataStream)
 			if err != nil {
 				d.SetError(err)
 			}
@@ -203,7 +203,7 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 			d.MarkAsInvalid()
 			break
 		}
-		base, err := pdf.Decode(c, d.args[0], ExtractSpace)
+		base, err := c.Decode(d.args[0], ExtractSpace)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "base color space"))
 			break
@@ -258,13 +258,13 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 			break
 		}
 
-		alternate, err := pdf.Decode(c, d.args[1], ExtractSpace)
+		alternate, err := c.Decode(d.args[1], ExtractSpace)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "alternate color space"))
 			break
 		}
 
-		trfm, err := pdf.Decode(c, d.args[2], function.Extract)
+		trfm, err := c.Decode(d.args[2], function.Extract)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "tint transform"))
 			break
@@ -307,13 +307,13 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 			break
 		}
 
-		alternate, err := pdf.Decode(c, d.args[1], ExtractSpace)
+		alternate, err := c.Decode(d.args[1], ExtractSpace)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "alternate color space"))
 			break
 		}
 
-		trfm, err := pdf.Decode(c, d.args[2], function.Extract)
+		trfm, err := c.Decode(d.args[2], function.Extract)
 		if err != nil {
 			d.SetError(pdf.Wrap(err, "tint transform"))
 			break

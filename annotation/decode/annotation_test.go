@@ -257,7 +257,7 @@ func TestOpacityRangeOnRead(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			a, err := pdf.Decode(pdf.CursorAt(x, nil), dict, Annotation)
+			a, err := pdf.CursorAt(x, nil).Decode(dict, Annotation)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -335,12 +335,10 @@ func TestOpacity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			annot := &annotation.Text{
-				Common: annotation.Common{
-					Rect:                    pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
-					StrokingTransparency:    tt.strokeTransparency,
-					NonStrokingTransparency: tt.nonStrokeTransparency,
-					Appearance:              defaultAppearanceDict,
-				},
+				Rect:                    pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
+				StrokingTransparency:    tt.strokeTransparency,
+				NonStrokingTransparency: tt.nonStrokeTransparency,
+				Appearance:              defaultAppearanceDict,
 			}
 
 			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)

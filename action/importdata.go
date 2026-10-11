@@ -71,7 +71,7 @@ func (a *ImportData) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeImportData(c pdf.Cursor, dict pdf.Dict) (*ImportData, error) {
-	f, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
+	f, err := c.Decode(dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func decodeImportData(c pdf.Cursor, dict pdf.Dict) (*ImportData, error) {
 		return nil, pdf.Error("ImportData action missing F entry")
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

@@ -29,8 +29,6 @@ func spec(name string) *file.Specification {
 	return &file.Specification{FileName: name, AFRelationship: file.RelationshipUnspecified}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 var testCases = []struct {
 	name string
 	dict Dict
@@ -57,11 +55,11 @@ var testCases = []struct {
 			Resolution:   &[2]float64{300, 300},
 			ColorType:    "Separation",
 			Color:        &Color13{CMYK: [4]float64{0, 0, 0, 1}, Name: pdf.String("Black")},
-			Tint:         ptr(0.5),
+			Tint:         new(0.5),
 			Overprint:    true,
 			ImageType:    &[2]int{3, 8},
 			GrayMap:      []int{0, 65535, 32768},
-			Transparency: ptr(false),
+			Transparency: new(false),
 			Tags: []Tag13{
 				{Num: 270, Text: "description"},
 				{Num: 271, Text: "make"},

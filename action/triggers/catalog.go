@@ -121,31 +121,31 @@ func DecodeCatalog(c pdf.Cursor, obj pdf.Object, _ bool) (*Catalog, error) {
 
 	cat := &Catalog{}
 
-	if act, err := pdf.DecodeOptional(c, dict["WC"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["WC"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		cat.WillClose = js
 	}
 
-	if act, err := pdf.DecodeOptional(c, dict["WS"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["WS"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		cat.WillSave = js
 	}
 
-	if act, err := pdf.DecodeOptional(c, dict["DS"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["DS"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		cat.DidSave = js
 	}
 
-	if act, err := pdf.DecodeOptional(c, dict["WP"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["WP"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		cat.WillPrint = js
 	}
 
-	if act, err := pdf.DecodeOptional(c, dict["DP"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["DP"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		cat.DidPrint = js

@@ -197,7 +197,7 @@ func TestZeroWidthDrawsHairline(t *testing.T) {
 // room for the hairline on every side.
 func TestHairlineRect(t *testing.T) {
 	a := &annotation.Line{
-		Common: annotation.Common{Color: color.DeviceRGB{1, 0, 0}},
+		Color:  color.DeviceRGB{1, 0, 0},
 		Coords: [4]float64{10, 20, 110, 20},
 	}
 	s := newGen(t, pdf.V2_0)
@@ -216,11 +216,10 @@ func TestHairlineRect(t *testing.T) {
 // clamped to the box, so no coordinate degenerates.
 func TestCaretThinBox(t *testing.T) {
 	for _, h := range []float64{0, 0.5, 1} {
-		a := &annotation.Caret{Common: annotation.Common{
+		a := &annotation.Caret{
 			Rect:   pdf.Rectangle{LLx: 10, LLy: 10, URx: 20, URy: 10 + h},
 			Border: &annotation.Border{Width: 1},
-			Color:  color.DeviceRGB{1, 0, 0},
-		}}
+			Color:  color.DeviceRGB{1, 0, 0}}
 		s := newGen(t, pdf.V2_0)
 		if err := s.AddAppearance(a); err != nil {
 			t.Fatal(err)
@@ -339,11 +338,9 @@ func TestTextMarkupIgnoresBorderWidth(t *testing.T) {
 			var want []byte
 			for _, border := range borders {
 				a := &annotation.TextMarkup{
-					Common: annotation.Common{
-						Rect:   pdf.Rectangle{LLx: 10, LLy: 10, URx: 190, URy: 90},
-						Border: border,
-						Color:  color.DeviceRGB{1, 1, 0},
-					},
+					Rect:       pdf.Rectangle{LLx: 10, LLy: 10, URx: 190, URy: 90},
+					Border:     border,
+					Color:      color.DeviceRGB{1, 1, 0},
 					Type:       markupType,
 					QuadPoints: quads,
 				}

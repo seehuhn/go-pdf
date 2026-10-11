@@ -30,10 +30,8 @@ import (
 // between their connection points.
 func TestShortLineInsetEndings(t *testing.T) {
 	a := &annotation.Line{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: 1},
-		},
+		Color:  color.DeviceRGB{1, 0, 0},
+		Border: &annotation.Border{Width: 1},
 		Coords: [4]float64{100, 100, 105, 100},
 		LineEndingStyle: [2]annotation.LineEndingStyle{
 			annotation.LineEndingStyleDiamond,
@@ -59,10 +57,8 @@ func TestShortLineInsetEndings(t *testing.T) {
 // that segment.
 func TestPolyLineShortEndSegment(t *testing.T) {
 	a := &annotation.PolyLine{
-		Common: annotation.Common{
-			Color:  color.DeviceRGB{1, 0, 0},
-			Border: &annotation.Border{Width: 1},
-		},
+		Color:    color.DeviceRGB{1, 0, 0},
+		Border:   &annotation.Border{Width: 1},
 		Vertices: []float64{100, 100, 102, 100, 102, 150},
 		LineEndingStyle: [2]annotation.LineEndingStyle{
 			annotation.LineEndingStyleDiamond,

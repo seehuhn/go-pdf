@@ -37,7 +37,7 @@ func decodeSound(c pdf.Cursor, dict pdf.Dict) (*annotation.Sound, error) {
 	// Sound (required): without a usable Sound the annotation cannot be
 	// written back, so reject it; the page decoder drops annotations that
 	// fail to decode, matching the permissive-reader policy.
-	s, err := pdf.Decode(c, dict["Sound"], sound.Extract)
+	s, err := c.Decode(dict["Sound"], sound.Extract)
 	if err != nil {
 		return nil, err
 	}

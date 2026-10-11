@@ -259,7 +259,7 @@ func TestSetOCGStateDecodeIndirectOperation(t *testing.T) {
 
 // TestSetOCGStateSharedGroup checks that a group used both by an annotation
 // and by a SetOCGState action stays a single object in the file.  The typed
-// State field relies on this: pdf.Decode caches by reference, so both uses
+// State field relies on this: pdf.Cursor.Decode caches by reference, so both uses
 // yield the same *oc.Group, which rm.Embed then writes only once.
 func TestSetOCGStateSharedGroup(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
@@ -291,11 +291,11 @@ func TestSetOCGStateSharedGroup(t *testing.T) {
 	// reading twice gives the same Go value, so writing it out again
 	// produces a single object rather than a copy per use
 	c := pdf.NewCursor(w)
-	decoded, err := pdf.Decode(c, encoded, Decode)
+	decoded, err := c.Decode(encoded, Decode)
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := pdf.Decode(c, groupRef, oc.ExtractGroup)
+	again, err := c.Decode(groupRef, oc.ExtractGroup)
 	if err != nil {
 		t.Fatal(err)
 	}

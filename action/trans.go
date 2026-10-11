@@ -71,12 +71,12 @@ func (a *Trans) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeTrans(c pdf.Cursor, dict pdf.Dict) (*Trans, error) {
-	trans, err := pdf.Decode(c, dict["Trans"], transition.Extract)
+	trans, err := c.Decode(dict["Trans"], transition.Extract)
 	if err != nil {
 		return nil, err
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

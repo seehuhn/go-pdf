@@ -92,11 +92,9 @@ func createDocument(filename string) error {
 	w.yPos -= 24.0
 
 	a := &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "default border width",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "default border width",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -104,12 +102,10 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "Border.Width=2",
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-			Color:    color.Blue,
-		},
+		Contents: "Border.Width=2",
+		Flags:    annotation.FlagPrint,
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
+		Color:    color.Blue,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -117,11 +113,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "BorderStyle.Width=2",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents:    "BorderStyle.Width=2",
+		Flags:       annotation.FlagPrint,
+		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a)
@@ -130,11 +124,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "dashed border",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "dashed border",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     2,
 			Style:     "D",
@@ -148,11 +140,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "border style B",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "border style B",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     2,
 			Style:     "B",
@@ -165,11 +155,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "border style U",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "border style U",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     2,
 			Style:     "U",
@@ -182,11 +170,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "default border color",
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-		},
+		Contents: "default border color",
+		Flags:    annotation.FlagPrint,
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -194,12 +180,10 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "filled",
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 1, SingleUse: true},
-			Color:    color.Black,
-		},
+		Contents:  "filled",
+		Flags:     annotation.FlagPrint,
+		Border:    &annotation.Border{Width: 1, SingleUse: true},
+		Color:     color.Black,
 		FillColor: color.White,
 	}
 	err = w.addAnnotationPair(a)
@@ -211,11 +195,9 @@ func createDocument(filename string) error {
 	w.size = 70
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "cloudy border, intensity=0",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Black,
-		},
+		Contents:  "cloudy border, intensity=0",
+		Flags:     annotation.FlagPrint,
+		Color:     color.Black,
 		FillColor: color.White,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     1,
@@ -234,11 +216,9 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "cloudy border, intensity=1",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Black,
-		},
+		Contents:  "cloudy border, intensity=1",
+		Flags:     annotation.FlagPrint,
+		Color:     color.Black,
 		FillColor: color.White,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     1,
@@ -259,11 +239,9 @@ func createDocument(filename string) error {
 	w.yPos += 12
 
 	a = &annotation.Polygon{
-		Common: annotation.Common{
-			Contents: "cloudy border, intensity=2",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Black,
-		},
+		Contents:  "cloudy border, intensity=2",
+		Flags:     annotation.FlagPrint,
+		Color:     color.Black,
 		FillColor: color.White,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     1,
@@ -387,12 +365,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

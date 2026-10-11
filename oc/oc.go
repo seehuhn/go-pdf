@@ -65,9 +65,9 @@ func ExtractConditional(c pdf.Cursor, obj pdf.Object, isDirect bool) (Conditiona
 
 	switch tp {
 	case "OCG":
-		return pdf.Decode(c, obj, ExtractGroup)
+		return c.Decode(obj, ExtractGroup)
 	case "OCMD":
-		return pdf.Decode(c, obj, ExtractMembership)
+		return c.Decode(obj, ExtractMembership)
 	default:
 		return nil, pdf.Error("invalid optional content object")
 	}

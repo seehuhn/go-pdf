@@ -76,7 +76,7 @@ func validateType16Dims(width, height, width2, height2 int) (hasSecondRect bool,
 // HalftoneType is 5. Callers must not descend into such an entry: this
 // prevents unbounded recursion when extracting a Type 5 halftone whose
 // Default or colorant entry is itself Type 5. Indirect-reference cycles
-// among Type 5 dicts are caught by pdf.Decode's path.Seen check, but inline
+// among Type 5 dicts are caught by pdf.Cursor.Decode's path.Seen check, but inline
 // nesting and deep linear chains of distinct refs are not — without this
 // check, a malicious file can grow the call stack proportionally to file
 // size.

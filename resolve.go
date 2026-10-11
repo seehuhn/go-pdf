@@ -66,7 +66,7 @@ func resolvePath(g Getter, path *CycleCheck, obj Object, canObjStm bool) (Native
 // step extends the path by ref, after checking that ref is not already on the
 // path (cycle) and that the resulting depth stays within the limit.  It is the
 // single place where reference following enforces its cycle and depth bounds,
-// shared by [resolvePath] and the cache-aware loop in [Decode].
+// shared by [resolvePath] and the cache-aware loop in [Cursor.Decode].
 func (path *CycleCheck) step(ref Reference) (*CycleCheck, error) {
 	if path.Seen(ref) {
 		return nil, &MalformedFileError{

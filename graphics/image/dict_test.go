@@ -1758,7 +1758,7 @@ func TestExtractDictMaskProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	d2, err := pdf.Decode(c, imgRef, ExtractDict)
+	d2, err := c.Decode(imgRef, ExtractDict)
 	if err != nil {
 		t.Fatal(err)
 	}

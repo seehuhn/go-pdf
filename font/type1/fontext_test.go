@@ -569,7 +569,7 @@ func TestTextContent(t *testing.T) {
 		}
 		return nil
 	}
-	pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageRef, pdfpage.Decode)
+	pg, err := pdf.CursorAt(x, nil).Decode(pageRef, pdfpage.Decode)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -65,7 +65,7 @@ func ExtractProperties(c pdf.Cursor, obj pdf.Object, _ bool) (*Properties, error
 	}
 
 	// D (required)
-	p.D, err = pdf.DecodeOptional(c, dict["D"], ExtractConfiguration)
+	p.D, err = c.DecodeOptional(dict["D"], ExtractConfiguration)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func ExtractProperties(c pdf.Cursor, obj pdf.Object, _ bool) (*Properties, error
 		return nil, err
 	} else {
 		for _, item := range configsArr {
-			config, err := pdf.DecodeOptional(c, item, ExtractConfiguration)
+			config, err := c.DecodeOptional(item, ExtractConfiguration)
 			if err != nil {
 				continue // permissive
 			}

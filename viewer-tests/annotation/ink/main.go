@@ -93,11 +93,9 @@ func createDocument(filename string) error {
 
 	// test 1: default border width
 	a := &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "default line width",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "default line width",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 	}
 	err = w.addAnnotationPair(a, scribble)
 	if err != nil {
@@ -106,12 +104,10 @@ func createDocument(filename string) error {
 
 	// test 2: Border.Width=2
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "Border.Width=2",
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-			Color:    color.Blue,
-		},
+		Contents: "Border.Width=2",
+		Flags:    annotation.FlagPrint,
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
+		Color:    color.Blue,
 	}
 	err = w.addAnnotationPair(a, scribble)
 	if err != nil {
@@ -120,11 +116,9 @@ func createDocument(filename string) error {
 
 	// test 3: BorderStyle.Width=2
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "BorderStyle.Width=2",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents:    "BorderStyle.Width=2",
+		Flags:       annotation.FlagPrint,
+		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a, scribble)
@@ -134,11 +128,9 @@ func createDocument(filename string) error {
 
 	// test 4: dashed line
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "dashed line",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "dashed line",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     2,
 			Style:     "D",
@@ -153,11 +145,9 @@ func createDocument(filename string) error {
 
 	// test 5: thick stroke
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "thick stroke (width 5)",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents:    "thick stroke (width 5)",
+		Flags:       annotation.FlagPrint,
+		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 5, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a, scribble)
@@ -167,11 +157,9 @@ func createDocument(filename string) error {
 
 	// test 6: multi-stroke (plus sign — two disjoint paths)
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "multi-stroke (plus sign)",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents:    "multi-stroke (plus sign)",
+		Flags:       annotation.FlagPrint,
+		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a, plusSign)
@@ -181,11 +169,9 @@ func createDocument(filename string) error {
 
 	// test 7: short stroke (two points only)
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "short stroke (two points)",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents:    "short stroke (two points)",
+		Flags:       annotation.FlagPrint,
+		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a, shortStroke)
@@ -195,11 +181,9 @@ func createDocument(filename string) error {
 
 	// test 8: single-point dot
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "single-point dot",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents:    "single-point dot",
+		Flags:       annotation.FlagPrint,
+		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 6, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a, dot)
@@ -209,10 +193,8 @@ func createDocument(filename string) error {
 
 	// test 9: no color (invisible)
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents: "no color (invisible)",
-			Flags:    annotation.FlagPrint,
-		},
+		Contents: "no color (invisible)",
+		Flags:    annotation.FlagPrint,
 	}
 	err = w.addAnnotationPair(a, scribble)
 	if err != nil {
@@ -221,14 +203,12 @@ func createDocument(filename string) error {
 
 	// test 10: stroking transparency
 	a = &annotation.Ink{
-		Common: annotation.Common{
-			Contents:                "50% transparency",
-			Flags:                   annotation.FlagPrint,
-			Color:                   color.Blue,
-			StrokingTransparency:    0.5,
-			NonStrokingTransparency: 0.5,
-		},
-		BorderStyle: &annotation.BorderStyle{Width: 5, Style: "S", SingleUse: true},
+		Contents:                "50% transparency",
+		Flags:                   annotation.FlagPrint,
+		Color:                   color.Blue,
+		StrokingTransparency:    0.5,
+		NonStrokingTransparency: 0.5,
+		BorderStyle:             &annotation.BorderStyle{Width: 5, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a, scribble)
 	if err != nil {
@@ -356,12 +336,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

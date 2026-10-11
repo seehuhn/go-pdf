@@ -210,7 +210,7 @@ func TestFieldRoundTrip(t *testing.T) {
 // inherited context, for tests that build a tree by hand.
 func decodeRootField(x *pdf.Extractor, ref pdf.Reference) (acroform.Node, error) {
 	d := newFieldTreeDecoder()
-	res, err := pdf.DecodeOptional(pdf.CursorAt(x, nil), ref, d.nodeFunc(inherited{}))
+	res, err := pdf.CursorAt(x, nil).DecodeOptional(ref, d.nodeFunc(inherited{}))
 	if err != nil || res == nil {
 		return nil, err
 	}
@@ -496,7 +496,7 @@ func TestDecodeGroupDropsOwnEntries(t *testing.T) {
 
 // TestDecodeFieldKidsDeepChainBounded guards against a stack-overflow DoS: a
 // /Kids chain of distinct fields is acyclic, so the cycle guard never trips, yet
-// recursing one frame per level would exhaust the Go stack. The pdf.Decode
+// recursing one frame per level would exhaust the Go stack. The pdf.Cursor.Decode
 // depth cap truncates the over-deep tail; because every level here is a
 // non-terminal field (a group), losing the deepest kid empties each group in
 // turn, so the whole over-deep chain is dropped — the point is that decoding
@@ -1102,7 +1102,7 @@ func TestDecodeParentChainShared(t *testing.T) {
 	g := &countingGetter{Getter: w}
 	x := pdf.NewExtractor(g)
 	for _, ref := range widgets {
-		a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+		a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1132,7 +1132,7 @@ func TestDecodeParentChainDeepBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	a, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+	a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1157,7 +1157,7 @@ func TestDecodeParentChainCycle(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	an, err := pdf.Decode(pdf.CursorAt(x, nil), ref, Annotation)
+	an, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}

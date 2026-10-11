@@ -98,7 +98,7 @@ func Extract(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Movie, error) {
 	m := &Movie{SingleUse: isDirect}
 
 	// F (required)
-	if f, err := pdf.DecodeOptional(c, dict["F"], file.ExtractSpecification); err != nil {
+	if f, err := c.DecodeOptional(dict["F"], file.ExtractSpecification); err != nil {
 		return nil, err
 	} else {
 		m.File = f
@@ -134,7 +134,7 @@ func Extract(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Movie, error) {
 				m.Poster = PosterFromMovieFile
 			}
 		case *pdf.Stream:
-			if img, err := pdf.DecodeOptional(c, posterObj, image.ExtractDict); err != nil {
+			if img, err := c.DecodeOptional(posterObj, image.ExtractDict); err != nil {
 				return nil, err
 			} else if img != nil {
 				m.Poster = img

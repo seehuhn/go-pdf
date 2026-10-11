@@ -152,8 +152,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 	}
 	version, err := s.ReadHeaderVersion()
 	if err != nil {
-		var e *MalformedFileError
-		if errors.As(err, &e) && e.Err == errNoPDF {
+		if e, ok := errors.AsType[*MalformedFileError](err); ok && e.Err == errNoPDF {
 			return nil, err // no PDF header at all
 		}
 		// A PDF processor shall attempt to read any PDF file, even if the
@@ -207,8 +206,7 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 			return false
 		}
 		if opt.ErrorHandling == ErrorHandlingReport {
-			var e *MalformedFileError
-			if errors.As(err, &e) {
+			if e, ok := errors.AsType[*MalformedFileError](err); ok {
 				r.Errors = append(r.Errors, e)
 				return false
 			}
@@ -236,8 +234,7 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 			// ErrorHandling — the file is unsalvageable in any mode.
 			// AuthenticationError is returned unwrapped so callers can
 			// detect it cleanly via errors.As.
-			var authErr *AuthenticationError
-			if errors.As(err, &authErr) {
+			if _, ok := errors.AsType[*AuthenticationError](err); ok {
 				return err
 			}
 			return Wrap(err, "encryption dictionary")
@@ -287,7 +284,7 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 	}
 
 	x := NewExtractor(r)
-	r.meta.Catalog, err = Decode(CursorAt(x, nil), catalogDict, DecodeCatalog)
+	r.meta.Catalog, err = CursorAt(x, nil).Decode(catalogDict, DecodeCatalog)
 	if shouldExit(err) {
 		return err
 	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
@@ -317,7 +314,7 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 		r.meta.ID = nil
 	}
 
-	r.meta.Info, err = Decode(CursorAt(x, nil), trailer["Info"], ExtractInfo)
+	r.meta.Info, err = CursorAt(x, nil).Decode(trailer["Info"], ExtractInfo)
 	if shouldExit(err) {
 		return err
 	}

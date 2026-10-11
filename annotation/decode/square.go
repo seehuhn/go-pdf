@@ -36,7 +36,7 @@ func decodeSquare(c pdf.Cursor, dict pdf.Dict) (*annotation.Square, error) {
 
 	// Extract square-specific fields
 	// BS (optional)
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		square.BorderStyle = bs
@@ -48,7 +48,7 @@ func decodeSquare(c pdf.Cursor, dict pdf.Dict) (*annotation.Square, error) {
 
 	// BE (optional): a border effect is meaningful only together with a
 	// border style, so drop it when BS is absent (the writer requires BS)
-	if be, err := pdf.DecodeOptional(c, dict["BE"], annotation.ExtractBorderEffect); err != nil {
+	if be, err := c.DecodeOptional(dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
 	} else if square.BorderStyle != nil {
 		square.BorderEffect = be

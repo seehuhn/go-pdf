@@ -93,11 +93,9 @@ func createDocument(filename string) error {
 
 	// test 1: default border width
 	a := &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "default line width",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "default line width",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -106,12 +104,10 @@ func createDocument(filename string) error {
 
 	// test 2: Border.Width=2
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "Border.Width=2",
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-			Color:    color.Blue,
-		},
+		Contents: "Border.Width=2",
+		Flags:    annotation.FlagPrint,
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
+		Color:    color.Blue,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -120,11 +116,9 @@ func createDocument(filename string) error {
 
 	// test 3: BorderStyle.Width=2
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "BorderStyle.Width=2",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents:    "BorderStyle.Width=2",
+		Flags:       annotation.FlagPrint,
+		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
 	}
 	err = w.addAnnotationPair(a)
@@ -134,11 +128,9 @@ func createDocument(filename string) error {
 
 	// test 4: dashed line
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "dashed line",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "dashed line",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
 			Width:     2,
 			Style:     "D",
@@ -153,11 +145,9 @@ func createDocument(filename string) error {
 
 	// test 5: ClosedArrow endings
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "ClosedArrow endings",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "ClosedArrow endings",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		LineEndingStyle: [2]annotation.LineEndingStyle{
 			annotation.LineEndingStyleClosedArrow,
 			annotation.LineEndingStyleClosedArrow,
@@ -171,11 +161,9 @@ func createDocument(filename string) error {
 
 	// test 6: OpenArrow / Diamond
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "OpenArrow / Diamond",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "OpenArrow / Diamond",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		LineEndingStyle: [2]annotation.LineEndingStyle{
 			annotation.LineEndingStyleOpenArrow,
 			annotation.LineEndingStyleDiamond,
@@ -189,11 +177,9 @@ func createDocument(filename string) error {
 
 	// test 7: Circle endings
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "Circle endings",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "Circle endings",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 		LineEndingStyle: [2]annotation.LineEndingStyle{
 			annotation.LineEndingStyleCircle,
 			annotation.LineEndingStyleCircle,
@@ -207,10 +193,8 @@ func createDocument(filename string) error {
 
 	// test 8: no color (invisible)
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "no color (invisible)",
-			Flags:    annotation.FlagPrint,
-		},
+		Contents: "no color (invisible)",
+		Flags:    annotation.FlagPrint,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -219,11 +203,9 @@ func createDocument(filename string) error {
 
 	// test 9: no line style specified
 	a = &annotation.PolyLine{
-		Common: annotation.Common{
-			Contents: "no line style specified",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Black,
-		},
+		Contents: "no line style specified",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Black,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -319,12 +301,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

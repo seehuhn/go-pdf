@@ -69,7 +69,7 @@ func extractPlayerInfoArray(c pdf.Cursor, obj pdf.Object) ([]*MediaPlayerInfo, e
 	}
 	var out []*MediaPlayerInfo
 	for _, elem := range arr {
-		info, err := pdf.DecodeOptional(c, elem, ExtractMediaPlayerInfo)
+		info, err := c.DecodeOptional(elem, ExtractMediaPlayerInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +145,7 @@ func ExtractMediaPlayerInfo(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Media
 		return nil, pdf.Error("missing media player info dictionary")
 	}
 
-	pid, err := pdf.Decode(c, dict["PID"], ExtractSoftwareIdentifier)
+	pid, err := c.Decode(dict["PID"], ExtractSoftwareIdentifier)
 	if err != nil {
 		return nil, err
 	} else if pid == nil {

@@ -191,22 +191,22 @@ func TestMeshEmbedFunctionShape(t *testing.T) {
 	for name, fn := range meshFunctions() {
 		shadings := []graphics.Shading{
 			&Type4{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, F: fn,
 				Vertices: []Type4Vertex{{Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}},
 			},
 			&Type5{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
 				Decode: decode, F: fn,
 				Vertices: []Type5Vertex{{Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}},
 			},
 			&Type6{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, F: fn,
 				Patches: []Type6Patch{{ControlPoints: [12]vec.Vec2{}, CornerColors: corners}},
 			},
 			&Type7{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, F: fn,
 				Patches: []Type7Patch{{ControlPoints: [16]vec.Vec2{}, CornerColors: corners}},
 			},
@@ -235,17 +235,17 @@ func TestMeshEmbedNonFinite(t *testing.T) {
 
 	cases := map[string]graphics.Shading{
 		"type4 X": &Type4{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:   decode,
 			Vertices: []Type4Vertex{{X: nan, Y: 0, Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}},
 		},
 		"type4 color": &Type4{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:   decode,
 			Vertices: []Type4Vertex{{X: 0, Y: 0, Color: []float64{math.Inf(1)}}, {Color: []float64{0}}, {Color: []float64{0}}},
 		},
 		"type5 Y": &Type5{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
 			Decode: decode,
 			Vertices: []Type5Vertex{
 				{X: 0, Y: math.Inf(-1), Color: []float64{0}}, {X: 1, Y: 0, Color: []float64{0}},
@@ -253,32 +253,32 @@ func TestMeshEmbedNonFinite(t *testing.T) {
 			},
 		},
 		"type6 control point": &Type6{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  decode,
 			Patches: []Type6Patch{{ControlPoints: func() [12]vec.Vec2 { p := cp; p[5].X = nan; return p }(), CornerColors: corners()}},
 		},
 		"type6 color": &Type6{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  decode,
 			Patches: []Type6Patch{{ControlPoints: cp, CornerColors: [][]float64{{0}, {nan}, {0}, {0}}}},
 		},
 		"type7 control point": &Type7{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  decode,
 			Patches: []Type7Patch{{ControlPoints: func() [16]vec.Vec2 { p := cp16; p[15].Y = nan; return p }(), CornerColors: corners()}},
 		},
 		"type7 color": &Type7{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  decode,
 			Patches: []Type7Patch{{ControlPoints: cp16, CornerColors: [][]float64{{0}, {0}, {0}, {math.Inf(-1)}}}},
 		},
 		"type4 decode": &Type4{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:   []float64{0, math.Inf(1), 0, 100, 0, 1},
 			Vertices: []Type4Vertex{{X: 0, Y: 0, Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}},
 		},
 		"type5 decode": &Type5{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
 			Decode: []float64{0, 100, nan, 100, 0, 1},
 			Vertices: []Type5Vertex{
 				{X: 0, Y: 0, Color: []float64{0}}, {X: 1, Y: 0, Color: []float64{0}},
@@ -286,12 +286,12 @@ func TestMeshEmbedNonFinite(t *testing.T) {
 			},
 		},
 		"type6 decode": &Type6{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  []float64{0, 100, 0, 100, 0, nan},
 			Patches: []Type6Patch{{ControlPoints: cp, CornerColors: corners()}},
 		},
 		"type7 decode": &Type7{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  []float64{math.Inf(-1), 100, 0, 100, 0, 1},
 			Patches: []Type7Patch{{ControlPoints: cp16, CornerColors: corners()}},
 		},
@@ -313,11 +313,11 @@ func TestType3EmbedFunctionShape(t *testing.T) {
 	for name, fn := range meshFunctions() {
 		t.Run(name, func(t *testing.T) {
 			sh := &Type3{
-				Common:  Common{ColorSpace: color.SpaceDeviceGray},
-				Center2: vec.Vec2{X: 10, Y: 10},
-				R2:      10,
-				F:       fn,
-				TMax:    1,
+				ColorSpace: color.SpaceDeviceGray,
+				Center2:    vec.Vec2{X: 10, Y: 10},
+				R2:         10,
+				F:          fn,
+				TMax:       1,
 			}
 			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 			rm := pdf.NewResourceManager(buf)
@@ -369,22 +369,22 @@ func TestMeshEmbedFunctionDomain(t *testing.T) {
 	for _, decode := range [][]float64{{0, 1, 0, 1, 0, 2}, {0, 1, 0, 1, -0.5, 1}} {
 		shadings := []graphics.Shading{
 			&Type4{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, F: fn,
 				Vertices: []Type4Vertex{{Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}},
 			},
 			&Type5{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
 				Decode: decode, F: fn,
 				Vertices: []Type5Vertex{{Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}, {Color: []float64{0}}},
 			},
 			&Type6{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, F: fn,
 				Patches: []Type6Patch{{CornerColors: corners}},
 			},
 			&Type7{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, F: fn,
 				Patches: []Type7Patch{{CornerColors: corners}},
 			},
@@ -439,7 +439,7 @@ func TestRepairType4Mesh(t *testing.T) {
 // ignores trailing bytes which do not form a whole vertex.
 func TestType4ReadFlagBits(t *testing.T) {
 	s := &Type4{
-		Common: Common{ColorSpace: color.SpaceDeviceGray}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+		ColorSpace: color.SpaceDeviceGray, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 		Decode: []float64{0, 1, 0, 1, 0, 1},
 		Vertices: []Type4Vertex{
 			{Color: []float64{0}}, {X: 1, Color: []float64{0}}, {Y: 1, Color: []float64{0}},
@@ -471,7 +471,7 @@ func TestPatchReadFlags(t *testing.T) {
 
 	t.Run("type6", func(t *testing.T) {
 		s := &Type6{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  decode,
 			Patches: []Type6Patch{{CornerColors: corners}},
 		}
@@ -518,7 +518,7 @@ func TestPatchReadFlags(t *testing.T) {
 
 	t.Run("type7", func(t *testing.T) {
 		s := &Type7{
-			Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+			ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 			Decode:  decode,
 			Patches: []Type7Patch{{CornerColors: corners}},
 		}
@@ -695,7 +695,7 @@ func TestPatchEmbedSharedData(t *testing.T) {
 				next.CornerColors[i] = prev.CornerColors[src]
 			}
 			sh := &Type6{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, Patches: []Type6Patch{prev, next},
 			}
 			if err := embed(t, sh); err != nil {
@@ -728,7 +728,7 @@ func TestPatchEmbedSharedData(t *testing.T) {
 				next.CornerColors[i] = prev.CornerColors[src]
 			}
 			sh := &Type7{
-				Common: Common{ColorSpace: cs}, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
+				ColorSpace: cs, BitsPerCoordinate: 16, BitsPerComponent: 8, BitsPerFlag: 8,
 				Decode: decode, Patches: []Type7Patch{prev, next},
 			}
 			if err := embed(t, sh); err != nil {
@@ -753,7 +753,7 @@ func TestPatchEmbedSharedData(t *testing.T) {
 // fewer than two whole rows remain.
 func TestType5ReadPartialRow(t *testing.T) {
 	s := &Type5{
-		Common: Common{ColorSpace: color.SpaceDeviceGray}, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
+		ColorSpace: color.SpaceDeviceGray, BitsPerCoordinate: 16, BitsPerComponent: 8, VerticesPerRow: 2,
 		Decode: []float64{0, 1, 0, 1, 0, 1},
 		Vertices: []Type5Vertex{
 			{Color: []float64{0}}, {X: 1, Color: []float64{0}},

@@ -123,7 +123,9 @@ func (e *EmbedHelper) CopierFrom(x *Extractor) *Copier {
 	return c
 }
 
-func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
+// EmbedFunc embeds obj using the function f, as an alternative to the
+// [Embedder] interface.  See [ResourceManager.EmbedFunc] for details.
+func (e *EmbedHelper) EmbedFunc[T any](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
 	if existing, ok := e.rm.Out.lookup(obj); ok {
 		return existing, nil
 	}
@@ -146,9 +148,9 @@ func EmbedHelperEmbedFunc[T any](e *EmbedHelper, f func(*EmbedHelper, T) (Native
 // Values are deduplicated per Writer: a value embedded through any
 // resource manager of a Writer is written once.
 //
-// Use the [ResourceManagerEmbed] function to embed resources.
+// Use the [ResourceManager.Embed] method to embed resources.
 //
-// The ResourceManager must be closed with the [Close] method before the PDF
+// The ResourceManager must be closed with the [ResourceManager.Close] method before the PDF
 // file is closed.
 type ResourceManager struct {
 	Out      *Writer
@@ -173,9 +175,9 @@ func (rm *ResourceManager) Embed(r Embedder) (Native, error) {
 	return e.Embed(r)
 }
 
-// ResourceManagerEmbedFunc embeds a resource using a function-driven approach.
+// EmbedFunc embeds a resource using a function-driven approach.
 //
-// This function provides an alternative to the Embedder interface when you need
+// This method provides an alternative to the Embedder interface when you need
 // to embed objects that don't implement the Embedder interface, or when you need
 // more control over the embedding process.  The type T must be "comparable".
 //
@@ -183,9 +185,9 @@ func (rm *ResourceManager) Embed(r Embedder) (Native, error) {
 // returned without calling the embed function again.
 //
 // The function f must return the PDF representation of the embedded object.
-func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
-	e := &EmbedHelper{rm: rm}
-	return EmbedHelperEmbedFunc(e, f, obj)
+func (rm *ResourceManager) EmbedFunc[T any](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
+	e := &EmbedHelper{rm: rm, copiers: make(map[*Extractor]*Copier)}
+	return e.EmbedFunc(f, obj)
 }
 
 // GetReference returns the reference associated with enc, assigning one if
@@ -538,12 +540,12 @@ func (x *Extractor) cacheStoreOrLoad(refs []Reference, tp reflect.Type, res any)
 // existing pair and stores nothing, so every caller shares one consistent pair.
 //
 // The two views are cached under their respective Go types, exactly as
-// [Decode] would cache them, so a later Decode for either type finds
+// [Cursor.Decode] would cache them, so a later Decode for either type finds
 // the published value.
-func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
+func (x *Extractor) StoreOrLoadPair[A, B any](ref Reference, a A, b B) (A, B) {
 	ka := extractorKey{ref: ref, tp: reflect.TypeFor[A]()}
 	kb := extractorKey{ref: ref, tp: reflect.TypeFor[B]()}
-	a, b = storeOrLoadPairLocked(x, ka, kb, a, b)
+	a, b = x.storeOrLoadPairLocked(ka, kb, a, b)
 
 	if w, ok := x.R.(*Writer); ok {
 		w.recordOrigin(a, ref)
@@ -555,7 +557,7 @@ func StoreOrLoadPair[A, B any](x *Extractor, ref Reference, a A, b B) (A, B) {
 
 // storeOrLoadPairLocked performs the cache lookup-or-store of a and b under
 // x.mu, returning the values now published in the cache.
-func storeOrLoadPairLocked[A, B any](x *Extractor, ka, kb extractorKey, a A, b B) (A, B) {
+func (x *Extractor) storeOrLoadPairLocked[A, B any](ka, kb extractorKey, a A, b B) (A, B) {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	if v, ok := x.cache[ka]; ok {

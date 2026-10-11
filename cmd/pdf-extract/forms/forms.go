@@ -42,7 +42,7 @@ func List(doc pdf.Getter, w io.Writer) error {
 	}
 
 	x := pdf.NewExtractor(doc)
-	form, err := pdf.Decode(pdf.CursorAt(x, nil), acroFormObj, decode.Form)
+	form, err := pdf.CursorAt(x, nil).Decode(acroFormObj, decode.Form)
 	if err != nil {
 		return err
 	}

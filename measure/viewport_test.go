@@ -235,7 +235,7 @@ func viewportRoundTripTest(t *testing.T, version pdf.Version, vp *Viewport) {
 
 	// Read it back
 	x := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, ExtractViewport)
+	extracted, err := pdf.CursorAt(x, nil).Decode(embedded, ExtractViewport)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -346,7 +346,7 @@ func FuzzViewportRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		vp, err := pdf.Decode(pdf.CursorAt(x, nil), objPDF, ExtractViewport)
+		vp, err := pdf.CursorAt(x, nil).Decode(objPDF, ExtractViewport)
 		if err != nil {
 			t.Skip("malformed viewport")
 		}
@@ -387,7 +387,7 @@ func viewportArrayRoundTripTest(t *testing.T, version pdf.Version, data *ViewPor
 	}
 
 	x := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, ExtractViewportArray)
+	extracted, err := pdf.CursorAt(x, nil).Decode(embedded, ExtractViewportArray)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -440,7 +440,7 @@ func FuzzViewPortArrayRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractViewportArray)
+		data, err := pdf.CursorAt(x, nil).Decode(obj, ExtractViewportArray)
 		if err != nil {
 			t.Skip("malformed object")
 		}
@@ -633,7 +633,7 @@ func TestExtractViewportMalformed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			x := pdf.NewExtractor(w)
-			vp, err := pdf.Decode(pdf.CursorAt(x, nil), tt.obj, ExtractViewport)
+			vp, err := pdf.CursorAt(x, nil).Decode(tt.obj, ExtractViewport)
 			if tt.shouldErr {
 				if err == nil {
 					t.Error("expected error but got none")

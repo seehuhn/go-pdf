@@ -92,7 +92,7 @@ func extractType2(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*pattern.Type2, e
 		}
 	}
 
-	sh, err := pdf.Decode(c, shadingObj, shading.Extract)
+	sh, err := c.Decode(shadingObj, shading.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func extractType2(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*pattern.Type2, e
 	}
 
 	// extract optional ExtGState
-	if extGState, err := pdf.DecodeOptional(c, dict["ExtGState"], ExtGState); err != nil {
+	if extGState, err := c.DecodeOptional(dict["ExtGState"], ExtGState); err != nil {
 		return nil, err
 	} else {
 		pat.ExtGState = extGState
@@ -197,7 +197,7 @@ func extractType1(c pdf.Cursor, stream *pdf.Stream) (*pattern.Type1, error) {
 	// extract resources (required)
 	pat.Res = &content.Resources{FontFallback: StandardFontFallback}
 	if resObj := dict["Resources"]; resObj != nil {
-		res, err := pdf.Decode(c, resObj, Resources)
+		res, err := c.Decode(resObj, Resources)
 		if err != nil {
 			return nil, err
 		}

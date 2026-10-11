@@ -79,7 +79,7 @@ func TestOriginOfDecodedValue(t *testing.T) {
 	}
 	c := pdf.NewCursor(w)
 	pagesRef := w.GetMeta().Catalog.Pages
-	pg, err := pdf.Decode(c, pagesRef, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
+	pg, err := c.Decode(pagesRef, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
 		d, err := c.Dict(obj)
 		return &d, err
 	})
@@ -117,7 +117,7 @@ func TestDecodedValueEmbedsAsOrigin(t *testing.T) {
 	}
 	c := pdf.NewCursor(w)
 	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
-	info, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	info, err := c.Decode(infoRef, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestValueFromOtherGetterHasNoOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	infoRef := r.GetMeta().Trailer["Info"].(pdf.Reference)
-	info, err := pdf.Decode(pdf.NewCursor(r), infoRef, pdf.ExtractInfo)
+	info, err := pdf.NewCursor(r).Decode(infoRef, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestInlineValueHasNoOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	v, err := pdf.Decode(c, pdf.Dict{"A": pdf.Integer(1)}, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
+	v, err := c.Decode(pdf.Dict{"A": pdf.Integer(1)}, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
 		d, err := c.Dict(obj)
 		return &d, err
 	})
@@ -206,7 +206,7 @@ func TestOriginFollowsReferenceChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	v, err := pdf.Decode(pdf.NewCursor(w), middle, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
+	v, err := pdf.NewCursor(w).Decode(middle, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
 		d, err := c.Dict(obj)
 		return &d, err
 	})
@@ -227,7 +227,7 @@ func TestReplaceWritesInPlace(t *testing.T) {
 	}
 	c := pdf.NewCursor(w)
 	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
-	old, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	old, err := c.Decode(infoRef, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func TestReplaceSkipsEqualEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old, err := pdf.Decode(pdf.NewCursor(w), ref0, pdf.DecodeCatalog)
+	old, err := pdf.NewCursor(w).Decode(ref0, pdf.DecodeCatalog)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestReplaceSelfReferencingEncoder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old, err := pdf.Decode(pdf.NewCursor(w), selfRef, decodeSelfRef)
+	old, err := pdf.NewCursor(w).Decode(selfRef, decodeSelfRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,7 +410,7 @@ func TestReplaceEmbedderErrorRestoresPreviousEntry(t *testing.T) {
 	}
 	c := pdf.NewCursor(w)
 	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
-	old, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	old, err := c.Decode(infoRef, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func TestReplaceEmbedderInlineRejected(t *testing.T) {
 	}
 	c := pdf.NewCursor(w)
 	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
-	old, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	old, err := c.Decode(infoRef, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +498,7 @@ func TestReplaceEqualEncodingKeepsUnrelatedReservation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old, err := pdf.Decode(pdf.NewCursor(w), thingRef, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
+	old, err := pdf.NewCursor(w).Decode(thingRef, func(c pdf.Cursor, obj pdf.Object, _ bool) (*pdf.Dict, error) {
 		d, err := c.Dict(obj)
 		return &d, err
 	})
@@ -534,7 +534,7 @@ func TestOriginVoidAfterFree(t *testing.T) {
 	}
 	c := pdf.NewCursor(w)
 	infoRef := w.GetMeta().Trailer["Info"].(pdf.Reference)
-	info, err := pdf.Decode(c, infoRef, pdf.ExtractInfo)
+	info, err := c.Decode(infoRef, pdf.ExtractInfo)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -94,7 +94,7 @@ func fixedPrintRoundTrip(t *testing.T, version pdf.Version, data *FixedPrint) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.Decode(pdf.CursorAt(x, nil), embedded, ExtractFixedPrint)
+	decoded, err := pdf.CursorAt(x, nil).Decode(embedded, ExtractFixedPrint)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -158,7 +158,7 @@ func FuzzFixedPrintRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractFixedPrint)
+		data, err := pdf.CursorAt(x, nil).Decode(obj, ExtractFixedPrint)
 		if err != nil {
 			t.Skip("malformed object")
 		}

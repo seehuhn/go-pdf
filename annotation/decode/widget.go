@@ -38,28 +38,28 @@ func decodeWidgetBody(c pdf.Cursor, dict pdf.Dict) (*annotation.Widget, error) {
 	widget.Highlight = decodeHighlight(c, dict["H"])
 
 	// MK (optional)
-	if mk, err := pdf.DecodeOptional(c, dict["MK"], appearance.ExtractCharacteristics); err != nil {
+	if mk, err := c.DecodeOptional(dict["MK"], appearance.ExtractCharacteristics); err != nil {
 		return nil, err
 	} else {
 		widget.Style = mk
 	}
 
 	// A (optional)
-	if a, err := pdf.DecodeOptional(c, dict["A"], action.Decode); err != nil {
+	if a, err := c.DecodeOptional(dict["A"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		widget.Action = a
 	}
 
 	// AA (optional)
-	if aa, err := pdf.DecodeOptional(c, dict["AA"], triggers.DecodeAnnotation); err != nil {
+	if aa, err := c.DecodeOptional(dict["AA"], triggers.DecodeAnnotation); err != nil {
 		return nil, err
 	} else {
 		widget.AA = aa
 	}
 
 	// BS (optional)
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		widget.BorderStyle = bs

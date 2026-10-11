@@ -190,7 +190,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		propList, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractList)
+		propList, err := pdf.CursorAt(x, nil).Decode(obj, ExtractList)
 		if err != nil {
 			t.Skip("malformed property list")
 		}
@@ -222,7 +222,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 		// use the writer as a getter
 		x2 := pdf.NewExtractor(w)
-		decoded, err := pdf.Decode(pdf.CursorAt(x2, nil), embedded, ExtractList)
+		decoded, err := pdf.CursorAt(x2, nil).Decode(embedded, ExtractList)
 		if err != nil {
 			t.Fatalf("second extract failed: %v", err)
 		}

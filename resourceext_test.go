@@ -178,8 +178,35 @@ func TestCursorArrayCycle(t *testing.T) {
 		return arr, nil
 	}
 
-	_, err = pdf.Decode(pdf.CursorAt(x, nil), refA, extract)
+	_, err = pdf.CursorAt(x, nil).Decode(refA, extract)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
+	}
+}
+
+// TestEmbedFuncCopier checks that an embed function passed to
+// [pdf.ResourceManager.EmbedFunc] can copy objects from another file.
+func TestEmbedFuncCopier(t *testing.T) {
+	src, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	ref := src.Alloc()
+	if err := src.Put(ref, pdf.Dict{"A": pdf.Integer(1)}); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(src)
+
+	dst, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(dst)
+	embed := func(e *pdf.EmbedHelper, r pdf.Reference) (pdf.Native, error) {
+		return e.CopierFrom(x).Copy(r)
+	}
+	got, err := rm.EmbedFunc(embed, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.(pdf.Reference); !ok {
+		t.Errorf("expected a reference, got %T", got)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
 	}
 }

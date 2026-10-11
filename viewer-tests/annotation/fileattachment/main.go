@@ -104,16 +104,12 @@ func createDocument(filename string) error {
 	}
 	for _, icon := range allIcons {
 		fa := &annotation.FileAttachment{
-			Common: annotation.Common{
-				Contents: fmt.Sprintf("Icon: %s", icon),
-				Border:   annotation.PDFDefaultBorder,
-				Flags:    annotation.FlagPrint,
-			},
-			Markup: annotation.Markup{
-				User: "Test User",
-			},
-			Icon: icon,
-			FS:   sampleFile(fmt.Sprintf("%s-sample.txt", icon)),
+			Contents: fmt.Sprintf("Icon: %s", icon),
+			Border:   annotation.PDFDefaultBorder,
+			Flags:    annotation.FlagPrint,
+			User:     "Test User",
+			Icon:     icon,
+			FS:       sampleFile(fmt.Sprintf("%s-sample.txt", icon)),
 		}
 		err = w.addPair(fa, string(icon))
 		if err != nil {
@@ -124,17 +120,13 @@ func createDocument(filename string) error {
 	// red-tinted push pin
 	red := color.DeviceRGB{0.8, 0.15, 0.15}
 	fa := &annotation.FileAttachment{
-		Common: annotation.Common{
-			Contents: "Red push pin",
-			Color:    red,
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{
-			User: "Test User",
-		},
-		Icon: annotation.FileAttachmentIconPushPin,
-		FS:   sampleFile("red-pin.txt"),
+		Contents: "Red push pin",
+		Color:    red,
+		Border:   annotation.PDFDefaultBorder,
+		Flags:    annotation.FlagPrint,
+		User:     "Test User",
+		Icon:     annotation.FileAttachmentIconPushPin,
+		FS:       sampleFile("red-pin.txt"),
 	}
 	if err = w.addPair(fa, "Common.Color = red"); err != nil {
 		return err
@@ -143,17 +135,13 @@ func createDocument(filename string) error {
 	// blue-tinted paperclip
 	blue := color.DeviceRGB{0.1, 0.3, 0.75}
 	fa = &annotation.FileAttachment{
-		Common: annotation.Common{
-			Contents: "Blue paperclip",
-			Color:    blue,
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{
-			User: "Test User",
-		},
-		Icon: annotation.FileAttachmentIconPaperclip,
-		FS:   sampleFile("blue-clip.txt"),
+		Contents: "Blue paperclip",
+		Color:    blue,
+		Border:   annotation.PDFDefaultBorder,
+		Flags:    annotation.FlagPrint,
+		User:     "Test User",
+		Icon:     annotation.FileAttachmentIconPaperclip,
+		FS:       sampleFile("blue-clip.txt"),
 	}
 	if err = w.addPair(fa, "Common.Color = blue"); err != nil {
 		return err
@@ -161,16 +149,12 @@ func createDocument(filename string) error {
 
 	// tag with a thicker border
 	fa = &annotation.FileAttachment{
-		Common: annotation.Common{
-			Contents: "Tag with border width 2",
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{
-			User: "Test User",
-		},
-		Icon: annotation.FileAttachmentIconTag,
-		FS:   sampleFile("tagged.txt"),
+		Contents: "Tag with border width 2",
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
+		Flags:    annotation.FlagPrint,
+		User:     "Test User",
+		Icon:     annotation.FileAttachmentIconTag,
+		FS:       sampleFile("tagged.txt"),
 	}
 	if err = w.addPair(fa, "Common.Border.Width = 2"); err != nil {
 		return err
@@ -178,15 +162,11 @@ func createDocument(filename string) error {
 
 	// no-icon default (empty Icon name falls back to PushPin)
 	fa = &annotation.FileAttachment{
-		Common: annotation.Common{
-			Contents: "Unset Icon (defaults to PushPin)",
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{
-			User: "Test User",
-		},
-		FS: sampleFile("default.txt"),
+		Contents: "Unset Icon (defaults to PushPin)",
+		Border:   annotation.PDFDefaultBorder,
+		Flags:    annotation.FlagPrint,
+		User:     "Test User",
+		FS:       sampleFile("default.txt"),
 	}
 	if err = w.addPair(fa, "Icon: (unset)"); err != nil {
 		return err
@@ -290,11 +270,11 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	return &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 }

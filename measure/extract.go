@@ -193,7 +193,7 @@ func extractRectilinearMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Rec
 func extractNumberFormatArray(c pdf.Cursor, arr pdf.Array) ([]*NumberFormat, error) {
 	formats := make([]*NumberFormat, len(arr))
 	for i, obj := range arr {
-		nf, err := pdf.Decode(c, obj, ExtractNumberFormat)
+		nf, err := c.Decode(obj, ExtractNumberFormat)
 		if err != nil {
 			return nil, err
 		}
@@ -207,14 +207,14 @@ func extractGeospatialMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (Measu
 	gm := &GeospatialMeasure{}
 
 	// GCS (required)
-	gcs, err := pdf.Decode(c, dict["GCS"], ExtractCoordinateSystem)
+	gcs, err := c.Decode(dict["GCS"], ExtractCoordinateSystem)
 	if err != nil {
 		return nil, err
 	}
 	gm.GCS = gcs
 
 	// DCS (optional)
-	dcs, err := pdf.DecodeOptional(c, dict["DCS"], ExtractCoordinateSystem)
+	dcs, err := c.DecodeOptional(dict["DCS"], ExtractCoordinateSystem)
 	if err != nil {
 		return nil, err
 	}

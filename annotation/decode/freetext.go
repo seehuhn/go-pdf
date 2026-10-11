@@ -77,7 +77,7 @@ func decodeFreeText(c pdf.Cursor, dict pdf.Dict) (*annotation.FreeText, error) {
 		f.CalloutLine = points
 	}
 
-	if be, err := pdf.DecodeOptional(c, dict["BE"], annotation.ExtractBorderEffect); err != nil {
+	if be, err := c.DecodeOptional(dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
 	} else {
 		f.BorderEffect = be
@@ -96,7 +96,7 @@ func decodeFreeText(c pdf.Cursor, dict pdf.Dict) (*annotation.FreeText, error) {
 		}
 	}
 
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		f.BorderStyle = bs

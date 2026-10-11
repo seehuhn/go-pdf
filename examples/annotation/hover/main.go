@@ -94,18 +94,16 @@ func run() error {
 	rect := pdf.Rectangle{LLx: 72, LLy: 690, URx: 232, URy: 720}
 
 	ft := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:     rect,
-			Contents: message,
-			// Lock the annotation so viewers do not let the user edit the text.
-			// Editing would make the viewer regenerate the appearance, which
-			// cannot reproduce this annotation's frame colour or vertical
-			// centring and would discard the rollover appearance entirely.
-			Flags: annotation.FlagLocked | annotation.FlagLockedContents,
-			Appearance: &appearance.Dict{
-				Normal:   box(rect, F, frameGray),
-				RollOver: box(rect, F, color.DeviceRGB{0, 0, 1}),
-			},
+		Rect:     rect,
+		Contents: message,
+		// Lock the annotation so viewers do not let the user edit the text.
+		// Editing would make the viewer regenerate the appearance, which
+		// cannot reproduce this annotation's frame colour or vertical
+		// centring and would discard the rollover appearance entirely.
+		Flags: annotation.FlagLocked | annotation.FlagLockedContents,
+		Appearance: &appearance.Dict{
+			Normal:   box(rect, F, frameGray),
+			RollOver: box(rect, F, color.DeviceRGB{0, 0, 1}),
 		},
 		DefaultAppearance: fmt.Sprintf("/Helv %g Tf 0 g", fontSize),
 	}

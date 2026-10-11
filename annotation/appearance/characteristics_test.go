@@ -81,7 +81,7 @@ func roundTripCharacteristics(t *testing.T, version pdf.Version, data *Character
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractCharacteristics)
+	decoded, err := pdf.CursorAt(x, nil).Decode(ref, ExtractCharacteristics)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -141,7 +141,7 @@ func FuzzCharacteristicsRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, _ := pdf.Decode(pdf.CursorAt(x, nil), objPDF, ExtractCharacteristics)
+		objGo, _ := pdf.CursorAt(x, nil).Decode(objPDF, ExtractCharacteristics)
 		if objGo == nil {
 			t.Skip("no characteristics dictionary")
 		}

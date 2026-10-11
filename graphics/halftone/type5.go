@@ -62,7 +62,7 @@ func extractType5(c pdf.Cursor, dict pdf.Dict) (*Type5, error) {
 	if isNestedType5(c, dict["Default"]) {
 		return nil, pdf.Error("invalid Default halftone: Type 5 cannot be nested")
 	}
-	if ht, err := pdf.Decode(c, dict["Default"], Extract); err != nil {
+	if ht, err := c.Decode(dict["Default"], Extract); err != nil {
 		return nil, err
 	} else if ht != nil {
 		h.Default = ht
@@ -83,7 +83,7 @@ func extractType5(c pdf.Cursor, dict pdf.Dict) (*Type5, error) {
 		if isNestedType5(c, val) {
 			continue
 		}
-		if ht, err := pdf.DecodeOptional(c, val, Extract); err != nil {
+		if ht, err := c.DecodeOptional(val, Extract); err != nil {
 			return nil, err
 		} else if ht != nil {
 			h.Colorants[colorant] = ht

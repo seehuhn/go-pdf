@@ -80,8 +80,7 @@ func Root(fileName string, passwords ...string) (Context, func(), error) {
 		if err == nil {
 			break
 		}
-		var authErr *pdf.AuthenticationError
-		if !errors.As(err, &authErr) {
+		if _, ok := errors.AsType[*pdf.AuthenticationError](err); !ok {
 			fd.Close()
 			return nil, nil, err
 		}

@@ -100,7 +100,7 @@ func (a *Sound) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeSound(c pdf.Cursor, dict pdf.Dict) (*Sound, error) {
-	soundObj, err := pdf.Decode(c, dict["Sound"], sound.Extract)
+	soundObj, err := c.Decode(dict["Sound"], sound.Extract)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func decodeSound(c pdf.Cursor, dict pdf.Dict) (*Sound, error) {
 		return nil, err
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

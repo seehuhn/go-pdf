@@ -245,7 +245,7 @@ func TestExtractDefaults(t *testing.T) {
 			}
 
 			x := pdf.NewExtractor(w)
-			d, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractDict)
+			d, err := pdf.CursorAt(x, nil).Decode(ref, ExtractDict)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -292,7 +292,7 @@ func TestExtractDropsEmptyStateName(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	d, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractDict)
+	d, err := pdf.CursorAt(x, nil).Decode(ref, ExtractDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 	}
 
 	x := pdf.NewExtractor(w)
-	decoded, err := pdf.Decode(pdf.CursorAt(x, nil), ref, ExtractDict)
+	decoded, err := pdf.CursorAt(x, nil).Decode(ref, ExtractDict)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -500,7 +500,7 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		objGo, _ := pdf.Decode(pdf.CursorAt(x, nil), objPDF, ExtractDict)
+		objGo, _ := pdf.CursorAt(x, nil).Decode(objPDF, ExtractDict)
 		if objGo == nil {
 			t.Skip("no appearance dictionary")
 		}

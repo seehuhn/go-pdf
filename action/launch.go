@@ -102,7 +102,7 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeLaunch(c pdf.Cursor, dict pdf.Dict) (*Launch, error) {
-	f, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
+	f, err := c.Decode(dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func decodeLaunch(c pdf.Cursor, dict pdf.Dict) (*Launch, error) {
 		}
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

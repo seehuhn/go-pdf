@@ -228,7 +228,7 @@ func TestExtractCMAP(t *testing.T) {
 	data, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(data)
 
-	rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, testROS)
+	rosRef, err := rm.EmbedFunc(font.WriteCIDSystemInfo, testROS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +545,7 @@ func TestExtractLoop(t *testing.T) {
 				Ordering:   "Simple",
 				Supplement: 0,
 			}
-			rosRef, err := pdf.ResourceManagerEmbedFunc(rm, font.WriteCIDSystemInfo, ros)
+			rosRef, err := rm.EmbedFunc(font.WriteCIDSystemInfo, ros)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -591,7 +591,7 @@ func TestExtractLoop(t *testing.T) {
 				}
 			}
 
-			info, err := pdf.Decode(pdf.NewCursor(data), refs[0], Extract)
+			info, err := pdf.NewCursor(data).Decode(refs[0], Extract)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -625,7 +625,7 @@ func TestEmbedCMap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	info2, err := pdf.Decode(pdf.NewCursor(data), ref, ExtractToUnicode)
+	info2, err := pdf.NewCursor(data).Decode(ref, ExtractToUnicode)
 	if err != nil {
 		t.Fatal(err)
 	}

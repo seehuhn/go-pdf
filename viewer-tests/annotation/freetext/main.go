@@ -133,21 +133,17 @@ func createDocument(filename string) error {
 
 		template := &annotation.FreeText{
 			DefaultAppearance: da,
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: pdf.Round(leftX0, 2),
-					LLy: pdf.Round(yTopOuter-annotHeight, 2),
-					URx: pdf.Round(leftX1, 2),
-					URy: pdf.Round(yTopOuter, 2),
-				},
-				Contents: string(annotation.FreeTextIntentCallout) + "\n" + string(style),
-				Flags:    annotation.FlagPrint,
-				Border:   &annotation.Border{Width: lw, SingleUse: true},
-				Color:    col,
+			Rect: pdf.Rectangle{
+				LLx: pdf.Round(leftX0, 2),
+				LLy: pdf.Round(yTopOuter-annotHeight, 2),
+				URx: pdf.Round(leftX1, 2),
+				URy: pdf.Round(yTopOuter, 2),
 			},
-			Markup: annotation.Markup{
-				Intent: annotation.FreeTextIntentCallout,
-			},
+			Contents: string(annotation.FreeTextIntentCallout) + "\n" + string(style),
+			Flags:    annotation.FlagPrint,
+			Border:   &annotation.Border{Width: lw, SingleUse: true},
+			Color:    col,
+			Intent:   annotation.FreeTextIntentCallout,
 			CalloutLine: []vec.Vec2{
 				{X: pdf.Round(mid1, 2), Y: pdf.Round(yMid, 2)},
 				{X: pdf.Round(mid1-50, 2), Y: pdf.Round(yTopOuter-annotHeight/2, 2)},
@@ -197,20 +193,16 @@ func addCalloutWidths(w *writer, da string) error {
 		// the width is given via BS, since a Border array cannot express 0
 		template := &annotation.FreeText{
 			DefaultAppearance: da,
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{
-					LLx: pdf.Round(leftX0, 2),
-					LLy: pdf.Round(y-annotHeight/2, 2),
-					URx: pdf.Round(leftX1, 2),
-					URy: pdf.Round(y+annotHeight/2, 2),
-				},
-				Contents: fmt.Sprintf("callout\nBS.W = %g", width),
-				Flags:    annotation.FlagPrint,
-				Color:    color.DeviceRGB{0.965, 0.898, 0.749},
+			Rect: pdf.Rectangle{
+				LLx: pdf.Round(leftX0, 2),
+				LLy: pdf.Round(y-annotHeight/2, 2),
+				URx: pdf.Round(leftX1, 2),
+				URy: pdf.Round(y+annotHeight/2, 2),
 			},
-			Markup: annotation.Markup{
-				Intent: annotation.FreeTextIntentCallout,
-			},
+			Contents:    fmt.Sprintf("callout\nBS.W = %g", width),
+			Flags:       annotation.FlagPrint,
+			Color:       color.DeviceRGB{0.965, 0.898, 0.749},
+			Intent:      annotation.FreeTextIntentCallout,
 			BorderStyle: &annotation.BorderStyle{Width: width, SingleUse: true},
 			CalloutLine: []vec.Vec2{
 				{X: pdf.Round(mid1, 2), Y: pdf.Round(y, 2)},
@@ -289,12 +281,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

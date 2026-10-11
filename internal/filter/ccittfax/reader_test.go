@@ -145,9 +145,7 @@ func TestFillRowBits(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := &Reader{
-				Params: Params{
-					Columns: tc.columns,
-				},
+				Columns: tc.columns,
 			}
 
 			r.fillRowBits(tc.start, tc.end, tc.fill)

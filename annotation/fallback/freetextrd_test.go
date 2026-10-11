@@ -37,12 +37,10 @@ func TestCalloutNegativeRD(t *testing.T) {
 	// the right edge lies just below a rounding boundary, so rounding to
 	// nearest moves it inwards, past the text box's own right edge
 	a := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:     pdf.Rectangle{LLx: 100.1158, LLy: 200, URx: 280.1142, URy: 240},
-			Contents: "a line of text",
-			Border:   &annotation.Border{Width: 1},
-		},
-		Markup:            annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+		Rect:              pdf.Rectangle{LLx: 100.1158, LLy: 200, URx: 280.1142, URy: 240},
+		Contents:          "a line of text",
+		Border:            &annotation.Border{Width: 1},
+		Intent:            annotation.FreeTextIntentCallout,
 		DefaultAppearance: "/Helv 12 Tf 0 0 0 rg",
 		CalloutLine: []vec.Vec2{
 			{X: 40, Y: 300}, {X: 70, Y: 220}, {X: 100.1158, Y: 220},
@@ -80,12 +78,10 @@ func TestCalloutRDAtArbitraryCoordinates(t *testing.T) {
 		x := rng.Float64() * 500
 		y := rng.Float64() * 700
 		a := &annotation.FreeText{
-			Common: annotation.Common{
-				Rect:     pdf.Rectangle{LLx: x, LLy: y, URx: x + 180, URy: y + 40},
-				Contents: "a line of text",
-				Border:   &annotation.Border{Width: 1},
-			},
-			Markup:            annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+			Rect:              pdf.Rectangle{LLx: x, LLy: y, URx: x + 180, URy: y + 40},
+			Contents:          "a line of text",
+			Border:            &annotation.Border{Width: 1},
+			Intent:            annotation.FreeTextIntentCallout,
 			DefaultAppearance: "/Helv 12 Tf 0 0 0 rg",
 			CalloutLine: []vec.Vec2{
 				{X: x - 60, Y: y + 100}, {X: x - 30, Y: y + 20}, {X: x, Y: y + 20},

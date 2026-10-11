@@ -147,7 +147,7 @@ func TestTrapNetEncodeInvalidCombinations(t *testing.T) {
 // PDF 1.3 because LastModified requires PDF 1.4.
 func TestTrapNetEncodeLastModifiedV13(t *testing.T) {
 	tn := TrapNet{
-		Common:       Common{Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect)},
+		Rect: trapNetRect, Flags: FlagPrint | FlagReadOnly, Appearance: trapNetAppearance(trapNetRect),
 		LastModified: time.Date(2023, 12, 15, 10, 30, 0, 0, time.UTC),
 	}
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)

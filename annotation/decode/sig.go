@@ -104,7 +104,7 @@ func sigSeedValue(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.SigSeedValue,
 		sv.V = int(v)
 	}
 
-	if cert, err := pdf.DecodeOptional(c, dict["Cert"], sigCertSeedValue); err != nil {
+	if cert, err := c.DecodeOptional(dict["Cert"], sigCertSeedValue); err != nil {
 		return nil, err
 	} else {
 		sv.Cert = cert

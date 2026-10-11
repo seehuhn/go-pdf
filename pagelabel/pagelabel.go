@@ -194,9 +194,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 
 		lr := Entry{
 			FirstPage: int(key),
-			Range: Range{
-				Start: 1,
-			},
+			Start:     1,
 		}
 
 		// a value which is not a dictionary is treated like a missing one
@@ -238,7 +236,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 	if len(l.Ranges) == 0 || l.Ranges[0].FirstPage != 0 {
 		l.Ranges = slices.Insert(l.Ranges, 0, Entry{
 			FirstPage: 0,
-			Range:     Range{Style: Decimal, Start: 1},
+			Style:     Decimal, Start: 1,
 		})
 	}
 

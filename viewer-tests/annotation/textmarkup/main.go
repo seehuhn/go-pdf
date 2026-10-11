@@ -141,10 +141,8 @@ func (w *writer) label(desc string) {
 // Rect the bounding box of the quads plus a small margin.
 func newMarkup(markupType annotation.TextMarkupType, col color.Color, qq []vec.Vec2) *annotation.TextMarkup {
 	a := &annotation.TextMarkup{
-		Common: annotation.Common{
-			Flags: annotation.FlagPrint,
-			Color: col,
-		},
+		Flags:      annotation.FlagPrint,
+		Color:      col,
 		Type:       markupType,
 		QuadPoints: qq,
 	}

@@ -54,7 +54,7 @@ type MetadataStream struct {
 //
 // I/O errors from the underlying file are surfaced unchanged.  Errors
 // caused by malformed XMP data are returned as [*MalformedFileError]
-// so callers can use [Optional] / [DecodeOptional] to swallow
+// so callers can use [Optional] / [Cursor.DecodeOptional] to swallow
 // them.
 func ExtractMetadataStream(c Cursor, ref Object, _ bool) (*MetadataStream, error) {
 	if ref == nil {

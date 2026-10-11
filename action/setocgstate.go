@@ -212,7 +212,7 @@ func decodeSetOCGState(c pdf.Cursor, dict pdf.Dict) (*SetOCGState, error) {
 			continue
 		}
 
-		group, err := pdf.DecodeOptional(c, obj, oc.ExtractGroup)
+		group, err := c.DecodeOptional(obj, oc.ExtractGroup)
 		if err != nil {
 			return nil, err
 		} else if group == nil {
@@ -235,7 +235,7 @@ func decodeSetOCGState(c pdf.Cursor, dict pdf.Dict) (*SetOCGState, error) {
 		ignoreRB = !bool(rb)
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

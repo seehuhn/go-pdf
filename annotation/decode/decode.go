@@ -34,7 +34,7 @@ import (
 // merged with its widget the one every reader sees.  Errors in the form are
 // not reported; a malformed form must not break annotation decoding.
 //
-// Always invoke this via [pdf.Decode] so that indirect references are
+// Always invoke this via [pdf.Cursor.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func Annotation(c pdf.Cursor, obj pdf.Object, isDirect bool) (annotation.Annotation, error) {
 	dict, err := c.DictTyped(obj, "Annot")
@@ -54,13 +54,13 @@ func Annotation(c pdf.Cursor, obj pdf.Object, isDirect bool) (annotation.Annotat
 	// DecodeExclusive single-flights the form, so concurrent decoders share
 	// one field tree.
 	if m := c.Getter().GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
-		_, _ = pdf.DecodeExclusive(pdf.CursorAt(c.Extractor(), nil), m.Catalog.AcroForm, Form)
+		_, _ = pdf.CursorAt(c.Extractor(), nil).DecodeExclusive(m.Catalog.AcroForm, Form)
 	}
 
 	// If the form claimed this widget, this is a cache hit and returns the
 	// form's widget; otherwise the widget is an orphan and is decoded here.
 	// The path is rewound by one step, since p.Ref is the object being decoded.
-	return pdf.Decode(pdf.CursorAt(c.Extractor(), p.Parent), p.Ref, annotationBody)
+	return pdf.CursorAt(c.Extractor(), p.Parent).Decode(p.Ref, annotationBody)
 }
 
 // annotationBody decodes an annotation dictionary without first reading the

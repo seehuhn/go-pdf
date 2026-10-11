@@ -136,25 +136,25 @@ func ExtractCharacteristics(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Chara
 		res.DownCaption = string(ac)
 	}
 
-	if f, err := pdf.DecodeOptional(c, dict["I"], extract.Form); err != nil {
+	if f, err := c.DecodeOptional(dict["I"], extract.Form); err != nil {
 		return nil, err
 	} else {
 		res.Icon = f
 	}
 
-	if f, err := pdf.DecodeOptional(c, dict["RI"], extract.Form); err != nil {
+	if f, err := c.DecodeOptional(dict["RI"], extract.Form); err != nil {
 		return nil, err
 	} else {
 		res.RolloverIcon = f
 	}
 
-	if f, err := pdf.DecodeOptional(c, dict["IX"], extract.Form); err != nil {
+	if f, err := c.DecodeOptional(dict["IX"], extract.Form); err != nil {
 		return nil, err
 	} else {
 		res.DownIcon = f
 	}
 
-	if fit, err := pdf.DecodeOptional(c, dict["IF"], ExtractIconFit); err != nil {
+	if fit, err := c.DecodeOptional(dict["IF"], ExtractIconFit); err != nil {
 		return nil, err
 	} else {
 		res.IconFit = fit

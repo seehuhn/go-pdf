@@ -272,7 +272,7 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 
 	// validate ColorSpace is DeviceGray (required for soft masks)
 	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
+		cs, err := c.Decode(csObj, color.ExtractSpace)
 		if err != nil {
 			return nil, err
 		}

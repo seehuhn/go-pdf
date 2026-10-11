@@ -134,15 +134,13 @@ func createDocument(filename string) error {
 
 	linkRect := pdf.Rectangle{LLx: 72, LLy: 640, URx: 340, URy: 670}
 	link := &annotation.Link{
-		Common: annotation.Common{
-			Rect:            linkRect,
-			Contents:        "example.com, between 200% and 400%",
-			OptionalContent: group,
-			Appearance: &appearance.Dict{
-				Normal: linkFrame(linkRect.URx-linkRect.LLx,
-					linkRect.URy-linkRect.LLy,
-					F, "open example.com, at 200% to 400%"),
-			},
+		Rect:            linkRect,
+		Contents:        "example.com, between 200% and 400%",
+		OptionalContent: group,
+		Appearance: &appearance.Dict{
+			Normal: linkFrame(linkRect.URx-linkRect.LLx,
+				linkRect.URy-linkRect.LLy,
+				F, "open example.com, at 200% to 400%"),
 		},
 		Action: &action.URI{URI: "https://example.com/zoom"},
 	}

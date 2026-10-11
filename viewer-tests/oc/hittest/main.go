@@ -150,35 +150,27 @@ func createDocument(filename string) error {
 	// comment thread in the layer
 	commentRect := pdf.Rectangle{LLx: 72, LLy: 640, URx: 92, URy: 660}
 	parent := &annotation.Text{
-		Common: annotation.Common{
-			Rect:            commentRect,
-			Contents:        "Only while the layer is on.",
-			OptionalContent: group,
-		},
-		Markup: annotation.Markup{
-			User:         "Alice",
-			Subject:      "Layered note",
-			CreationDate: base,
-		},
-		Icon: annotation.TextIconComment,
+		Rect:            commentRect,
+		Contents:        "Only while the layer is on.",
+		OptionalContent: group,
+		User:            "Alice",
+		Subject:         "Layered note",
+		CreationDate:    base,
+		Icon:            annotation.TextIconComment,
 	}
 	parentRef := page.RM.GetReference(parent)
 	if err := style.AddAppearance(parent); err != nil {
 		return err
 	}
 	reply := &annotation.Text{
-		Common: annotation.Common{
-			Rect:            commentRect,
-			Contents:        "A reply inside the same layer.",
-			OptionalContent: group,
-		},
-		Markup: annotation.Markup{
-			User:         "Bob",
-			InReplyTo:    parentRef,
-			RT:           "R",
-			CreationDate: base.Add(30 * time.Minute),
-		},
-		Icon: annotation.TextIconComment,
+		Rect:            commentRect,
+		Contents:        "A reply inside the same layer.",
+		OptionalContent: group,
+		User:            "Bob",
+		InReplyTo:       parentRef,
+		RT:              "R",
+		CreationDate:    base.Add(30 * time.Minute),
+		Icon:            annotation.TextIconComment,
 	}
 	if err := style.AddAppearance(reply); err != nil {
 		return err
@@ -187,17 +179,15 @@ func createDocument(filename string) error {
 	// hyperlink in the layer
 	linkRect := pdf.Rectangle{LLx: 72, LLy: 560, URx: 340, URy: 585}
 	link := &annotation.Link{
-		Common: annotation.Common{
-			Rect:            linkRect,
-			Contents:        "example.com, in the layer",
-			OptionalContent: group,
-			Appearance: &appearance.Dict{
-				Normal: linkFrame(linkRect.URx-linkRect.LLx,
-					linkRect.URy-linkRect.LLy,
-					color.DeviceRGB{0.85, 0.92, 1},
-					color.DeviceRGB{0, 0, 1},
-					F, "open example.com, in the Notes layer"),
-			},
+		Rect:            linkRect,
+		Contents:        "example.com, in the layer",
+		OptionalContent: group,
+		Appearance: &appearance.Dict{
+			Normal: linkFrame(linkRect.URx-linkRect.LLx,
+				linkRect.URy-linkRect.LLy,
+				color.DeviceRGB{0.85, 0.92, 1},
+				color.DeviceRGB{0, 0, 1},
+				F, "open example.com, in the Notes layer"),
 		},
 		Action: &action.URI{URI: "https://example.com/layer"},
 	}
@@ -214,14 +204,10 @@ func createDocument(filename string) error {
 		}
 	}
 	sound := &annotation.Sound{
-		Common: annotation.Common{
-			Rect:     soundRect,
-			Contents: "A sound outside the layer.",
-		},
-		Markup: annotation.Markup{
-			User:         "Carol",
-			CreationDate: base.Add(time.Hour),
-		},
+		Rect:         soundRect,
+		Contents:     "A sound outside the layer.",
+		User:         "Carol",
+		CreationDate: base.Add(time.Hour),
 		Sound: &pdfsound.Sound{
 			SampleRate:    8000,
 			Channels:      1,
@@ -243,16 +229,14 @@ func createDocument(filename string) error {
 	// a link outside the layer which toggles it (§12.6.4.13)
 	toggleRect := pdf.Rectangle{LLx: 72, LLy: 400, URx: 340, URy: 425}
 	toggle := &annotation.Link{
-		Common: annotation.Common{
-			Rect:     toggleRect,
-			Contents: "toggle the Notes layer",
-			Appearance: &appearance.Dict{
-				Normal: linkFrame(toggleRect.URx-toggleRect.LLx,
-					toggleRect.URy-toggleRect.LLy,
-					color.DeviceRGB{0.93, 0.93, 0.93},
-					color.DeviceRGB{0.35, 0.35, 0.35},
-					F, "toggle the Notes layer"),
-			},
+		Rect:     toggleRect,
+		Contents: "toggle the Notes layer",
+		Appearance: &appearance.Dict{
+			Normal: linkFrame(toggleRect.URx-toggleRect.LLx,
+				toggleRect.URy-toggleRect.LLy,
+				color.DeviceRGB{0.93, 0.93, 0.93},
+				color.DeviceRGB{0.35, 0.35, 0.35},
+				F, "toggle the Notes layer"),
 		},
 		Action: &action.SetOCGState{
 			State: []action.OCGStateChange{

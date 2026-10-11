@@ -37,10 +37,10 @@
 //	dict, err := action.Encode(rm)
 //
 // Decode an action from a PDF object. Always invoke the decoder via
-// [pdf.Decode] so that indirect references are resolved and cycle
+// [pdf.Cursor.Decode] so that indirect references are resolved and cycle
 // detection is preserved:
 //
-//	a, err := pdf.Decode(c, obj, action.Decode)
+//	a, err := c.Decode(obj, action.Decode)
 //	switch a := a.(type) {
 //	case *action.GoTo:
 //	    // handle go-to action

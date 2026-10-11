@@ -84,19 +84,17 @@ func withoutAP(filename string) error {
 		}
 
 		a := &annotation.Square{
-			Common: annotation.Common{
-				Rect: rect.Round(1),
-				Border: &annotation.Border{
-					Width:     8,
-					SingleUse: true,
-				},
-				Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
-				NonStrokingTransparency: 1 - CA,
-				StrokingTransparency:    1 - CA,
-				Contents:                text,
-				Flags:                   annotation.FlagPrint,
+			Rect: rect.Round(1),
+			Border: &annotation.Border{
+				Width:     8,
+				SingleUse: true,
 			},
-			FillColor: color.DeviceRGB{0.5056, 0.9555, 0.9956},
+			Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
+			NonStrokingTransparency: 1 - CA,
+			StrokingTransparency:    1 - CA,
+			Contents:                text,
+			Flags:                   annotation.FlagPrint,
+			FillColor:               color.DeviceRGB{0.5056, 0.9555, 0.9956},
 		}
 
 		page.Page.AddAnnots(a)
@@ -143,19 +141,17 @@ func withAP(filename string) error {
 			}
 
 			a := &annotation.Square{
-				Common: annotation.Common{
-					Rect: rect.Round(1),
-					Border: &annotation.Border{
-						Width:     8,
-						SingleUse: true,
-					},
-					Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
-					NonStrokingTransparency: 1 - ca,
-					StrokingTransparency:    1 - CA,
-					Contents:                text,
-					Flags:                   annotation.FlagPrint,
+				Rect: rect.Round(1),
+				Border: &annotation.Border{
+					Width:     8,
+					SingleUse: true,
 				},
-				FillColor: color.DeviceRGB{0.5056, 0.9555, 0.9956},
+				Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
+				NonStrokingTransparency: 1 - ca,
+				StrokingTransparency:    1 - CA,
+				Contents:                text,
+				Flags:                   annotation.FlagPrint,
+				FillColor:               color.DeviceRGB{0.5056, 0.9555, 0.9956},
 			}
 			err = style.AddAppearance(a)
 			if err != nil {
@@ -185,12 +181,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

@@ -37,7 +37,7 @@ func TestAddAppearanceAnyVersion(t *testing.T) {
 
 	build := map[string]func() annotation.Annotation{
 		"text": func() annotation.Annotation {
-			return &annotation.Text{Common: annotation.Common{Rect: rect}}
+			return &annotation.Text{Rect: rect}
 		},
 		"widget": func() annotation.Annotation {
 			return combWidget("AB", 6, pdf.TextAlignLeft)
@@ -72,9 +72,7 @@ func TestResetGraphicsStateVersion(t *testing.T) {
 	} {
 		t.Run(tc.version.String(), func(t *testing.T) {
 			a := &annotation.Text{
-				Common: annotation.Common{
-					Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
-				},
+				Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
 			}
 			if err := newGen(t, tc.version).AddAppearance(a); err != nil {
 				t.Fatal(err)
@@ -101,16 +99,16 @@ func TestErrNoFallback(t *testing.T) {
 	rect := pdf.Rectangle{URx: 100, URy: 100}
 
 	for _, a := range []annotation.Annotation{
-		&annotation.PrinterMark{Common: annotation.Common{Rect: rect}},
-		&annotation.TrapNet{Common: annotation.Common{Rect: rect}},
-		&annotation.Projection{Common: annotation.Common{Rect: rect}},
+		&annotation.PrinterMark{Rect: rect},
+		&annotation.TrapNet{Rect: rect},
+		&annotation.Projection{Rect: rect},
 	} {
 		if err := s.AddAppearance(a); !errors.Is(err, ErrNoFallback) {
 			t.Errorf("%T: expected ErrNoFallback, got %v", a, err)
 		}
 	}
 
-	square := &annotation.Square{Common: annotation.Common{Rect: rect}}
+	square := &annotation.Square{Rect: rect}
 	if err := s.AddAppearance(square); errors.Is(err, ErrNoFallback) {
 		t.Error("Square: expected a fallback to be available")
 	}
@@ -133,10 +131,9 @@ func TestAddAppearanceKeepsRollover(t *testing.T) {
 
 	build := map[string]func() annotation.Annotation{
 		"text": func() annotation.Annotation {
-			return &annotation.Text{Common: annotation.Common{
+			return &annotation.Text{
 				Rect:       rect,
-				Appearance: &appearance.Dict{RollOver: rollover, Down: down},
-			}}
+				Appearance: &appearance.Dict{RollOver: rollover, Down: down}}
 		},
 		"widget": func() annotation.Annotation {
 			w := combWidget("AB", 6, pdf.TextAlignLeft)
@@ -177,12 +174,11 @@ func TestAddAppearanceKeepsRepeats(t *testing.T) {
 
 	build := map[string]func() annotation.Annotation{
 		"text": func() annotation.Annotation {
-			return &annotation.Text{Common: annotation.Common{
+			return &annotation.Text{
 				Rect: rect,
 				Appearance: &appearance.Dict{
 					Normal: empty, RollOver: empty, Down: empty,
-				},
-			}}
+				}}
 		},
 		"widget": func() annotation.Annotation {
 			w := combWidget("AB", 6, pdf.TextAlignLeft)
@@ -309,7 +305,7 @@ func TestAddAppearanceLeavesSharedDictAlone(t *testing.T) {
 
 	build := map[string]func(*appearance.Dict) annotation.Annotation{
 		"text": func(ap *appearance.Dict) annotation.Annotation {
-			return &annotation.Text{Common: annotation.Common{Rect: rect, Appearance: ap}}
+			return &annotation.Text{Rect: rect, Appearance: ap}
 		},
 		"widget": func(ap *appearance.Dict) annotation.Annotation {
 			w := combWidget("AB", 6, pdf.TextAlignLeft)
@@ -362,9 +358,7 @@ func TestGeneratorReusesFonts(t *testing.T) {
 	iconFontOf := func() font.Instance {
 		t.Helper()
 		a := &annotation.Text{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
-			},
+			Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 20, URy: 20},
 			Icon: annotation.TextIconHelp,
 		}
 		if err := g.AddAppearance(a); err != nil {

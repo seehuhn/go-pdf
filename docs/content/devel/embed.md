@@ -24,8 +24,8 @@ type Embedder interface {
 ```
 
 Users should not call the `Embed` method directly. Instead, the
-`pdf.ResourceManagerEmbed` function should be used to embed objects into a PDF
-file.
+`Embed` method of `pdf.ResourceManager` should be used to embed objects into a
+PDF file.
 
 
 ## Resource Managers
@@ -45,10 +45,10 @@ func (rm *pdf.ResourceManager) Close() error
 
 Normally, there will only be one ResourceManager per PDF file.  The resource
 manager must be closed before the PDF file is closed.  New objects are added
-to the PDF file using the `pdf.ResourceManagerEmbed` function:
+to the PDF file using the `Embed` method:
 
 ```go
-func ResourceManagerEmbed(rm *ResourceManager, obj Embedder) (pdf.Native, error)
+func (rm *ResourceManager) Embed(obj Embedder) (pdf.Native, error)
 ```
 
 The return values are:
@@ -70,31 +70,32 @@ An easy way to ensure this is to implement embedders as pointer types.
 ### Alternative: Function-Driven Embedding
 
 For cases where objects don't implement the Embedder interface, or when you
-need more control over the embedding process, the `ResourceManagerEmbedFunc`
-function provides an alternative approach:
+need more control over the embedding process, the `EmbedFunc` method
+provides an alternative approach:
 
 ```go
-func ResourceManagerEmbedFunc[T any](rm *ResourceManager, f func(*ResourceManager, T) (Object, error), obj T) (Object, error)
+func (rm *ResourceManager) EmbedFunc[T any](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error)
 ```
 
-This function embeds a resource using a custom embedding function instead of
-the Embedder interface. Like `ResourceManagerEmbed`, it prevents duplicate
-embedding by tracking already embedded objects.
+This method embeds a resource using a custom embedding function instead of
+the Embedder interface. Like `Embed`, it prevents duplicate embedding by
+tracking already embedded objects, so `T` must be comparable.  Inside an
+`Embed` method, the same functionality is available as `EmbedHelper.EmbedFunc`.
 
 Example usage:
 
 ```go
-embedFunc := func(rm *ResourceManager, data MyCustomData) (Object, error) {
-    ref := rm.Out.Alloc()
+embedFunc := func(e *pdf.EmbedHelper, data MyCustomData) (pdf.Native, error) {
+    ref := e.Alloc()
     dict := pdf.Dict{
         "Type": pdf.Name("CustomType"),
         "Data": pdf.String(data.Value),
     }
-    err := rm.Out.Put(ref, dict)
+    err := e.Out().Put(ref, dict)
     return ref, err
 }
 
-obj, err := pdf.ResourceManagerEmbedFunc(rm, embedFunc, myData)
+obj, err := rm.EmbedFunc(embedFunc, myData)
 ```
 
 ## Embedders
@@ -143,13 +144,13 @@ func (img *Image) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 ```
 
 Example 3: When objects depend on other embeddable resources, they use
-`pdf.ResourceManagerEmbed` to recursively embed their dependencies before
-embedding the main object. For example, when a PNG image embeds its color space
-dependency:
+the `Embed` method of the `EmbedHelper` to recursively embed their
+dependencies before embedding the main object.  For example, when a PNG
+image embeds its color space dependency:
 
 ```go
 func (img *Image) Embed(rm *EmbedHelper) (Native, error) {
-    csEmbedded, err := pdf.EmbedHelperEmbed(rm, img.cs)
+    csEmbedded, err := rm.Embed(img.cs)
     if err != nil {
         return nil, err
     }
@@ -194,7 +195,7 @@ type Font interface {
 }
 ```
 
-When using the `pdf.ResourceManagerEmbed` function to embed a font, the
+When using the `ResourceManager.Embed` method to embed a font, the
 embedded font becomes available in the PDF file and can be referenced from content streams.
 
 For objects with delayed embedding, normally the `Embed` method

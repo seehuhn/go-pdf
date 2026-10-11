@@ -130,7 +130,7 @@ func roundTripSigSeedValue(t *testing.T, version pdf.Version, sv *acroform.SigSe
 		t.Fatalf("w.Close failed: %v", err)
 	}
 
-	decoded, err := pdf.Decode(pdf.NewCursor(w), ref, sigSeedValue)
+	decoded, err := pdf.NewCursor(w).Decode(ref, sigSeedValue)
 	if err != nil {
 		t.Fatalf("extract failed: %v", err)
 	}
@@ -179,7 +179,7 @@ func FuzzSigSeedValueRoundTrip(f *testing.F) {
 			t.Skip("missing test object")
 		}
 
-		sv, err := pdf.Decode(pdf.NewCursor(r), obj, sigSeedValue)
+		sv, err := pdf.NewCursor(r).Decode(obj, sigSeedValue)
 		if err != nil {
 			t.Skip("malformed object")
 		}
@@ -277,7 +277,7 @@ func TestSigFieldLockInvalid(t *testing.T) {
 		{"Action": pdf.Name("Include")},
 		{"Action": pdf.Name("Exclude"), "Fields": pdf.Integer(1)},
 	} {
-		lock, err := pdf.DecodeOptional(c, dict, sigFieldLock)
+		lock, err := c.DecodeOptional(dict, sigFieldLock)
 		if err != nil {
 			t.Errorf("%v: unexpected error %v", dict, err)
 		}

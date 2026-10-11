@@ -145,7 +145,7 @@ func ExtractTransparencyAttributes(c pdf.Cursor, obj pdf.Object, isDirect bool) 
 
 	// extract color space (optional)
 	if csObj, ok := dict["CS"]; ok {
-		cs, err := pdf.Decode(c, csObj, color.ExtractSpace)
+		cs, err := c.Decode(csObj, color.ExtractSpace)
 		if err != nil {
 			return nil, pdf.Wrap(err, "group color space")
 		}

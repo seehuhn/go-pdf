@@ -123,7 +123,7 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Dict, error) {
 
 	d := &Dict{SingleUse: isDirect}
 
-	fs, err := pdf.Decode(c, dict["F"], file.ExtractSpecification)
+	fs, err := c.Decode(dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	} else if fs == nil {

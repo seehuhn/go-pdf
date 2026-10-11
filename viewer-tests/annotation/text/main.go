@@ -107,15 +107,11 @@ func createDocument(filename string) error {
 
 	for _, icon := range allIcons {
 		text := &annotation.Text{
-			Common: annotation.Common{
-				Contents: fmt.Sprintf("Icon: %s", icon),
-				Border:   annotation.PDFDefaultBorder,
-				Flags:    annotation.FlagPrint,
-			},
-			Markup: annotation.Markup{
-				User: "Test User",
-			},
-			Icon: icon,
+			Contents: fmt.Sprintf("Icon: %s", icon),
+			Border:   annotation.PDFDefaultBorder,
+			Flags:    annotation.FlagPrint,
+			User:     "Test User",
+			Icon:     icon,
 		}
 		err = w.addAnnotationPair(text, string(icon))
 		if err != nil {
@@ -126,16 +122,12 @@ func createDocument(filename string) error {
 	// test with pink color
 	pink := color.DeviceRGB{0.96, 0.87, 0.90}
 	text := &annotation.Text{
-		Common: annotation.Common{
-			Contents: "Pink background",
-			Color:    pink,
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{
-			User: "Test User",
-		},
-		Icon: annotation.TextIconNote,
+		Contents: "Pink background",
+		Color:    pink,
+		Border:   annotation.PDFDefaultBorder,
+		Flags:    annotation.FlagPrint,
+		User:     "Test User",
+		Icon:     annotation.TextIconNote,
 	}
 	err = w.addAnnotationPair(text, "Common.Color = pink")
 	if err != nil {
@@ -144,16 +136,12 @@ func createDocument(filename string) error {
 
 	// test with an empty /C array, the spec's "no colour; transparent"
 	text = &annotation.Text{
-		Common: annotation.Common{
-			Contents: "Transparent background",
-			Color:    colorenc.Transparent,
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{
-			User: "Test User",
-		},
-		Icon: annotation.TextIconNote,
+		Contents: "Transparent background",
+		Color:    colorenc.Transparent,
+		Border:   annotation.PDFDefaultBorder,
+		Flags:    annotation.FlagPrint,
+		User:     "Test User",
+		Icon:     annotation.TextIconNote,
 	}
 	err = w.addAnnotationPair(text, "Common.Color = Transparent")
 	if err != nil {
@@ -162,15 +150,11 @@ func createDocument(filename string) error {
 
 	// test with border width
 	text = &annotation.Text{
-		Common: annotation.Common{
-			Contents: "Border width 2",
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{
-			User: "Test User",
-		},
-		Icon: annotation.TextIconNote,
+		Contents: "Border width 2",
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
+		Flags:    annotation.FlagPrint,
+		User:     "Test User",
+		Icon:     annotation.TextIconNote,
 	}
 	err = w.addAnnotationPair(text, "Common.Border.Width = 2")
 	if err != nil {
@@ -257,12 +241,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

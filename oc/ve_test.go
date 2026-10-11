@@ -301,7 +301,7 @@ func TestVisibilityExpressionCycle(t *testing.T) {
 
 			done := make(chan error, 1)
 			go func() {
-				_, err := pdf.Decode(pdf.CursorAt(x, nil), veRef, ExtractVisibilityExpression)
+				_, err := pdf.CursorAt(x, nil).Decode(veRef, ExtractVisibilityExpression)
 				done <- err
 			}()
 

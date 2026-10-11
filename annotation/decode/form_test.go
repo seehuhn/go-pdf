@@ -200,7 +200,7 @@ func roundTripForm(t *testing.T, version pdf.Version, want *acroform.Interactive
 	t.Cleanup(func() { r.Close() })
 
 	x := pdf.NewExtractor(r)
-	got, err := pdf.Decode(pdf.CursorAt(x, nil), r.GetMeta().Catalog.AcroForm, Form)
+	got, err := pdf.CursorAt(x, nil).Decode(r.GetMeta().Catalog.AcroForm, Form)
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
 	}
@@ -374,7 +374,7 @@ func FuzzFormRoundTrip(f *testing.F) {
 		defer r.Close()
 
 		x := pdf.NewExtractor(r)
-		form1, err := pdf.Decode(pdf.CursorAt(x, nil), r.GetMeta().Catalog.AcroForm, Form)
+		form1, err := pdf.CursorAt(x, nil).Decode(r.GetMeta().Catalog.AcroForm, Form)
 		if err != nil || form1 == nil {
 			t.Skip("no interactive form")
 		}

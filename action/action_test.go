@@ -225,7 +225,7 @@ func TestDecodeActionListNextCycleSelf(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, Decode)
+	_, err = pdf.CursorAt(x, nil).Decode(ref, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -257,7 +257,7 @@ func TestDecodeActionListNextCycleMutual(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.Decode(pdf.CursorAt(x, nil), refA, Decode)
+	_, err := pdf.CursorAt(x, nil).Decode(refA, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -287,7 +287,7 @@ func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, Decode)
+	_, err = pdf.CursorAt(x, nil).Decode(ref, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -295,7 +295,7 @@ func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
 
 // TestDecodeActionListNextCycleDeep checks that a /Next chain that loops
 // between two refs neither of which is the entry ref (A → B → C → B) is
-// detected. This is the case the path-extending pdf.Decode wrapper
+// detected. This is the case the path-extending pdf.Cursor.Decode wrapper
 // handles: a cycle check that only catches refs already on the entry
 // path would recurse forever between B and C.
 func TestDecodeActionListNextCycleDeep(t *testing.T) {
@@ -330,7 +330,7 @@ func TestDecodeActionListNextCycleDeep(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.Decode(pdf.CursorAt(x, nil), refA, Decode)
+	_, err := pdf.CursorAt(x, nil).Decode(refA, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -355,7 +355,7 @@ func TestDecodeActionListNextCycleArray(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.Decode(pdf.CursorAt(x, nil), ref, Decode)
+	_, err = pdf.CursorAt(x, nil).Decode(ref, Decode)
 	if !errors.Is(err, pdf.ErrCycle) {
 		t.Errorf("expected cycle error, got %v", err)
 	}
@@ -385,7 +385,7 @@ func TestDecodeActionListNextDeepChainBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := pdf.Decode(pdf.CursorAt(x, nil), refs[0], Decode); !pdf.IsMalformed(err) {
+	if _, err := pdf.CursorAt(x, nil).Decode(refs[0], Decode); !pdf.IsMalformed(err) {
 		t.Errorf("err = %v, want malformed", err)
 	}
 }

@@ -315,7 +315,7 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*Movie, error) {
 		}
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

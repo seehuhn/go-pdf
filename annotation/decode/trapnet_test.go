@@ -347,7 +347,7 @@ func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
 
 	// the form the file holds is what every other holder of the reference
 	// sees, and the repair must have left it alone
-	shared, err := pdf.Decode(pdf.CursorAt(x, nil), formRef, extract.Form)
+	shared, err := pdf.CursorAt(x, nil).Decode(formRef, extract.Form)
 	if err != nil {
 		t.Fatal(err)
 	}

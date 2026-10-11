@@ -64,7 +64,7 @@ var Unset = math.NaN()
 // (structure destination) entry is ignored. D is the page-based fallback, so
 // the navigable destination is preserved.
 //
-// Always invoke this via [pdf.Decode] so that indirect references are
+// Always invoke this via [pdf.Cursor.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (Destination, error) {
 	obj, err := c.Resolve(obj)

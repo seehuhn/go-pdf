@@ -224,7 +224,7 @@ func TestProcessSplitContentStream(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(pdfData)
-	pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageRef, page.Decode)
+	pg, err := pdf.CursorAt(x, nil).Decode(pageRef, page.Decode)
 	if err != nil {
 		t.Fatal(err)
 	}

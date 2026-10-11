@@ -36,7 +36,7 @@ func decodeFileAttachment(c pdf.Cursor, dict pdf.Dict) (*annotation.FileAttachme
 
 	// Extract file attachment-specific fields
 	// FS (required)
-	if fs, err := pdf.DecodeOptional(c, dict["FS"], file.ExtractSpecification); err != nil {
+	if fs, err := c.DecodeOptional(dict["FS"], file.ExtractSpecification); err != nil {
 		return nil, err
 	} else if fs == nil {
 		return nil, pdf.Error("file attachment annotation requires FS entry")

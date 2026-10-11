@@ -555,7 +555,7 @@ func TestColorOutOfRange(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	o, err := pdf.Decode(pdf.CursorAt(x, nil), rootRef, Decode)
+	o, err := pdf.CursorAt(x, nil).Decode(rootRef, Decode)
 	if err != nil {
 		t.Fatal(err)
 	}

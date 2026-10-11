@@ -38,7 +38,7 @@ func NewSource(stream *pdf.Stream, x *pdf.Extractor) *Source {
 
 // ExtractContents builds the [Page.Contents] segment list from a /Contents
 // object, which may be a Reference, a direct stream, or an array of either.
-// A stream reached through a Reference is decoded via [pdf.Decode], through
+// A stream reached through a Reference is decoded via [pdf.Cursor.Decode], through
 // c, so it carries provenance (see [Source]).  An array entry that is itself
 // a direct stream is malformed (streams must be indirect); such entries are
 // read permissively but carry no provenance.  A nil or unrecognised object
@@ -51,7 +51,7 @@ func ExtractContents(c pdf.Cursor, contents pdf.Object) ([]Segment, error) {
 	switch v := resolved.(type) {
 	case *pdf.Stream:
 		if ref, ok := contents.(pdf.Reference); ok {
-			src, err := pdf.Decode(c, ref, decodeSource)
+			src, err := c.Decode(ref, decodeSource)
 			if err != nil {
 				return nil, err
 			}
@@ -66,7 +66,7 @@ func ExtractContents(c pdf.Cursor, contents pdf.Object) ([]Segment, error) {
 		segments := make([]Segment, 0, len(v))
 		for _, item := range v {
 			if ref, ok := item.(pdf.Reference); ok {
-				src, err := pdf.Decode(c, ref, decodeSource)
+				src, err := c.Decode(ref, decodeSource)
 				if err != nil {
 					return nil, err
 				}
@@ -91,7 +91,7 @@ func ExtractContents(c pdf.Cursor, contents pdf.Object) ([]Segment, error) {
 }
 
 // decodeSource decodes a single content-stream object into a *Source.  Used
-// through [pdf.Decode] so an indirect stream carries provenance.
+// through [pdf.Cursor.Decode] so an indirect stream carries provenance.
 func decodeSource(c pdf.Cursor, obj pdf.Object, _ bool) (*Source, error) {
 	stm, err := c.Stream(obj)
 	if err != nil {

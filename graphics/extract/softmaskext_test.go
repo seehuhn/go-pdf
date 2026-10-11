@@ -83,7 +83,7 @@ func TestSoftMaskTRProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	sc, err := pdf.Decode(c, smRef, extract.SoftMaskDict)
+	sc, err := c.Decode(smRef, extract.SoftMaskDict)
 	if err != nil {
 		t.Fatal(err)
 	}

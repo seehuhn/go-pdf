@@ -92,10 +92,8 @@ func createDocument(filename string) error {
 
 	// 1. default (Draft), no color
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "Draft (default, no color)",
-			Flags:    annotation.FlagPrint,
-		},
+		Contents: "Draft (default, no color)",
+		Flags:    annotation.FlagPrint,
 	})
 	if err != nil {
 		return err
@@ -103,11 +101,9 @@ func createDocument(filename string) error {
 
 	// 2. Approved
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "Approved",
-			Flags:    annotation.FlagPrint,
-		},
-		Icon: annotation.StampIconApproved,
+		Contents: "Approved",
+		Flags:    annotation.FlagPrint,
+		Icon:     annotation.StampIconApproved,
 	})
 	if err != nil {
 		return err
@@ -115,11 +111,9 @@ func createDocument(filename string) error {
 
 	// 3. Confidential
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "Confidential",
-			Flags:    annotation.FlagPrint,
-		},
-		Icon: annotation.StampIconConfidential,
+		Contents: "Confidential",
+		Flags:    annotation.FlagPrint,
+		Icon:     annotation.StampIconConfidential,
 	})
 	if err != nil {
 		return err
@@ -127,11 +121,9 @@ func createDocument(filename string) error {
 
 	// 4. NotForPublicRelease (longest name)
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "NotForPublicRelease",
-			Flags:    annotation.FlagPrint,
-		},
-		Icon: annotation.StampIconNotForPublicRelease,
+		Contents: "NotForPublicRelease",
+		Flags:    annotation.FlagPrint,
+		Icon:     annotation.StampIconNotForPublicRelease,
 	})
 	if err != nil {
 		return err
@@ -139,12 +131,10 @@ func createDocument(filename string) error {
 
 	// 5. TopSecret with blue color
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "TopSecret, blue",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
-		Icon: annotation.StampIconTopSecret,
+		Contents: "TopSecret, blue",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
+		Icon:     annotation.StampIconTopSecret,
 	})
 	if err != nil {
 		return err
@@ -152,12 +142,10 @@ func createDocument(filename string) error {
 
 	// 6. Final with green color
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "Final, green",
-			Flags:    annotation.FlagPrint,
-			Color:    color.DeviceRGB{0, 0.5, 0},
-		},
-		Icon: annotation.StampIconFinal,
+		Contents: "Final, green",
+		Flags:    annotation.FlagPrint,
+		Color:    color.DeviceRGB{0, 0.5, 0},
+		Icon:     annotation.StampIconFinal,
 	})
 	if err != nil {
 		return err
@@ -165,12 +153,10 @@ func createDocument(filename string) error {
 
 	// 7. Draft with border
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "Draft, Border.Width=3",
-			Flags:    annotation.FlagPrint,
-			Border:   &annotation.Border{Width: 3, SingleUse: true},
-		},
-		Icon: annotation.StampIconDraft,
+		Contents: "Draft, Border.Width=3",
+		Flags:    annotation.FlagPrint,
+		Border:   &annotation.Border{Width: 3, SingleUse: true},
+		Icon:     annotation.StampIconDraft,
 	})
 	if err != nil {
 		return err
@@ -178,11 +164,9 @@ func createDocument(filename string) error {
 
 	// 8. Expired
 	err = w.addStampPair(&annotation.Stamp{
-		Common: annotation.Common{
-			Contents: "Expired",
-			Flags:    annotation.FlagPrint,
-		},
-		Icon: annotation.StampIconExpired,
+		Contents: "Expired",
+		Flags:    annotation.FlagPrint,
+		Icon:     annotation.StampIconExpired,
 	})
 	if err != nil {
 		return err
@@ -263,12 +247,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

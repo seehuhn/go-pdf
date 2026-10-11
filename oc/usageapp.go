@@ -120,7 +120,7 @@ func ExtractUsageApplication(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usag
 	} else if len(arr) > 0 {
 		var ocgs []*Group
 		for _, item := range arr {
-			if group, err := pdf.DecodeOptional(c, item, ExtractGroup); err != nil {
+			if group, err := c.DecodeOptional(item, ExtractGroup); err != nil {
 				return nil, err
 			} else if group != nil {
 				ocgs = append(ocgs, group)

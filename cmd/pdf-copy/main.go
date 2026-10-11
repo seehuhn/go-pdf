@@ -121,7 +121,7 @@ func copyPDF(inFile, outFile string) (retErr error) {
 	if err != nil {
 		return err
 	}
-	newCatalog, err := pdf.Decode(pdf.NewCursor(w), newDict, pdf.DecodeCatalog)
+	newCatalog, err := pdf.NewCursor(w).Decode(newDict, pdf.DecodeCatalog)
 	if err != nil {
 		return err
 	}

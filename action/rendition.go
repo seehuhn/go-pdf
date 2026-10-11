@@ -117,7 +117,7 @@ func (a *Rendition) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 func decodeRendition(c pdf.Cursor, dict pdf.Dict) (*Rendition, error) {
 	an, _ := dict["AN"].(pdf.Reference)
 
-	r, err := pdf.DecodeOptional(c, dict["R"], media.ExtractRendition)
+	r, err := c.DecodeOptional(dict["R"], media.ExtractRendition)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func decodeRendition(c pdf.Cursor, dict pdf.Dict) (*Rendition, error) {
 		js = &sos
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

@@ -52,9 +52,7 @@ func TestFreeTextLastLineDescenderInsideClip(t *testing.T) {
 			g := newGen(t, pdf.V2_0)
 
 			a := &annotation.FreeText{
-				Common: annotation.Common{
-					Contents: tc.contents,
-				},
+				Contents:          tc.contents,
 				DefaultAppearance: "/F " + strconv.Itoa(size) + " Tf 0 0 0 rg",
 			}
 			if tc.typewriter {
@@ -115,7 +113,7 @@ func TestFreeTextAscentsUsedForFirstBaseline(t *testing.T) {
 		{"text box", &annotation.FreeText{}, 0.729},
 		{
 			"typewriter",
-			&annotation.FreeText{Markup: annotation.Markup{Intent: annotation.FreeTextIntentTypeWriter}},
+			&annotation.FreeText{Intent: annotation.FreeTextIntentTypeWriter},
 			0.825,
 		},
 	}

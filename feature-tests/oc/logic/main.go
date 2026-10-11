@@ -275,13 +275,11 @@ func drawSquare(page *document.Page, F *type1.Instance, x, y, size float64, cond
 // addToggleLink adds a link annotation that toggles an OCG on click.
 func addToggleLink(page *document.Page, x, y, size float64, group *oc.Group) {
 	link := &annotation.Link{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{
-				LLx: x,
-				LLy: y,
-				URx: x + size,
-				URy: y + size,
-			},
+		Rect: pdf.Rectangle{
+			LLx: x,
+			LLy: y,
+			URx: x + size,
+			URy: y + size,
 		},
 		Action: &action.SetOCGState{
 			State: []action.OCGStateChange{

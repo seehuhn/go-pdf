@@ -75,13 +75,11 @@ func createDocument(filename string) error {
 	rend := newRendition()
 
 	screen := &annotation.Screen{
-		Common: annotation.Common{
-			Rect:     moviepage.Screen,
-			Contents: moviepage.Description + ", external file movie.mp4.",
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
-		Title: "Tick movie",
+		Rect:     moviepage.Screen,
+		Contents: moviepage.Description + ", external file movie.mp4.",
+		Border:   annotation.PDFDefaultBorder,
+		Flags:    annotation.FlagPrint,
+		Title:    "Tick movie",
 	}
 	// reserve the reference up front, so the actions can target it via AN
 	screenRef := page.Doc.RM.GetReference(screen)
@@ -104,12 +102,10 @@ func createDocument(filename string) error {
 		// is the right type (a Screen would reserve a playback region it
 		// does not have)
 		page.Add(&annotation.Link{
-			Common: annotation.Common{
-				Rect:     rects[i],
-				Contents: b.label,
-				Flags:    annotation.FlagPrint,
-			},
-			Action: renditionAction(actionRend, screenRef, b.op),
+			Rect:     rects[i],
+			Contents: b.label,
+			Flags:    annotation.FlagPrint,
+			Action:   renditionAction(actionRend, screenRef, b.op),
 		})
 	}
 
@@ -131,7 +127,7 @@ func renditionAction(r media.Rendition, an pdf.Reference, op uint) *action.Rendi
 // movie.mp4, with the player's controller UI shown.
 func newRendition() *media.MediaRendition {
 	return &media.MediaRendition{
-		RenditionCommon: media.RenditionCommon{Name: "Tick movie"},
+		Name: "Tick movie",
 		Clip: &media.MediaClipData{
 			Name:        "Tick movie",
 			DataFile:    moviepage.ExternalSpec(),

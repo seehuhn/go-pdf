@@ -40,21 +40,21 @@ func decodeScreen(c pdf.Cursor, dict pdf.Dict) (*annotation.Screen, error) {
 	}
 
 	// MK (optional)
-	if mk, err := pdf.DecodeOptional(c, dict["MK"], appearance.ExtractCharacteristics); err != nil {
+	if mk, err := c.DecodeOptional(dict["MK"], appearance.ExtractCharacteristics); err != nil {
 		return nil, err
 	} else {
 		screen.Style = mk
 	}
 
 	// A (optional)
-	if act, err := pdf.DecodeOptional(c, dict["A"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["A"], action.Decode); err != nil {
 		return nil, err
 	} else {
 		screen.Action = act
 	}
 
 	// AA (optional)
-	if aa, err := pdf.DecodeOptional(c, dict["AA"], triggers.DecodeAnnotation); err != nil {
+	if aa, err := c.DecodeOptional(dict["AA"], triggers.DecodeAnnotation); err != nil {
 		return nil, err
 	} else {
 		screen.AA = aa

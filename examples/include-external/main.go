@@ -106,7 +106,7 @@ func LoadFigure(fname string) (graphics.XObject, *pdf.Rectangle, error) {
 	}
 
 	x := pdf.NewExtractor(r)
-	pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageDict, pdfpage.Decode)
+	pg, err := pdf.CursorAt(x, nil).Decode(pageDict, pdfpage.Decode)
 	if err != nil {
 		return nil, nil, err
 	}

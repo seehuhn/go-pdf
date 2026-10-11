@@ -30,7 +30,7 @@ import (
 // PDF 2.0 sections: 12.3.3
 
 // Outline represents the root of a document outline.
-// Use [Decode] to read an outline from a PDF file, or create a new outline
+// Use [Cursor.Decode] to read an outline from a PDF file, or create a new outline
 // and populate it using [Outline.AddItem].
 type Outline struct {
 	// Items contains the top-level outline items.
@@ -100,7 +100,7 @@ func (item *Item) AddChild(title string) *Item {
 // The obj argument should be the value of the Outlines entry in the catalog.
 // Returns nil if obj is nil.
 //
-// Always invoke this via [pdf.Decode] so that the outline root's
+// Always invoke this via [pdf.Cursor.Decode] so that the outline root's
 // reference is resolved and cycle detection covers back-references into the
 // root.
 func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Outline, error) {
@@ -146,13 +146,13 @@ func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, d
 	item.Open = count > 0
 
 	if dict["Dest"] != nil {
-		dest, err := pdf.DecodeOptional(c, dict["Dest"], destination.Decode)
+		dest, err := c.DecodeOptional(dict["Dest"], destination.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/Dest in outline")
 		}
 		item.Destination = dest
 	} else if dict["A"] != nil {
-		a, err := pdf.DecodeOptional(c, dict["A"], action.Decode)
+		a, err := c.DecodeOptional(dict["A"], action.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/A in outline")
 		}

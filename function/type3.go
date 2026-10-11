@@ -102,7 +102,7 @@ func extractType3(c pdf.Cursor, d pdf.Dict) (*Type3, error) {
 
 	functions := make([]pdf.Function, len(functionsArray))
 	for i, funcObj := range functionsArray {
-		fn, err := pdf.Decode(c, funcObj, Extract)
+		fn, err := c.Decode(funcObj, Extract)
 		if err != nil {
 			return nil, err
 		}

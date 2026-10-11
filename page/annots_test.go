@@ -39,7 +39,7 @@ func TestAnnotsRoundTrip(t *testing.T) {
 				MediaBox: &pdf.Rectangle{URx: 100, URy: 100},
 				Parent:   w.GetMeta().Catalog.Pages,
 				Annots: &Annots{
-					List:      []annotation.Annotation{&annotation.Square{Common: annotation.Common{Rect: rect}}},
+					List:      []annotation.Annotation{&annotation.Square{Rect: rect}},
 					SingleUse: singleUse,
 				},
 			}
@@ -66,7 +66,7 @@ func TestAnnotsRoundTrip(t *testing.T) {
 			if isRef == singleUse {
 				t.Errorf("Annots indirect = %v, want %v", isRef, !singleUse)
 			}
-			got, err := pdf.Decode(pdf.NewCursor(r), ref, Decode)
+			got, err := pdf.NewCursor(r).Decode(ref, Decode)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -141,7 +141,7 @@ func writeBase(t *testing.T, singleUse bool) (*memfile.MemFile, pdf.Reference) {
 			}},
 		},
 		Annots: &Annots{
-			List:      []annotation.Annotation{&annotation.Square{Common: annotation.Common{Rect: pdf.Rectangle{URx: 10, URy: 10}}}},
+			List:      []annotation.Annotation{&annotation.Square{Rect: pdf.Rectangle{URx: 10, URy: 10}}},
 			SingleUse: singleUse,
 		},
 	}
@@ -167,7 +167,7 @@ func TestUpdateReplacesPageOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	old, err := pdf.Decode(c, pageRef, Decode)
+	old, err := c.Decode(pageRef, Decode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestUpdateReplacesPageOnly(t *testing.T) {
 
 	p := *old
 	p.Annots = &Annots{List: append([]annotation.Annotation{}, old.Annots.List...), SingleUse: true}
-	p.Annots.Add(&annotation.Square{Common: annotation.Common{Rect: pdf.Rectangle{URx: 20, URy: 20}}})
+	p.Annots.Add(&annotation.Square{Rect: pdf.Rectangle{URx: 20, URy: 20}})
 	if _, err := rm.Replace(old, &p); err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestUpdateReplacesPageOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := pdf.Decode(pdf.NewCursor(r), pageRef, Decode)
+	got, err := pdf.NewCursor(r).Decode(pageRef, Decode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +231,7 @@ func TestContentSegmentsHaveProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	old, err := pdf.Decode(c, pageRef, Decode)
+	old, err := c.Decode(pageRef, Decode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestContentSegmentsHaveProvenance(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 	p := *old
 	p.Annots = &Annots{List: append([]annotation.Annotation{}, old.Annots.List...), SingleUse: true}
-	p.Annots.Add(&annotation.Square{Common: annotation.Common{Rect: pdf.Rectangle{URx: 20, URy: 20}}})
+	p.Annots.Add(&annotation.Square{Rect: pdf.Rectangle{URx: 20, URy: 20}})
 	if _, err := rm.Replace(old, &p); err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,7 @@ func TestUpdateReplacesIndirectAnnotsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	old, err := pdf.Decode(c, pageRef, Decode)
+	old, err := c.Decode(pageRef, Decode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +292,7 @@ func TestUpdateReplacesIndirectAnnotsOnly(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	list := &Annots{List: append([]annotation.Annotation{}, old.Annots.List...)}
-	list.Add(&annotation.Square{Common: annotation.Common{Rect: pdf.Rectangle{URx: 20, URy: 20}}})
+	list.Add(&annotation.Square{Rect: pdf.Rectangle{URx: 20, URy: 20}})
 	if _, err := rm.Replace(old.Annots, list); err != nil {
 		t.Fatal(err)
 	}
@@ -351,7 +351,7 @@ func TestDecodeAnnotsEmptyOrMalformed(t *testing.T) {
 			}
 
 			c := pdf.NewCursor(w)
-			p, err := pdf.Decode(c, pageRef, Decode)
+			p, err := c.Decode(pageRef, Decode)
 			if err != nil {
 				t.Fatal(err)
 			}

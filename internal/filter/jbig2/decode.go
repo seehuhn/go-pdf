@@ -129,7 +129,7 @@ type bitmapPool struct {
 	// work bounds cumulative pixel-decode work.  Unlike budget, it is only
 	// ever charged, never credited back, so it caps total work rather than
 	// live work.  A nil work budget disables the cap; the production decoder
-	// always sets one (see [Decode]), so only test pools decoding trusted,
+	// always sets one (see [Cursor.Decode]), so only test pools decoding trusted,
 	// size-bounded input leave it nil.
 	work *membudget.Budget
 }

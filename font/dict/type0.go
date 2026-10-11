@@ -152,7 +152,7 @@ func (d *CIDFontType0) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)
 
-	cidSystemInfo, err := pdf.EmbedHelperEmbedFunc(rm, font.WriteCIDSystemInfo, d.ROS)
+	cidSystemInfo, err := rm.EmbedFunc(font.WriteCIDSystemInfo, d.ROS)
 	if err != nil {
 		return nil, err
 	}

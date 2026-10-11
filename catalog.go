@@ -26,7 +26,7 @@ import (
 // Catalog represents a PDF Document Catalog.  The only required field in this
 // structure is Pages, which specifies the root of the page tree.
 //
-// Use [DecodeCatalog] (typically via [Decode]) to read a catalog from a
+// Use [DecodeCatalog] (typically via [Cursor.Decode]) to read a catalog from a
 // PDF file and [Catalog.Encode] to produce its dictionary form for writing.
 //
 // The Document Catalog is documented in section 7.7.2 of PDF 32000-1:2008.
@@ -229,7 +229,7 @@ func DecodeCatalog(c Cursor, obj Object, _ bool) (*Catalog, error) {
 	needsRendering, _ := c.Boolean(dict["NeedsRendering"])
 
 	// Metadata stream (eager decode; PDF 1.4)
-	metadata, err := DecodeOptional(c, dict["Metadata"], ExtractMetadataStream)
+	metadata, err := c.DecodeOptional(dict["Metadata"], ExtractMetadataStream)
 	if err != nil {
 		return nil, err
 	}

@@ -44,13 +44,13 @@ func TestOCGPointerIdentity(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	// path 1: extract as *Group (simulates OCProperties extraction)
-	group1, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
+	group1, err := pdf.CursorAt(x, nil).Decode(ocgRef, ExtractGroup)
 	if err != nil {
 		t.Fatalf("extract Group: %v", err)
 	}
 
 	// path 2: extract as property.List, then re-extract as *Group via ListGet
-	props, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, property.ExtractList)
+	props, err := pdf.CursorAt(x, nil).Decode(ocgRef, property.ExtractList)
 	if err != nil {
 		t.Fatalf("extract List: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestVEGroupPointerIdentity(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	// extract as *Group (simulates OCProperties)
-	group1, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
+	group1, err := pdf.CursorAt(x, nil).Decode(ocgRef, ExtractGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
 
 	x := pdf.NewExtractor(w)
 
-	group1, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
+	group1, err := pdf.CursorAt(x, nil).Decode(ocgRef, ExtractGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,16 +193,16 @@ func TestConditionalPointerIdentity(t *testing.T) {
 
 	x := pdf.NewExtractor(w)
 
-	group, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractGroup)
+	group, err := pdf.CursorAt(x, nil).Decode(ocgRef, ExtractGroup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	md, err := pdf.Decode(pdf.CursorAt(x, nil), ocmdRef, ExtractMembership)
+	md, err := pdf.CursorAt(x, nil).Decode(ocmdRef, ExtractMembership)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cond, err := pdf.Decode(pdf.CursorAt(x, nil), ocgRef, ExtractConditional)
+	cond, err := pdf.CursorAt(x, nil).Decode(ocgRef, ExtractConditional)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestConditionalPointerIdentity(t *testing.T) {
 		t.Error("conditional group pointer differs from directly extracted group")
 	}
 
-	condMD, err := pdf.Decode(pdf.CursorAt(x, nil), ocmdRef, ExtractConditional)
+	condMD, err := pdf.CursorAt(x, nil).Decode(ocmdRef, ExtractConditional)
 	if err != nil {
 		t.Fatal(err)
 	}

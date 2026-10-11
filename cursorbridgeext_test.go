@@ -56,7 +56,7 @@ func decodeAtRefHolder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*atRefHolde
 		return nil, err
 	}
 	c, obj = c.AtRef(obj, isDirect)
-	leaf, err := pdf.Decode(c, obj, decodeAtRefLeaf)
+	leaf, err := c.Decode(obj, decodeAtRefLeaf)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func decodeAtRefHolder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*atRefHolde
 // decodeAtRefResolved delegates the way AtRef exists to prevent: it passes the
 // resolved object on, so the delegate runs under no reference.
 func decodeAtRefResolved(c pdf.Cursor, obj pdf.Object, _ bool) (*atRefHolder, error) {
-	leaf, err := pdf.Decode(c, obj, decodeAtRefLeaf)
+	leaf, err := c.Decode(obj, decodeAtRefLeaf)
 	if err != nil {
 		return nil, err
 	}
@@ -85,14 +85,14 @@ func decodeBothWays(t *testing.T, r pdf.Getter, ref pdf.Reference, outerFirst bo
 
 	x := pdf.NewExtractor(r)
 	viaOuter := func() *atRefLeaf {
-		holder, err := pdf.Decode(pdf.CursorAt(x, nil), ref, outer)
+		holder, err := pdf.CursorAt(x, nil).Decode(ref, outer)
 		if err != nil {
 			t.Fatal(err)
 		}
 		return holder.leaf
 	}
 	viaDelegate := func() *atRefLeaf {
-		leaf, err := pdf.Decode(pdf.CursorAt(x, nil), ref, decodeAtRefLeaf)
+		leaf, err := pdf.CursorAt(x, nil).Decode(ref, decodeAtRefLeaf)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -151,7 +151,7 @@ func TestCursorAtRefPassThrough(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// a dictionary written inline inside the object containerRef, as [pdf.Decode]
+	// a dictionary written inline inside the object containerRef, as [pdf.Cursor.Decode]
 	// would present it
 	t.Run("direct object", func(t *testing.T) {
 		c := pdf.CursorAt(pdf.NewExtractor(w), &pdf.CycleCheck{Ref: containerRef})
@@ -165,7 +165,7 @@ func TestCursorAtRefPassThrough(t *testing.T) {
 		}
 	})
 
-	// a decoder called by hand rather than through [pdf.Decode] can be handed a
+	// a decoder called by hand rather than through [pdf.Cursor.Decode] can be handed a
 	// cursor with no path together with isDirect false
 	t.Run("cursor with no path", func(t *testing.T) {
 		c := pdf.CursorAt(pdf.NewExtractor(w), nil)
@@ -187,7 +187,7 @@ func decodeAtRefLink(c pdf.Cursor, obj pdf.Object, isDirect bool) (*atRefHolder,
 		return nil, err
 	}
 	c, obj = c.AtRef(obj, isDirect)
-	leaf, err := pdf.Decode(c, obj, decodeAtRefLinkLeaf)
+	leaf, err := c.Decode(obj, decodeAtRefLinkLeaf)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func decodeAtRefLinkLeaf(c pdf.Cursor, obj pdf.Object, _ bool) (*atRefLeaf, erro
 		return nil, err
 	}
 	if next := dict["Next"]; next != nil {
-		if _, err := pdf.Decode(c, next, decodeAtRefLink); err != nil {
+		if _, err := c.Decode(next, decodeAtRefLink); err != nil {
 			return nil, err
 		}
 	}
@@ -221,7 +221,7 @@ func TestCursorAtRefCycle(t *testing.T) {
 	}
 
 	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
-	if _, err := pdf.Decode(c, refA, decodeAtRefLink); err == nil {
+	if _, err := c.Decode(refA, decodeAtRefLink); err == nil {
 		t.Error("no error for a cycle running through a delegating decoder")
 	}
 }

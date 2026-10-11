@@ -52,13 +52,13 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 
 	d.Name, _ = c.Name(fontDict["Name"])
 
-	fd, err := pdf.DecodeOptional(c, fontDict["FontDescriptor"], font.ExtractDescriptor)
+	fd, err := c.DecodeOptional(fontDict["FontDescriptor"], font.ExtractDescriptor)
 	if err != nil {
 		return nil, err
 	}
 	d.Descriptor = fd
 
-	enc, err := pdf.Decode(c, fontDict["Encoding"], encoding.ExtractType3)
+	enc, err := c.Decode(fontDict["Encoding"], encoding.ExtractType3)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 	}
 	getSimpleWidths(d.Width[:], c, fontDict, defaultWidth)
 
-	d.ToUnicode, _ = pdf.Decode(c, fontDict["ToUnicode"], cmap.ExtractToUnicode)
+	d.ToUnicode, _ = c.Decode(fontDict["ToUnicode"], cmap.ExtractToUnicode)
 
 	// Extract CharProcs - parse each content stream
 	charProcsDict, err := c.Dict(fontDict["CharProcs"])
@@ -82,7 +82,7 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 	// the consumer, so that glyph streams without a Resources entry
 	// still have none when the font is written back
 	if fontDict["Resources"] != nil {
-		d.Resources, _ = pdf.Decode(c, fontDict["Resources"], Resources)
+		d.Resources, _ = c.Decode(fontDict["Resources"], Resources)
 	}
 
 	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
@@ -97,7 +97,7 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 
 		var glyphRes *content.Resources
 		if stm.Dict["Resources"] != nil {
-			glyphRes, _ = pdf.Decode(c, stm.Dict["Resources"], Resources)
+			glyphRes, _ = c.Decode(stm.Dict["Resources"], Resources)
 		}
 
 		// store a reader factory closure so each iteration re-opens the PDF stream

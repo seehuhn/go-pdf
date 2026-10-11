@@ -99,8 +99,7 @@ func (err *MalformedFileError) Unwrap() error {
 }
 
 // Optional zeros out any [MalformedFileError] but returns all other errors.
-// The check uses [errors.As] so wrapped malformed errors are recognised,
-// consistent with [IsMalformed].
+// Wrapped malformed errors are recognised, consistent with [IsMalformed].
 func Optional[T any](value T, err error) (T, error) {
 	var zero T
 	if IsMalformed(err) {
@@ -121,8 +120,7 @@ func Wrap(err error, loc string) error {
 	if err == nil {
 		return nil
 	}
-	var e *MalformedFileError
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[*MalformedFileError](err); ok {
 		e.Loc = append(e.Loc, loc)
 		return err
 	}
@@ -132,8 +130,8 @@ func Wrap(err error, loc string) error {
 // IsMalformed returns true if the error or any of its wrapped errors is a
 // [MalformedFileError].
 func IsMalformed(err error) bool {
-	var malformed *MalformedFileError
-	return errors.As(err, &malformed)
+	_, ok := errors.AsType[*MalformedFileError](err)
+	return ok
 }
 
 // IsReadError returns true if the error is non-nil and not a
@@ -204,6 +202,6 @@ func (err *VersionError) Error() string {
 // IsWrongVersion returns true if the error or any of its wrapped errors is a
 // [VersionError].
 func IsWrongVersion(err error) bool {
-	var versionError *VersionError
-	return errors.As(err, &versionError)
+	_, ok := errors.AsType[*VersionError](err)
+	return ok
 }

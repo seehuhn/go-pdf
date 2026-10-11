@@ -31,7 +31,7 @@ import (
 // should be the value of the AcroForm entry in the document catalog. It returns
 // nil if obj is nil.
 //
-// Always invoke this via [pdf.Decode] so that the form dictionary's
+// Always invoke this via [pdf.Cursor.Decode] so that the form dictionary's
 // reference is resolved and cached.
 func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.InteractiveForm, error) {
 	dict, err := c.Dict(obj)
@@ -85,7 +85,7 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.InteractiveForm, erro
 
 	// DR (optional)
 	if drObj := dict["DR"]; drObj != nil {
-		if dr, err := pdf.Optional(pdf.Decode(c, drObj, extract.Resources)); err != nil {
+		if dr, err := pdf.Optional(c.Decode(drObj, extract.Resources)); err != nil {
 			return nil, err
 		} else {
 			form.DefaultResources = dr

@@ -743,8 +743,7 @@ func TestEncryptVTypeCoercion(t *testing.T) {
 				}()
 				_, err = NewReader(bytes.NewReader(data), int64(len(data)), nil)
 			}()
-			var ae *AuthenticationError
-			if !errors.As(err, &ae) {
+			if _, ok := errors.AsType[*AuthenticationError](err); !ok {
 				t.Errorf("expected AuthenticationError (parse reached auth), got %v", err)
 			}
 		})

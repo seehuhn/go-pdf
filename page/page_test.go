@@ -550,9 +550,7 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 			parentRef := w.Alloc()
 
 			annot := &annotation.Link{
-				Common: annotation.Common{
-					Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 50},
-				},
+				Rect: pdf.Rectangle{LLx: 10, LLy: 10, URx: 100, URy: 50},
 			}
 			annotRef := rm.GetReference(annot)
 
@@ -586,7 +584,7 @@ func TestAnnotInfoRoundTrip(t *testing.T) {
 			if p2.Annots == nil || len(p2.Annots.List) != 1 {
 				t.Fatalf("got %+v, want 1 annotation", p2.Annots)
 			}
-			a, err := pdf.Decode(pdf.CursorAt(x, nil), annotRef, decode.Annotation)
+			a, err := pdf.CursorAt(x, nil).Decode(annotRef, decode.Annotation)
 			if err != nil {
 				t.Fatalf("failed to get annotation by reference: %v", err)
 			}
@@ -614,9 +612,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 
 	// parent text annotation
 	textAnnot := &annotation.Text{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{URx: 24, URy: 24},
-		},
+		Rect: pdf.Rectangle{URx: 24, URy: 24},
 	}
 	textDict, err := textAnnot.Encode(rm)
 	if err != nil {
@@ -628,12 +624,8 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 
 	// reply pointing to the on-page parent (should survive filtering)
 	replyAnnot := &annotation.Text{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{URx: 24, URy: 24},
-		},
-		Markup: annotation.Markup{
-			InReplyTo: textRef,
-		},
+		Rect:      pdf.Rectangle{URx: 24, URy: 24},
+		InReplyTo: textRef,
 	}
 	replyDict, err := replyAnnot.Encode(rm)
 	if err != nil {
@@ -646,12 +638,8 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 	// orphan reply pointing off-page (should be filtered out)
 	orphanRef := w.Alloc()
 	orphanAnnot := &annotation.Text{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{URx: 24, URy: 24},
-		},
-		Markup: annotation.Markup{
-			InReplyTo: offPageRef,
-		},
+		Rect:      pdf.Rectangle{URx: 24, URy: 24},
+		InReplyTo: offPageRef,
 	}
 	orphanDict, err := orphanAnnot.Encode(rm)
 	if err != nil {
@@ -697,7 +685,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 	type hasMarkup interface {
 		GetMarkup() *annotation.Markup
 	}
-	reply, err := pdf.Decode(pdf.CursorAt(x, nil), replyRef, decode.Annotation)
+	reply, err := pdf.CursorAt(x, nil).Decode(replyRef, decode.Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -706,7 +694,7 @@ func TestAnnotInfoIRTFiltering(t *testing.T) {
 			t.Errorf("on-page reply: InReplyTo = %v, want %v", irt, textRef)
 		}
 	}
-	orphan, err := pdf.Decode(pdf.CursorAt(x, nil), orphanRef, decode.Annotation)
+	orphan, err := pdf.CursorAt(x, nil).Decode(orphanRef, decode.Annotation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -728,9 +716,7 @@ func TestAnnotEncodeWithoutReservedRef(t *testing.T) {
 		MediaBox:  &pdf.Rectangle{URx: 612, URy: 792},
 		Resources: &content.Resources{SingleUse: true},
 		Annots: &Annots{List: []annotation.Annotation{&annotation.Link{
-			Common: annotation.Common{
-				Rect: pdf.Rectangle{URx: 100, URy: 50},
-			},
+			Rect: pdf.Rectangle{URx: 100, URy: 50},
 		}}},
 	}
 

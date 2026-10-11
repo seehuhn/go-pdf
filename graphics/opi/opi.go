@@ -54,14 +54,14 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (Dict, error) {
 	}
 
 	if _, ok := dict["1.3"]; ok {
-		v, err := pdf.Decode(c, dict["1.3"], extractV13)
+		v, err := c.Decode(dict["1.3"], extractV13)
 		if err != nil {
 			return nil, err
 		}
 		return v, nil
 	}
 	if _, ok := dict["2.0"]; ok {
-		v, err := pdf.Decode(c, dict["2.0"], extractV20)
+		v, err := c.Decode(dict["2.0"], extractV20)
 		if err != nil {
 			return nil, err
 		}

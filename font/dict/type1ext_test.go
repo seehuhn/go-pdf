@@ -119,7 +119,7 @@ func TestType1Embedding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pg, err := pdf.Decode(pdf.CursorAt(x, nil), pageDict, page.Decode)
+	pg, err := pdf.CursorAt(x, nil).Decode(pageDict, page.Decode)
 	if err != nil {
 		t.Fatal(err)
 	}

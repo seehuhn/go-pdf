@@ -410,7 +410,7 @@ func TestType0EncodingProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	dictAny, err := pdf.Decode(c, fontRef, extract.Dict)
+	dictAny, err := c.Decode(fontRef, extract.Dict)
 	if err != nil {
 		t.Fatal(err)
 	}

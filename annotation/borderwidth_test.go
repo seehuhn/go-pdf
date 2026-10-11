@@ -40,12 +40,12 @@ func TestEffectiveBorderWidth(t *testing.T) {
 		},
 		{
 			"border only",
-			&Square{Common: Common{Border: &Border{Width: 2}}},
+			&Square{Border: &Border{Width: 2}},
 			2,
 		},
 		{
 			"the PDF default border",
-			&Square{Common: Common{Border: PDFDefaultBorder}},
+			&Square{Border: PDFDefaultBorder},
 			1,
 		},
 		{
@@ -57,7 +57,7 @@ func TestEffectiveBorderWidth(t *testing.T) {
 			// the border array is ignored whenever a style is present
 			"style wins over border",
 			&Square{
-				Common:      Common{Border: &Border{Width: 2}},
+				Border:      &Border{Width: 2},
 				BorderStyle: &BorderStyle{Width: 3},
 			},
 			3,
@@ -66,7 +66,7 @@ func TestEffectiveBorderWidth(t *testing.T) {
 			// a style asking for width 0 is not overridden by the array
 			"style suppresses the border",
 			&Square{
-				Common:      Common{Border: &Border{Width: 2}},
+				Border:      &Border{Width: 2},
 				BorderStyle: &BorderStyle{Width: 0},
 			},
 			0,
@@ -74,7 +74,7 @@ func TestEffectiveBorderWidth(t *testing.T) {
 		{
 			// a type without a border style dictionary uses the array alone
 			"no style dictionary",
-			&Text{Common: Common{Border: &Border{Width: 4}}},
+			&Text{Border: &Border{Width: 4}},
 			4,
 		},
 		{
@@ -100,12 +100,12 @@ func TestEffectiveBorderStyle(t *testing.T) {
 		want pdf.Name
 	}{
 		{"neither", &Square{}, "S"},
-		{"plain border array", &Square{Common: Common{Border: PDFDefaultBorder}}, "S"},
+		{"plain border array", &Square{Border: PDFDefaultBorder}, "S"},
 		{
 			// a border array has no style entry, so a dash pattern is the
 			// only way it can ask for anything but a solid border
 			"dashed border array",
-			&Square{Common: Common{Border: &Border{Width: 1, DashArray: []float64{2, 2}}}},
+			&Square{Border: &Border{Width: 1, DashArray: []float64{2, 2}}},
 			"D",
 		},
 		{"style with no style name", &Square{BorderStyle: &BorderStyle{Width: 1}}, "S"},
@@ -115,7 +115,7 @@ func TestEffectiveBorderStyle(t *testing.T) {
 			// cannot make a solid style dashed
 			"solid style over dashed array",
 			&Square{
-				Common:      Common{Border: &Border{Width: 1, DashArray: []float64{2, 2}}},
+				Border:      &Border{Width: 1, DashArray: []float64{2, 2}},
 				BorderStyle: &BorderStyle{Width: 1, Style: "S"},
 			},
 			"S",
@@ -139,10 +139,10 @@ func TestEffectiveBorderDash(t *testing.T) {
 		want []float64
 	}{
 		{"neither", &Square{}, nil},
-		{"solid border array", &Square{Common: Common{Border: PDFDefaultBorder}}, nil},
+		{"solid border array", &Square{Border: PDFDefaultBorder}, nil},
 		{
 			"dashed border array",
-			&Square{Common: Common{Border: &Border{Width: 1, DashArray: []float64{2, 3}}}},
+			&Square{Border: &Border{Width: 1, DashArray: []float64{2, 3}}},
 			[]float64{2, 3},
 		},
 		{
@@ -154,14 +154,14 @@ func TestEffectiveBorderDash(t *testing.T) {
 			// the array is ignored whenever a style is present
 			"solid style over dashed array",
 			&Square{
-				Common:      Common{Border: &Border{Width: 1, DashArray: []float64{2, 3}}},
+				Border:      &Border{Width: 1, DashArray: []float64{2, 3}},
 				BorderStyle: &BorderStyle{Width: 1, Style: "S"},
 			},
 			nil,
 		},
 		{
 			"no style dictionary",
-			&Text{Common: Common{Border: &Border{Width: 1, DashArray: []float64{5}}}},
+			&Text{Border: &Border{Width: 1, DashArray: []float64{5}}},
 			[]float64{5},
 		},
 	}
@@ -188,7 +188,7 @@ func TestSetBorderWidth(t *testing.T) {
 		wantStyle bool
 	}{
 		{"neither", &Square{}, true},
-		{"border array only", &Square{Common: Common{Border: &Border{Width: 2}}}, false},
+		{"border array only", &Square{Border: &Border{Width: 2}}, false},
 		{"style only", &Square{BorderStyle: &BorderStyle{Width: 3}}, true},
 		{"a line", &Line{}, true},
 		{"a circle", &Circle{}, true},
@@ -296,9 +296,9 @@ func TestSetBorderWidthKeepsTheStyle(t *testing.T) {
 // already carrying in its array keeps its corner radii and dashes, which a
 // style dictionary has no room for.
 func TestSetBorderWidthKeepsTheArray(t *testing.T) {
-	a := &Square{Common: Common{Border: &Border{
+	a := &Square{Border: &Border{
 		HCornerRadius: 3, VCornerRadius: 4, Width: 1, DashArray: []float64{5, 2},
-	}}}
+	}}
 	SetBorderWidth(a, 7, pdf.V2_0)
 
 	if a.BorderStyle != nil {
@@ -316,8 +316,8 @@ func TestSetBorderWidthKeepsTheArray(t *testing.T) {
 // annotations is not changed underneath the ones which were not asked about.
 func TestSetBorderWidthCopiesTheArray(t *testing.T) {
 	shared := &Border{Width: 1}
-	a := &Text{Common: Common{Border: shared}}
-	b := &Text{Common: Common{Border: shared}}
+	a := &Text{Border: shared}
+	b := &Text{Border: shared}
 
 	SetBorderWidth(a, 5, pdf.V2_0)
 
@@ -377,10 +377,10 @@ func TestSetBorderWidthZeroRemovesIt(t *testing.T) {
 		a    *Square
 	}{
 		{"both", &Square{
-			Common:      Common{Border: &Border{Width: 2}},
+			Border:      &Border{Width: 2},
 			BorderStyle: &BorderStyle{Width: 3},
 		}},
-		{"array only", &Square{Common: Common{Border: &Border{Width: 2}}}},
+		{"array only", &Square{Border: &Border{Width: 2}}},
 		{"style only", &Square{BorderStyle: &BorderStyle{Width: 3}}},
 		{"neither", &Square{}},
 	} {

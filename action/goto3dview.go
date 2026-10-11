@@ -70,7 +70,7 @@ func (a *GoTo3DView) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeGoTo3DView(c pdf.Cursor, dict pdf.Dict) (*GoTo3DView, error) {
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

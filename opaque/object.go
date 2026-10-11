@@ -269,5 +269,5 @@ func (o *Object) As[T any](
 		var zero T
 		return zero, errors.New("opaque: Object.As requires an Object built via Extract")
 	}
-	return pdf.Decode(pdf.CursorAt(o.src, path), o.obj, extract)
+	return pdf.CursorAt(o.src, path).Decode(o.obj, extract)
 }

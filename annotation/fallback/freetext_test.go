@@ -68,10 +68,8 @@ func TestFreeTextTextColor(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			a := &annotation.FreeText{
-				Common: annotation.Common{
-					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
-					Contents: "hello",
-				},
+				Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
+				Contents:          "hello",
 				DefaultAppearance: c.da,
 			}
 
@@ -98,11 +96,9 @@ func TestFreeTextTextColor(t *testing.T) {
 func TestFreeTextCalloutMargin(t *testing.T) {
 	box := pdf.Rectangle{LLx: 50, LLy: 50, URx: 200, URy: 110}
 	a := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:     box,
-			Contents: "hello",
-		},
-		Markup: annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+		Rect:     box,
+		Contents: "hello",
+		Intent:   annotation.FreeTextIntentCallout,
 		// the line starts to the right of and above the box
 		CalloutLine: []vec.Vec2{{X: 320, Y: 220}, {X: 200, Y: 110}},
 	}
@@ -134,11 +130,9 @@ func TestFreeTextCalloutMargin(t *testing.T) {
 // rewritten DA, and leaves the annotation's alignment as set.
 func TestFreeTextHonoursDAFontSize(t *testing.T) {
 	a := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 400, URy: 200},
-			Contents: "one two three four five six seven eight nine ten " +
-				"eleven twelve thirteen fourteen",
-		},
+		Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 400, URy: 200},
+		Contents: "one two three four five six seven eight nine ten " +
+			"eleven twelve thirteen fourteen",
 		DefaultAppearance: "/Helv 18 Tf 0 g",
 		Align:             pdf.TextAlignCenter,
 	}
@@ -180,10 +174,8 @@ func TestFreeTextDefaultFontSize(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			a := &annotation.FreeText{
-				Common: annotation.Common{
-					Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
-					Contents: "hello",
-				},
+				Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
+				Contents:          "hello",
 				DefaultAppearance: c.da,
 			}
 
@@ -213,11 +205,9 @@ func TestFreeTextTypewriterEncodesAtV2(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	a := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:     pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
-			Contents: "hello",
-		},
-		Markup:            annotation.Markup{Intent: annotation.FreeTextIntentTypeWriter},
+		Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
+		Contents:          "hello",
+		Intent:            annotation.FreeTextIntentTypeWriter,
 		DefaultAppearance: "/Cour 12 Tf 0 g",
 	}
 
@@ -238,8 +228,8 @@ func TestFreeTextTypewriterEncodesAtV2(t *testing.T) {
 // uses, and that a plain FreeText still uses the shared one.
 func TestFreeTextTypewriterFont(t *testing.T) {
 	g := newGen(t, pdf.V2_0)
-	plain := &annotation.FreeText{Markup: annotation.Markup{Intent: annotation.FreeTextIntentPlain}}
-	typewriter := &annotation.FreeText{Markup: annotation.Markup{Intent: annotation.FreeTextIntentTypeWriter}}
+	plain := &annotation.FreeText{Intent: annotation.FreeTextIntentPlain}
+	typewriter := &annotation.FreeText{Intent: annotation.FreeTextIntentTypeWriter}
 
 	if g.freeTextFont(plain) != g.ContentFont() {
 		t.Error("a plain FreeText should be drawn in the shared content font")
@@ -262,7 +252,7 @@ func TestFreeTextTypewriterFont(t *testing.T) {
 // back to the file, so a style lost here is lost for good.
 func TestFreeTextKeepsItsBorderStyle(t *testing.T) {
 	a := &annotation.FreeText{
-		Common:            annotation.Common{Rect: pdf.Rectangle{URx: 200, URy: 60}},
+		Rect:              pdf.Rectangle{URx: 200, URy: 60},
 		DefaultAppearance: "/Helv 12 Tf 0 g",
 		BorderStyle: &annotation.BorderStyle{
 			Width: 2, Style: "D", DashArray: []float64{3, 2},
@@ -295,7 +285,7 @@ func TestFreeTextKeepsItsBorderStyle(t *testing.T) {
 // either of the two places one can live.
 func TestFreeTextBorderlessStaysBorderless(t *testing.T) {
 	a := &annotation.FreeText{
-		Common:            annotation.Common{Rect: pdf.Rectangle{URx: 200, URy: 60}},
+		Rect:              pdf.Rectangle{URx: 200, URy: 60},
 		DefaultAppearance: "/Helv 12 Tf 0 g",
 	}
 
@@ -320,7 +310,7 @@ func TestFreeTextKeepsStyleAndBorderEffect(t *testing.T) {
 	const ds = "font: Helvetica 12pt; color: #FF0000"
 	be := &annotation.BorderEffect{Style: "S"}
 	a := &annotation.FreeText{
-		Common:            annotation.Common{Rect: pdf.Rectangle{URx: 200, URy: 60}},
+		Rect:              pdf.Rectangle{URx: 200, URy: 60},
 		DefaultAppearance: "/Helv 12 Tf 0 g",
 		DefaultStyle:      ds,
 		BorderEffect:      be,
@@ -345,12 +335,10 @@ func TestFreeTextKeepsStyleAndBorderEffect(t *testing.T) {
 func TestFreeTextCloudyCalloutRect(t *testing.T) {
 	const lw = 4
 	a := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
-			Contents: "hello",
-			Border:   &annotation.Border{Width: lw},
-		},
-		Markup: annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+		Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
+		Contents: "hello",
+		Border:   &annotation.Border{Width: lw},
+		Intent:   annotation.FreeTextIntentCallout,
 		// a horizontal line out to the left, whose cap reaches to x = 18
 		CalloutLine:  []vec.Vec2{{X: 20, Y: 130}, {X: 100, Y: 130}},
 		BorderEffect: &annotation.BorderEffect{Style: "C", Intensity: 1},
@@ -375,12 +363,10 @@ func TestFreeTextCloudyCalloutRect(t *testing.T) {
 func TestFreeTextCalloutRound(t *testing.T) {
 	const lw = 4
 	a := &annotation.FreeText{
-		Common: annotation.Common{
-			Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
-			Contents: "hello",
-			Border:   &annotation.Border{Width: lw},
-		},
-		Markup: annotation.Markup{Intent: annotation.FreeTextIntentCallout},
+		Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
+		Contents: "hello",
+		Border:   &annotation.Border{Width: lw},
+		Intent:   annotation.FreeTextIntentCallout,
 		// the line doubles back at its knee, x = 20, by 20 degrees: sharp,
 		// but within the miter limit
 		CalloutLine: []vec.Vec2{{X: 60, Y: 130}, {X: 20, Y: 130}, {X: 100, Y: 159.12}},

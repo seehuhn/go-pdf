@@ -114,7 +114,7 @@ func Encode(rm *pdf.ResourceManager, nodes []*Node) (pdf.Native, error) {
 // Decode reads a navigation node list from PDF format.
 // The doubly-linked list starting at obj is flattened into a slice.
 //
-// Always invoke this via [pdf.Decode] so that indirect references are
+// Always invoke this via [pdf.Cursor.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func Decode(c pdf.Cursor, obj pdf.Object, _ bool) ([]*Node, error) {
 	if obj == nil {
@@ -155,7 +155,7 @@ func decodeNode(c pdf.Cursor, dict pdf.Dict) (*Node, error) {
 
 	// NA (optional)
 	if naObj := dict["NA"]; naObj != nil {
-		na, err := pdf.Decode(c, naObj, action.Decode)
+		na, err := c.Decode(naObj, action.Decode)
 		if err != nil {
 			return nil, pdf.Wrap(err, "NA")
 		}
@@ -164,7 +164,7 @@ func decodeNode(c pdf.Cursor, dict pdf.Dict) (*Node, error) {
 
 	// PA (optional)
 	if paObj := dict["PA"]; paObj != nil {
-		pa, err := pdf.Decode(c, paObj, action.Decode)
+		pa, err := c.Decode(paObj, action.Decode)
 		if err != nil {
 			return nil, pdf.Wrap(err, "PA")
 		}

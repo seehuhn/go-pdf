@@ -33,14 +33,14 @@ func decodeLink(c pdf.Cursor, dict pdf.Dict) (*annotation.Link, error) {
 
 	// Extract link-specific fields
 	if dict["A"] != nil {
-		act, err := pdf.DecodeOptional(c, dict["A"], action.Decode)
+		act, err := c.DecodeOptional(dict["A"], action.Decode)
 		if err != nil {
 			return nil, err
 		}
 		link.Action = act
 	}
 	if dict["Dest"] != nil && link.Action == nil {
-		dest, err := pdf.DecodeOptional(c, dict["Dest"], destination.Decode)
+		dest, err := c.DecodeOptional(dict["Dest"], destination.Decode)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func decodeLink(c pdf.Cursor, dict pdf.Dict) (*annotation.Link, error) {
 		link.QuadPoints = points
 	}
 
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		link.BorderStyle = bs

@@ -70,8 +70,6 @@ type List interface {
 // ListGet resolves indirect references and extracts a typed object.
 //
 // This only works for property lists that have been extracted from a PDF file.
-//
-// Once Go allows generic methods, this function can be made a method of List.
 func ListGet[T any](l List, extract func(pdf.Cursor, pdf.Object, bool) (T, error)) (T, error) {
 	p, ok := l.(*proxyList)
 	if !ok {

@@ -65,7 +65,7 @@ var _ pdf.Embedder = (*Stream)(nil)
 // program and in what order they take precedence. fdDict may be nil.
 func ExtractFontFile(c pdf.Cursor, fdDict pdf.Dict, dictType pdf.Name) (*Stream, error) {
 	for _, key := range fontFileKeys(dictType) {
-		s, err := pdf.DecodeOptional(c, fdDict[key],
+		s, err := c.DecodeOptional(fdDict[key],
 			func(c pdf.Cursor, obj pdf.Object, _ bool) (*Stream, error) {
 				return extractStream(c, obj, dictType, key)
 			})

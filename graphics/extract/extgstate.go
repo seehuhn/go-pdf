@@ -180,7 +180,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 				set |= graphics.StateBlendMode
 			}
 		case "SMask":
-			sMask, err := pdf.DecodeOptional(c, v, SoftMaskDict)
+			sMask, err := c.DecodeOptional(v, SoftMaskDict)
 			if err != nil {
 				return nil, err
 			}
@@ -271,7 +271,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 				set |= graphics.StateHalftone
 				break
 			}
-			ht, err := pdf.DecodeOptional(c, v, halftone.Extract)
+			ht, err := c.DecodeOptional(v, halftone.Extract)
 			if err != nil {
 				return nil, err
 			}
@@ -339,7 +339,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 		set |= graphics.StateBlackGeneration
 	}
 	if set&graphics.StateBlackGeneration == 0 && bg2 != nil {
-		fn, err := pdf.Decode(c, bg2, function.Extract)
+		fn, err := c.Decode(bg2, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
@@ -348,7 +348,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 		}
 	}
 	if set&graphics.StateBlackGeneration == 0 && bg1 != nil {
-		fn, err := pdf.Decode(c, bg1, function.Extract)
+		fn, err := c.Decode(bg1, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.BlackGeneration = fn
@@ -364,7 +364,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 		set |= graphics.StateUndercolorRemoval
 	}
 	if set&graphics.StateUndercolorRemoval == 0 && ucr2 != nil {
-		fn, err := pdf.Decode(c, ucr2, function.Extract)
+		fn, err := c.Decode(ucr2, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
@@ -373,7 +373,7 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 		}
 	}
 	if set&graphics.StateUndercolorRemoval == 0 && ucr1 != nil {
-		fn, err := pdf.Decode(c, ucr1, function.Extract)
+		fn, err := c.Decode(ucr1, function.Extract)
 		if err == nil {
 			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
 				res.UndercolorRemoval = fn
@@ -533,7 +533,7 @@ func parseSingleTransfer(c pdf.Cursor, obj pdf.Object) (pdf.Function, error) {
 		}
 	}
 
-	fn, err := pdf.Decode(c, obj, function.Extract)
+	fn, err := c.Decode(obj, function.Extract)
 	if err != nil {
 		return nil, err
 	}

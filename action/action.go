@@ -57,7 +57,7 @@ const (
 
 // Decode reads an action from a PDF object.
 //
-// Always invoke this via [pdf.Decode] so that indirect references are
+// Always invoke this via [pdf.Cursor.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (pdf.Action, error) {
 	dict, err := c.DictTyped(obj, "Action")
@@ -144,7 +144,7 @@ func (al ActionList) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 // DecodeActionList reads an action list from a PDF object.
 // Handles both single dictionary and array formats.
 //
-// Always invoke this via [pdf.Decode] so that indirect references are
+// Always invoke this via [pdf.Cursor.Decode] so that indirect references are
 // resolved and cycle detection covers self- and back-references.
 func DecodeActionList(c pdf.Cursor, obj pdf.Object, _ bool) (ActionList, error) {
 	if obj == nil {
@@ -172,7 +172,7 @@ func DecodeActionList(c pdf.Cursor, obj pdf.Object, _ bool) (ActionList, error) 
 
 	result := make(ActionList, 0, len(arr))
 	for _, item := range arr {
-		action, err := pdf.Decode(c, item, Decode)
+		action, err := c.Decode(item, Decode)
 		if err != nil {
 			return nil, err
 		}

@@ -83,7 +83,7 @@ func TestPageRewriteKeepsInheritedMediaBox(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(upd)
-	old, err := pdf.Decode(c, pageRef, pdfpage.Decode)
+	old, err := c.Decode(pageRef, pdfpage.Decode)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestPageRewriteKeepsInheritedMediaBox(t *testing.T) {
 	// list replaces it at its original object number
 	annots := &pdfpage.Annots{SingleUse: old.Annots.SingleUse}
 	annots.Add(old.Annots.List...)
-	annots.Add(&annotation.Square{Common: annotation.Common{Rect: pdf.Rectangle{URx: 20, URy: 20}}})
+	annots.Add(&annotation.Square{Rect: pdf.Rectangle{URx: 20, URy: 20}})
 
 	rm := pdf.NewResourceManager(upd)
 	p := *old

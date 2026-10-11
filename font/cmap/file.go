@@ -84,7 +84,7 @@ func (r Range) String() string {
 // Extract extracts a CMap from a PDF object.
 // The argument must be the name of a predefined CMap or a stream containing a CMap.
 // Cycle detection for recursive parent CMap chains is handled by routing
-// parent extraction through [pdf.Decode].
+// parent extraction through [pdf.Cursor.Decode].
 func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*File, error) {
 	resolved, err := c.Resolve(obj)
 	if err != nil {
@@ -126,7 +126,7 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*File, error) {
 			res.Name = clean
 		}
 	}
-	if ros, _ := pdf.Decode(c, dict["CIDSystemInfo"], font.ExtractCIDSystemInfo); ros != nil {
+	if ros, _ := c.Decode(dict["CIDSystemInfo"], font.ExtractCIDSystemInfo); ros != nil {
 		res.ROS = ros
 	}
 	if wMode, _ := c.Integer(dict["WMode"]); wMode == 1 {
@@ -135,7 +135,7 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*File, error) {
 
 	// parent CMap
 	if useCMap := dict["UseCMap"]; useCMap != nil {
-		res.Parent, err = pdf.Decode(c, useCMap, Extract)
+		res.Parent, err = c.Decode(useCMap, Extract)
 		if pdf.IsReadError(err) {
 			return nil, err
 		}
@@ -490,7 +490,7 @@ func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return pdf.Name(f.Name), nil
 	}
 
-	ros, err := pdf.EmbedHelperEmbedFunc(rm, font.WriteCIDSystemInfo, f.ROS)
+	ros, err := rm.EmbedFunc(font.WriteCIDSystemInfo, f.ROS)
 	if err != nil {
 		return nil, err
 	}

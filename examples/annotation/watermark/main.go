@@ -130,7 +130,7 @@ func run(inputName, text string, replace bool) error {
 			return err
 		}
 
-		old, err := pdf.Decode(c, pageRef, page.Decode)
+		old, err := c.Decode(pageRef, page.Decode)
 		if err != nil {
 			return err
 		}
@@ -155,11 +155,9 @@ func run(inputName, text string, replace bool) error {
 			}
 		}
 		annots.Add(&annotation.Watermark{
-			Common: annotation.Common{
-				Rect:       *mediaBox,
-				Flags:      annotation.FlagPrint | annotation.FlagReadOnly,
-				Appearance: &appearance.Dict{Normal: stamp.form(*mediaBox, int(rotate))},
-			},
+			Rect:       *mediaBox,
+			Flags:      annotation.FlagPrint | annotation.FlagReadOnly,
+			Appearance: &appearance.Dict{Normal: stamp.form(*mediaBox, int(rotate))},
 		})
 
 		if old.Annots != nil && w.Origin(old.Annots) != 0 {

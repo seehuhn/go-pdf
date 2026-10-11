@@ -32,7 +32,7 @@ import (
 // references) with the current reference-resolution path used to detect cycles.
 // Cursors are small values passed by value: leaf values are read with the typed
 // accessor methods ([Cursor.Integer], [Cursor.Dict], ...), and nested typed
-// objects with [Decode], which threads the path and shares the cache.
+// objects with [Cursor.Decode], which threads the path and shares the cache.
 type Cursor struct {
 	x    *Extractor
 	path *CycleCheck
@@ -64,7 +64,7 @@ func (c Cursor) Resolve(obj Object) (Native, error) {
 // Getter returns the underlying PDF file the cursor reads from.
 func (c Cursor) Getter() Getter { return c.x.R }
 
-func cursorCast[T Native](c Cursor, obj Object) (T, error) {
+func (c Cursor) cast[T Native](obj Object) (T, error) {
 	resolved, err := c.resolve(obj)
 	if err != nil {
 		var zero T
@@ -107,27 +107,27 @@ func (c Cursor) Number(obj Object) (float64, error) {
 
 // Array resolves any indirect reference and returns the object as an Array.
 // A nil object yields nil.
-func (c Cursor) Array(obj Object) (Array, error) { return cursorCast[Array](c, obj) }
+func (c Cursor) Array(obj Object) (Array, error) { return c.cast[Array](obj) }
 
 // Boolean resolves any indirect reference and returns the object as a Boolean.
 // A nil object yields false.
-func (c Cursor) Boolean(obj Object) (Boolean, error) { return cursorCast[Boolean](c, obj) }
+func (c Cursor) Boolean(obj Object) (Boolean, error) { return c.cast[Boolean](obj) }
 
 // Dict resolves any indirect reference and returns the object as a Dict.
 // A nil object yields nil.
-func (c Cursor) Dict(obj Object) (Dict, error) { return cursorCast[Dict](c, obj) }
+func (c Cursor) Dict(obj Object) (Dict, error) { return c.cast[Dict](obj) }
 
 // Name resolves any indirect reference and returns the object as a Name.
 // A nil object yields the empty Name.
-func (c Cursor) Name(obj Object) (Name, error) { return cursorCast[Name](c, obj) }
+func (c Cursor) Name(obj Object) (Name, error) { return c.cast[Name](obj) }
 
 // Stream resolves any indirect reference and returns the object as a stream.
 // A nil object yields nil.
-func (c Cursor) Stream(obj Object) (*Stream, error) { return cursorCast[*Stream](c, obj) }
+func (c Cursor) Stream(obj Object) (*Stream, error) { return c.cast[*Stream](obj) }
 
 // String resolves any indirect reference and returns the object as a String.
 // A nil object yields the empty String.
-func (c Cursor) String(obj Object) (String, error) { return cursorCast[String](c, obj) }
+func (c Cursor) String(obj Object) (String, error) { return c.cast[String](obj) }
 
 // DictTyped resolves any indirect reference and returns the object as a Dict,
 // checking that its "Type" entry, if present, equals tp.
@@ -294,7 +294,7 @@ func (c Cursor) Version() Version {
 //
 // If c reads from a *Writer, Decode records provenance on it; an Extractor
 // whose Getter is a *Writer must not be used from more than one goroutine.
-func Decode[T any](c Cursor, obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
+func (c Cursor) Decode[T any](obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
 	var zero T
 	x := c.x
 	path := c.path
@@ -349,22 +349,22 @@ func Decode[T any](c Cursor, obj Object, decode func(Cursor, Object, bool) (T, e
 	return res, nil
 }
 
-// DecodeOptional is like [Decode] but treats a nil result as acceptable rather
+// DecodeOptional is like [Cursor.Decode] but treats a nil result as acceptable rather
 // than as an error.
-func DecodeOptional[T any](c Cursor, obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
-	return Optional(Decode(c, obj, decode))
+func (c Cursor) DecodeOptional[T any](obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
+	return Optional(c.Decode(obj, decode))
 }
 
-// DecodeExclusive is like [Decode] but runs the decode function at most once
+// DecodeExclusive is like [Cursor.Decode] but runs the decode function at most once
 // per reference: concurrent callers for the same reference wait for the first
 // to finish and share its result.
 //
 // Use this ONLY for decodes that cannot participate in a cross-goroutine
 // reference cycle — that is, a document "sink" such as the interactive form,
 // whose decode never waits on an object that might be waiting on it. For
-// anything that can be mutually referential, use [Decode], whose load-or-store
+// anything that can be mutually referential, use [Cursor.Decode], whose load-or-store
 // publishing never waits and so cannot deadlock.
-func DecodeExclusive[T any](c Cursor, obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
+func (c Cursor) DecodeExclusive[T any](obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
 	var zero T
 	x := c.x
 	ref, ok := obj.(Reference)
@@ -390,7 +390,7 @@ func DecodeExclusive[T any](c Cursor, obj Object, decode func(Cursor, Object, bo
 	x.wip[key] = p
 	x.mu.Unlock()
 
-	res, err := Decode(c, obj, decode)
+	res, err := c.Decode(obj, decode)
 
 	x.mu.Lock()
 	p.val, p.err = res, err

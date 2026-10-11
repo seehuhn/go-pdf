@@ -119,25 +119,25 @@ func DecodeForm(c pdf.Cursor, obj pdf.Object, _ bool) (*Form, error) {
 
 	f := &Form{}
 
-	if act, err := pdf.DecodeOptional(c, dict["K"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["K"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Keystroke = js
 	}
 
-	if act, err := pdf.DecodeOptional(c, dict["F"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["F"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Format = js
 	}
 
-	if act, err := pdf.DecodeOptional(c, dict["V"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["V"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Validate = js
 	}
 
-	if act, err := pdf.DecodeOptional(c, dict["C"], action.Decode); err != nil {
+	if act, err := c.DecodeOptional(dict["C"], action.Decode); err != nil {
 		return nil, err
 	} else if js, ok := act.(*action.JavaScript); ok {
 		f.Calculate = js

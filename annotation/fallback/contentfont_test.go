@@ -126,7 +126,7 @@ func TestContentFontMadeOnFirstUse(t *testing.T) {
 
 	// an annotation which draws no text leaves the font unmade
 	square := &annotation.Square{
-		Common: annotation.Common{Rect: pdf.Rectangle{URx: 20, URy: 20}},
+		Rect: pdf.Rectangle{URx: 20, URy: 20},
 	}
 	if err := gen.AddAppearance(square); err != nil {
 		t.Fatal(err)

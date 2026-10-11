@@ -92,11 +92,9 @@ func createDocument(filename string) error {
 
 	// blue caret
 	a := &annotation.Caret{
-		Common: annotation.Common{
-			Contents: "blue caret",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "blue caret",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -105,13 +103,11 @@ func createDocument(filename string) error {
 
 	// paragraph symbol, large rect with RD
 	err = w.addWidePair(&annotation.Caret{
-		Common: annotation.Common{
-			Contents: "Sy=P, large rect",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
-		Symbol: "P",
-		Margin: []float64{30, 10, 30, 10},
+		Contents: "Sy=P, large rect",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
+		Symbol:   "P",
+		Margin:   []float64{30, 10, 30, 10},
 	})
 	if err != nil {
 		return err
@@ -119,10 +115,8 @@ func createDocument(filename string) error {
 
 	// nil color
 	a = &annotation.Caret{
-		Common: annotation.Common{
-			Contents: "nil color",
-			Flags:    annotation.FlagPrint,
-		},
+		Contents: "nil color",
+		Flags:    annotation.FlagPrint,
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -131,12 +125,10 @@ func createDocument(filename string) error {
 
 	// border width
 	a = &annotation.Caret{
-		Common: annotation.Common{
-			Contents: "Border.Width=2",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-			Border:   &annotation.Border{Width: 2, SingleUse: true},
-		},
+		Contents: "Border.Width=2",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
+		Border:   &annotation.Border{Width: 2, SingleUse: true},
 	}
 	err = w.addAnnotationPair(a)
 	if err != nil {
@@ -259,18 +251,14 @@ func (w *writer) addTallCaret() error {
 	w.page.TextEnd()
 
 	left := &annotation.Caret{
-		Common: annotation.Common{
-			Contents: "tall rect (viewer)",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "tall rect (viewer)",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 	}
 	right := &annotation.Caret{
-		Common: annotation.Common{
-			Contents: "tall rect (quire)",
-			Flags:    annotation.FlagPrint,
-			Color:    color.Blue,
-		},
+		Contents: "tall rect (quire)",
+		Flags:    annotation.FlagPrint,
+		Color:    color.Blue,
 	}
 
 	left.Rect = pdf.Rectangle{
@@ -322,12 +310,12 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	background := &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 	return background
 }

@@ -62,7 +62,7 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// AP (optional)
-	if ap, err := pdf.DecodeOptional(c, dict["AP"], appearance.ExtractDict); err != nil {
+	if ap, err := c.DecodeOptional(dict["AP"], appearance.ExtractDict); err != nil {
 		return err
 	} else {
 		common.Appearance = ap
@@ -74,7 +74,7 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// Border (optional)
-	if border, err := pdf.DecodeOptional(c, dict["Border"], annotation.ExtractBorder); err != nil {
+	if border, err := c.DecodeOptional(dict["Border"], annotation.ExtractBorder); err != nil {
 		return err
 	} else {
 		common.Border = border
@@ -97,7 +97,7 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// OC (optional)
-	if oc, err := pdf.DecodeOptional(c, dict["OC"], oc.ExtractConditional); err != nil {
+	if oc, err := c.DecodeOptional(dict["OC"], oc.ExtractConditional); err != nil {
 		return err
 	} else {
 		common.OptionalContent = oc
@@ -109,7 +109,7 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	} else if afArray != nil {
 		common.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
 		for _, afObj := range afArray {
-			if spec, err := pdf.DecodeOptional(c, afObj, file.ExtractSpecification); err != nil {
+			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
 				return err
 			} else if spec != nil {
 				common.AssociatedFiles = append(common.AssociatedFiles, spec)

@@ -115,7 +115,7 @@ func TestResourcesInstallFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := pdf.Decode(pdf.NewCursor(w), ref, Resources)
+	res, err := pdf.NewCursor(w).Decode(ref, Resources)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestSynthesisedResourcesCarryFallback(t *testing.T) {
 
 	c := pdf.NewCursor(w)
 
-	f, err := pdf.Decode(c, formRef, Form)
+	f, err := c.Decode(formRef, Form)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestSynthesisedResourcesCarryFallback(t *testing.T) {
 		t.Error("form without /Resources lost the fallback")
 	}
 
-	p, err := pdf.Decode(c, patRef, Pattern)
+	p, err := c.Decode(patRef, Pattern)
 	if err != nil {
 		t.Fatal(err)
 	}

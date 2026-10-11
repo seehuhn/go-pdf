@@ -28,9 +28,7 @@ func TestFreeTextRejectsInvalidAlign(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	a := &FreeText{
-		Common: Common{
-			Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
-		},
+		Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
 		DefaultAppearance: "/Helv 12 Tf 0 g",
 		Align:             pdf.TextAlign(99),
 	}
@@ -45,9 +43,7 @@ func TestRedactRejectsInvalidAlign(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	a := &Redact{
-		Common: Common{
-			Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
-		},
+		Rect:  pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
 		Align: pdf.TextAlign(99),
 	}
 

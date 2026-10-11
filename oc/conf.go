@@ -215,7 +215,7 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 		return nil, err
 	} else {
 		for _, item := range asArr {
-			ua, err := pdf.DecodeOptional(c, item, ExtractUsageApplication)
+			ua, err := c.DecodeOptional(item, ExtractUsageApplication)
 			if err != nil {
 				continue // permissive
 			}
@@ -478,9 +478,9 @@ func extractGroupArrayFromArray(c pdf.Cursor, arr pdf.Array) ([]*Group, error) {
 	}
 	var groups []*Group
 	for _, item := range arr {
-		group, err := pdf.DecodeOptional(c, item, ExtractGroup)
+		group, err := c.DecodeOptional(item, ExtractGroup)
 		if err != nil {
-			continue // permissive
+			return nil, err
 		}
 		if group != nil {
 			groups = append(groups, group)
@@ -554,7 +554,7 @@ func doExtractOrderItems(c pdf.Cursor, arr pdf.Array, remaining *int) ([]OrderIt
 			items = append(items, og)
 		default:
 			// try to extract as a Group
-			group, err := pdf.DecodeOptional(c, elem, ExtractGroup)
+			group, err := c.DecodeOptional(elem, ExtractGroup)
 			if err != nil {
 				continue
 			}

@@ -191,7 +191,7 @@ func (c *converter) buildOCState(hidden []pdf.Reference) error {
 		if !ok {
 			continue
 		}
-		if g, err := pdf.DecodeOptional(cur, ref, oc.ExtractGroup); err == nil && g != nil {
+		if g, err := cur.DecodeOptional(ref, oc.ExtractGroup); err == nil && g != nil {
 			state.SetState(g, !hiddenSet[ref])
 		}
 	}

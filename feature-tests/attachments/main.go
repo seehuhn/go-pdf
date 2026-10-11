@@ -191,15 +191,13 @@ func finaliseCatalogue(doc *document.MultiPage, tree map[pdf.Name]pdf.Object) er
 func addFileAttachment(page *document.Page, style *fallback.Generator,
 	spec *file.Specification, rect pdf.Rectangle, contents string) error {
 	fa := &annotation.FileAttachment{
-		Common: annotation.Common{
-			Rect:     rect,
-			Contents: contents,
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
-		Markup: annotation.Markup{User: "Attachments test"},
-		Icon:   annotation.FileAttachmentIconPushPin,
-		FS:     spec,
+		Rect:     rect,
+		Contents: contents,
+		Border:   annotation.PDFDefaultBorder,
+		Flags:    annotation.FlagPrint,
+		User:     "Attachments test",
+		Icon:     annotation.FileAttachmentIconPushPin,
+		FS:       spec,
 	}
 	if err := style.AddAppearance(fa); err != nil {
 		return err

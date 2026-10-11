@@ -66,7 +66,7 @@ func TestType1SpotFunctionProvenance(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := pdf.NewCursor(w)
-	ht, err := pdf.Decode(c, htRef, Extract)
+	ht, err := c.Decode(htRef, Extract)
 	if err != nil {
 		t.Fatal(err)
 	}

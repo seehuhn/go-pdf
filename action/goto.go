@@ -85,20 +85,20 @@ func (a *GoTo) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeGoTo(c pdf.Cursor, dict pdf.Dict) (pdf.Action, error) {
-	dest, err := pdf.Decode(c, dict["D"], destination.Decode)
+	dest, err := c.Decode(dict["D"], destination.Decode)
 	if err != nil {
 		return nil, err
 	}
 
 	var sd destination.Destination
 	if dict["SD"] != nil {
-		sd, err = pdf.DecodeOptional(c, dict["SD"], destination.Decode)
+		sd, err = c.DecodeOptional(dict["SD"], destination.Decode)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

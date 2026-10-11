@@ -24,7 +24,7 @@ import (
 
 // Extract extracts a function from a PDF file.
 // Cycle detection for recursive Type 3 functions is handled by routing
-// sub-function extraction through [pdf.Decode].
+// sub-function extraction through [pdf.Cursor.Decode].
 func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (pdf.Function, error) {
 	resolved, err := c.Resolve(obj)
 	if err != nil {

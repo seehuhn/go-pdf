@@ -39,7 +39,7 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*annotation.Movie, error) {
 	// Movie (required): a movie annotation without a usable Movie cannot be
 	// written back, so reject it here.  The page decoder drops annotations
 	// that fail to decode, matching the permissive-reader policy.
-	if m, err := pdf.DecodeOptional(c, dict["Movie"], movie.Extract); err != nil {
+	if m, err := c.DecodeOptional(dict["Movie"], movie.Extract); err != nil {
 		return nil, err
 	} else if m == nil {
 		return nil, pdf.Error("movie annotation missing Movie")
@@ -57,7 +57,7 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*annotation.Movie, error) {
 			}
 			// false → leave Activation nil (do not play)
 		default:
-			if act, err := pdf.DecodeOptional(c, aObj, movie.ExtractActivation); err != nil {
+			if act, err := c.DecodeOptional(aObj, movie.ExtractActivation); err != nil {
 				return nil, err
 			} else if act != nil {
 				annot.Activation = act

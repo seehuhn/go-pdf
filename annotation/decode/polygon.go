@@ -47,7 +47,7 @@ func decodePolygon(c pdf.Cursor, dict pdf.Dict) (*annotation.Polygon, error) {
 	polygon.Vertices = vertices[:len(vertices)&^1]
 
 	// BS (optional)
-	if bs, err := pdf.DecodeOptional(c, dict["BS"], annotation.ExtractBorderStyle); err != nil {
+	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderStyle = bs
@@ -65,14 +65,14 @@ func decodePolygon(c pdf.Cursor, dict pdf.Dict) (*annotation.Polygon, error) {
 	}
 
 	// BE (optional)
-	if be, err := pdf.DecodeOptional(c, dict["BE"], annotation.ExtractBorderEffect); err != nil {
+	if be, err := c.DecodeOptional(dict["BE"], annotation.ExtractBorderEffect); err != nil {
 		return nil, err
 	} else {
 		polygon.BorderEffect = be
 	}
 
 	// Measure (optional)
-	if m, err := pdf.DecodeOptional(c, dict["Measure"], measure.Extract); err != nil {
+	if m, err := c.DecodeOptional(dict["Measure"], measure.Extract); err != nil {
 		return nil, err
 	} else {
 		polygon.Measure = m

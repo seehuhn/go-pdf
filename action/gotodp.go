@@ -70,7 +70,7 @@ func decodeGoToDp(c pdf.Cursor, dict pdf.Dict) (*GoToDp, error) {
 		return nil, pdf.Error("GoToDp action missing or invalid Dp entry")
 	}
 
-	next, err := pdf.Decode(c, dict["Next"], DecodeActionList)
+	next, err := c.Decode(dict["Next"], DecodeActionList)
 	if err != nil {
 		return nil, err
 	}

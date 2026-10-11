@@ -246,7 +246,7 @@ func testUsageAppRoundTrip(t *testing.T, version pdf.Version, data *UsageApplica
 	}
 
 	extractor := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(extractor, nil), obj, ExtractUsageApplication)
+	extracted, err := pdf.CursorAt(extractor, nil).Decode(obj, ExtractUsageApplication)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -306,7 +306,7 @@ func FuzzUsageAppRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractUsageApplication)
+		data, err := pdf.CursorAt(x, nil).Decode(obj, ExtractUsageApplication)
 		if err != nil {
 			t.Skip("malformed object")
 		}

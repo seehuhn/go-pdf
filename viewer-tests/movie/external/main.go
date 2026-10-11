@@ -55,12 +55,10 @@ func createDocument(filename string) error {
 	page.Note(note)
 
 	annot := &annotation.Movie{
-		Common: annotation.Common{
-			Rect:     moviepage.Screen,
-			Contents: moviepage.Description + ", external file movie.mp4.",
-			Border:   annotation.PDFDefaultBorder,
-			Flags:    annotation.FlagPrint,
-		},
+		Rect:       moviepage.Screen,
+		Contents:   moviepage.Description + ", external file movie.mp4.",
+		Border:     annotation.PDFDefaultBorder,
+		Flags:      annotation.FlagPrint,
 		Title:      "Tick movie",
 		Movie:      newMovie(),
 		Activation: movie.DefaultActivation,

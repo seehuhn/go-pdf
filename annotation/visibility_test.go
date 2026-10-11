@@ -46,7 +46,7 @@ func TestHiddenSuppressesEverywhere(t *testing.T) {
 		if f&FlagHidden == 0 {
 			continue
 		}
-		a := &Link{Common: Common{Flags: f}}
+		a := &Link{Flags: f}
 		for _, ctx := range visibilityContexts {
 			if !Suppressed(a, ctx.forPrint, ctx.hover, false, nil) {
 				t.Errorf("%s: not suppressed %s", f, ctx.name)
@@ -86,7 +86,7 @@ func TestNoViewPrints(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			a := &Link{Common: Common{Flags: tc.flags}}
+			a := &Link{Flags: tc.flags}
 			want := map[string]bool{
 				"on screen": tc.display,
 				"on hover":  tc.interact,
@@ -193,10 +193,10 @@ func TestIsReply(t *testing.T) {
 		want bool
 	}{
 		{"plain markup annotation", &Text{}, false},
-		{"reply, RT absent", &Text{Markup: Markup{InReplyTo: parent}}, true},
-		{"reply, RT=R", &Text{Markup: Markup{InReplyTo: parent, RT: "R"}}, true},
-		{"group member", &Text{Markup: Markup{InReplyTo: parent, RT: "Group"}}, false},
-		{"RT without IRT", &Text{Markup: Markup{RT: "R"}}, false},
+		{"reply, RT absent", &Text{InReplyTo: parent}, true},
+		{"reply, RT=R", &Text{InReplyTo: parent, RT: "R"}, true},
+		{"group member", &Text{InReplyTo: parent, RT: "Group"}, false},
+		{"RT without IRT", &Text{RT: "R"}, false},
 		{"non-markup annotation", &Link{}, false},
 	}
 

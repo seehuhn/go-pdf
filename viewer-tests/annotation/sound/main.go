@@ -102,14 +102,12 @@ func createDocument(filename string) error {
 		{annotation.SoundIconMic, "Icon: Mic"},
 	} {
 		a := &annotation.Sound{
-			Common: annotation.Common{
-				Contents: "Sound annotation",
-				Border:   annotation.PDFDefaultBorder,
-				Flags:    annotation.FlagPrint,
-			},
-			Markup: annotation.Markup{User: "Test User"},
-			Icon:   row.icon,
-			Sound:  iconSnd,
+			Contents: "Sound annotation",
+			Border:   annotation.PDFDefaultBorder,
+			Flags:    annotation.FlagPrint,
+			User:     "Test User",
+			Icon:     row.icon,
+			Sound:    iconSnd,
 		}
 		if err := w.addPair(a, row.label); err != nil {
 			return err
@@ -140,14 +138,12 @@ func createDocument(filename string) error {
 	}
 	for _, e := range encodings {
 		a := &annotation.Sound{
-			Common: annotation.Common{
-				Contents: "Sound annotation: " + e.label,
-				Border:   annotation.PDFDefaultBorder,
-				Flags:    annotation.FlagPrint,
-			},
-			Markup: annotation.Markup{User: "Test User"},
-			Icon:   annotation.SoundIconSpeaker,
-			Sound:  buildSound(e.rate, e.channels, e.bits, e.enc),
+			Contents: "Sound annotation: " + e.label,
+			Border:   annotation.PDFDefaultBorder,
+			Flags:    annotation.FlagPrint,
+			User:     "Test User",
+			Icon:     annotation.SoundIconSpeaker,
+			Sound:    buildSound(e.rate, e.channels, e.bits, e.enc),
 		}
 		if err := w.addSingle(a, e.label); err != nil {
 			return err
@@ -410,11 +406,11 @@ func pageBackground(paper *pdf.Rectangle) graphics.Shading {
 	}
 
 	return &shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
-		P1:     vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
-		F:      F,
-		TMin:   t0,
-		TMax:   t1,
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: pdf.Round(t0*nx, 1), Y: pdf.Round(t0*ny, 1)},
+		P1:         vec.Vec2{X: pdf.Round(t1*nx, 1), Y: pdf.Round(t1*ny, 1)},
+		F:          F,
+		TMin:       t0,
+		TMax:       t1,
 	}
 }

@@ -113,9 +113,9 @@ func makeType3Font() (font.Instance, error) {
 	b := builder.New(content.Glyph, nil, pdf.V1_7)
 	b.Type3ColoredGlyph(1000, 0)
 	b.DrawShading(&shading.Type2{
-		Common: shading.Common{ColorSpace: color.SpaceDeviceRGB},
-		P0:     vec.Vec2{X: 0, Y: 0},
-		P1:     vec.Vec2{X: 1000, Y: 0},
+		ColorSpace: color.SpaceDeviceRGB,
+		P0:         vec.Vec2{X: 0, Y: 0},
+		P1:         vec.Vec2{X: 1000, Y: 0},
 		F: &function.Type2{
 			XMin: 0,
 			XMax: 1,

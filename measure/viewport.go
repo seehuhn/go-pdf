@@ -72,13 +72,13 @@ func ExtractViewport(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Viewport, er
 		vp.Name = string(name)
 	}
 
-	if measure, err := pdf.DecodeOptional(c, dict["Measure"], Extract); err != nil {
+	if measure, err := c.DecodeOptional(dict["Measure"], Extract); err != nil {
 		return nil, err
 	} else {
 		vp.Measure = measure
 	}
 
-	if ptData, err := pdf.DecodeOptional(c, dict["PtData"], ExtractPtData); err != nil {
+	if ptData, err := c.DecodeOptional(dict["PtData"], ExtractPtData); err != nil {
 		return nil, err
 	} else {
 		vp.PtData = ptData
@@ -178,7 +178,7 @@ func ExtractViewportArray(c pdf.Cursor, obj pdf.Object, isDirect bool) (*ViewPor
 
 	viewports := make([]*Viewport, len(a))
 	for i, obj := range a {
-		vp, err := pdf.Decode(c, obj, ExtractViewport)
+		vp, err := c.Decode(obj, ExtractViewport)
 		if err != nil {
 			return nil, err
 		}

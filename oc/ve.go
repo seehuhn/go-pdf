@@ -55,7 +55,7 @@ func ExtractVisibilityExpression(c pdf.Cursor, obj pdf.Object, isDirect bool) (V
 
 		var args []VisibilityExpression
 		for _, elem := range arr[1:] {
-			arg, err := pdf.Decode(c, elem, ExtractVisibilityExpression)
+			arg, err := c.Decode(elem, ExtractVisibilityExpression)
 			if err != nil {
 				return nil, err
 			}
@@ -94,7 +94,7 @@ func ExtractVisibilityExpression(c pdf.Cursor, obj pdf.Object, isDirect bool) (V
 	if groupObj == nil {
 		return nil, pdf.Error("invalid visibility expression: missing object")
 	}
-	g, err := pdf.Decode(groupCursor, groupObj, ExtractGroup)
+	g, err := groupCursor.Decode(groupObj, ExtractGroup)
 	if err != nil {
 		return nil, err
 	}

@@ -75,7 +75,7 @@ func SoftMaskDict(c pdf.Cursor, obj pdf.Object, _ bool) (graphics.SoftClip, erro
 			Err: errors.New("soft mask: missing G entry"),
 		}
 	}
-	g, err := pdf.Decode(c, gObj, Form)
+	g, err := c.Decode(gObj, Form)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func SoftMaskDict(c pdf.Cursor, obj pdf.Object, _ bool) (graphics.SoftClip, erro
 			return nil, err
 		}
 		if trResolved != pdf.Name("Identity") {
-			tr, err := pdf.DecodeOptional(c, trObj, function.Extract)
+			tr, err := c.DecodeOptional(trObj, function.Extract)
 			if err != nil {
 				return nil, err
 			}

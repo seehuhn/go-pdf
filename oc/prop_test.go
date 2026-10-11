@@ -220,7 +220,7 @@ func testPropertiesRoundTrip(t *testing.T, version pdf.Version, data *Properties
 	}
 
 	extractor := pdf.NewExtractor(w)
-	extracted, err := pdf.Decode(pdf.CursorAt(extractor, nil), obj, ExtractProperties)
+	extracted, err := pdf.CursorAt(extractor, nil).Decode(obj, ExtractProperties)
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -331,7 +331,7 @@ func FuzzPropertiesRoundTrip(f *testing.F) {
 		}
 
 		x := pdf.NewExtractor(r)
-		data, err := pdf.Decode(pdf.CursorAt(x, nil), obj, ExtractProperties)
+		data, err := pdf.CursorAt(x, nil).Decode(obj, ExtractProperties)
 		if err != nil {
 			t.Skip("malformed object")
 		}
@@ -382,7 +382,7 @@ func TestPropertiesOrderInheritance(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	p, err := pdf.Decode(pdf.CursorAt(x, nil), propRef, ExtractProperties)
+	p, err := pdf.CursorAt(x, nil).Decode(propRef, ExtractProperties)
 	if err != nil {
 		t.Fatal(err)
 	}

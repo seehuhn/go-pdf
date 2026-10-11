@@ -280,7 +280,7 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*Sound, error) {
 
 	// ExternalFile (F) — optional.  When present, the sample data lives
 	// in an external file; the inline stream body is ignored.
-	externalFile, err := pdf.DecodeOptional(c, stream.Dict["F"], file.ExtractSpecification)
+	externalFile, err := c.DecodeOptional(stream.Dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
