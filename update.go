@@ -281,7 +281,7 @@ func (w *Writer) closeUpdate() (Dict, error) {
 		if w.w.enc != nil && w.w.enc.sec.unencryptedMetadata {
 			w.refIsPlaintext[ref] = true
 		}
-		e := &EmbedHelper{rm: w.rm, copiers: map[*Extractor]*Copier{}}
+		e := &EmbedHelper{rm: w.rm}
 		if _, err := e.EmbedAt(ref, m); err != nil {
 			return nil, err
 		}

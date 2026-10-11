@@ -53,6 +53,9 @@ type Embedder interface {
 	Embed(e *EmbedHelper) (Native, error)
 }
 
+// EmbedHelper is passed to [Embedder.Embed], to embed functions and to
+// deferred functions.  It gives access to the output file and to the
+// resource manager during embedding.
 type EmbedHelper struct {
 	rm      *ResourceManager
 	copiers map[*Extractor]*Copier
@@ -114,9 +117,15 @@ func (e *EmbedHelper) Store(enc Encoder) (Reference, error) {
 	return e.rm.Store(enc)
 }
 
+// CopierFrom returns a [Copier] which copies objects from the file read by x
+// into the output file.  Repeated calls with the same x return the same
+// Copier, so that objects shared between resources are copied only once.
 func (e *EmbedHelper) CopierFrom(x *Extractor) *Copier {
 	if c, ok := e.copiers[x]; ok {
 		return c
+	}
+	if e.copiers == nil {
+		e.copiers = make(map[*Extractor]*Copier)
 	}
 	c := NewCopier(e.rm.Out, x.R)
 	e.copiers[x] = c
@@ -125,7 +134,7 @@ func (e *EmbedHelper) CopierFrom(x *Extractor) *Copier {
 
 // EmbedFunc embeds obj using the function f, as an alternative to the
 // [Embedder] interface.  See [ResourceManager.EmbedFunc] for details.
-func (e *EmbedHelper) EmbedFunc[T any](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
+func (e *EmbedHelper) EmbedFunc[T comparable](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
 	if existing, ok := e.rm.Out.lookup(obj); ok {
 		return existing, nil
 	}
@@ -170,8 +179,7 @@ func NewResourceManager(w *Writer) *ResourceManager {
 // If the resource is already present in the file, the existing resource is
 // returned.
 func (rm *ResourceManager) Embed(r Embedder) (Native, error) {
-	cc := make(map[*Extractor]*Copier)
-	e := &EmbedHelper{rm: rm, copiers: cc}
+	e := &EmbedHelper{rm: rm}
 	return e.Embed(r)
 }
 
@@ -179,14 +187,15 @@ func (rm *ResourceManager) Embed(r Embedder) (Native, error) {
 //
 // This method provides an alternative to the Embedder interface when you need
 // to embed objects that don't implement the Embedder interface, or when you need
-// more control over the embedding process.  The type T must be "comparable".
+// more control over the embedding process.  The value obj is used as a map
+// key, so it must not be an interface holding an unhashable value.
 //
 // If the resource is already present in the file, the existing resource is
 // returned without calling the embed function again.
 //
 // The function f must return the PDF representation of the embedded object.
-func (rm *ResourceManager) EmbedFunc[T any](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
-	e := &EmbedHelper{rm: rm, copiers: make(map[*Extractor]*Copier)}
+func (rm *ResourceManager) EmbedFunc[T comparable](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error) {
+	e := &EmbedHelper{rm: rm}
 	return e.EmbedFunc(f, obj)
 }
 
@@ -359,7 +368,7 @@ func (rm *ResourceManager) Replace(orig, repl any) (Reference, error) {
 		return rm.putEncoded(r, native)
 	case Embedder:
 		prevRef, hadPrevRef := rm.Out.objects[repl].(Reference)
-		e := &EmbedHelper{rm: rm, copiers: map[*Extractor]*Copier{}}
+		e := &EmbedHelper{rm: rm}
 		delete(rm.Out.objects, repl) // EmbedAt must not see a stale entry
 		_, err := e.EmbedAt(ref, r)
 		if errors.Is(err, errEmbedMismatch) {

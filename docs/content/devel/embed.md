@@ -74,7 +74,7 @@ need more control over the embedding process, the `EmbedFunc` method
 provides an alternative approach:
 
 ```go
-func (rm *ResourceManager) EmbedFunc[T any](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error)
+func (rm *ResourceManager) EmbedFunc[T comparable](f func(*EmbedHelper, T) (Native, error), obj T) (Native, error)
 ```
 
 This method embeds a resource using a custom embedding function instead of

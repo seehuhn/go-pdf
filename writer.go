@@ -342,7 +342,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		if unencryptedMetadata {
 			pdf.refIsPlaintext[metaRef] = true
 		}
-		e := &EmbedHelper{rm: pdf.rm, copiers: map[*Extractor]*Copier{}}
+		e := &EmbedHelper{rm: pdf.rm}
 		if _, err := e.EmbedAt(metaRef, opt.DocumentMetadata); err != nil {
 			return nil, err
 		}

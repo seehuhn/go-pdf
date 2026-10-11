@@ -210,3 +210,35 @@ func TestEmbedFuncCopier(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestDeferCopier checks that a function registered with
+// [pdf.EmbedHelper.Defer] can use [pdf.EmbedHelper.CopierFrom].
+func TestDeferCopier(t *testing.T) {
+	src, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	ref := src.Alloc()
+	if err := src.Put(ref, pdf.Dict{"A": pdf.Integer(1)}); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(src)
+
+	dst, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(dst)
+	var got pdf.Native
+	embed := func(e *pdf.EmbedHelper, r pdf.Reference) (pdf.Native, error) {
+		e.Defer(func(e *pdf.EmbedHelper) error {
+			var err error
+			got, err = e.CopierFrom(x).Copy(r)
+			return err
+		})
+		return pdf.Integer(0), nil
+	}
+	if _, err := rm.EmbedFunc(embed, ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := got.(pdf.Reference); !ok {
+		t.Errorf("expected a reference, got %T", got)
+	}
+}
