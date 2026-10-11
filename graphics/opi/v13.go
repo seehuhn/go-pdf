@@ -17,6 +17,8 @@
 package opi
 
 import (
+	"fmt"
+	"math"
 	"reflect"
 
 	"seehuhn.de/go/pdf"
@@ -39,14 +41,18 @@ type V13 struct {
 	// Size is the image dimensions in pixels, as [pixelsWide pixelsHigh].
 	Size [2]int
 
-	// CropRect is the portion of the image to use, as [left top right bottom].
+	// CropRect is the portion of the image to use, as [left top right bottom],
+	// with 0 ≤ left < right ≤ width.  Top and bottom must differ and lie in
+	// the range 0 to height, in either order.
 	CropRect [4]int
 
-	// CropFixed (optional) is CropRect expressed with real numbers.
+	// CropFixed (optional) is CropRect expressed with real numbers.  It must
+	// satisfy the same conditions as CropRect.
 	CropFixed *[4]float64
 
 	// Position is the location of the cropped image on the page, as eight
-	// numbers [llx lly ulx uly urx ury lrx lry].
+	// numbers [llx lly ulx uly urx ury lrx lry].  The four corners must be
+	// finite and form a parallelogram.
 	Position [8]float64
 
 	// Resolution (optional) is the image resolution in samples per inch, as
@@ -57,7 +63,8 @@ type V13 struct {
 	// Process, Spot, or Separation.
 	ColorType pdf.Name
 
-	// Color (optional) is the colour the image is rendered in.
+	// Color (optional) is the colour the image is rendered in.  The CMYK
+	// values must be in the range 0.0 to 1.0.
 	Color *Color13
 
 	// Tint (optional) is the concentration of Color, in the range 0.0 to 1.0.
@@ -70,7 +77,8 @@ type V13 struct {
 	ImageType *[2]int
 
 	// GrayMap (optional) records brightness or contrast changes, as an array
-	// of integers in the range 0 to 65535.
+	// of 2^n integers in the range 0 to 65535, where n is the number of bits
+	// per sample.  If ImageType is set, n must match its bits per sample.
 	GrayMap []int
 
 	// Transparency (optional) specifies whether white image pixels are
@@ -121,6 +129,31 @@ func (v *V13) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	if v.F == nil {
 		return nil, pdf.Error("OPI dictionary requires F entry")
+	}
+	if !validCrop13(&v.Size, &v.CropRect) {
+		return nil, pdf.Error("OPI 1.3 CropRect must lie inside the image")
+	}
+	if v.CropFixed != nil && !validCrop13(sizeFloat13(v.Size), v.CropFixed) {
+		return nil, pdf.Error("OPI 1.3 CropFixed must lie inside the image")
+	}
+	if !validPosition(&v.Position) {
+		return nil, pdf.Error("OPI 1.3 Position must be finite and form a parallelogram")
+	}
+	if !validColorType13(v.ColorType) {
+		return nil, fmt.Errorf("invalid OPI 1.3 ColorType %q", v.ColorType)
+	}
+	if v.Color != nil {
+		for _, x := range v.Color.CMYK {
+			if !inUnitRange(x) {
+				return nil, pdf.Error("OPI 1.3 Color values must be in the range 0 to 1")
+			}
+		}
+	}
+	if v.Tint != nil && !inUnitRange(*v.Tint) {
+		return nil, pdf.Error("OPI 1.3 Tint must be in the range 0 to 1")
+	}
+	if len(v.GrayMap) > 0 && !validGrayMap(v.GrayMap, v.ImageType) {
+		return nil, pdf.Error("invalid OPI 1.3 GrayMap")
 	}
 
 	inner := pdf.Dict{"Version": pdf.Number(1.3)}
@@ -208,31 +241,62 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 	} else if len(id) > 0 {
 		v.ID = id
 	}
-	if c, err := pdf.Optional(c.String(dict["Comments"])); err != nil {
+	if cm, err := pdf.Optional(c.String(dict["Comments"])); err != nil {
 		return nil, err
-	} else if len(c) > 0 {
-		v.Comments = string(c.AsTextString())
+	} else if len(cm) > 0 {
+		v.Comments = string(cm.AsTextString())
 	}
+
+	// Size, CropRect and Position are required.  CropFixed has the same
+	// meaning as CropRect, so a missing or invalid CropRect can be recovered
+	// from it.  The others cannot be repaired.
 	if s, err := readInts(c, dict["Size"]); err != nil {
 		return nil, err
 	} else if len(s) == 2 {
 		v.Size = [2]int{s[0], s[1]}
+	} else {
+		return nil, pdf.Error("OPI 1.3 dictionary has no valid Size entry")
 	}
-	if c, err := readInts(c, dict["CropRect"]); err != nil {
+	if cf, err := readNumbers(c, dict["CropFixed"]); err != nil {
 		return nil, err
-	} else if len(c) == 4 {
-		v.CropRect = [4]int{c[0], c[1], c[2], c[3]}
+	} else if len(cf) == 4 {
+		crop := [4]float64(cf)
+		if validCrop13(sizeFloat13(v.Size), &crop) {
+			v.CropFixed = &crop
+		}
 	}
-	if c, err := readNumbers(c, dict["CropFixed"]); err != nil {
+	if cr, err := readInts(c, dict["CropRect"]); err != nil {
 		return nil, err
-	} else if len(c) == 4 {
-		v.CropFixed = &[4]float64{c[0], c[1], c[2], c[3]}
+	} else if len(cr) == 4 && validCrop13(&v.Size, (*[4]int)(cr)) {
+		v.CropRect = [4]int(cr)
+	} else if v.CropFixed != nil {
+		// CropFixed lies inside the image, so the rounded values fit into
+		// an int
+		for i, x := range v.CropFixed {
+			v.CropRect[i] = int(math.Round(x))
+		}
+		if !validCrop13(&v.Size, &v.CropRect) {
+			return nil, pdf.Error("OPI 1.3 dictionary has no valid CropRect entry")
+		}
+	} else {
+		return nil, pdf.Error("OPI 1.3 dictionary has no valid CropRect entry")
 	}
 	if p, err := readNumbers(c, dict["Position"]); err != nil {
 		return nil, err
 	} else if len(p) == 8 {
-		v.Position = [8]float64{p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]}
+		v.Position = [8]float64(p)
+		if !validPosition(&v.Position) {
+			// move the lower-right corner to complete the parallelogram
+			v.Position[6] = v.Position[0] + v.Position[4] - v.Position[2]
+			v.Position[7] = v.Position[1] + v.Position[5] - v.Position[3]
+			if !validPosition(&v.Position) {
+				return nil, pdf.Error("OPI 1.3 dictionary has no valid Position entry")
+			}
+		}
+	} else {
+		return nil, pdf.Error("OPI 1.3 dictionary has no valid Position entry")
 	}
+
 	if r, err := readNumbers(c, dict["Resolution"]); err != nil {
 		return nil, err
 	} else if len(r) == 2 {
@@ -240,34 +304,20 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 	}
 	if ct, err := pdf.Optional(c.Name(dict["ColorType"])); err != nil {
 		return nil, err
-	} else {
+	} else if validColorType13(ct) {
 		v.ColorType = ct
 	}
-	if col, err := pdf.Optional(c.Array(dict["Color"])); err != nil {
+	if col, err := readColor13(c, dict["Color"]); err != nil {
 		return nil, err
-	} else if len(col) == 5 {
-		var col13 Color13
-		for i := range 4 {
-			n, err := pdf.Optional(c.Number(col[i]))
-			if err != nil {
-				return nil, err
-			}
-			col13.CMYK[i] = n
-		}
-		name, err := pdf.Optional(c.String(col[4]))
-		if err != nil {
-			return nil, err
-		}
-		col13.Name = name
-		v.Color = &col13
+	} else {
+		v.Color = col
 	}
-	if _, ok := dict["Tint"]; ok {
-		if t, err := pdf.Optional(c.Number(dict["Tint"])); err != nil {
-			return nil, err
-		} else {
-			tint := t
-			v.Tint = &tint
+	if t, err := c.Number(dict["Tint"]); err == nil {
+		if inUnitRange(t) {
+			v.Tint = &t
 		}
+	} else if !pdf.IsMalformed(err) {
+		return nil, err
 	}
 	if o, err := pdf.Optional(c.Boolean(dict["Overprint"])); err != nil {
 		return nil, err
@@ -281,27 +331,32 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 	}
 	if gm, err := readInts(c, dict["GrayMap"]); err != nil {
 		return nil, err
-	} else if len(gm) > 0 {
+	} else if validGrayMap(gm, v.ImageType) {
 		v.GrayMap = gm
 	}
 	if _, ok := dict["Transparency"]; ok {
-		if tr, err := pdf.Optional(c.Boolean(dict["Transparency"])); err != nil {
-			return nil, err
-		} else {
+		if tr, err := c.Boolean(dict["Transparency"]); err == nil {
 			b := bool(tr)
 			v.Transparency = &b
+		} else if !pdf.IsMalformed(err) {
+			return nil, err
 		}
 	}
 	if tags, err := pdf.Optional(c.Array(dict["Tags"])); err != nil {
 		return nil, err
-	} else if len(tags) >= 2 {
+	} else {
+		// each pair stands on its own, so a malformed pair is skipped
 		for i := 0; i+1 < len(tags); i += 2 {
-			num, err := pdf.Optional(c.Integer(tags[i]))
-			if err != nil {
+			num, err := c.Integer(tags[i])
+			if pdf.IsMalformed(err) {
+				continue
+			} else if err != nil {
 				return nil, err
 			}
-			text, err := pdf.Optional(c.String(tags[i+1]))
-			if err != nil {
+			text, err := c.String(tags[i+1])
+			if pdf.IsMalformed(err) {
+				continue
+			} else if err != nil {
 				return nil, err
 			}
 			v.Tags = append(v.Tags, Tag13{Num: int(num), Text: string(text.AsTextString())})
@@ -309,4 +364,46 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 	}
 
 	return v, nil
+}
+
+// readColor13 reads the Color entry of an OPI 1.3 dictionary.  The result is
+// nil if the entry is absent or malformed.
+func readColor13(c pdf.Cursor, obj pdf.Object) (*Color13, error) {
+	arr, err := pdf.Optional(c.Array(obj))
+	if err != nil || len(arr) != 5 {
+		return nil, err
+	}
+	cmyk, err := readNumbers(c, arr[:4])
+	if err != nil || cmyk == nil {
+		return nil, err
+	}
+	for _, x := range cmyk {
+		if !inUnitRange(x) {
+			return nil, nil
+		}
+	}
+	name, err := c.String(arr[4])
+	if pdf.IsMalformed(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &Color13{CMYK: [4]float64(cmyk), Name: name}, nil
+}
+
+// validColorType13 reports whether ct is a valid OPI 1.3 ColorType, with the
+// empty name standing for an absent entry.
+func validColorType13(ct pdf.Name) bool {
+	switch ct {
+	case "", "Process", "Spot", "Separation":
+		return true
+	default:
+		return false
+	}
+}
+
+// sizeFloat13 converts an OPI 1.3 Size entry to floating point, for checking
+// CropFixed against it.
+func sizeFloat13(size [2]int) *[2]float64 {
+	return &[2]float64{float64(size[0]), float64(size[1])}
 }

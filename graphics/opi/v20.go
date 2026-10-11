@@ -41,7 +41,8 @@ type V20 struct {
 	Size *[2]float64
 
 	// CropRect (optional) is the portion of the image to use, as
-	// [left top right bottom].
+	// [left top right bottom], with 0 ≤ left < right ≤ width and
+	// 0 ≤ top < bottom ≤ height.
 	CropRect *[4]float64
 
 	// Overprint specifies whether the image overprints underlying marks.
@@ -69,8 +70,8 @@ type Tag20 struct {
 	Text []string
 }
 
-// Inks20 specifies the colourants applied to an OPI 2.0 proxy image. Either
-// Name (full_color or registration) or Monochrome is set.
+// Inks20 specifies the colourants applied to an OPI 2.0 proxy image. Exactly
+// one of Name (full_color or registration) and Monochrome is set.
 type Inks20 struct {
 	// Name is full_color or registration.
 	Name pdf.Name
@@ -79,7 +80,8 @@ type Inks20 struct {
 	Monochrome []Ink20Comp
 }
 
-// Ink20Comp is a colourant name and the tint applied to it.
+// Ink20Comp is a colourant name and the tint applied to it.  The tint must be
+// in the range 0.0 to 1.0.
 type Ink20Comp struct {
 	Name pdf.String
 	Tint float64
@@ -111,6 +113,22 @@ func (v *V20) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	if (v.Size == nil) != (v.CropRect == nil) {
 		return nil, pdf.Error("OPI 2.0 Size and CropRect must both be set or unset")
+	}
+	if v.Size != nil && !validCrop(v.Size, v.CropRect) {
+		return nil, pdf.Error("OPI 2.0 CropRect must lie inside the image")
+	}
+	if v.Inks != nil {
+		if (v.Inks.Name == "") == (len(v.Inks.Monochrome) == 0) {
+			return nil, pdf.Error("OPI 2.0 Inks must have exactly one of Name and Monochrome")
+		}
+		for _, comp := range v.Inks.Monochrome {
+			if !inUnitRange(comp.Tint) {
+				return nil, pdf.Error("OPI 2.0 ink tints must be in the range 0 to 1")
+			}
+		}
+	}
+	if v.Inks != nil && v.Inks.Name != "" && v.Inks.Name != "full_color" && v.Inks.Name != "registration" {
+		return nil, pdf.Error("OPI 2.0 Inks name must be full_color or registration")
 	}
 	if q := v.IncludedImageQuality; q != 0 && q != 1 && q != 2 && q != 3 {
 		return nil, pdf.Error("OPI 2.0 IncludedImageQuality must be 1, 2, or 3")
@@ -202,15 +220,20 @@ func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
 	}
 	if tags, err := pdf.Optional(c.Array(dict["Tags"])); err != nil {
 		return nil, err
-	} else if len(tags) >= 2 {
+	} else {
+		// each pair stands on its own, so a malformed pair is skipped
 		for i := 0; i+1 < len(tags); i += 2 {
-			num, err := pdf.Optional(c.Integer(tags[i]))
-			if err != nil {
+			num, err := c.Integer(tags[i])
+			if pdf.IsMalformed(err) {
+				continue
+			} else if err != nil {
 				return nil, err
 			}
 			text, err := readTagText(c, tags[i+1])
 			if err != nil {
 				return nil, err
+			} else if text == nil {
+				continue
 			}
 			v.Tags = append(v.Tags, Tag20{Num: int(num), Text: text})
 		}
@@ -220,10 +243,10 @@ func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
 	} else if len(s) == 2 {
 		v.Size = &[2]float64{s[0], s[1]}
 	}
-	if c, err := readNumbers(c, dict["CropRect"]); err != nil {
+	if cr, err := readNumbers(c, dict["CropRect"]); err != nil {
 		return nil, err
-	} else if len(c) == 4 {
-		v.CropRect = &[4]float64{c[0], c[1], c[2], c[3]}
+	} else if len(cr) == 4 {
+		v.CropRect = &[4]float64{cr[0], cr[1], cr[2], cr[3]}
 	}
 	if o, err := pdf.Optional(c.Boolean(dict["Overprint"])); err != nil {
 		return nil, err
@@ -246,8 +269,9 @@ func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
 		v.IncludedImageQuality = q
 	}
 
-	// Size and CropRect are present or absent together.
-	if (v.Size == nil) != (v.CropRect == nil) {
+	// Size and CropRect are present or absent together, and the crop
+	// rectangle lies inside the image.
+	if v.Size == nil || v.CropRect == nil || !validCrop(v.Size, v.CropRect) {
 		v.Size = nil
 		v.CropRect = nil
 	}
@@ -261,7 +285,7 @@ func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
 }
 
 // readTagText reads an OPI 2.0 tag value, which is a single ASCII string or an
-// array of ASCII strings.
+// array of ASCII strings.  The result is nil if the value is malformed.
 func readTagText(c pdf.Cursor, obj pdf.Object) ([]string, error) {
 	resolved, err := c.Resolve(obj)
 	if err != nil {
@@ -274,8 +298,10 @@ func readTagText(c pdf.Cursor, obj pdf.Object) ([]string, error) {
 		}
 		out := make([]string, 0, len(t))
 		for _, el := range t {
-			s, err := pdf.Optional(c.String(el))
-			if err != nil {
+			s, err := c.String(el)
+			if pdf.IsMalformed(err) {
+				return nil, nil
+			} else if err != nil {
 				return nil, err
 			}
 			out = append(out, string(s.AsTextString()))
@@ -289,7 +315,9 @@ func readTagText(c pdf.Cursor, obj pdf.Object) ([]string, error) {
 }
 
 // readInks reads the OPI 2.0 Inks entry, which is either a name or a
-// /monochrome array.
+// /monochrome array.  The result is nil if the entry is absent or malformed.
+// A malformed colourant pair invalidates the whole entry, since dropping one
+// colourant would change how the image is printed.
 func readInks(c pdf.Cursor, obj pdf.Object) (*Inks20, error) {
 	resolved, err := c.Resolve(obj)
 	if err != nil {
@@ -297,17 +325,34 @@ func readInks(c pdf.Cursor, obj pdf.Object) (*Inks20, error) {
 	}
 	switch t := resolved.(type) {
 	case pdf.Name:
+		if t != "full_color" && t != "registration" {
+			return nil, nil
+		}
 		return &Inks20{Name: t}, nil
 	case pdf.Array:
+		if len(t)%2 != 1 {
+			return nil, nil
+		}
+		if kind, err := c.Name(t[0]); err != nil && !pdf.IsMalformed(err) {
+			return nil, err
+		} else if kind != "monochrome" {
+			return nil, nil
+		}
 		inks := &Inks20{}
 		for i := 1; i+1 < len(t); i += 2 {
-			name, err := pdf.Optional(c.String(t[i]))
-			if err != nil {
+			name, err := c.String(t[i])
+			if pdf.IsMalformed(err) {
+				return nil, nil
+			} else if err != nil {
 				return nil, err
 			}
-			tint, err := pdf.Optional(c.Number(t[i+1]))
-			if err != nil {
+			tint, err := c.Number(t[i+1])
+			if pdf.IsMalformed(err) {
+				return nil, nil
+			} else if err != nil {
 				return nil, err
+			} else if !inUnitRange(tint) {
+				return nil, nil
 			}
 			inks.Monochrome = append(inks.Monochrome, Ink20Comp{Name: name, Tint: tint})
 		}

@@ -11,17 +11,19 @@ I am grateful that the PDF association is actively working on improving the
 PDF specification, and that their process is open to the public.
 I have filed the following bug reports against the PDF specification:
 
+- https://github.com/pdf-association/pdf-issues/issues/834
 - https://github.com/pdf-association/pdf-issues/issues/730
 - https://github.com/pdf-association/pdf-issues/issues/726
+- https://github.com/pdf-association/pdf-issues/issues/619 [fixed]
 - https://github.com/pdf-association/pdf-issues/issues/615
-- https://github.com/pdf-association/pdf-issues/issues/608
+- https://github.com/pdf-association/pdf-issues/issues/608 [fixed]
 - https://github.com/pdf-association/pdf-issues/issues/607
 - https://github.com/pdf-association/pdf-issues/issues/592
 - https://github.com/pdf-association/pdf-issues/issues/588
 - https://github.com/pdf-association/pdf-issues/issues/587
 - https://github.com/pdf-association/pdf-issues/issues/586
 - https://github.com/pdf-association/pdf-issues/issues/585
-- https://github.com/pdf-association/pdf-issues/issues/577
+- https://github.com/pdf-association/pdf-issues/issues/577 [fixed]
 - https://github.com/pdf-association/pdf-issues/issues/573
 - https://github.com/pdf-association/pdf-issues/issues/518 [fixed]
 - https://github.com/pdf-association/pdf-issues/issues/512

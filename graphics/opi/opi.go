@@ -27,6 +27,8 @@
 package opi
 
 import (
+	"math"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -85,6 +87,9 @@ func embedVersion(rm *pdf.EmbedHelper, version pdf.Name, inner pdf.Dict, singleU
 }
 
 // readNumbers resolves obj to an array and returns its elements as float64.
+//
+// The OPI arrays are positional, so a single malformed element invalidates
+// the whole array: the result is then nil, as for an absent entry.
 func readNumbers(c pdf.Cursor, obj pdf.Object) ([]float64, error) {
 	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil || arr == nil {
@@ -92,8 +97,10 @@ func readNumbers(c pdf.Cursor, obj pdf.Object) ([]float64, error) {
 	}
 	out := make([]float64, 0, len(arr))
 	for _, el := range arr {
-		v, err := pdf.Optional(c.Number(el))
-		if err != nil {
+		v, err := c.Number(el)
+		if pdf.IsMalformed(err) {
+			return nil, nil
+		} else if err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -102,6 +109,7 @@ func readNumbers(c pdf.Cursor, obj pdf.Object) ([]float64, error) {
 }
 
 // readInts resolves obj to an array and returns its elements as int.
+// Like [readNumbers], it returns nil if any element is malformed.
 func readInts(c pdf.Cursor, obj pdf.Object) ([]int, error) {
 	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil || arr == nil {
@@ -109,8 +117,10 @@ func readInts(c pdf.Cursor, obj pdf.Object) ([]int, error) {
 	}
 	out := make([]int, 0, len(arr))
 	for _, el := range arr {
-		v, err := pdf.Optional(c.Integer(el))
-		if err != nil {
+		v, err := c.Integer(el)
+		if pdf.IsMalformed(err) {
+			return nil, nil
+		} else if err != nil {
 			return nil, err
 		}
 		out = append(out, int(v))
@@ -132,4 +142,64 @@ func intsToArray(vals []int) pdf.Array {
 		arr[i] = pdf.Integer(v)
 	}
 	return arr
+}
+
+// inUnitRange reports whether x lies in the range 0.0 to 1.0.
+func inUnitRange(x float64) bool {
+	return x >= 0 && x <= 1
+}
+
+// validGrayMap reports whether gm is a valid OPI 1.3 gray map: 2^n integers
+// in the range 0 to 65535, where n is the number of bits per sample.  If
+// imageType is known, n must match its bits per sample.
+func validGrayMap(gm []int, imageType *[2]int) bool {
+	n := len(gm)
+	if n < 2 || n > 1<<16 || n&(n-1) != 0 {
+		return false
+	}
+	if imageType != nil {
+		if bits := imageType[1]; bits >= 1 && bits <= 16 && n != 1<<bits {
+			return false
+		}
+	}
+	for _, x := range gm {
+		if x < 0 || x > 65535 {
+			return false
+		}
+	}
+	return true
+}
+
+// validPosition reports whether the corners [llx lly ulx uly urx ury lrx lry]
+// of an OPI 1.3 Position entry form a parallelogram, up to rounding errors.
+// Corners which are not finite, or whose differences overflow, are invalid.
+func validPosition(p *[8]float64) bool {
+	return approxEqual(p[2]-p[0], p[4]-p[6]) && approxEqual(p[3]-p[1], p[5]-p[7])
+}
+
+// approxEqual reports whether a and b are finite and equal up to rounding
+// errors.
+func approxEqual(a, b float64) bool {
+	if math.IsInf(a, 0) || math.IsInf(b, 0) {
+		return false
+	}
+	return math.Abs(a-b) <= 1e-6*max(1, math.Abs(a), math.Abs(b))
+}
+
+// validCrop reports whether a crop rectangle [left top right bottom] lies
+// inside an image of the given size, as 0 ≤ left < right ≤ width and
+// 0 ≤ top < bottom ≤ height.
+func validCrop[T int | float64](size *[2]T, crop *[4]T) bool {
+	return 0 <= crop[0] && crop[0] < crop[2] && crop[2] <= size[0] &&
+		0 <= crop[1] && crop[1] < crop[3] && crop[3] <= size[1]
+}
+
+// validCrop13 reports whether an OPI 1.3 crop rectangle [left top right
+// bottom] lies inside an image of the given size.  Unlike for OPI 2.0, the
+// PDF specification does not fix the direction of the vertical axis, so top
+// and bottom may come in either order but must differ.
+func validCrop13[T int | float64](size *[2]T, crop *[4]T) bool {
+	lo, hi := min(crop[1], crop[3]), max(crop[1], crop[3])
+	return 0 <= crop[0] && crop[0] < crop[2] && crop[2] <= size[0] &&
+		0 <= lo && lo < hi && hi <= size[1]
 }
