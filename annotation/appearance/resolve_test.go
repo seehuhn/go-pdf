@@ -372,6 +372,72 @@ func TestAppearanceToRectNothingToDraw(t *testing.T) {
 	}
 }
 
+func TestTransformedBBox(t *testing.T) {
+	cases := []struct {
+		name       string
+		ap         *form.Form
+		wantMatrix matrix.Matrix
+		wantBox    pdf.Rectangle
+		wantOK     bool
+	}{
+		{
+			name:       "identity",
+			ap:         testForm(pdf.Rectangle{LLx: -10, LLy: 5, URx: 30, URy: 45}, matrix.Identity),
+			wantMatrix: matrix.Identity,
+			wantBox:    pdf.Rectangle{LLx: -10, LLy: 5, URx: 30, URy: 45},
+			wantOK:     true,
+		},
+		{
+			name:       "zeroMatrix",
+			ap:         testForm(pdf.Rectangle{URx: 24, URy: 12}, matrix.Zero),
+			wantMatrix: matrix.Identity,
+			wantBox:    pdf.Rectangle{URx: 24, URy: 12},
+			wantOK:     true,
+		},
+		{
+			// a quarter turn maps (x, y) to (-y, x)
+			name:       "rotated",
+			ap:         testForm(pdf.Rectangle{URx: 40, URy: 20}, matrix.Matrix{0, 1, -1, 0, 0, 0}),
+			wantMatrix: matrix.Matrix{0, 1, -1, 0, 0, 0},
+			wantBox:    pdf.Rectangle{LLx: -20, URy: 40},
+			wantOK:     true,
+		},
+		{
+			name: "degenerateBBox",
+			ap:   testForm(pdf.Rectangle{URx: 24}, matrix.Identity),
+		},
+		{
+			name: "noContent",
+			ap: func() *form.Form {
+				f := testForm(pdf.Rectangle{URx: 24, URy: 24}, matrix.Identity)
+				f.Content = nil
+				return f
+			}(),
+		},
+		{
+			name: "nilForm",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, box, ok := TransformedBBox(tc.ap)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if !ok {
+				return
+			}
+			if m != tc.wantMatrix {
+				t.Errorf("matrix = %v, want %v", m, tc.wantMatrix)
+			}
+			if box != tc.wantBox {
+				t.Errorf("box = %v, want %v", box, tc.wantBox)
+			}
+		})
+	}
+}
+
 // testForm returns an appearance with the given bounding box and form matrix.
 func testForm(bbox pdf.Rectangle, m matrix.Matrix) *form.Form {
 	f := makeTestAppearance(0.5)

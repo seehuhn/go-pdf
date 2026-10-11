@@ -89,40 +89,58 @@ func XObjectToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
 	return a, true
 }
 
-// rectMapping splits the appearance-to-rectangle mapping of §12.5.5 into the
-// form matrix and the matrix A which carries the transformed appearance box
-// onto rect.  Their product maps form coordinates into the rectangle.
-func rectMapping(ap *form.Form, rect pdf.Rectangle) (formMatrix, a matrix.Matrix, ok bool) {
-	if ap == nil || ap.Content == nil {
-		return matrix.Matrix{}, matrix.Matrix{}, false
+// TransformedBBox returns the bounding box of the form's BBox after
+// transformation by the form's Matrix, together with the matrix used.  The
+// box lies in the coordinate space the form is drawn into (PDF 2.0 section
+// 12.5.5, step 1); for a rotated or skewed matrix it is the axis-aligned
+// bounding box of the four transformed corners.  A form matrix left at zero
+// stands for the identity matrix.
+//
+// The last return value is false when the form has no content or the
+// transformed box has zero width or height, in which case there is nothing
+// to draw.
+func TransformedBBox(f *form.Form) (formMatrix matrix.Matrix, box pdf.Rectangle, ok bool) {
+	if f == nil || f.Content == nil {
+		return matrix.Matrix{}, pdf.Rectangle{}, false
 	}
 
-	formMatrix = ap.Matrix
+	formMatrix = f.Matrix
 	if formMatrix == (matrix.Matrix{}) {
 		formMatrix = matrix.Identity
 	}
 
-	// transform BBox through the form matrix to get the transformed appearance box
-	bbox := ap.BBox
+	bbox := f.BBox
 	ll := formMatrix.Apply(vec.Vec2{X: bbox.LLx, Y: bbox.LLy})
 	lr := formMatrix.Apply(vec.Vec2{X: bbox.URx, Y: bbox.LLy})
 	ul := formMatrix.Apply(vec.Vec2{X: bbox.LLx, Y: bbox.URy})
 	ur := formMatrix.Apply(vec.Vec2{X: bbox.URx, Y: bbox.URy})
-	tbLLx := min(ll.X, lr.X, ul.X, ur.X)
-	tbLLy := min(ll.Y, lr.Y, ul.Y, ur.Y)
-	tbURx := max(ll.X, lr.X, ul.X, ur.X)
-	tbURy := max(ll.Y, lr.Y, ul.Y, ur.Y)
-	tbW := tbURx - tbLLx
-	tbH := tbURy - tbLLy
-	if tbW == 0 || tbH == 0 {
+	box = pdf.Rectangle{
+		LLx: min(ll.X, lr.X, ul.X, ur.X),
+		LLy: min(ll.Y, lr.Y, ul.Y, ur.Y),
+		URx: max(ll.X, lr.X, ul.X, ur.X),
+		URy: max(ll.Y, lr.Y, ul.Y, ur.Y),
+	}
+	if box.URx-box.LLx == 0 || box.URy-box.LLy == 0 {
+		return matrix.Matrix{}, pdf.Rectangle{}, false
+	}
+	return formMatrix, box, true
+}
+
+// rectMapping splits the appearance-to-rectangle mapping of section 12.5.5
+// into the form matrix and the matrix A which carries the transformed
+// appearance box onto rect.  Their product maps form coordinates into the
+// rectangle.
+func rectMapping(ap *form.Form, rect pdf.Rectangle) (formMatrix, a matrix.Matrix, ok bool) {
+	formMatrix, box, ok := TransformedBBox(ap)
+	if !ok {
 		return matrix.Matrix{}, matrix.Matrix{}, false
 	}
 
 	// matrix A maps the transformed appearance box to the annotation rectangle
-	sx := (rect.URx - rect.LLx) / tbW
-	sy := (rect.URy - rect.LLy) / tbH
-	tx := rect.LLx - tbLLx*sx
-	ty := rect.LLy - tbLLy*sy
+	sx := (rect.URx - rect.LLx) / (box.URx - box.LLx)
+	sy := (rect.URy - rect.LLy) / (box.URy - box.LLy)
+	tx := rect.LLx - box.LLx*sx
+	ty := rect.LLy - box.LLy*sy
 
 	return formMatrix, matrix.Matrix{sx, 0, 0, sy, tx, ty}, true
 }
