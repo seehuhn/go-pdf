@@ -270,14 +270,7 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 	} else if len(cr) == 4 && validCrop13(&v.Size, (*[4]int)(cr)) {
 		v.CropRect = [4]int(cr)
 	} else if v.CropFixed != nil {
-		// CropFixed lies inside the image, so the rounded values fit into
-		// an int
-		for i, x := range v.CropFixed {
-			v.CropRect[i] = int(math.Round(x))
-		}
-		if !validCrop13(&v.Size, &v.CropRect) {
-			return nil, pdf.Error("OPI 1.3 dictionary has no valid CropRect entry")
-		}
+		v.CropRect = roundOut13(v.CropFixed)
 	} else {
 		return nil, pdf.Error("OPI 1.3 dictionary has no valid CropRect entry")
 	}
@@ -406,4 +399,17 @@ func validColorType13(ct pdf.Name) bool {
 // CropFixed against it.
 func sizeFloat13(size [2]int) *[2]float64 {
 	return &[2]float64{float64(size[0]), float64(size[1])}
+}
+
+// roundOut13 rounds an OPI 1.3 crop rectangle outwards to integers, keeping
+// the order of the vertical coordinates.  If crop lies inside an image, so
+// does the result, and the result is never empty.
+func roundOut13(crop *[4]float64) [4]int {
+	res := [4]int{int(math.Floor(crop[0])), 0, int(math.Ceil(crop[2])), 0}
+	if crop[1] <= crop[3] {
+		res[1], res[3] = int(math.Floor(crop[1])), int(math.Ceil(crop[3]))
+	} else {
+		res[1], res[3] = int(math.Ceil(crop[1])), int(math.Floor(crop[3]))
+	}
+	return res
 }

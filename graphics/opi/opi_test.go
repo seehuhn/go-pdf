@@ -373,8 +373,8 @@ func TestV13ReadRequired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := [4]int{10, 11, 601, 470}; v.CropRect != want {
-		t.Errorf("CropRect from CropFixed: got %v, want %v", v.CropRect, want)
+	if want := [4]int{10, 10, 601, 470}; v.CropRect != want {
+		t.Errorf("recovered CropRect: got %v, want %v", v.CropRect, want)
 	}
 
 	dict = base()
@@ -403,6 +403,18 @@ func TestV13ReadRequired(t *testing.T) {
 		t.Error("flipped CropFixed dropped")
 	}
 
+	// outward rounding keeps a narrow crop rectangle non-empty
+	dict = base()
+	delete(dict, "CropRect")
+	dict["CropFixed"] = nums(10.2, 479.5, 10.4, 0.5)
+	v, err = extractV13(c, dict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := [4]int{10, 480, 11, 0}; v.CropRect != want {
+		t.Errorf("narrow CropRect from CropFixed: got %v, want %v", v.CropRect, want)
+	}
+
 	dict = base()
 	dict["Position"] = nums(0, 0, 0, 480, 640, 480, math.Inf(1), 0)
 	v, err = extractV13(c, dict, true)
@@ -410,7 +422,7 @@ func TestV13ReadRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := [8]float64{0, 0, 0, 480, 640, 480, 640, 0}; v.Position != want {
-		t.Errorf("Position with infinite corner: got %v, want %v", v.Position, want)
+		t.Errorf("infinite Position corner: got %v, want %v", v.Position, want)
 	}
 
 	broken := []struct {
@@ -427,7 +439,6 @@ func TestV13ReadRequired(t *testing.T) {
 		{"CropRect", ints(-1, 0, 640, 480)},
 		{"CropRect", ints(0, 100, 640, 100)},
 		{"CropRect", ints(0, 481, 640, 0)},
-		{"CropFixed", nums(10.2, 0, 10.4, 480)},
 		{"CropFixed", nums(0, 0, 1e300, 480)},
 		{"Position", nil},
 		{"Position", nums(0, 0, 0, 480, 640, 480, 640)},
@@ -597,7 +608,7 @@ func TestV13ReadRange(t *testing.T) {
 			t.Fatal(err)
 		}
 		if v.GrayMap != nil {
-			t.Errorf("GrayMap %v not dropped", gm)
+			t.Errorf("dropping GrayMap %v failed", gm)
 		}
 	}
 }
