@@ -56,7 +56,7 @@ func createDocument(filename string) error {
 	annot := &annotation.Movie{
 		Rect:       moviepage.Screen,
 		Contents:   moviepage.Description + ", embedded in the PDF file.",
-		Border:     annotation.PDFDefaultBorder,
+		Border:     &annotation.Border{Width: 1},
 		Flags:      annotation.FlagPrint,
 		Title:      "Tick movie",
 		Movie:      newMovie(),

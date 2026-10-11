@@ -45,7 +45,7 @@ func TestEffectiveBorderWidth(t *testing.T) {
 		},
 		{
 			"the PDF default border",
-			&Square{Border: PDFDefaultBorder},
+			&Square{Border: &Border{Width: 1}},
 			1,
 		},
 		{
@@ -100,7 +100,7 @@ func TestEffectiveBorderStyle(t *testing.T) {
 		want pdf.Name
 	}{
 		{"neither", &Square{}, "S"},
-		{"plain border array", &Square{Border: PDFDefaultBorder}, "S"},
+		{"plain border array", &Square{Border: &Border{Width: 1}}, "S"},
 		{
 			// a border array has no style entry, so a dash pattern is the
 			// only way it can ask for anything but a solid border
@@ -139,7 +139,7 @@ func TestEffectiveBorderDash(t *testing.T) {
 		want []float64
 	}{
 		{"neither", &Square{}, nil},
-		{"solid border array", &Square{Border: PDFDefaultBorder}, nil},
+		{"solid border array", &Square{Border: &Border{Width: 1}}, nil},
 		{
 			"dashed border array",
 			&Square{Border: &Border{Width: 1, DashArray: []float64{2, 3}}},

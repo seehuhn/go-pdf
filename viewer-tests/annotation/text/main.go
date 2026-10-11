@@ -108,7 +108,7 @@ func createDocument(filename string) error {
 	for _, icon := range allIcons {
 		text := &annotation.Text{
 			Contents: fmt.Sprintf("Icon: %s", icon),
-			Border:   annotation.PDFDefaultBorder,
+			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
 			User:     "Test User",
 			Icon:     icon,
@@ -124,7 +124,7 @@ func createDocument(filename string) error {
 	text := &annotation.Text{
 		Contents: "Pink background",
 		Color:    pink,
-		Border:   annotation.PDFDefaultBorder,
+		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
 		User:     "Test User",
 		Icon:     annotation.TextIconNote,
@@ -138,7 +138,7 @@ func createDocument(filename string) error {
 	text = &annotation.Text{
 		Contents: "Transparent background",
 		Color:    colorenc.Transparent,
-		Border:   annotation.PDFDefaultBorder,
+		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
 		User:     "Test User",
 		Icon:     annotation.TextIconNote,

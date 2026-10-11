@@ -105,7 +105,7 @@ func createDocument(filename string) error {
 	for _, icon := range allIcons {
 		fa := &annotation.FileAttachment{
 			Contents: fmt.Sprintf("Icon: %s", icon),
-			Border:   annotation.PDFDefaultBorder,
+			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
 			User:     "Test User",
 			Icon:     icon,
@@ -122,7 +122,7 @@ func createDocument(filename string) error {
 	fa := &annotation.FileAttachment{
 		Contents: "Red push pin",
 		Color:    red,
-		Border:   annotation.PDFDefaultBorder,
+		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
 		User:     "Test User",
 		Icon:     annotation.FileAttachmentIconPushPin,
@@ -137,7 +137,7 @@ func createDocument(filename string) error {
 	fa = &annotation.FileAttachment{
 		Contents: "Blue paperclip",
 		Color:    blue,
-		Border:   annotation.PDFDefaultBorder,
+		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
 		User:     "Test User",
 		Icon:     annotation.FileAttachmentIconPaperclip,
@@ -163,7 +163,7 @@ func createDocument(filename string) error {
 	// no-icon default (empty Icon name falls back to PushPin)
 	fa = &annotation.FileAttachment{
 		Contents: "Unset Icon (defaults to PushPin)",
-		Border:   annotation.PDFDefaultBorder,
+		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
 		User:     "Test User",
 		FS:       sampleFile("default.txt"),

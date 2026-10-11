@@ -193,7 +193,7 @@ func addFileAttachment(page *document.Page, style *fallback.Generator,
 	fa := &annotation.FileAttachment{
 		Rect:     rect,
 		Contents: contents,
-		Border:   annotation.PDFDefaultBorder,
+		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
 		User:     "Attachments test",
 		Icon:     annotation.FileAttachmentIconPushPin,

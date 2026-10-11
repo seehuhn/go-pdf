@@ -196,7 +196,7 @@ func createDocument(filename string) error {
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		// the PDF default, which is written by leaving Border out
-		Border: annotation.PDFDefaultBorder,
+		Border: &annotation.Border{Width: 1},
 		Coords: [4]float64{
 			pdf.Round(leftColStart, 2),
 			pdf.Round(w.yPos, 2),

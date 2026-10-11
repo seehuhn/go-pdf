@@ -48,10 +48,6 @@ type Border struct {
 
 var _ pdf.Embedder = (*Border)(nil)
 
-// PDFDefaultBorder is the default border values within PDF files.
-// Using this for [Common.Border] slightly reduces file size.
-var PDFDefaultBorder = &Border{Width: 1}
-
 // borderStyled is implemented by the annotation types which can carry a border
 // style dictionary, so that a rule reading the style can be written once for
 // all of them.  Each type's style is reachable through its exported
@@ -132,8 +128,7 @@ func SetBorderWidth(a Annotation, width float64, v pdf.Version) {
 		c.Border = nil
 		return
 	}
-	// a copy, as above; this also protects the package-level
-	// [PDFDefaultBorder]
+	// a copy, as above
 	border := Border{Width: width}
 	if c.Border != nil {
 		border = *c.Border
@@ -217,7 +212,7 @@ func ExtractBorder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Border, error)
 	}
 
 	if len(border) < 3 {
-		return PDFDefaultBorder, nil
+		return &Border{Width: 1}, nil
 	}
 
 	b := &Border{}
@@ -252,10 +247,11 @@ func ExtractBorder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Border, error)
 		}
 	}
 
-	// the writer omits a default border, which then reads back as
-	// PDFDefaultBorder; return that here too, whatever the form of the entry
+	// the writer omits a default border, which then reads back as the
+	// border a viewer draws when the file gives no Border entry; return
+	// that here too, whatever the form of the entry
 	if b.isPDFDefault() {
-		return PDFDefaultBorder, nil
+		return &Border{Width: 1}, nil
 	}
 
 	b.SingleUse = isDirect

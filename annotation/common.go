@@ -39,7 +39,7 @@ type Common struct {
 	Rect pdf.Rectangle
 
 	// Border (optional) specifies the characteristics of the annotation's
-	// border.
+	// border.  A nil Border means that no border is drawn.
 	Border *Border
 
 	// Color (optional) is the color used for the annotation's background,

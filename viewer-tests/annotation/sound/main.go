@@ -103,7 +103,7 @@ func createDocument(filename string) error {
 	} {
 		a := &annotation.Sound{
 			Contents: "Sound annotation",
-			Border:   annotation.PDFDefaultBorder,
+			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
 			User:     "Test User",
 			Icon:     row.icon,
@@ -139,7 +139,7 @@ func createDocument(filename string) error {
 	for _, e := range encodings {
 		a := &annotation.Sound{
 			Contents: "Sound annotation: " + e.label,
-			Border:   annotation.PDFDefaultBorder,
+			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
 			User:     "Test User",
 			Icon:     annotation.SoundIconSpeaker,

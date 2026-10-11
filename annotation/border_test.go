@@ -62,7 +62,7 @@ func TestBorderDefaults(t *testing.T) {
 }
 
 // TestExtractBorderDefault checks that an explicit /Border entry holding the
-// PDF default value reads as [PDFDefaultBorder], the same as an absent entry.
+// PDF default value reads as the border of an absent entry.
 // The writer omits a default border, so anything else would change in a
 // read-write-read cycle.
 func TestExtractBorderDefault(t *testing.T) {
@@ -75,9 +75,30 @@ func TestExtractBorderDefault(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if diff := cmp.Diff(PDFDefaultBorder, b); diff != "" {
+		if diff := cmp.Diff(&Border{Width: 1}, b); diff != "" {
 			t.Errorf("%v: (-want +got):\n%s", obj, diff)
 		}
+	}
+}
+
+// TestExtractBorderAbsentFresh checks that each read of an absent entry
+// returns its own Border, so that mutating one result affects no other.
+func TestExtractBorderAbsentFresh(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	b1, err := ExtractBorder(pdf.NewCursor(w), nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b1.Width = 5
+	b2, err := ExtractBorder(pdf.NewCursor(w), nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b1 == b2 {
+		t.Fatal("ExtractBorder returned a shared pointer")
+	}
+	if diff := cmp.Diff(&Border{Width: 1}, b2); diff != "" {
+		t.Errorf("second read changed (-want +got):\n%s", diff)
 	}
 }
 
