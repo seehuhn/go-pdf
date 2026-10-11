@@ -507,7 +507,7 @@ func TestFormXFAStreamRoundTrip(t *testing.T) {
 	if got.XFA == nil {
 		t.Fatal("XFA lost in round trip")
 	}
-	s, err := opaque.ObjectAs(got.XFA, nil, func(c pdf.Cursor, obj pdf.Object, _ bool) ([]byte, error) {
+	s, err := got.XFA.As(nil, func(c pdf.Cursor, obj pdf.Object, _ bool) ([]byte, error) {
 		return c.ReadAll(obj, 1<<20)
 	})
 	if err != nil {

@@ -18,7 +18,6 @@ package property
 
 import (
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/opaque"
 )
 
 // Standard tags (from Table 352a and spec):
@@ -79,7 +78,7 @@ func ListGet[T any](l List, extract func(pdf.Cursor, pdf.Object, bool) (T, error
 		var zero T
 		return zero, pdf.Error("ListGet only works for property lists extracted from PDF files")
 	}
-	return opaque.ObjectAs(p.inner, p.path, extract)
+	return p.inner.As(p.path, extract)
 }
 
 // ListsEqual compares two property lists for semantic equality.

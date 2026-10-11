@@ -259,18 +259,15 @@ func (o *Object) AsDirectDict() pdf.Dict {
 	return dict
 }
 
-// ObjectAs decodes the value wrapped by o using extract, with path for cycle
+// As decodes the value wrapped by o using extract, with path for cycle
 // detection.  It returns an error if o was created by [Direct].
-func ObjectAs[T any](
-	o *Object,
+func (o *Object) As[T any](
 	path *pdf.CycleCheck,
 	extract func(pdf.Cursor, pdf.Object, bool) (T, error),
 ) (T, error) {
-	// Once Go supports generic methods, this will become Object.As.
-
 	if o.src == nil {
 		var zero T
-		return zero, errors.New("opaque: ObjectAs requires an Object built via Extract")
+		return zero, errors.New("opaque: Object.As requires an Object built via Extract")
 	}
 	return pdf.Decode(pdf.CursorAt(o.src, path), o.obj, extract)
 }

@@ -204,7 +204,7 @@ func TestEmbedDedup(t *testing.T) {
 	}
 }
 
-// TestObjectAs verifies that ObjectAs runs a typed extractor against
+// TestObjectAs verifies that Object.As runs a typed extractor against
 // the wrapped value when the Object has a source extractor, and
 // returns an error when called on an Object built via New.
 func TestObjectAs(t *testing.T) {
@@ -232,19 +232,19 @@ func TestObjectAs(t *testing.T) {
 	// success: file-backed Object.
 	srcX := pdf.NewExtractor(src)
 	fileBacked := Extract(srcX, srcRef)
-	got, err := ObjectAs(fileBacked, nil, extract)
+	got, err := fileBacked.As(nil, extract)
 	if err != nil {
-		t.Fatalf("ObjectAs(file-backed): %v", err)
+		t.Fatalf("As(file-backed): %v", err)
 	}
 	if got != 7 {
-		t.Errorf("ObjectAs(file-backed) = %d, want 7", got)
+		t.Errorf("As(file-backed) = %d, want 7", got)
 	}
 
 	// error: in-memory Object has no source.
 	inMemory := Direct(pdf.Dict{"N": pdf.Integer(99)})
-	_, err = ObjectAs(inMemory, nil, extract)
+	_, err = inMemory.As(nil, extract)
 	if err == nil {
-		t.Error("ObjectAs(in-memory): expected error, got nil")
+		t.Error("As(in-memory): expected error, got nil")
 	}
 }
 
