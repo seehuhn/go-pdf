@@ -649,3 +649,122 @@ func TestGroupArrayReadError(t *testing.T) {
 		t.Error("I/O error was not reported")
 	}
 }
+
+// TestConfigurationReadErrors checks that I/O errors in array elements of a
+// configuration are reported, while malformed elements are skipped.
+func TestConfigurationReadErrors(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	put := func(obj pdf.Object) pdf.Reference {
+		ref := w.Alloc()
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
+		return ref
+	}
+	good := put(pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Layer")})
+	unreadable := put(pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Other")})
+	malformed := pdf.Integer(1)
+
+	x := pdf.NewExtractor(failingGetter{Getter: w, bad: unreadable})
+	c := pdf.CursorAt(x, nil)
+
+	cases := []struct {
+		name  string
+		key   pdf.Name
+		bad   []pdf.Array // arrays which must cause a read error
+		skip  pdf.Array   // malformed elements, to be skipped
+		check func(*Configuration) bool
+	}{
+		{
+			name: "RBGroups",
+			key:  "RBGroups",
+			bad: []pdf.Array{
+				{pdf.Array{good, unreadable}},
+				{unreadable},
+			},
+			skip: pdf.Array{malformed, pdf.Array{malformed, good}},
+			check: func(cfg *Configuration) bool {
+				return len(cfg.RBGroups) == 1 && len(cfg.RBGroups[0]) == 1
+			},
+		},
+		{
+			name: "AS",
+			key:  "AS",
+			bad:  []pdf.Array{{unreadable}},
+			skip: pdf.Array{malformed},
+			check: func(cfg *Configuration) bool {
+				return len(cfg.AS) == 0
+			},
+		},
+		{
+			name: "Order",
+			key:  "Order",
+			bad: []pdf.Array{
+				{unreadable},
+				{pdf.Array{pdf.TextString("label"), unreadable}},
+				{pdf.Array{unreadable}},
+			},
+			skip: pdf.Array{malformed, pdf.Array{malformed, good}, good},
+			check: func(cfg *Configuration) bool {
+				return len(cfg.Order) == 2
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for i, arr := range tc.bad {
+				dict := pdf.Dict{tc.key: arr}
+				if _, err := ExtractConfiguration(c, dict, true); err == nil || pdf.IsMalformed(err) {
+					t.Errorf("case %d: I/O error not reported: %v", i, err)
+				}
+			}
+
+			dict := pdf.Dict{tc.key: tc.skip}
+			cfg, err := ExtractConfiguration(c, dict, true)
+			if err != nil {
+				t.Fatalf("malformed elements: unexpected error %v", err)
+			}
+			if !tc.check(cfg) {
+				t.Errorf("malformed elements: unexpected result %+v", cfg)
+			}
+		})
+	}
+}
+
+// TestPropertiesConfigsReadError checks that an I/O error while reading an
+// alternate configuration is reported, while a malformed entry is skipped.
+func TestPropertiesConfigsReadError(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	group := w.Alloc()
+	if err := w.Put(group, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Layer")}); err != nil {
+		t.Fatal(err)
+	}
+	unreadable := w.Alloc()
+	if err := w.Put(unreadable, pdf.Dict{"Name": pdf.TextString("Alt")}); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(failingGetter{Getter: w, bad: unreadable})
+	c := pdf.CursorAt(x, nil)
+
+	props := func(configs pdf.Array) pdf.Dict {
+		return pdf.Dict{
+			"OCGs":    pdf.Array{group},
+			"D":       pdf.Dict{},
+			"Configs": configs,
+		}
+	}
+
+	p, err := ExtractProperties(c, props(pdf.Array{pdf.Integer(1), pdf.Dict{"Name": pdf.TextString("Alt")}}), true)
+	if err != nil {
+		t.Fatalf("malformed entry: unexpected error %v", err)
+	}
+	if len(p.Configs) != 1 {
+		t.Errorf("malformed entry: got %d configs, want 1", len(p.Configs))
+	}
+
+	_, err = ExtractProperties(c, props(pdf.Array{unreadable}), true)
+	if err == nil || pdf.IsMalformed(err) {
+		t.Errorf("I/O error not reported: %v", err)
+	}
+}

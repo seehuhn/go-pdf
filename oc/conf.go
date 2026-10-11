@@ -217,7 +217,7 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 		for _, item := range asArr {
 			ua, err := c.DecodeOptional(item, ExtractUsageApplication)
 			if err != nil {
-				continue // permissive
+				return nil, err
 			}
 			if ua != nil {
 				cfg.AS = append(cfg.AS, ua)
@@ -268,11 +268,11 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 			}
 			inner, err := pdf.Optional(c.Array(item))
 			if err != nil {
-				continue
+				return nil, err
 			}
 			groups, err := extractGroupArrayFromArray(c, inner)
 			if err != nil {
-				continue
+				return nil, err
 			}
 			if len(groups) > remaining {
 				groups = groups[:remaining]
@@ -530,8 +530,11 @@ func doExtractOrderItems(c pdf.Cursor, arr pdf.Array, remaining *int) ([]OrderIt
 		if *remaining <= 0 {
 			break
 		}
-		resolved, err := c.Resolve(elem)
+		resolved, err := pdf.Optional(c.Resolve(elem))
 		if err != nil {
+			return nil, err
+		}
+		if resolved == nil {
 			continue
 		}
 		switch v := resolved.(type) {
@@ -541,14 +544,18 @@ func doExtractOrderItems(c pdf.Cursor, arr pdf.Array, remaining *int) ([]OrderIt
 			og := &OrderGroup{}
 			start := 0
 			if len(v) > 0 {
-				if label, err := pdf.Optional(c.TextString(v[0])); err == nil && label != "" {
+				label, err := pdf.Optional(c.TextString(v[0]))
+				if err != nil {
+					return nil, err
+				}
+				if label != "" {
 					og.Label = string(label)
 					start = 1
 				}
 			}
 			children, err := doExtractOrderItems(c, v[start:], remaining)
 			if err != nil {
-				continue
+				return nil, err
 			}
 			og.Children = children
 			items = append(items, og)
@@ -556,7 +563,7 @@ func doExtractOrderItems(c pdf.Cursor, arr pdf.Array, remaining *int) ([]OrderIt
 			// try to extract as a Group
 			group, err := c.DecodeOptional(elem, ExtractGroup)
 			if err != nil {
-				continue
+				return nil, err
 			}
 			if group != nil {
 				*remaining--

@@ -92,7 +92,7 @@ func ExtractProperties(c pdf.Cursor, obj pdf.Object, _ bool) (*Properties, error
 		for _, item := range configsArr {
 			config, err := c.DecodeOptional(item, ExtractConfiguration)
 			if err != nil {
-				continue // permissive
+				return nil, err
 			}
 			if config == nil {
 				continue
