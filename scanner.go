@@ -101,12 +101,31 @@ func newScanner(r io.Reader, getInt getIntFn, enc *encryptInfo) *scanner {
 	}
 }
 
+// eofToMalformed turns an end-of-input error into a [MalformedFileError],
+// reporting that the named construct is truncated.  Other errors are returned
+// unchanged.
+func eofToMalformed(err error, what string) error {
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		return &MalformedFileError{
+			Err: fmt.Errorf("unexpected EOF while reading %s", what),
+		}
+	}
+	return err
+}
+
 // CurrentPos returns the current position in the file.
 func (s *scanner) CurrentPos() int64 {
 	return s.filePos + int64(s.pos)
 }
 
-func (s *scanner) ReadIndirectObject() (Native, Reference, error) {
+// ReadIndirectObject reads an indirect object, from the object number up to
+// and including the "endobj" keyword.  If the input ends before the object is
+// complete, a [MalformedFileError] is returned.
+func (s *scanner) ReadIndirectObject() (_ Native, _ Reference, err error) {
+	defer func() {
+		err = eofToMalformed(err, "indirect object")
+	}()
+
 	number, err := s.ReadInteger()
 	if err != nil {
 		return nil, 0, err
@@ -202,7 +221,9 @@ func (s *scanner) ReadObject() (Native, error) {
 	switch {
 	case len(buf) == 0:
 		// Test this first, so that we can use buf[0] in the following cases.
-		return nil, &MalformedFileError{Err: io.EOF}
+		return nil, &MalformedFileError{
+			Err: errors.New("unexpected EOF while reading object"),
+		}
 	case bytes.HasPrefix(buf, []byte("null")):
 		s.pos += 4
 		return nil, nil
@@ -346,7 +367,11 @@ func (s *scanner) ReadNumber() (Native, error) {
 }
 
 // ReadString reads a ()-delimited string, starting after the opening bracket.
-func (s *scanner) ReadString() (String, error) {
+func (s *scanner) ReadString() (_ String, err error) {
+	defer func() {
+		err = eofToMalformed(err, "String")
+	}()
+
 	var res []byte
 	bracketLevel := 1 // we are already inside the opening "("
 	ignoreLF := false
@@ -432,12 +457,16 @@ func (s *scanner) ReadString() (String, error) {
 
 // ReadHexString reads a <>-delimited string, starting after the opening
 // angled bracket.
-func (s *scanner) ReadHexString() (String, error) {
+func (s *scanner) ReadHexString() (_ String, err error) {
+	defer func() {
+		err = eofToMalformed(err, "hex String")
+	}()
+
 	var res []byte
 	var hexVal byte
 	first := true
 	tooLong := false
-	err := s.ScanBytes(func(b byte) bool {
+	err = s.ScanBytes(func(b byte) bool {
 		var d byte
 		if b >= '0' && b <= '9' {
 			d = b - '0'
@@ -562,15 +591,8 @@ func hexDigit(c byte) byte {
 // ReadArray reads an array, starting after the opening "[".
 func (s *scanner) ReadArray() (array Array, err error) {
 	defer func() {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		if err == io.ErrUnexpectedEOF {
-			err = &MalformedFileError{
-				Err: errors.New("unexpected EOF while reading Array"),
-			}
-		} else if err != nil {
-			err = Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
+		if err != nil {
+			err = Wrap(eofToMalformed(err, "Array"), fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 	}()
 
@@ -640,17 +662,13 @@ func (s *scanner) ReadArray() (array Array, err error) {
 }
 
 // ReadDict reads a PDF dictionary.
+//
+// Entries whose value is null, or a token which reads as null, are omitted
+// from the result.
 func (s *scanner) ReadDict() (dict Dict, err error) {
 	defer func() {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		if err == io.ErrUnexpectedEOF {
-			err = &MalformedFileError{
-				Err: errors.New("unexpected EOF while reading Dict"),
-			}
-		} else if err != nil {
-			err = Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
+		if err != nil {
+			err = Wrap(eofToMalformed(err, "Dict"), fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 	}()
 
@@ -704,7 +722,7 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 				return nil, err
 			}
 			if len(buf) == 0 {
-				return nil, &MalformedFileError{Err: io.ErrUnexpectedEOF}
+				return nil, io.ErrUnexpectedEOF
 			}
 			if buf[0] != '/' && buf[0] != '>' {
 				b, err := s.ReadInteger()
@@ -738,6 +756,12 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 			}
 		}
 
+		// a null value is the same as an absent entry (PDF 7.3.7)
+		if val == nil {
+			delete(dict, key)
+			continue
+		}
+
 		if _, exists := dict[key]; !exists && len(dict) >= maxDictLen {
 			return nil, &MalformedFileError{
 				Err: errors.New("dictionary too large"),
@@ -756,15 +780,8 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 // ReadStreamData reads the data of a PDF Stream, starting after the Dict.
 func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	defer func() {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		if err == io.ErrUnexpectedEOF {
-			err = &MalformedFileError{
-				Err: errors.New("unexpected EOF while reading Stream"),
-			}
-		} else if err != nil {
-			err = Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
+		if err != nil {
+			err = Wrap(eofToMalformed(err, "Stream"), fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 	}()
 

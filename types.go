@@ -66,7 +66,8 @@ type Object interface {
 }
 
 // Equal reports whether two Objects have the same PDF representation.
-// Arrays and Dicts are compared recursively.
+// Arrays and Dicts are compared recursively.  Dict entries with a nil
+// value are treated as absent.
 //
 // Stream and Placeholder objects are compared by pointer identity: this
 // is a deliberate compromise to avoid the I/O and decoding required for
@@ -100,16 +101,10 @@ func Equal(a, b Object) bool {
 		return ok && va == vb
 	case Dict:
 		vb, ok := bN.(Dict)
-		if !ok || (va == nil) != (vb == nil) || len(va) != len(vb) {
+		if !ok || (va == nil) != (vb == nil) {
 			return false
 		}
-		for k, valA := range va {
-			valB, exists := vb[k]
-			if !exists || !Equal(valA, valB) {
-				return false
-			}
-		}
-		return true
+		return dictEntriesEqual(va, vb, Equal)
 	case Integer:
 		vb, ok := bN.(Integer)
 		return ok && va == vb
@@ -137,6 +132,22 @@ func Equal(a, b Object) bool {
 	default:
 		return false
 	}
+}
+
+// dictEntriesEqual reports whether a and b have equal entries, using eq to
+// compare values.  An entry with a nil value is the same as an absent entry.
+func dictEntriesEqual(a, b Dict, eq func(x, y Object) bool) bool {
+	for k, valA := range a {
+		if !eq(valA, b[k]) {
+			return false
+		}
+	}
+	for k, valB := range b {
+		if _, exists := a[k]; !exists && valB != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // NearlyEqual reports whether two Objects have approximately the same value.
@@ -169,16 +180,12 @@ func NearlyEqual(a, b Object, eps float64) bool {
 		return ok && va == vb
 	case Dict:
 		vb, ok := bN.(Dict)
-		if !ok || len(va) != len(vb) {
+		if !ok {
 			return false
 		}
-		for k, valA := range va {
-			valB, exists := vb[k]
-			if !exists || !NearlyEqual(valA, valB, eps) {
-				return false
-			}
-		}
-		return true
+		return dictEntriesEqual(va, vb, func(x, y Object) bool {
+			return NearlyEqual(x, y, eps)
+		})
 	case Integer:
 		return nearlyEqualNumeric(float64(va), bN, eps)
 	case Name:
@@ -1070,6 +1077,9 @@ func (x Reference) String() string {
 //
 // TODO(voss): remove?
 func IsDirect(obj Object) bool {
+	if obj == nil {
+		return true
+	}
 	native := obj.AsPDF(0)
 
 	switch x := native.(type) {

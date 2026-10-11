@@ -120,6 +120,7 @@ func (c *Copier) Copy(obj Native) (Native, error) {
 }
 
 // CopyDict copies a dictionary from the source file to the target file.
+// Entries with a nil value are omitted from the copy.
 //
 // The keys are visited in the order [Dict.SortedKeys] returns them.  Copying a
 // reference allocates an object number in the target file, so map order would
@@ -128,6 +129,9 @@ func (c *Copier) CopyDict(obj Dict) (Dict, error) {
 	res := Dict{}
 	for _, key := range obj.SortedKeys() {
 		val := obj[key]
+		if val == nil {
+			continue
+		}
 		repl, err := c.Copy(val.AsPDF(c.w.GetOptions()))
 		if err != nil {
 			return nil, err

@@ -358,8 +358,8 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 	// Extract Matte array (specific to soft masks); drop wholesale if it
 	// exceeds the largest plausible parent-image channel count rather
 	// than allocate up to maxArrayLen floats from an attacker-controlled
-	// array.  Parity with the actual parent ncomp is validated by the
-	// writer in (*Dict).check and defensively by renderers.
+	// array.  Whether it fits the parent image is checked by
+	// [ExtractDict], which drops a Matte that does not, and by the writer.
 	if matteArray, err := pdf.Optional(c.Array(dict["Matte"])); err != nil {
 		return nil, err
 	} else if matteArray != nil && len(matteArray) <= limits.MaxImageChannels {

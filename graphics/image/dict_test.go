@@ -1785,3 +1785,98 @@ func TestExtractDictMaskProvenance(t *testing.T) {
 		t.Errorf("mask stream written again: found %d copies in the update", n)
 	}
 }
+
+// TestExtractDictMatteRepair checks that a soft mask Matte which does not fit
+// the parent image is dropped on read, so that the image can be written
+// again, and that the soft mask shared with another image is not affected.
+func TestExtractDictMatteRepair(t *testing.T) {
+	tests := []struct {
+		name      string
+		maskW     int
+		matte     pdf.Array
+		wantMatte bool
+	}{
+		{"fits", 2, pdf.Array{pdf.Number(0), pdf.Number(0.5), pdf.Number(1)}, true},
+		{"dimensions mismatch", 3, pdf.Array{pdf.Number(0), pdf.Number(0.5), pdf.Number(1)}, false},
+		{"wrong length", 2, pdf.Array{pdf.Number(0)}, false},
+		{"empty", 2, pdf.Array{}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			writeStream := func(ref pdf.Reference, dict pdf.Dict, data []byte) {
+				body, err := w.OpenStream(ref, dict)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := body.Write(data); err != nil {
+					t.Fatal(err)
+				}
+				if err := body.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			maskRef := w.Alloc()
+			writeStream(maskRef, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(tc.maskW),
+				"Height":           pdf.Integer(2),
+				"ColorSpace":       pdf.Name("DeviceGray"),
+				"BitsPerComponent": pdf.Integer(8),
+				"Matte":            tc.matte,
+			}, make([]byte, tc.maskW*2))
+
+			// the image under test, and a second image of the mask's own
+			// size sharing the same soft mask
+			imageDict := func(width int) pdf.Dict {
+				return pdf.Dict{
+					"Type":             pdf.Name("XObject"),
+					"Subtype":          pdf.Name("Image"),
+					"Width":            pdf.Integer(width),
+					"Height":           pdf.Integer(2),
+					"ColorSpace":       pdf.Name("DeviceRGB"),
+					"BitsPerComponent": pdf.Integer(8),
+					"SMask":            maskRef,
+				}
+			}
+			imgRef := w.Alloc()
+			writeStream(imgRef, imageDict(2), make([]byte, 2*2*3))
+			otherRef := w.Alloc()
+			writeStream(otherRef, imageDict(tc.maskW), make([]byte, tc.maskW*2*3))
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			x := pdf.NewExtractor(w)
+			other, err := ExtractDict(pdf.CursorAt(x, nil), otherRef, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			img, err := ExtractDict(pdf.CursorAt(x, nil), imgRef, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if img.SMask == nil {
+				t.Fatal("soft mask dropped")
+			}
+			if got := img.SMask.Matte != nil; got != tc.wantMatte {
+				t.Errorf("Matte present = %v, want %v", got, tc.wantMatte)
+			}
+			if len(tc.matte) == 3 && other.SMask.Matte == nil {
+				t.Error("Matte of the shared soft mask was dropped")
+			}
+
+			out, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(out)
+			if _, err := rm.Embed(img); err != nil {
+				t.Errorf("embedding the repaired image failed: %v", err)
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

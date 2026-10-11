@@ -306,3 +306,65 @@ func (c *streamCarrier) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	return c.ref, nil
 }
+
+// TestStreamWriteAtUnreadable checks that a stream whose dict holds a
+// reference to an unreadable object can still be copied; the reference then
+// points to null in the destination (PDF 2.0, 7.3.10).
+func TestStreamWriteAtUnreadable(t *testing.T) {
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	bad := src.Alloc()
+	if err := src.Put(bad, pdf.Integer(1)); err != nil {
+		t.Fatal(err)
+	}
+	streamRef := src.Alloc()
+	w, err := src.OpenStream(streamRef, pdf.Dict{
+		"Junk": pdf.Array{pdf.Dict{"K": bad}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("data")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	srcX := pdf.NewExtractor(unreadableGetter{Getter: src, bad: bad})
+	srcStream, err := pdf.CursorAt(srcX, nil).Stream(streamRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := ExtractStream(srcX, srcStream)
+
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(dst)
+	dstRef := dst.Alloc()
+	if _, err := rm.Embed(&streamCarrier{s: s, ref: dstRef, extras: pdf.Dict{}}); err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := pdf.CursorAt(pdf.NewExtractor(dst), nil)
+	dstStream, err := c.Stream(dstRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	junk, err := c.Array(dstStream.Dict["Junk"])
+	if err != nil || len(junk) != 1 {
+		t.Fatalf("Junk = %v, %v", junk, err)
+	}
+	inner, err := c.Dict(junk[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	val, err := c.Resolve(inner["K"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != nil {
+		t.Errorf("K resolves to %v, want null", val)
+	}
+}

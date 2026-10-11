@@ -460,11 +460,11 @@ func (fi *FileInfo) decodeObjStmIndex(objInfo *FileObject) ([]stmObj, error) {
 	for i := range int(N) {
 		no, err := s.ReadInteger()
 		if err != nil {
-			return nil, err
+			return nil, eofToMalformed(err, "object stream index")
 		}
 		offs, err := s.ReadInteger()
 		if err != nil {
-			return nil, err
+			return nil, eofToMalformed(err, "object stream index")
 		}
 		if no < 0 || no > math.MaxUint32 || offs < 0 || offs > math.MaxInt {
 			return nil, &MalformedFileError{Err: errors.New("invalid object number or offset")}

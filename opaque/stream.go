@@ -32,14 +32,7 @@ var streamMechanicsKeys = []pdf.Name{
 	"Length", "Filter", "DecodeParms", "F", "FFilter", "FDecodeParms",
 }
 
-// Stream wraps a [pdf.Stream] from a source PDF together with its
-// [pdf.Extractor], so that the stream can be re-emitted into a
-// different PDF with internal references translated and the
-// encoded body copied verbatim (preserving JPEG/CCITT/JBIG2/Flate
-// encoding without a decode/re-encode round-trip).
-//
-// Stream is the natural counterpart to [Object] for opaque values
-// that happen to be PDF streams.
+// Stream holds a PDF stream read from a file.
 type Stream struct {
 	src    *pdf.Extractor
 	stream *pdf.Stream
@@ -59,17 +52,14 @@ func (s *Stream) Reader() (io.ReadCloser, error) {
 	return pdf.CursorAt(s.src, nil).StreamReader(s.stream)
 }
 
-// WriteAt copies the stream into rm's output writer at ref.
-// Internal references inside the stream's dict are translated to the
-// destination via [pdf.Copier]; the body bytes are copied without
-// decode/re-encode (preserving the original filter chain and any
-// content encoding).
+// WriteAt writes the stream to the output of rm, under the reference ref.
+// Indirect references in the stream dictionary are translated to the output
+// file.  The stream data is copied without decode/re-encode, keeping the
+// original filters.
 //
-// The given extras are merged on top of the source-translated dict,
-// with extras winning when keys overlap.  Stream-mechanics keys
-// (Length, Filter, DecodeParms, F, FFilter, FDecodeParms) are
-// produced by the copier and the writer; passing any of them in
-// extras returns an error.
+// Entries in extras are added to the stream dictionary, replacing entries
+// with the same key.  WriteAt returns an error if extras contains Length,
+// Filter, DecodeParms, F, FFilter or FDecodeParms.
 func (s *Stream) WriteAt(rm *pdf.EmbedHelper, ref pdf.Reference, extras pdf.Dict) error {
 	for _, key := range streamMechanicsKeys {
 		if _, ok := extras[key]; ok {

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -105,6 +106,33 @@ func TestCopyReferenceMalformedBecomesNull(t *testing.T) {
 	}
 	if val != nil {
 		t.Errorf("resolved value = %v, want null", val)
+	}
+}
+
+// A nil dictionary value is a PDF null, which is the same as an absent
+// entry.  CopyDict must drop it rather than call methods on it.  Array
+// elements keep their nulls, since arrays are positional.
+func TestCopyNullValues(t *testing.T) {
+	src, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	dest, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	copier := pdf.NewCopier(dest, src)
+
+	in := pdf.Dict{
+		"A": nil,
+		"B": pdf.Integer(1),
+		"C": pdf.Array{nil, pdf.Dict{"D": nil}},
+	}
+	out, err := copier.Copy(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := pdf.Dict{
+		"B": pdf.Integer(1),
+		"C": pdf.Array{nil, pdf.Dict{}},
+	}
+	if diff := cmp.Diff(want, out); diff != "" {
+		t.Errorf("copy failed (-want +got):\n%s", diff)
 	}
 }
 

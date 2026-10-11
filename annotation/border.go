@@ -252,6 +252,12 @@ func ExtractBorder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Border, error)
 		}
 	}
 
+	// the writer omits a default border, which then reads back as
+	// PDFDefaultBorder; return that here too, whatever the form of the entry
+	if b.isPDFDefault() {
+		return PDFDefaultBorder, nil
+	}
+
 	b.SingleUse = isDirect
 
 	return b, nil

@@ -436,6 +436,14 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 		}
 	}
 
+	// A Matte entry which does not fit this image is dropped.  The soft mask
+	// may be shared with other images, so the repair goes into a copy.
+	if img.SMask != nil && img.checkMatte() != nil {
+		sm := *img.SMask
+		sm.Matte = nil
+		img.SMask = &sm
+	}
+
 	// Extract Name (deprecated in PDF 2.0)
 	if name, err := pdf.Optional(c.Name(dict["Name"])); err != nil {
 		return nil, err
@@ -956,22 +964,8 @@ func (d *Dict) check(out *pdf.Writer) error {
 			return err
 		}
 
-		// Validate soft mask dimensions match if Matte is present
-		if d.SMask.Matte != nil {
-			if d.SMask.Width != d.Width || d.SMask.Height != d.Height {
-				return errors.New("soft mask dimensions mismatch")
-			}
-			// Validate Matte length matches color space channels.  When
-			// ColorSpace is absent (JPX), we only bound the length.
-			if d.ColorSpace != nil {
-				if len(d.SMask.Matte) != numChannels {
-					return fmt.Errorf("matte array length %d does not match color space channels %d",
-						len(d.SMask.Matte), numChannels)
-				}
-			} else if len(d.SMask.Matte) < 1 ||
-				len(d.SMask.Matte) > limits.MaxImageChannels {
-				return fmt.Errorf("invalid Matte length %d", len(d.SMask.Matte))
-			}
+		if err := d.checkMatte(); err != nil {
+			return err
 		}
 	}
 
@@ -1014,4 +1008,27 @@ func (d *Dict) Subtype() pdf.Name {
 // See [graphics.XObject.ResourceName].
 func (d *Dict) ResourceName() pdf.Name {
 	return d.Name
+}
+
+// checkMatte reports whether the Matte entry of the soft mask, if any, fits
+// the image: the mask must have the same dimensions as the image, and the
+// matte colour must have one component per colour channel.  When ColorSpace
+// is absent (JPX), only the length of the array is bounded.
+func (d *Dict) checkMatte() error {
+	matte := d.SMask.Matte
+	if matte == nil {
+		return nil
+	}
+	if d.SMask.Width != d.Width || d.SMask.Height != d.Height {
+		return errors.New("soft mask dimensions mismatch")
+	}
+	if d.ColorSpace != nil {
+		if n := d.ColorSpace.Channels(); len(matte) != n {
+			return fmt.Errorf("matte array length %d does not match color space channels %d",
+				len(matte), n)
+		}
+	} else if len(matte) < 1 || len(matte) > limits.MaxImageChannels {
+		return fmt.Errorf("invalid Matte length %d", len(matte))
+	}
+	return nil
 }

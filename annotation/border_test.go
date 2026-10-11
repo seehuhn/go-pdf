@@ -63,6 +63,26 @@ func TestBorderDefaults(t *testing.T) {
 	}
 }
 
+// TestExtractBorderDefault checks that an explicit /Border entry holding the
+// PDF default value reads as [PDFDefaultBorder], the same as an absent entry.
+// The writer omits a default border, so anything else would change in a
+// read-write-read cycle.
+func TestExtractBorderDefault(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	for _, obj := range []pdf.Array{
+		{pdf.Integer(0), pdf.Integer(0), pdf.Integer(1)},
+		{pdf.Integer(0), pdf.Integer(0), pdf.Real(1), pdf.Array{pdf.Integer(0), pdf.Integer(0)}},
+	} {
+		b, err := ExtractBorder(pdf.NewCursor(w), obj, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(PDFDefaultBorder, b); diff != "" {
+			t.Errorf("%v: (-want +got):\n%s", obj, diff)
+		}
+	}
+}
+
 // TestBorderDashRules checks the rules of PDF 32000-2 8.4.3.6 for the dash
 // array of the /Border entry: the lengths must be non-negative and must not
 // all be zero.  Values which a PDF file can contain but the rules do not

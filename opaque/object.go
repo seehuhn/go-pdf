@@ -22,30 +22,17 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Object holds an arbitrary PDF value that the library does not need to
-// interpret.  It is constructed in one of two modes:
+// Object holds an arbitrary PDF value that can be embedded into PDF files.
 //
-//   - [Extract] binds the value to its source extractor; on [Object.Embed],
-//     references inside the value are translated to the destination file
-//     through [pdf.Copier].
-//   - [Direct] wraps an in-memory PDF value, which is written verbatim on
-//     Embed.  The caller is responsible for ensuring the value contains
-//     no indirect objects.
-//
-// Object implements [pdf.Embedder].  Two [Object.Embed] calls with the
-// same *Object pointer produce a single copy of the value in the
-// destination file: the resource manager's Embedder cache returns the
-// same [pdf.Native] for every call, so the underlying [pdf.Copier]
-// runs at most once per write.
+// Object implements [pdf.Embedder].
 type Object struct {
 	src *pdf.Extractor // nil for in-memory values
 	obj pdf.Object
 }
 
-// Extract wraps an opaque PDF value read from a file.  The extractor is
-// stashed so that references inside obj can be translated to the
-// destination file when [Object.Embed] is called.  obj must remain
-// valid for as long as Object is used.
+// Extract wraps a PDF value read through x.  References inside obj refer to
+// objects in the file x reads from.  x must remain usable for as long as the
+// Object is used.
 func Extract(x *pdf.Extractor, obj pdf.Object) *Object {
 	return &Object{src: x, obj: obj}
 }
@@ -70,88 +57,194 @@ func (o *Object) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	return e.CopierFrom(o.src).Copy(native)
 }
 
-// Equal reports whether o and other denote the same PDF value.  For
-// Extract-built objects, references are resolved through the source
-// extractor before comparison; for Direct-built objects, the wrapped
-// value is compared directly.  The comparison is structural except
-// for streams and placeholders, which are compared by pointer
-// identity (inherited from [pdf.Equal]).
+// Equal reports whether o and other denote the same PDF value.
+// Streams and placeholders are compared by pointer identity.
 func (o *Object) Equal(other *Object) bool {
 	if o == nil || other == nil {
 		return o == other
 	}
-	a, errA := o.resolve()
-	b, errB := other.resolve()
-	if errA != nil || errB != nil {
+
+	// Two values are equal if they unfold to the same tree of dictionaries,
+	// arrays and scalars, whether the parts are direct or indirect objects.
+	// The unfolding can be infinite, so the comparison uses the algorithm
+	// of Hopcroft and Karp (1971) for the equivalence of deterministic
+	// automata: each dictionary or array met on either side is a state, and
+	// a pair of states is expanded only when the two are not yet known to be
+	// equivalent.  Every expansion merges two classes, so the work is linear
+	// in the size of the two values.
+	var next int
+	a := newWalker(o.src, &next)
+	b := newWalker(other.src, &next)
+	var classes unionFind
+
+	// Each task compares one pair of values.  Both values are found under
+	// the same key of their parents, and the parent positions identify
+	// where they sit inside their objects.
+	type task struct {
+		a, b             pdf.Object
+		parentA, parentB int
+		key              step
+	}
+	todo := []task{{a: o.obj, b: other.obj, parentA: -1, parentB: -1}}
+	for len(todo) > 0 {
+		t := todo[len(todo)-1]
+		todo = todo[:len(todo)-1]
+
+		valA, posA, err := a.visit(t.a, t.parentA, t.key)
+		if err != nil {
+			return false
+		}
+		valB, posB, err := b.visit(t.b, t.parentB, t.key)
+		if err != nil {
+			return false
+		}
+
+		switch va := valA.(type) {
+		case pdf.Dict:
+			vb, ok := valB.(pdf.Dict)
+			if !ok || (va == nil) != (vb == nil) {
+				return false
+			}
+			if !classes.union(posA, posB) {
+				continue
+			}
+			for k, val := range va {
+				todo = append(todo, task{val, vb[k], posA, posB, step{key: k}})
+			}
+			for k, val := range vb {
+				if _, exists := va[k]; !exists {
+					todo = append(todo, task{nil, val, posA, posB, step{key: k}})
+				}
+			}
+		case pdf.Array:
+			vb, ok := valB.(pdf.Array)
+			if !ok || (va == nil) != (vb == nil) || len(va) != len(vb) {
+				return false
+			}
+			if !classes.union(posA, posB) {
+				continue
+			}
+			for i := range va {
+				todo = append(todo, task{va[i], vb[i], posA, posB, step{idx: i}})
+			}
+		default:
+			if !pdf.Equal(valA, valB) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// unionFind partitions position numbers into classes of values which are
+// assumed to be equal.  Positions not yet mentioned form classes of their
+// own.
+type unionFind []int
+
+// find returns the representative of the class containing x.
+func (u *unionFind) find(x int) int {
+	for len(*u) <= x {
+		*u = append(*u, len(*u))
+	}
+	p := *u
+	for p[x] != x {
+		p[x] = p[p[x]]
+		x = p[x]
+	}
+	return x
+}
+
+// union merges the classes of x and y, and reports whether they were
+// distinct before.
+func (u *unionFind) union(x, y int) bool {
+	x, y = u.find(x), u.find(y)
+	if x == y {
 		return false
 	}
-	return pdf.Equal(a, b)
+	(*u)[x] = y
+	return true
 }
 
-// resolve flattens all references inside the wrapped value, using the
-// source extractor when present.
-func (o *Object) resolve() (pdf.Native, error) {
-	if o.src == nil {
-		return o.obj.AsPDF(0), nil
-	}
-	return deepResolve(pdf.CursorAt(o.src, nil), 0, o.obj)
+// step identifies a child of a dictionary (by key) or of an array (by index),
+// together with the position number of the parent.  A parent is either a
+// dictionary or an array, so key and idx are never both in use.
+type step struct {
+	parent int
+	key    pdf.Name
+	idx    int
 }
 
-// maxDeepResolveDepth caps the recursion depth of [deepResolve],
-// rejecting adversarially deep object trees before they exhaust the Go
-// call stack.
-const maxDeepResolveDepth = 256
-
-// deepResolve recursively resolves all references in a PDF object tree.
-// References are resolved through the extractor, and the values within
-// Dicts and Arrays are resolved recursively.  The returned object
-// contains no References.
+// walker follows the references inside one of the two values compared by
+// [Object.Equal], and numbers the dictionaries and arrays it meets.  The
+// two walkers of a comparison draw their numbers from a shared counter.
 //
-// path threads cycle detection across the recursion so that reference
-// loops that cross structural boundaries (e.g. dict A holds a reference
-// to dict B which holds a reference back to A) are detected.  depth
-// bounds the recursion against adversarial nesting.
-func deepResolve(c pdf.Cursor, depth int, obj pdf.Object) (pdf.Native, error) {
-	if obj == nil {
-		return nil, nil
+// A dictionary or array reached through a reference is numbered by that
+// reference, so that each visit of the reference gives the same number.
+// A direct dictionary or array is numbered by its parent and its position
+// in the parent.  Each number thus stands for a fixed value, and a pair of
+// numbers which comes up again during the comparison can be skipped.
+type walker struct {
+	c     pdf.Cursor
+	src   bool
+	refs  map[pdf.Reference]int
+	steps map[step]int
+	next  *int
+}
+
+func newWalker(x *pdf.Extractor, next *int) *walker {
+	return &walker{
+		c:     pdf.CursorAt(x, nil),
+		src:   x != nil,
+		refs:  make(map[pdf.Reference]int),
+		steps: make(map[step]int),
+		next:  next,
 	}
-	if depth >= maxDeepResolveDepth {
-		return nil, &pdf.MalformedFileError{Err: errors.New("nesting depth exceeded")}
+}
+
+// visit resolves obj, found at the given step from the parent position, and
+// returns the resulting value together with its position number.  The
+// position is only meaningful for dictionaries and arrays.
+func (w *walker) visit(obj pdf.Object, parent int, s step) (pdf.Native, int, error) {
+	if obj == nil {
+		return nil, -1, nil
 	}
 	native := obj.AsPDF(0)
-	if ref, ok := native.(pdf.Reference); ok {
-		resolved, err := c.Resolve(ref)
-		if err != nil {
-			return nil, err
+	if ref, ok := native.(pdf.Reference); ok && w.src {
+		// The cursor carries no path, so cycle detection covers only the
+		// chain of references itself.  A looping or over-long chain is
+		// malformed, and reads as null like any other unreadable object.
+		resolved, err := w.c.Resolve(ref)
+		if pdf.IsMalformed(err) {
+			return nil, -1, nil
+		} else if err != nil {
+			return nil, -1, err
 		}
-		// extend the path with ref so nested resolves detect back-references
-		c = pdf.CursorAt(c.Extractor(), &pdf.CycleCheck{Ref: ref, Parent: c.Path()})
-		native = resolved
+		pos, ok := w.refs[ref]
+		if !ok {
+			pos = w.newPos()
+			w.refs[ref] = pos
+		}
+		return resolved, pos, nil
 	}
-	switch v := native.(type) {
-	case pdf.Dict:
-		res := make(pdf.Dict, len(v))
-		for k, val := range v {
-			r, err := deepResolve(c, depth+1, val)
-			if err != nil {
-				return nil, err
-			}
-			res[k] = r
+
+	switch native.(type) {
+	case pdf.Dict, pdf.Array:
+		s.parent = parent
+		pos, ok := w.steps[s]
+		if !ok {
+			pos = w.newPos()
+			w.steps[s] = pos
 		}
-		return res, nil
-	case pdf.Array:
-		res := make(pdf.Array, len(v))
-		for i, val := range v {
-			r, err := deepResolve(c, depth+1, val)
-			if err != nil {
-				return nil, err
-			}
-			res[i] = r
-		}
-		return res, nil
+		return native, pos, nil
 	default:
-		return native, nil
+		return native, -1, nil
 	}
+}
+
+func (w *walker) newPos() int {
+	pos := *w.next
+	*w.next++
+	return pos
 }
 
 // AsDirectDict checks whether the wrapped value is a PDF dictionary,
@@ -166,18 +259,15 @@ func (o *Object) AsDirectDict() pdf.Dict {
 	return dict
 }
 
-// ObjectAs runs the given typed extractor against the value wrapped
-// by o, using o's source extractor for cache coherency and the
-// supplied path for cycle detection.  It returns an error if o was
-// built via [Direct] (no source available); that case is a programming
-// bug, not malformed PDF input.
-//
-// Once Go supports generic methods, this will become Object.As.
+// ObjectAs decodes the value wrapped by o using extract, with path for cycle
+// detection.  It returns an error if o was created by [Direct].
 func ObjectAs[T any](
 	o *Object,
 	path *pdf.CycleCheck,
 	extract func(pdf.Cursor, pdf.Object, bool) (T, error),
 ) (T, error) {
+	// Once Go supports generic methods, this will become Object.As.
+
 	if o.src == nil {
 		var zero T
 		return zero, errors.New("opaque: ObjectAs requires an Object built via Extract")

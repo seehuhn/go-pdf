@@ -675,3 +675,92 @@ func TestNewReaderNestedArrayBomb(t *testing.T) {
 
 // compile time test
 var _ Getter = &Reader{}
+
+// rawFileWithObject3 returns a PDF file whose xref table places object 3 at
+// byte offset off3, or at the start of tail when off3 is negative.  The tail
+// is appended after the end of the file proper, so that it may be cut short
+// without damaging the xref table or trailer.
+func rawFileWithObject3(tail string, off3 int) []byte {
+	b := &bytes.Buffer{}
+	b.WriteString("%PDF-1.7\n")
+	o1 := b.Len()
+	b.WriteString("1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n")
+	o2 := b.Len()
+	b.WriteString("2 0 obj\n<</Type/Pages/Kids[]/Count 0>>\nendobj\n")
+	xref := b.Len()
+	tailStart := xref + 200
+	if off3 < 0 {
+		off3 = tailStart
+	}
+	fmt.Fprintf(b, "xref\n0 4\n0000000000 65535 f \n%010d 00000 n \n%010d 00000 n \n%010d 00000 n \n",
+		o1, o2, off3)
+	fmt.Fprintf(b, "trailer\n<</Size 4/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n", xref)
+	for b.Len() < tailStart {
+		b.WriteByte(' ')
+	}
+	b.WriteString(tail)
+	return b.Bytes()
+}
+
+// TestGetUnreadableObject checks that an object which cannot be read because
+// the file ends early, or because its xref offset lies beyond the end of the
+// file, gives a MalformedFileError.  A bare io.EOF would be taken for an I/O
+// failure, and readers and the Copier could not treat the object as null.
+func TestGetUnreadableObject(t *testing.T) {
+	cases := map[string][]byte{
+		"beyond EOF": rawFileWithObject3("", 1<<30),
+		"at EOF":     rawFileWithObject3("", -1),
+		"header":     rawFileWithObject3("3 0 ob", -1),
+		"body":       rawFileWithObject3("3 0 obj\n<</A (x", -1),
+		"no endobj":  rawFileWithObject3("3 0 obj\n<</A 1>>\n", -1),
+	}
+	for name, data := range cases {
+		t.Run(name, func(t *testing.T) {
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = r.Get(NewReference(3, 0), true)
+			if !IsMalformed(err) {
+				t.Errorf("got error %v, want MalformedFileError", err)
+			}
+		})
+	}
+}
+
+// objGetter is a Getter which serves objects from a map.
+type objGetter map[Reference]Native
+
+func (g objGetter) GetMeta() *MetaInfo { return &MetaInfo{Version: V1_7} }
+
+func (g objGetter) Get(ref Reference, _ bool) (Native, error) { return g[ref], nil }
+
+// TestGetFromObjStmTruncated checks that a truncated object stream index, and
+// a truncated object inside an object stream, give a MalformedFileError.
+func TestGetFromObjStmTruncated(t *testing.T) {
+	sRef := NewReference(10, 0)
+	cases := []struct {
+		name  string
+		n     int
+		first int
+		data  string
+	}{
+		{"index", 2, 0, "1 0 2"},
+		{"object", 1, 4, "1 0 (abc"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			stm := NewStream(Dict{
+				"Type":  Name("ObjStm"),
+				"N":     Integer(c.n),
+				"First": Integer(c.first),
+			}, []byte(c.data))
+			g := objGetter{sRef: stm}
+			getInt := safeGetInteger(g, false)
+			_, err := getFromObjStm(g, 1, sRef, getInt, newObjstmCache())
+			if !IsMalformed(err) {
+				t.Errorf("got error %v, want MalformedFileError", err)
+			}
+		})
+	}
+}

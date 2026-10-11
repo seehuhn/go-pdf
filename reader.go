@@ -504,11 +504,11 @@ func (c *objstmCache) load(r Getter, sRef Reference, stream *Stream, getInt getI
 	for i := range n {
 		no, err := s.ReadInteger()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, eofToMalformed(err, "object stream index")
 		}
 		offs, err := s.ReadInteger()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, eofToMalformed(err, "object stream index")
 		}
 		if no < 0 || no > math.MaxUint32 || offs < 0 || offs > math.MaxInt {
 			return nil, nil, &MalformedFileError{Err: errors.New("invalid object number or offset")}

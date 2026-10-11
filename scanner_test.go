@@ -23,6 +23,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func testScanner(contents string) *scanner {
@@ -157,6 +159,39 @@ func withSizeBound(t *testing.T, p *int, val int) {
 	t.Cleanup(func() { *p = orig })
 }
 
+// TestReadIndirectObjectTruncated checks that an indirect object cut short by
+// the end of the input is reported as a MalformedFileError, never as a bare
+// io.EOF.  Callers rely on this to treat an unreadable object as null (PDF
+// 2.0, 7.3.10) instead of aborting.
+func TestReadIndirectObjectTruncated(t *testing.T) {
+	const full = "3 0 obj\n<</A [1 (x\\061) <41> /N 2 0 R] /Length 3>>\nstream\nabc\nendstream\nendobj"
+	for i := range len(full) {
+		_, _, err := testScanner(full[:i]).ReadIndirectObject()
+		if !IsMalformed(err) {
+			t.Errorf("%q: got error %v, want MalformedFileError", full[:i], err)
+		}
+	}
+
+	obj, _, err := testScanner(full).ReadIndirectObject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := obj.(*Stream); !ok {
+		t.Errorf("got %T, want *Stream", obj)
+	}
+}
+
+// TestReadObjectTruncatedString checks that unterminated strings are
+// reported as malformed, so that ReadObject never returns a bare io.EOF.
+func TestReadObjectTruncatedString(t *testing.T) {
+	for _, body := range []string{"(", "(abc", "(a\\", "(a(b)", "<", "<41", "<41 4"} {
+		_, err := testScanner(body).ReadObject()
+		if !IsMalformed(err) {
+			t.Errorf("%q: got error %v, want MalformedFileError", body, err)
+		}
+	}
+}
+
 func TestReadStringBomb(t *testing.T) {
 	withSizeBound(t, &maxStringBytes, 100)
 	body := "(" + strings.Repeat("a", maxStringBytes+1) + ")"
@@ -252,6 +287,35 @@ func TestReadDictBomb(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	} else if !IsMalformed(err) {
 		t.Errorf("expected *MalformedFileError, got %T: %v", err, err)
+	}
+}
+
+// TestReadDictNullValues checks that dictionary entries whose value is
+// null, or a token which reads as null, are dropped: PDF 7.3.7 treats
+// them as absent.  Array elements keep their nulls, since arrays are
+// positional.
+func TestReadDictNullValues(t *testing.T) {
+	tests := []struct {
+		in   string
+		want Object
+	}{
+		{"<< /A null /B 1 >>", Dict{"B": Integer(1)}},
+		{"<< /A + /B 1 >>", Dict{"B": Integer(1)}},
+		{"<< /A . >>", Dict{}},
+		{"<< /A -1 0 R /B 1 >>", Dict{"B": Integer(1)}},
+		{"<< /A [null + 1] >>", Dict{"A": Array{nil, nil, Integer(1)}}},
+		{"<< /A << /B null >> >>", Dict{"A": Dict{}}},
+	}
+	for _, test := range tests {
+		s := testScanner(test.in)
+		got, err := s.ReadObject()
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", test.in, err)
+			continue
+		}
+		if diff := cmp.Diff(test.want, got); diff != "" {
+			t.Errorf("%q: wrong value (-want +got):\n%s", test.in, diff)
+		}
 	}
 }
 

@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package opaque provides a wrapper for PDF values that the library does not
-// need to interpret.  The wrapper preserves the source extractor so that, when
-// the value is later embedded into a different PDF file, indirect references
-// inside it are translated to the destination via [pdf.Copier].
+// Package opaque represents PDF values which the library does not interpret.
+// [Object] holds an arbitrary PDF value and implements [pdf.Embedder];
+// [Stream] holds a PDF stream and is written with [Stream.WriteAt].
 package opaque

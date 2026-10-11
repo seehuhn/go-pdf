@@ -390,6 +390,32 @@ func TestEqual(t *testing.T) {
 	}
 }
 
+// TestEqualNullEntries checks that dictionary entries with a nil value
+// compare as absent, since they have no PDF representation.
+func TestEqualNullEntries(t *testing.T) {
+	a := Dict{"X": Integer(1), "Y": nil}
+	b := Dict{"X": Integer(1)}
+	c := Dict{"X": Integer(1), "Z": nil}
+	for _, pair := range [][2]Dict{{a, b}, {b, a}, {a, c}} {
+		if !Equal(pair[0], pair[1]) {
+			t.Errorf("Equal(%v, %v) = false, want true", pair[0], pair[1])
+		}
+		if !NearlyEqual(pair[0], pair[1], 1e-6) {
+			t.Errorf("NearlyEqual(%v, %v) = false, want true", pair[0], pair[1])
+		}
+	}
+
+	d := Dict{"X": Integer(1), "Y": Integer(2)}
+	for _, pair := range [][2]Dict{{a, d}, {d, a}} {
+		if Equal(pair[0], pair[1]) {
+			t.Errorf("Equal(%v, %v) = true, want false", pair[0], pair[1])
+		}
+		if NearlyEqual(pair[0], pair[1], 1e-6) {
+			t.Errorf("NearlyEqual(%v, %v) = true, want false", pair[0], pair[1])
+		}
+	}
+}
+
 func TestNearlyEqual(t *testing.T) {
 	eps := 1e-6
 
@@ -437,5 +463,15 @@ func TestIsDirectPlaceholder(t *testing.T) {
 	}
 	if IsDirect(Dict{"P": placeholder}) {
 		t.Error("dict containing a placeholder reported as direct")
+	}
+}
+
+// TestIsDirectNull checks that nulls, also inside arrays and dictionaries,
+// count as direct objects.
+func TestIsDirectNull(t *testing.T) {
+	for _, obj := range []Object{nil, Array{nil}, Dict{"A": nil}} {
+		if !IsDirect(obj) {
+			t.Errorf("IsDirect(%s) = false, want true", AsString(obj))
+		}
 	}
 }
