@@ -224,7 +224,7 @@ func TestSetBorderWidth(t *testing.T) {
 
 // TestSetBorderWidthBelowTheStyleVersion checks that a width set on a type
 // whose style dictionary the file is too old to carry goes into the border
-// array instead.  A link annotation's BS entry arrived in PDF 1.6, where the
+// array instead.  A link annotation's BS entry arrived in PDF 1.3, where the
 // type dates from PDF 1.0, so a style written at an earlier version would
 // leave the annotation unwritable.
 func TestSetBorderWidthBelowTheStyleVersion(t *testing.T) {
@@ -233,8 +233,8 @@ func TestSetBorderWidthBelowTheStyleVersion(t *testing.T) {
 		wantStyle bool
 	}{
 		{pdf.V1_0, false},
-		{pdf.V1_5, false},
-		{pdf.V1_6, true},
+		{pdf.V1_2, false},
+		{pdf.V1_3, true},
 		{pdf.V2_0, true},
 	} {
 		t.Run(tc.version.String(), func(t *testing.T) {

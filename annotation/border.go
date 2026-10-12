@@ -97,7 +97,7 @@ var (
 // shallow copy of itself, is left as it was.  An annotation carrying neither
 // is given a style, which is what a cloudy border effect wants beside it,
 // where the file can hold one; some types gained their style dictionary
-// later than the type itself, a link annotation's arriving in PDF 1.6 where
+// later than the type itself, a link annotation's arriving in PDF 1.3 where
 // the type dates from PDF 1.0.  Below that version the array is used
 // instead, and the zero version, which stands for none, therefore chooses
 // the array too.

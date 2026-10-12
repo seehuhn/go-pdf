@@ -105,10 +105,10 @@ func (l *Link) setBorderStyle(bs *BorderStyle) {
 }
 
 // borderStyleVersion implements [borderStyled].  A link annotation's BS
-// entry arrived in PDF 1.6 (§12.5.6.5), long after the type itself, so a
-// width set at an earlier version goes into the border array instead.
+// entry arrived in PDF 1.3 (§12.5.6.5), so a width set at an earlier
+// version goes into the border array instead.
 func (l *Link) borderStyleVersion() pdf.Version {
-	return pdf.V1_6
+	return pdf.V1_3
 }
 
 func (l *Link) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
