@@ -249,10 +249,7 @@ func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo,
 	}
 
 	// eager authentication
-	perm, err := res.sec.authenticate("")
-	if err != nil && password != "" {
-		perm, err = res.sec.authenticate(password)
-	}
+	perm, err := res.sec.unlock(password)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -809,37 +806,61 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 	}
 }
 
-// authenticate tries the given password as both owner and user password.
-// On success it sets sec.key and returns the corresponding permissions.
-func (sec *stdSecHandler) authenticate(passwd string) (Perm, error) {
+// unlock tries both the empty string and password as owner and user
+// password.  On success it sets sec.key and returns the permissions of the
+// most permissive access granted.
+//
+// The owner checks come first, since success there settles the outcome.
+// The user check on password comes last because a user password grants
+// the same permissions whichever one matches.
+func (sec *stdSecHandler) unlock(password string) (Perm, error) {
+	if password != "" && sec.authenticateOwnerPasswd(password) == nil {
+		return PermAll, nil
+	}
+	if sec.authenticateOwnerPasswd("") == nil {
+		return PermAll, nil
+	}
+	if sec.authenticateUserPasswd("") == nil {
+		return stdSecPToPerm(sec.R, sec.P), nil
+	}
+	if password != "" && sec.authenticateUserPasswd(password) == nil {
+		return stdSecPToPerm(sec.R, sec.P), nil
+	}
+	return 0, &AuthenticationError{sec.ID}
+}
+
+// authenticateOwnerPasswd checks passwd as the owner password and sets
+// sec.key on success.
+func (sec *stdSecHandler) authenticateOwnerPasswd(passwd string) error {
 	if sec.R < 5 {
 		padded, err := padPasswd(passwd)
 		if err != nil {
-			return 0, err
+			return err
 		}
-		err = sec.authenticateOwner(padded)
-		if err == nil {
-			return PermAll, nil
-		}
-		err = sec.authenticateUser(padded)
-		if err == nil {
-			return stdSecPToPerm(sec.R, sec.P), nil
-		}
-	} else {
-		prepared, err := utf8Passwd(passwd)
-		if err != nil {
-			return 0, err
-		}
-		err = sec.authenticateOwner6(prepared)
-		if err == nil {
-			return PermAll, nil
-		}
-		err = sec.authenticateUser6(prepared)
-		if err == nil {
-			return stdSecPToPerm(sec.R, sec.P), nil
-		}
+		return sec.authenticateOwner(padded)
 	}
-	return 0, &AuthenticationError{sec.ID}
+	prepared, err := utf8Passwd(passwd)
+	if err != nil {
+		return err
+	}
+	return sec.authenticateOwner6(prepared)
+}
+
+// authenticateUserPasswd checks passwd as the user password and sets
+// sec.key on success.
+func (sec *stdSecHandler) authenticateUserPasswd(passwd string) error {
+	if sec.R < 5 {
+		padded, err := padPasswd(passwd)
+		if err != nil {
+			return err
+		}
+		return sec.authenticateUser(padded)
+	}
+	prepared, err := utf8Passwd(passwd)
+	if err != nil {
+		return err
+	}
+	return sec.authenticateUser6(prepared)
 }
 
 // Algorithm 2: compute the file encryption key for R <= 4.
@@ -1206,30 +1227,17 @@ func (sec *stdSecHandler) checkPerms(fileEncryptionKey []byte) error {
 	c, _ := aes.NewCipher(fileEncryptionKey)
 	c.Decrypt(buf, sec.Perms)
 
-	var emdCode byte
-	if sec.unencryptedMetadata {
-		emdCode = 'F'
-	} else {
-		emdCode = 'T'
-	}
-
-	// fold every per-byte mismatch into a single accumulator so that the
+	// Fold every per-byte mismatch into a single accumulator so that the
 	// function exits at the same point regardless of which field is wrong.
-	// Bytes 4-7 are the high 32 bits of the 64-bit extended permissions
-	// field reserved by §7.6.4.4.5 step (a); the encoder fills them with
-	// 0xFF, and the decoder rejects any other value to detect tampering
-	// with the (currently unused) extension half.  Bytes 12-15 are random
-	// fill and are not checked.
+	// Only the checks required by Algorithm 2.A step (f) are made:
+	// bytes 4-7 are reserved for future extension (§7.6.4.4.9 step (a)),
+	// byte 8 only "should" match EncryptMetadata (§7.6.4.4.12), and
+	// bytes 12-15 are random fill.
 	var diff byte
 	diff |= buf[0] ^ byte(sec.P)
 	diff |= buf[1] ^ byte(sec.P>>8)
 	diff |= buf[2] ^ byte(sec.P>>16)
 	diff |= buf[3] ^ byte(sec.P>>24)
-	diff |= buf[4] ^ 0xFF
-	diff |= buf[5] ^ 0xFF
-	diff |= buf[6] ^ 0xFF
-	diff |= buf[7] ^ 0xFF
-	diff |= buf[8] ^ emdCode
 	diff |= buf[9] ^ 'a'
 	diff |= buf[10] ^ 'd'
 	diff |= buf[11] ^ 'b'

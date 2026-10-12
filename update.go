@@ -31,8 +31,9 @@ import (
 // from the original file; they must be replaced by modified copies, never
 // edited in place, or the edit is silently lost.
 type UpdateOptions struct {
-	// Password is used to open an encrypted original.  The empty string
-	// is always tried first.
+	// Password is used to open an encrypted original.  Both Password and
+	// the empty string are tried, as owner and as user password, and the
+	// original is opened with the most permissive access either grants.
 	Password string
 
 	// MinimumVersion, if non-zero, is the minimum version of the updated document.

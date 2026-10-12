@@ -31,7 +31,9 @@ import (
 // ReaderOptions provides additional information for opening a PDF file.
 type ReaderOptions struct {
 	// Password is the password to use for opening encrypted PDF files.
-	// The empty string is always tried first, even if Password is set.
+	// Both Password and the empty string are tried, as owner and as user
+	// password, and the file is opened with the most permissive access
+	// either grants.
 	// If authentication fails, [Open] and [NewReader] return an
 	// [AuthenticationError].
 	Password string

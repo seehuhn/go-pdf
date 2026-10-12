@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -211,25 +212,26 @@ func TestAuth(t *testing.T) {
 		}
 		key := sec.key
 
-		// wrong password should fail (unless user password is empty)
+		// a wrong password falls back to the empty string, which only
+		// succeeds if the user password is empty
 		sec.key = nil
-		_, err = sec.authenticate("wrong")
-		if test.user == "" {
-			// empty user password means "wrong" will still fail owner,
-			// but empty string would succeed user — authenticate("wrong")
-			// should fail
-			if err == nil {
-				t.Errorf("%d: wrong password accepted", i)
-			}
-		} else {
+		perm, err := sec.unlock("wrong")
+		switch {
+		case test.user != "":
 			if _, authErr := err.(*AuthenticationError); !authErr {
 				t.Errorf("%d: expected AuthenticationError, got %v", i, err)
 			}
+		case err != nil:
+			t.Errorf("%d: empty user password failed: %v", i, err)
+		case test.owner == "" && perm != PermAll:
+			t.Errorf("%d: expected PermAll for empty owner password", i)
+		case test.owner != "" && perm == PermAll:
+			t.Errorf("%d: wrong password granted PermAll", i)
 		}
 
 		// user password should work
 		sec.key = nil
-		perm, err := sec.authenticate(test.user)
+		perm, err = sec.unlock(test.user)
 		if err != nil {
 			t.Errorf("%d: user password failed: %v", i, err)
 			continue
@@ -246,7 +248,7 @@ func TestAuth(t *testing.T) {
 
 		// owner password should work and give PermAll
 		sec.key = nil
-		perm, err = sec.authenticate(test.owner)
+		perm, err = sec.unlock(test.owner)
 		if err != nil {
 			t.Errorf("%d: owner password failed: %v", i, err)
 			continue
@@ -269,9 +271,9 @@ func TestAuth2(t *testing.T) {
 	}
 	key := sec.key
 
-	// empty user password should authenticate via authenticate("")
+	// empty user password should authenticate via unlock("")
 	sec.key = nil
-	_, err = sec.authenticate("")
+	_, err = sec.unlock("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -813,7 +815,7 @@ func TestAuthRevision5(t *testing.T) {
 
 	// user password: recovers the file key with restricted permissions
 	sec.key = nil
-	perm, err := sec.authenticate(userPwd)
+	perm, err := sec.unlock(userPwd)
 	if err != nil {
 		t.Fatalf("user authentication failed: %v", err)
 	}
@@ -826,7 +828,7 @@ func TestAuthRevision5(t *testing.T) {
 
 	// owner password: recovers the file key with full permissions
 	sec.key = nil
-	perm, err = sec.authenticate(ownerPwd)
+	perm, err = sec.unlock(ownerPwd)
 	if err != nil {
 		t.Fatalf("owner authentication failed: %v", err)
 	}
@@ -839,7 +841,110 @@ func TestAuthRevision5(t *testing.T) {
 
 	// wrong password: authentication error
 	sec.key = nil
-	if _, err := sec.authenticate("nope"); err == nil {
+	if _, err := sec.unlock("nope"); err == nil {
 		t.Error("expected authentication failure for the wrong password")
+	}
+}
+
+// TestReaderPassword checks that the reader opens a file with the most
+// permissive access granted by either the empty string or the given password.
+func TestReaderPassword(t *testing.T) {
+	type check struct {
+		password string
+		perm     Perm // 0 means authentication fails
+	}
+	cases := []struct {
+		user   string
+		checks []check
+	}{
+		{"", []check{
+			{"", PermCopy},
+			{"wrong", PermCopy},
+			{"owner", PermAll},
+		}},
+		{"user", []check{
+			{"", 0},
+			{"wrong", 0},
+			{"user", PermCopy},
+			{"owner", PermAll},
+		}},
+	}
+	for _, v := range []Version{V1_7, V2_0} {
+		for _, c := range cases {
+			opt := &WriterOptions{
+				UserPassword:    c.user,
+				OwnerPassword:   "owner",
+				UserPermissions: PermCopy,
+			}
+			buf := &bytes.Buffer{}
+			w, err := NewWriter(buf, v, opt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			for _, ch := range c.checks {
+				rOpt := &ReaderOptions{Password: ch.password}
+				r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
+				if ch.perm == 0 {
+					if _, ok := errors.AsType[*AuthenticationError](err); !ok {
+						t.Errorf("%s: user %q, password %q: got %v, want AuthenticationError",
+							v, c.user, ch.password, err)
+					}
+					continue
+				}
+				if err != nil {
+					t.Fatalf("%s: user %q, password %q: %v", v, c.user, ch.password, err)
+				}
+				if got := r.GetMeta().Permissions; got != ch.perm {
+					t.Errorf("%s: user %q, password %q: got permissions %v, want %v",
+						v, c.user, ch.password, got, ch.perm)
+				}
+			}
+		}
+	}
+}
+
+// TestCheckPerms checks that only the fields the specification requires are
+// validated in the decrypted Perms block.
+func TestCheckPerms(t *testing.T) {
+	key := bytes.Repeat([]byte{0x42}, 32)
+	const P uint32 = 0xFFFFF0C0
+
+	mkPerms := func(modify func(buf []byte)) []byte {
+		buf := make([]byte, 16)
+		binary.LittleEndian.PutUint32(buf, P)
+		copy(buf[4:8], []byte{0xFF, 0xFF, 0xFF, 0xFF})
+		buf[8] = 'T'
+		copy(buf[9:12], "adb")
+		modify(buf)
+		c, _ := aes.NewCipher(key)
+		c.Encrypt(buf, buf)
+		return buf
+	}
+
+	cases := []struct {
+		name   string
+		modify func(buf []byte)
+		ok     bool
+	}{
+		{"valid", func([]byte) {}, true},
+		{"reserved bytes not 0xFF", func(buf []byte) { buf[5] = 0 }, true},
+		{"EncryptMetadata mismatch", func(buf []byte) { buf[8] = 'F' }, true},
+		{"random fill", func(buf []byte) { buf[13] = 7 }, true},
+		{"P mismatch", func(buf []byte) { buf[1] ^= 0x04 }, false},
+		{"missing marker", func(buf []byte) { buf[10] = 'x' }, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			sec := &stdSecHandler{P: P, Perms: mkPerms(c.modify)}
+			err := sec.checkPerms(key)
+			if (err == nil) != c.ok {
+				t.Errorf("got err=%v, want ok=%v", err, c.ok)
+			}
+		})
 	}
 }
