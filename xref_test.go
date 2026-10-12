@@ -580,6 +580,234 @@ func TestXRefRunsOf(t *testing.T) {
 	}
 }
 
+// freeListOf returns the members of the free list headed by entry 0, in
+// list order and excluding entry 0.
+func freeListOf(t *testing.T, xref map[uint32]*xRefEntry) []uint32 {
+	t.Helper()
+	var list []uint32
+	if xref[0] == nil {
+		return nil
+	}
+	for n := xref[0].NextFree; n != 0; n = xref[n].NextFree {
+		if len(list) > len(xref) {
+			t.Fatalf("free list %v does not terminate", list)
+		}
+		list = append(list, n)
+	}
+	return list
+}
+
+func TestRepairFreeList(t *testing.T) {
+	free := func(gen uint16, next uint32) *xRefEntry {
+		return &xRefEntry{Pos: -1, Generation: gen, NextFree: next}
+	}
+	used := func() *xRefEntry { return &xRefEntry{Pos: 100} }
+
+	type testCase struct {
+		name string
+		xref map[uint32]*xRefEntry
+		want []uint32
+	}
+	cases := []testCase{
+		{
+			name: "valid",
+			xref: map[uint32]*xRefEntry{0: free(maxGeneration, 3), 1: used(), 2: free(1, 0), 3: free(2, 2)},
+			want: []uint32{3, 2},
+		},
+		{
+			name: "no entry 0",
+			xref: map[uint32]*xRefEntry{1: used(), 2: free(1, 0)},
+			want: nil,
+		},
+		{
+			name: "cycle",
+			xref: map[uint32]*xRefEntry{0: free(maxGeneration, 1), 1: free(1, 2), 2: free(1, 1)},
+			want: []uint32{1, 2},
+		},
+		{
+			name: "cycle to self",
+			xref: map[uint32]*xRefEntry{0: free(maxGeneration, 1), 1: free(1, 1)},
+			want: []uint32{1},
+		},
+		{
+			name: "link to used entry",
+			xref: map[uint32]*xRefEntry{0: free(maxGeneration, 1), 1: free(1, 2), 2: used()},
+			want: []uint32{1},
+		},
+		{
+			name: "link to missing entry",
+			xref: map[uint32]*xRefEntry{0: free(maxGeneration, 1), 1: free(1, 7)},
+			want: []uint32{1},
+		},
+		{
+			name: "link to exhausted entry",
+			xref: map[uint32]*xRefEntry{0: free(maxGeneration, 1), 1: free(1, 2), 2: free(maxGeneration, 0)},
+			want: []uint32{1},
+		},
+		{
+			name: "orphan is left alone",
+			xref: map[uint32]*xRefEntry{0: free(maxGeneration, 0), 1: free(1, 2), 2: free(1, 0)},
+			want: nil,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			repairFreeList(c.xref)
+			if diff := cmp.Diff(c.want, freeListOf(t, c.xref)); diff != "" {
+				t.Errorf("free list (-want +got):\n%s", diff)
+			}
+			if e := c.xref[0]; e != nil && e.Generation != maxGeneration {
+				t.Errorf("entry 0 has generation %d", e.Generation)
+			}
+			// the list ends at the last member, which links to 0
+			if list := freeListOf(t, c.xref); len(list) > 0 {
+				if last := c.xref[list[len(list)-1]]; last.NextFree != 0 {
+					t.Errorf("last member links to %d", last.NextFree)
+				}
+			}
+		})
+	}
+
+	// entry 0 with a wrong generation number is repaired
+	xref := map[uint32]*xRefEntry{0: free(0, 0)}
+	repairFreeList(xref)
+	if xref[0].Generation != maxGeneration {
+		t.Errorf("entry 0 has generation %d", xref[0].Generation)
+	}
+	// an orphan keeps its next-free number
+	xref = map[uint32]*xRefEntry{0: free(maxGeneration, 0), 1: free(1, 2), 2: free(1, 0)}
+	repairFreeList(xref)
+	if xref[1].NextFree != 2 {
+		t.Errorf("orphan links to %d, want 2", xref[1].NextFree)
+	}
+}
+
+func TestReadXRefKeepsNextFree(t *testing.T) {
+	for _, v := range []Version{V1_4, V1_7} {
+		t.Run(v.String(), func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w, err := NewWriter(buf, v, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := addPage(w); err != nil {
+				t.Fatal(err)
+			}
+			var refs []Reference
+			for range 3 {
+				ref := w.Alloc()
+				if err := w.Put(ref, Name("doomed")); err != nil {
+					t.Fatal(err)
+				}
+				refs = append(refs, ref)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			data := buf.Bytes()
+			out := &bytes.Buffer{}
+			u, err := NewUpdaterTo(bytes.NewReader(data), int64(len(data)), out, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, ref := range refs {
+				if err := u.Free(ref); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := u.Close(); err != nil {
+				t.Fatal(err)
+			}
+			data = out.Bytes()
+
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := []uint32{refs[0].Number(), refs[1].Number(), refs[2].Number()}
+			if diff := cmp.Diff(want, freeListOf(t, r.xref)); diff != "" {
+				t.Errorf("free list (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestLinkFreeEntries(t *testing.T) {
+	free := func(gen uint16, next uint32) *xRefEntry {
+		return &xRefEntry{Pos: -1, Generation: gen, NextFree: next}
+	}
+	used := func() *xRefEntry { return &xRefEntry{Pos: 100} }
+
+	// new file: every free entry below generation 65535 joins the list
+	w := &Writer{xref: map[uint32]*xRefEntry{
+		0: free(maxGeneration, 0), 1: used(), 2: free(1, 0), 3: free(maxGeneration, 0), 4: free(2, 0),
+	}}
+	w.linkFreeEntries()
+	if diff := cmp.Diff([]uint32{2, 4}, freeListOf(t, w.xref)); diff != "" {
+		t.Errorf("new file: free list (-want +got):\n%s", diff)
+	}
+
+	// update: base list is 0 -> 2 -> 5 -> 8 -> 0
+	newBase := func() *Reader {
+		return &Reader{xref: map[uint32]*xRefEntry{
+			0: free(maxGeneration, 2),
+			1: used(),
+			2: free(3, 5),
+			3: free(maxGeneration, 0), // never reused, not in the list
+			4: used(),
+			5: free(1, 8),
+			6: used(),
+			7: used(),
+			8: free(1, 0),
+		}}
+	}
+	base := newBase()
+	w = &Writer{base: base, xref: map[uint32]*xRefEntry{
+		4: free(1, 0),             // freed in this session
+		5: used(),                 // resurrected in this session
+		6: free(maxGeneration, 0), // generation exhausted, stays out of the list
+		7: free(1, 0),             // freed in this session
+	}}
+	w.linkFreeEntries()
+	merged := maps.Clone(base.xref)
+	maps.Copy(merged, w.xref)
+	if diff := cmp.Diff([]uint32{4, 7, 2, 8}, freeListOf(t, merged)); diff != "" {
+		t.Errorf("update: free list (-want +got):\n%s", diff)
+	}
+	// entry 0 and entry 2 change their next-free number, entry 8 does not
+	gotNums := slices.Sorted(maps.Keys(w.xref))
+	if diff := cmp.Diff([]uint32{0, 2, 4, 5, 6, 7}, gotNums); diff != "" {
+		t.Errorf("update: restated entries (-want +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(newBase().xref, base.xref); diff != "" {
+		t.Errorf("update: original table changed (-want +got):\n%s", diff)
+	}
+
+	// nothing freed or resurrected: the section stays as it is
+	w = &Writer{base: newBase(), xref: map[uint32]*xRefEntry{1: used()}}
+	w.linkFreeEntries()
+	if len(w.xref) != 1 {
+		t.Errorf("section grew to %d entries", len(w.xref))
+	}
+
+	// resurrecting the only list member empties the list
+	w = &Writer{base: &Reader{xref: map[uint32]*xRefEntry{
+		0: free(maxGeneration, 1), 1: free(1, 0),
+	}}, xref: map[uint32]*xRefEntry{1: used()}}
+	w.linkFreeEntries()
+	if e := w.xref[0]; e == nil || e.NextFree != 0 || e.Generation != maxGeneration {
+		t.Errorf("entry 0 is %v", e)
+	}
+
+	// an original without entry 0 (reconstructed table): entry 0 is created
+	w = &Writer{base: &Reader{xref: map[uint32]*xRefEntry{1: used()}}, xref: map[uint32]*xRefEntry{1: free(1, 0)}}
+	w.linkFreeEntries()
+	if diff := cmp.Diff([]uint32{1}, freeListOf(t, w.xref)); diff != "" {
+		t.Errorf("no entry 0: free list (-want +got):\n%s", diff)
+	}
+}
+
 func TestXRefStreamListsItself(t *testing.T) {
 	buf := &bytes.Buffer{}
 	w, err := NewWriter(buf, V1_7, nil)

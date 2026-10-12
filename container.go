@@ -204,13 +204,13 @@ func filterChainStartsWithCrypt(r Getter, filter Object) (bool, error) {
 	return false, nil
 }
 
-// DecodeStream returns a reader for the decoded stream data. If numFilters is
-// non-zero, only the first numFilters filters are decoded.
+// DecodeStream returns a reader for the stream data with all filters of
+// the stream applied.
 //
 // Each call creates a fresh reader, so streams can be decoded multiple times.
 //
 // For encrypted PDFs, decryption is applied on-the-fly before any other
-// filters. This does not count towards numFilters.
+// filters.
 //
 // Errors returned by Read on the resulting reader are classified per the
 // package-level two-class error model: malformed-content errors are tagged

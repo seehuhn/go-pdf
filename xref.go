@@ -164,7 +164,47 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		start = int64(prevStart) + r.headerOffset
 	}
 
+	repairFreeList(xref)
 	return xref, trailer, nil
+}
+
+// nextFreeNumber converts the next-free field of a free entry to an object
+// number.  A value which cannot be an object number is replaced by 0, the
+// end of the list.
+func nextFreeNumber(a int64) uint32 {
+	if a < 0 || a >= maxXRefSize {
+		return 0
+	}
+	return uint32(a)
+}
+
+// repairFreeList truncates the list of free entries headed by entry 0 at
+// the first link which does not lead to a free entry with generation
+// number below 65535, or which closes a cycle.  Free entries not in the
+// list keep their next-free numbers.  Entry 0 is given the generation
+// number 65535 which the specification requires.
+func repairFreeList(xref map[uint32]*xRefEntry) {
+	head := xref[0]
+	if head == nil {
+		return
+	}
+	head.Generation = maxGeneration
+
+	seen := map[uint32]bool{0: true}
+	prev := head
+	for {
+		n := prev.NextFree
+		if n == 0 {
+			return
+		}
+		entry := xref[n]
+		if seen[n] || entry == nil || !entry.IsFree() || entry.Generation == maxGeneration {
+			prev.NextFree = 0
+			return
+		}
+		seen[n] = true
+		prev = entry
+	}
 }
 
 func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
@@ -286,6 +326,7 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			xref[i-offByOne] = &xRefEntry{
 				Pos:        -1,
 				Generation: uint16(b),
+				NextFree:   nextFreeNumber(a),
 			}
 		case 'n':
 			xref[i-offByOne] = &xRefEntry{
@@ -475,14 +516,14 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				// a = next free object
 				// b = generation number to be used if the object is resurrected
 				if b > maxGeneration {
-					// dropping this entry leaves a hole in the circular
-					// free list, but neither reader nor writer follows
-					// that chain
+					// dropping this entry leaves a hole in the free
+					// list, which repairFreeList closes
 					continue
 				}
 				xref[i] = &xRefEntry{
 					Pos:        -1,
 					Generation: uint16(b),
+					NextFree:   nextFreeNumber(a),
 				}
 			case 1:
 				// used object, not compressed
@@ -598,7 +639,68 @@ func (w *Writer) xRefRuns(extra ...uint32) []xRefRun {
 	return xRefRunsOf(w.xref, extra...)
 }
 
+// linkFreeEntries sets the next-free numbers of the free entries, so that
+// those with generation numbers below 65535 form the list headed by entry 0
+// (PDF 32000-2:2020, section 7.5.4).  Other free entries link to object 0
+// without being in the list.
+//
+// For a new file, the list holds all free entries.  For an incremental
+// update, the entries freed in this session are put in front of the list
+// of the original file, and entries of the original which the session
+// put back in use are taken out.  Only entries whose next-free number
+// changes are restated in the update's cross-reference section.
+func (w *Writer) linkFreeEntries() {
+	var list []uint32
+	for n, entry := range w.xref {
+		if n != 0 && entry.IsFree() && entry.Generation < maxGeneration {
+			list = append(list, n)
+		}
+	}
+	slices.Sort(list)
+
+	var base map[uint32]*xRefEntry
+	if w.base != nil {
+		base = w.base.xref
+		// the original's list is valid after repairFreeList
+		if head := base[0]; head != nil {
+			for n := head.NextFree; n != 0; n = base[n].NextFree {
+				if _, replaced := w.xref[n]; !replaced {
+					list = append(list, n)
+				}
+			}
+		}
+	}
+
+	setNext := func(n, next uint32) {
+		entry := w.xref[n]
+		if entry == nil {
+			// n is 0 or a list member of the original, so this is an update
+			orig := base[n]
+			switch {
+			case orig == nil && next == 0:
+				return
+			case orig == nil:
+				entry = &xRefEntry{Pos: -1, Generation: maxGeneration}
+			case orig.NextFree == next:
+				return
+			default:
+				restated := *orig
+				entry = &restated
+			}
+			w.xref[n] = entry
+		}
+		entry.NextFree = next
+	}
+	prev := uint32(0)
+	for _, n := range list {
+		setNext(prev, n)
+		prev = n
+	}
+	setNext(prev, 0)
+}
+
 func (w *Writer) writeXRefTable(xRefDict Dict) error {
+	w.linkFreeEntries()
 	runs := w.xRefRuns()
 	if len(runs) == 0 {
 		// an update which changed nothing still needs one subsection
@@ -623,7 +725,8 @@ func (w *Writer) writeXRefTable(xRefDict Dict) error {
 				_, err = fmt.Fprintf(w.w, "%010d %05d n\r\n",
 					entry.Pos-w.headerOffset, entry.Generation)
 			case entry != nil:
-				_, err = fmt.Fprintf(w.w, "0000000000 %05d f\r\n", entry.Generation)
+				_, err = fmt.Fprintf(w.w, "%010d %05d f\r\n",
+					entry.NextFree, entry.Generation)
 			default:
 				_, err = w.w.Write([]byte("0000000000 65535 f\r\n"))
 			}
@@ -649,6 +752,8 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 	ref := w.Alloc()
 	// no more object allocations after this point
 
+	w.linkFreeEntries()
+
 	xRefDict["Type"] = Name("XRef")
 	xRefDict["Size"] = Integer(w.nextRef)
 
@@ -664,37 +769,31 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 		xRefDict["Index"] = index
 	}
 
+	// Object numbers without an entry, which occur only in new files, are
+	// free entries which are never reused, as in writeXRefTable.
+	fields := func(i uint32) (tp byte, f2, f3 uint64) {
+		entry := w.xref[i]
+		switch {
+		case i == ref.Number():
+			return 1, uint64(own.Pos - w.headerOffset), 0
+		case entry == nil:
+			return 0, 0, maxGeneration
+		case entry.InStream != 0:
+			return 2, uint64(entry.InStream.Number()), uint64(entry.Pos)
+		case entry.Pos >= 0:
+			return 1, uint64(entry.Pos - w.headerOffset), uint64(entry.Generation)
+		default:
+			return 0, uint64(entry.NextFree), uint64(entry.Generation)
+		}
+	}
+
 	maxField2 := uint64(0)
 	maxField3 := uint64(0)
 	for _, run := range runs {
 		for i := run.start; i < run.start+run.count; i++ {
-			entry := w.xref[i]
-			if i == ref.Number() {
-				entry = own
-			}
-			if entry == nil {
-				continue
-			}
-			var f2, f3 uint64
-			if entry.InStream != 0 {
-				f2 = uint64(entry.InStream.Number())
-				f3 = uint64(entry.Pos)
-			} else if entry.Pos >= 0 {
-				f2 = uint64(entry.Pos - w.headerOffset)
-				f3 = uint64(entry.Generation)
-			} else {
-				gen := entry.Generation
-				if gen == maxGeneration {
-					gen = 0
-				}
-				f3 = uint64(gen)
-			}
-			if f2 > maxField2 {
-				maxField2 = f2
-			}
-			if f3 > maxField3 {
-				maxField3 = f3
-			}
+			_, f2, f3 := fields(i)
+			maxField2 = max(maxField2, f2)
+			maxField3 = max(maxField3, f3)
 		}
 	}
 	w2 := (bits.Len64(maxField2) + 7) / 8
@@ -716,62 +815,18 @@ func (w *Writer) writeXRefStream(xRefDict Dict) error {
 	wx := bufio.NewWriter(wxRaw)
 	for _, run := range runs {
 		for i := run.start; i < run.start+run.count; i++ {
-			entry := w.xref[i]
-			if i == ref.Number() {
-				entry = own
+			tp, f2, f3 := fields(i)
+			err := wx.WriteByte(tp)
+			if err != nil {
+				return err
 			}
-			if entry == nil {
-				err := wx.WriteByte(0)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, 0, w2)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, 0, w3)
-				if err != nil {
-					return err
-				}
-			} else if entry.Pos < 0 {
-				err := wx.WriteByte(0)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, 0, w2)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, uint64(entry.Generation), w3)
-				if err != nil {
-					return err
-				}
-			} else if entry.InStream == 0 {
-				err := wx.WriteByte(1)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, uint64(entry.Pos-w.headerOffset), w2)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, uint64(entry.Generation), w3)
-				if err != nil {
-					return err
-				}
-			} else {
-				err := wx.WriteByte(2)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, uint64(entry.InStream.Number()), w2)
-				if err != nil {
-					return err
-				}
-				err = encodeInt64(wx, uint64(entry.Pos), w3)
-				if err != nil {
-					return err
-				}
+			err = encodeInt64(wx, f2, w2)
+			if err != nil {
+				return err
+			}
+			err = encodeInt64(wx, f3, w3)
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -823,6 +878,11 @@ type xRefEntry struct {
 	InStream   Reference
 	Pos        int64
 	Generation uint16
+
+	// NextFree is the object number of the next entry in the list of free
+	// entries (PDF 32000-2:2020, section 7.5.4).  It is only used for free
+	// entries.
+	NextFree uint32
 }
 
 func (entry *xRefEntry) IsFree() bool {

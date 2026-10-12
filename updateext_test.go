@@ -19,9 +19,11 @@ package pdf_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1236,4 +1238,284 @@ func FuzzUpdate(f *testing.F) {
 			t.Errorf("info changed (-before +after):\n%s", diff)
 		}
 	})
+}
+
+// xrefEntry is an entry of a cross-reference section.  For a free entry,
+// next and gen hold the next-free object number and the generation number.
+type xrefEntry struct {
+	used bool
+	next uint32
+	gen  uint64
+}
+
+// xrefEntriesAt returns the entries of the cross-reference section at pos.
+func xrefEntriesAt(t testing.TB, data []byte, pos int64) map[uint32]xrefEntry {
+	t.Helper()
+	res := make(map[uint32]xrefEntry)
+
+	if bytes.HasPrefix(data[pos:], []byte("xref")) {
+		end := bytes.Index(data[pos:], []byte("trailer"))
+		if end < 0 {
+			t.Fatal("no trailer keyword")
+		}
+		tokens := strings.Fields(string(data[pos+4 : pos+int64(end)]))
+		for len(tokens) > 0 {
+			if len(tokens) < 2 {
+				t.Fatalf("malformed xref subsection %q", tokens)
+			}
+			start, err1 := strconv.ParseUint(tokens[0], 10, 32)
+			count, err2 := strconv.Atoi(tokens[1])
+			if err1 != nil || err2 != nil || len(tokens) < 2+3*count {
+				t.Fatalf("malformed xref subsection %q", tokens[:2])
+			}
+			tokens = tokens[2:]
+			for i := range count {
+				n := uint32(start) + uint32(i)
+				if tokens[3*i+2] == "f" {
+					next, _ := strconv.ParseUint(tokens[3*i], 10, 32)
+					gen, _ := strconv.ParseUint(tokens[3*i+1], 10, 16)
+					res[n] = xrefEntry{next: uint32(next), gen: gen}
+				} else {
+					res[n] = xrefEntry{used: true}
+				}
+			}
+			tokens = tokens[3*count:]
+		}
+		return res
+	}
+
+	var num, gen uint32
+	if _, err := fmt.Sscanf(string(data[pos:]), "%d %d obj", &num, &gen); err != nil {
+		t.Fatal(err)
+	}
+	r := reopen(t, data)
+	obj, err := r.Get(pdf.NewReference(num, uint16(gen)), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stm, ok := obj.(*pdf.Stream)
+	if !ok {
+		t.Fatalf("xref stream is %T", obj)
+	}
+	var w [3]int
+	for i, x := range stm.Dict["W"].(pdf.Array) {
+		w[i] = int(x.(pdf.Integer))
+	}
+	index := pdf.Array{pdf.Integer(0), stm.Dict["Size"]}
+	if a, ok := stm.Dict["Index"].(pdf.Array); ok {
+		index = a
+	}
+	body, err := pdf.DecodeStream(r, nil, stm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf, err := io.ReadAll(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	field := func(width int) uint64 {
+		var x uint64
+		for range width {
+			x = x<<8 | uint64(buf[0])
+			buf = buf[1:]
+		}
+		return x
+	}
+	for k := 0; k+1 < len(index); k += 2 {
+		start := uint32(index[k].(pdf.Integer))
+		count := uint32(index[k+1].(pdf.Integer))
+		for i := range count {
+			tp := uint64(1)
+			if w[0] > 0 {
+				tp = field(w[0])
+			}
+			f2 := field(w[1])
+			f3 := field(w[2])
+			if tp == 0 {
+				res[start+i] = xrefEntry{next: uint32(f2), gen: f3}
+			} else {
+				res[start+i] = xrefEntry{used: true}
+			}
+		}
+	}
+	return res
+}
+
+// freeOnly returns the free entries of entries.
+func freeOnly(entries map[uint32]xrefEntry) map[uint32]xrefEntry {
+	res := make(map[uint32]xrefEntry)
+	for n, e := range entries {
+		if !e.used {
+			res[n] = e
+		}
+	}
+	return res
+}
+
+// lastFreeEntries returns the free entries of the last cross-reference
+// section in data.
+func lastFreeEntries(t testing.TB, data []byte) map[uint32]xrefEntry {
+	t.Helper()
+	return freeOnly(xrefEntriesAt(t, data, lastStartXRef(t, data)))
+}
+
+// allFreeEntries returns the free entries of data, merged over all
+// cross-reference sections with the newest entry for each object number
+// taking precedence.
+func allFreeEntries(t testing.TB, data []byte) map[uint32]xrefEntry {
+	t.Helper()
+	merged := make(map[uint32]xrefEntry)
+	rest := data
+	for {
+		i := bytes.LastIndex(rest, []byte("startxref"))
+		if i < 0 {
+			break
+		}
+		for n, e := range xrefEntriesAt(t, data, lastStartXRef(t, rest)) {
+			if _, ok := merged[n]; !ok {
+				merged[n] = e
+			}
+		}
+		rest = rest[:i]
+	}
+	return freeOnly(merged)
+}
+
+// checkFreeList verifies that the free entries form a valid list of free
+// entries (PDF 32000-2:2020, section 7.5.4) and returns its members, in
+// list order, excluding object 0.
+func checkFreeList(t testing.TB, free map[uint32]xrefEntry) []uint32 {
+	t.Helper()
+	head, ok := free[0]
+	if !ok || head.gen != 65535 {
+		t.Fatalf("entry 0 is %v, want a free entry with generation 65535", head)
+	}
+	var list []uint32
+	seen := make(map[uint32]bool)
+	for n := head.next; n != 0; n = free[n].next {
+		entry, ok := free[n]
+		if !ok || seen[n] {
+			t.Fatalf("free list %v continues to %d", list, n)
+		}
+		seen[n] = true
+		list = append(list, n)
+		if entry.gen == 65535 {
+			t.Errorf("free list contains entry %d with generation 65535", n)
+		}
+	}
+	for n, entry := range free {
+		if n != 0 && !seen[n] && (entry.gen != 65535 || entry.next != 0) {
+			t.Errorf("free entry %d %v is not in the free list", n, entry)
+		}
+	}
+	return list
+}
+
+func TestUpdateFreeList(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_4, pdf.V1_7} {
+		t.Run(v.String(), func(t *testing.T) {
+			w0, f := memfile.NewPDFWriter(t, v, nil)
+			var refs []pdf.Reference
+			for range 3 {
+				ref := w0.Alloc()
+				if err := w0.Put(ref, pdf.Name("doomed")); err != nil {
+					t.Fatal(err)
+				}
+				refs = append(refs, ref)
+			}
+			if err := w0.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if list := checkFreeList(t, lastFreeEntries(t, f.Data)); len(list) != 0 {
+				t.Errorf("new file has free list %v", list)
+			}
+
+			free := func(refs ...pdf.Reference) {
+				t.Helper()
+				w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, ref := range refs {
+					if err := w.Free(ref); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := w.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// the list starts with the entries freed in the update
+			free(refs[2], refs[0])
+			want := []uint32{refs[0].Number(), refs[2].Number()}
+			got := checkFreeList(t, allFreeEntries(t, f.Data))
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("first update: free list (-want +got):\n%s", diff)
+			}
+
+			// the new entry goes in front of the entries freed earlier,
+			// which are not restated
+			free(refs[1])
+			want = []uint32{refs[1].Number(), refs[0].Number(), refs[2].Number()}
+			got = checkFreeList(t, allFreeEntries(t, f.Data))
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("second update: free list (-want +got):\n%s", diff)
+			}
+			last := lastFreeEntries(t, f.Data)
+			wantLast := map[uint32]xrefEntry{
+				0:                {next: refs[1].Number(), gen: 65535},
+				refs[1].Number(): {next: refs[0].Number(), gen: 1},
+			}
+			if diff := cmp.Diff(wantLast, last, cmp.AllowUnexported(xrefEntry{})); diff != "" {
+				t.Errorf("second update: last section (-want +got):\n%s", diff)
+			}
+
+			// putting a freed object number back in use takes it out of
+			// the list; only its predecessor is restated
+			w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reborn := pdf.NewReference(refs[0].Number(), 1)
+			if err := w.Put(reborn, pdf.Name("reborn")); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+			want = []uint32{refs[1].Number(), refs[2].Number()}
+			got = checkFreeList(t, allFreeEntries(t, f.Data))
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("resurrection: free list (-want +got):\n%s", diff)
+			}
+			wantLast = map[uint32]xrefEntry{
+				refs[1].Number(): {next: refs[2].Number(), gen: 1},
+			}
+			if diff := cmp.Diff(wantLast, lastFreeEntries(t, f.Data), cmp.AllowUnexported(xrefEntry{})); diff != "" {
+				t.Errorf("resurrection: last section (-want +got):\n%s", diff)
+			}
+			if obj, err := reopen(t, f.Data).Get(reborn, true); err != nil || obj != pdf.Name("reborn") {
+				t.Errorf("reborn object reads as %v, %v", obj, err)
+			}
+			refs = refs[1:]
+
+			// an update which frees nothing leaves the list alone
+			applyEmptyUpdate(t, f)
+			if _, ok := lastFreeEntries(t, f.Data)[0]; ok {
+				t.Error("empty update restates entry 0")
+			}
+
+			r := reopen(t, f.Data)
+			for _, ref := range refs {
+				obj, err := r.Get(ref, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if obj != nil {
+					t.Errorf("freed object %s reads as %v", ref, obj)
+				}
+			}
+		})
+	}
 }
