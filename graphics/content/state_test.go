@@ -701,3 +701,40 @@ func TestIgnored(t *testing.T) {
 		}
 	}
 }
+
+// TestClipWithoutPath checks that a painting operator with no current path
+// is ignored (§8.5.3.1), so that a pending W does not record a clip.
+func TestClipWithoutPath(t *testing.T) {
+	s := NewState(Page, &Resources{})
+
+	// W n at the start of the stream
+	applyOps(s,
+		OpClipNonZero, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+	)
+	if len(s.GState.ClipPaths) != 0 {
+		t.Errorf("at stream start: got %d clip paths, want 0", len(s.GState.ClipPaths))
+	}
+
+	// W n directly after a painting operator
+	applyOps(s,
+		OpRectangle, []pdf.Object{n(0), n(0), n(10), n(10)},
+		OpEndPath, []pdf.Object{},
+		OpClipNonZero, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+	)
+	if len(s.GState.ClipPaths) != 0 {
+		t.Errorf("after a painting operator: got %d clip paths, want 0", len(s.GState.ClipPaths))
+	}
+
+	// the ignored W does not carry over to the next painting operator
+	applyOps(s,
+		OpClipNonZero, []pdf.Object{},
+		OpEndPath, []pdf.Object{},
+		OpRectangle, []pdf.Object{n(0), n(0), n(10), n(10)},
+		OpFill, []pdf.Object{},
+	)
+	if len(s.GState.ClipPaths) != 0 {
+		t.Errorf("after a later fill: got %d clip paths, want 0", len(s.GState.ClipPaths))
+	}
+}

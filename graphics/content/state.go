@@ -525,8 +525,9 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 			}
 		}
 
-		// capture clip path if pending
-		if s.pendingClip {
+		// A painting operator with no current path is ignored
+		// (§8.5.3.1), and a pending W goes with it.
+		if s.pendingClip && len(s.currentPath.Cmds) > 0 {
 			clipData := &path.Data{
 				Cmds:   slices.Clone(s.currentPath.Cmds),
 				Coords: slices.Clone(s.currentPath.Coords),
@@ -536,8 +537,8 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 				EvenOdd: s.pendingClipEvenOdd,
 				CTM:     s.GState.CTM,
 			})
-			s.pendingClip = false
 		}
+		s.pendingClip = false
 
 		// move path to paintedPath; swap reuses backing arrays
 		s.paintedPath, s.currentPath = s.currentPath, s.paintedPath
