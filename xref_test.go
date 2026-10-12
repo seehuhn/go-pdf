@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"maps"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestFindXref(t *testing.T) {
@@ -58,6 +60,8 @@ func TestDecodeInt(t *testing.T) {
 		// signed int64; now it must be rejected outright.
 		{"high bit overflow", []byte{0x80, 0, 0, 0, 0, 0, 0, 0}, 0, true},
 		{"all ones overflow", []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, 0, true},
+		{"ten bytes with leading zeros", []byte{0, 0, 0, 0, 0, 0, 0, 0, 1, 2}, 0x0102, false},
+		{"ten bytes overflow", []byte{0, 1, 0, 0, 0, 0, 0, 0, 0, 0}, 0, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -94,13 +98,13 @@ func TestCheckXRefStreamDict(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			// entries beyond Size are kept, as the table reader does
 			name: "Index subsection extends past Size",
 			dict: Dict{
 				"Size":  Integer(10),
 				"W":     Array{Integer(1), Integer(2), Integer(1)},
 				"Index": Array{Integer(0), Integer(11)},
 			},
-			wantErr: true,
 		},
 		{
 			name: "Index subsection start past Size",
@@ -109,7 +113,63 @@ func TestCheckXRefStreamDict(t *testing.T) {
 				"W":     Array{Integer(1), Integer(2), Integer(1)},
 				"Index": Array{Integer(11), Integer(1)},
 			},
+		},
+		{
+			name: "W width above 8",
+			dict: Dict{
+				"Size": Integer(10),
+				"W":    Array{Integer(1), Integer(10), Integer(1)},
+			},
+		},
+		{
+			name: "W row wider than the stream budget",
+			dict: Dict{
+				"Size": Integer(10),
+				"W":    Array{Integer(1), Integer(limits.StreamBudget(1 << 20)), Integer(1)},
+			},
 			wantErr: true,
+		},
+		{
+			name: "W width overflowing int64 when summed",
+			dict: Dict{
+				"Size": Integer(10),
+				"W":    Array{Integer(math.MaxInt64), Integer(math.MaxInt64), Integer(2)},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Index subsection with zero entries",
+			dict: Dict{
+				"Size":  Integer(10),
+				"W":     Array{Integer(1), Integer(2), Integer(1)},
+				"Index": Array{Integer(0), Integer(0), Integer(0), Integer(10)},
+			},
+		},
+		{
+			name: "Index subsection with negative count",
+			dict: Dict{
+				"Size":  Integer(10),
+				"W":     Array{Integer(1), Integer(2), Integer(1)},
+				"Index": Array{Integer(0), Integer(-1)},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Index subsection with negative start",
+			dict: Dict{
+				"Size":  Integer(10),
+				"W":     Array{Integer(1), Integer(2), Integer(1)},
+				"Index": Array{Integer(-1), Integer(1)},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Index subsection beyond the object number cap",
+			dict: Dict{
+				"Size":  Integer(10),
+				"W":     Array{Integer(1), Integer(2), Integer(1)},
+				"Index": Array{Integer(maxXRefSize), Integer(1)},
+			},
 		},
 		{
 			name: "Index covering exactly Size",
@@ -832,5 +892,180 @@ func TestXRefStreamListsItself(t *testing.T) {
 	}
 	if entry.Pos != lastStartXRef(t, data) {
 		t.Errorf("xref stream entry points to %d, want %d", entry.Pos, lastStartXRef(t, data))
+	}
+}
+
+// appendXRefStreamSection appends an update section holding the given
+// objects (object number to body) and a cross-reference stream whose
+// dictionary entries and raw data are produced by mk from the objects'
+// byte positions.  The stream object uses the number stmNum, and the
+// trailer entries /Root and /Prev are added automatically.
+func appendXRefStreamSection(t *testing.T, data []byte, objects map[uint32]string, stmNum uint32,
+	mk func(pos map[uint32]int64) (dict string, entries []byte)) []byte {
+	t.Helper()
+	prev := lastStartXRef(t, data)
+	buf := bytes.NewBuffer(bytes.Clone(data))
+	pos := map[uint32]int64{}
+	for _, n := range slices.Sorted(maps.Keys(objects)) {
+		pos[n] = int64(buf.Len())
+		fmt.Fprintf(buf, "%d 0 obj\n%s\nendobj\n", n, objects[n])
+	}
+	dict, entries := mk(pos)
+	stmPos := buf.Len()
+	fmt.Fprintf(buf, "%d 0 obj\n<< /Type /XRef %s /Root %d 0 R /Prev %d /Length %d >>\nstream\n",
+		stmNum, dict, rootRef(t, data).Number(), prev, len(entries))
+	buf.Write(entries)
+	fmt.Fprintf(buf, "\nendstream\nendobj\nstartxref\n%d\n%%%%EOF\n", stmPos)
+	return buf.Bytes()
+}
+
+// TestXRefStreamEntriesBeyondSizeKept verifies that an /Index subsection
+// extending past /Size neither rejects the file nor loses its entries,
+// matching the treatment of classic cross-reference tables.
+func TestXRefStreamEntriesBeyondSizeKept(t *testing.T) {
+	data := writeBaseFile(t, nil, "")
+	size := uint32(trailerSize(t, data))
+	hidden := size
+	stmNum := size + 1
+	data = appendXRefStreamSection(t, data, map[uint32]string{hidden: "/hidden"}, stmNum,
+		func(pos map[uint32]int64) (string, []byte) {
+			// Size is too small by two, but the entries are valid
+			p := pos[hidden]
+			entries := []byte{1, byte(p >> 24), byte(p >> 16), byte(p >> 8), byte(p), 0}
+			return fmt.Sprintf("/Size %d /W [1 4 1] /Index [%d 1]", size, hidden), entries
+		})
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := r.Get(NewReference(hidden, 0), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != Name("hidden") {
+		t.Errorf("got %v, want /hidden", obj)
+	}
+}
+
+// TestDecodeXRefStreamSkipsSubsectionBeyondCap verifies that a subsection
+// starting at or above the object number cap is skipped over, with its
+// bytes consumed so that later subsections stay aligned.
+func TestDecodeXRefStreamSkipsSubsectionBeyondCap(t *testing.T) {
+	xref := map[uint32]*xRefEntry{}
+	w := []int{1, 1, 1}
+	ss := []*xRefSubSection{{Start: maxXRefSize, Size: 1}, {Start: 5, Size: 1}}
+	data := []byte{1, 9, 0, 1, 7, 0}
+	if err := decodeXRefStream(xref, bytes.NewReader(data), w, ss); err != nil {
+		t.Fatalf("decodeXRefStream: %v", err)
+	}
+	if len(xref) != 1 || xref[5] == nil || xref[5].Pos != 7 {
+		t.Errorf("xref = %v, want only entry 5 at Pos 7", xref)
+	}
+}
+
+// TestDecodeXRefStreamUnknownTypeIsNull verifies that entries of a type
+// other than 0, 1 and 2, including a type field too large for int64, are
+// recorded as references to the null object (PDF 32000-2:2020, section
+// 7.5.8.3), so that they shadow older sections.
+func TestDecodeXRefStreamUnknownTypeIsNull(t *testing.T) {
+	xref := map[uint32]*xRefEntry{}
+	w := []int{8, 1, 1}
+	ss := []*xRefSubSection{{Start: 5, Size: 2}}
+	data := []byte{
+		0, 0, 0, 0, 0, 0, 0, 3, 7, 0, // type 3
+		0xff, 0, 0, 0, 0, 0, 0, 0, 7, 0, // type beyond int64
+	}
+	if err := decodeXRefStream(xref, bytes.NewReader(data), w, ss); err != nil {
+		t.Fatalf("decodeXRefStream: %v", err)
+	}
+	for _, n := range []uint32{5, 6} {
+		entry := xref[n]
+		if entry == nil || !entry.IsFree() {
+			t.Errorf("xref[%d] = %v, want a free entry", n, entry)
+		}
+	}
+}
+
+// TestXRefStreamUnknownTypeShadowsPrev verifies that an unknown entry type
+// in an update hides the object's definition in an older section.
+func TestXRefStreamUnknownTypeShadowsPrev(t *testing.T) {
+	data, ref := writeBaseFileWith(t, Name("old"))
+	size := uint32(trailerSize(t, data))
+	data = appendXRefStreamSection(t, data, nil, size,
+		func(map[uint32]int64) (string, []byte) {
+			return fmt.Sprintf("/Size %d /W [1 1 1] /Index [%d 1]", size+1, ref.Number()),
+				[]byte{3, 0, 0}
+		})
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := r.Get(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != nil {
+		t.Errorf("got %v, want null for unknown entry type", obj)
+	}
+}
+
+// TestXRefStreamWideFields verifies that a field width above 8 bytes is
+// accepted when the leading bytes are zero.
+func TestXRefStreamWideFields(t *testing.T) {
+	data := writeBaseFile(t, nil, "")
+	size := uint32(trailerSize(t, data))
+	hidden := size
+	stmNum := size + 1
+	data = appendXRefStreamSection(t, data, map[uint32]string{hidden: "/hidden"}, stmNum,
+		func(pos map[uint32]int64) (string, []byte) {
+			p := pos[hidden]
+			entries := []byte{1, 0, 0, 0, 0, 0, 0, byte(p >> 24), byte(p >> 16), byte(p >> 8), byte(p), 0}
+			return fmt.Sprintf("/Size %d /W [1 10 1] /Index [%d 1]", size+2, hidden), entries
+		})
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := r.Get(NewReference(hidden, 0), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obj != Name("hidden") {
+		t.Errorf("got %v, want /hidden", obj)
+	}
+}
+
+// TestXRefStreamEntry0Generation verifies that the generation number 65535
+// of entry 0 survives a write-read cycle through a cross-reference stream.
+// The third field must be sized for it even when every other entry would
+// fit in a narrower field.
+func TestXRefStreamEntry0Generation(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(w); err != nil {
+		t.Fatal(err)
+	}
+	// an object stream gives field 3 a small non-zero value
+	refs := []Reference{w.Alloc(), w.Alloc()}
+	if err := w.WriteCompressed(refs, Integer(1), Integer(2)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data := buf.Bytes()
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry := r.xref[0]
+	if entry == nil || !entry.IsFree() || entry.Generation != maxGeneration {
+		t.Errorf("entry 0 = %+v, want free with generation %d", entry, maxGeneration)
 	}
 }

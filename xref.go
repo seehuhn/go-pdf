@@ -407,21 +407,33 @@ func checkXRefStreamDict(dict Dict, rawLen int64) ([]int, []*xRefSubSection, err
 			Err: errInvalidXref,
 		}
 	}
+	// The specification sets no upper limit on field widths; a field
+	// wider than 8 bytes is usable when its leading bytes are zero.  An
+	// entry cannot be longer than the decoded stream, so the decoding
+	// budget bounds the row width and with it the buffer allocated for
+	// one entry.
+	maxRow := limits.StreamBudget(rawLen)
 	var w []int
+	var wTotal int64
 	for _, Wi := range W {
 		wi, ok := Wi.(Integer)
-		if !ok || wi < 0 || wi > 8 {
+		if !ok || wi < 0 || int64(wi) > maxRow || wTotal+int64(wi) > maxRow {
 			return nil, nil, &MalformedFileError{
 				Err: errInvalidXref,
 			}
 		}
 		w = append(w, int(wi))
+		wTotal += int64(wi)
 	}
-	if w[0]+w[1]+w[2] == 0 {
+	if wTotal == 0 {
 		return nil, nil, &MalformedFileError{
 			Err: errInvalidXref,
 		}
 	}
+
+	// reject entry counts disproportionate to the input size; decoding
+	// allocates one heap entry per declared object
+	maxEntries := min(int64(maxXRefSize), limits.MaxXRefEntries(rawLen))
 
 	Index := dict["Index"]
 	var ss []*xRefSubSection
@@ -437,26 +449,20 @@ func checkXRefStreamDict(dict Dict, rawLen int64) ([]int, []*xRefSubSection, err
 		for i := 0; i < len(ind); i += 2 {
 			subStart, ok1 := ind[i].(Integer)
 			subSize, ok2 := ind[i+1].(Integer)
-			if !ok1 || !ok2 {
+			if !ok1 || !ok2 || subStart < 0 || subSize < 0 || int64(subSize) > maxEntries {
 				return nil, nil, &MalformedFileError{
 					Err: errInvalidXref,
 				}
 			}
-			// each subsection must lie within [0, Size); the
-			// arithmetic stays in int64 since size <= maxXRefSize
-			if subStart < 0 || subSize <= 0 ||
-				subStart > size || subSize > size-subStart {
-				return nil, nil, &MalformedFileError{
-					Err: errInvalidXref,
-				}
-			}
+			// Entries beyond Size are kept, like those of a
+			// cross-reference table.  Entries at or above maxXRefSize
+			// are skipped by decodeXRefStream, so the start can be
+			// clamped to keep the arithmetic in uint32.
+			subStart = min(subStart, maxXRefSize)
 			ss = append(ss, &xRefSubSection{uint32(subStart), uint32(subSize)})
 		}
 	}
 
-	// reject entry counts disproportionate to the input size; decoding
-	// allocates one heap entry per declared object
-	maxEntries := min(int64(maxXRefSize), limits.MaxXRefEntries(rawLen))
 	var total int64
 	for _, sec := range ss {
 		total += int64(sec.Size)
@@ -487,7 +493,19 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				return err
 			}
 
-			if xref[i] != nil {
+			if i >= maxXRefSize || xref[i] != nil {
+				continue
+			}
+
+			// An entry type other than 0, 1 and 2 is a reference to the
+			// null object (PDF 32000-2:2020, section 7.5.8.3).  It is
+			// stored as a free entry outside the list of free objects
+			// (next-free number 0), so that it shadows older sections.
+			tp, err := decodeInt(buf[:w0])
+			if w0 == 0 {
+				tp = 1
+			} else if err != nil || tp > 2 {
+				xref[i] = &xRefEntry{Pos: -1, Generation: maxGeneration}
 				continue
 			}
 
@@ -495,13 +513,6 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 			// int64; valid PDFs never need 8-byte fields with the high
 			// bit set, so this only affects corrupted or adversarial
 			// files, and the rest of the table is still useful
-			tp, err := decodeInt(buf[:w0])
-			if err != nil {
-				continue
-			}
-			if w0 == 0 {
-				tp = 1
-			}
 			a, err := decodeInt(buf[w0 : w0+w1])
 			if err != nil {
 				continue
@@ -553,10 +564,15 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 	return nil
 }
 
-// decodeInt decodes a big-endian unsigned integer of up to 8 bytes from buf.
-// It returns an error if the value would not fit in a non-negative int64.
-// The caller must ensure len(buf) <= 8 (checkXRefStreamDict enforces this).
+// decodeInt decodes a big-endian unsigned integer from buf.  It returns an
+// error if the value would not fit in a non-negative int64.
 func decodeInt(buf []byte) (int64, error) {
+	for len(buf) > 8 && buf[0] == 0 {
+		buf = buf[1:]
+	}
+	if len(buf) > 8 {
+		return 0, errInvalidXref
+	}
 	var res uint64
 	for _, x := range buf {
 		res = res<<8 | uint64(x)
