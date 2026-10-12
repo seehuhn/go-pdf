@@ -25,6 +25,7 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 var usageTestCases = []struct {
@@ -52,6 +53,15 @@ var usageTestCases = []struct {
 		usage: &Usage{
 			Language: &UsageLanguage{
 				Lang:      language.MustParse("es-MX"),
+				Preferred: true,
+			},
+		},
+	},
+	{
+		name: "unknown language",
+		usage: &Usage{
+			Language: &UsageLanguage{
+				Lang:      language.Und,
 				Preferred: true,
 			},
 		},
@@ -268,6 +278,31 @@ func TestUsageValidation(t *testing.T) {
 	_, err := rm.Embed(usage)
 	if err == nil {
 		t.Error("expected error for Zoom.Min > Zoom.Max, but got none")
+	}
+}
+
+func TestExtractUsageLanguage(t *testing.T) {
+	cases := []struct {
+		name string
+		dict pdf.Dict
+		want *UsageLanguage
+	}{
+		{"tag", pdf.Dict{"Lang": pdf.TextString("es-MX")}, &UsageLanguage{Lang: language.MustParse("es-MX")}},
+		{"empty", pdf.Dict{"Lang": pdf.TextString("")}, &UsageLanguage{Lang: language.Und}},
+		{"und", pdf.Dict{"Lang": pdf.TextString("und")}, &UsageLanguage{Lang: language.Und}},
+		{"malformed", pdf.Dict{"Lang": pdf.TextString("en--US")}, &UsageLanguage{Lang: language.Und}},
+		{"missing", pdf.Dict{"Preferred": pdf.Name("ON")}, nil},
+		{"not a string", pdf.Dict{"Lang": pdf.Integer(1)}, nil},
+	}
+	c := pdf.NewCursor(mock.Getter)
+	for _, tc := range cases {
+		u, err := ExtractUsage(c, pdf.Dict{"Language": tc.dict}, false)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if diff := cmp.Diff(tc.want, u.Language, cmp.Comparer(func(a, b language.Tag) bool { return a == b })); diff != "" {
+			t.Errorf("%s: (-want +got):\n%s", tc.name, diff)
+		}
 	}
 }
 

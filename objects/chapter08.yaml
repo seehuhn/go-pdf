@@ -4153,17 +4153,20 @@ types:
     notes: Table 100, Export cell
 - name: OptContentLanguage
   purpose: language preference for an optional content group
-  goType:
+  goType: oc.UsageLanguage
   pdfRepr: dict
   introduced: '1.5'
   fields:
-  - goName:
+  - goName: Lang
+    goType: language.Tag
     pdfKey: Lang
-    pdfType: string
+    pdfType: text-string
     required: true
     introduced: '1.5'
-    notes: Table 100, Language cell
-  - goName:
+    notes: Table 100, Language cell.  The empty string (language unknown)
+      is represented by the root tag language.Und.
+  - goName: Preferred
+    goType: bool
     pdfKey: Preferred
     pdfType: name
     required: false
@@ -4172,6 +4175,9 @@ types:
     possibleValues:
     - 'ON'
     - 'OFF'
+  goPackage: oc
+  goRepr: struct
+  specSection: 8.11.4
 - name: OptContentPageElement
   purpose: page element type for an optional content group
   goType:

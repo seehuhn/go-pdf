@@ -104,6 +104,7 @@ type Common struct {
 
 	// Lang (optional) is a language identifier specifying the natural language
 	// for all text in the annotation.
+	// The root tag [language.Und] means no language is given.
 	Lang language.Tag
 
 	// LastModified (optional) is the date and time when the annotation was

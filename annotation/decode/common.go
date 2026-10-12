@@ -19,13 +19,12 @@ package decode
 import (
 	"math"
 
-	"golang.org/x/text/language"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/file"
+	"seehuhn.de/go/pdf/internal/langtag"
 	"seehuhn.de/go/pdf/oc"
 )
 
@@ -139,10 +138,8 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// Lang (optional)
-	if lang, err := c.TextString(dict["Lang"]); err == nil && lang != "" {
-		if tag, err := language.Parse(string(lang)); err == nil {
-			common.Lang = tag
-		}
+	if lang, err := c.TextString(dict["Lang"]); err == nil {
+		common.Lang = langtag.Parse(string(lang))
 	}
 
 	return nil

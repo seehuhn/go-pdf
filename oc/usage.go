@@ -23,6 +23,7 @@ import (
 
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/langtag"
 )
 
 // PDF 2.0 sections: 8.11.4
@@ -111,24 +112,22 @@ func ExtractUsage(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usage, error) {
 	// extract Language dictionary
 	if langDict, err := pdf.Optional(c.Dict(dict["Language"])); err != nil {
 		return nil, err
-	} else if langDict != nil {
-		if langStr, err := pdf.Optional(c.TextString(langDict["Lang"])); err != nil {
+	} else if langDict != nil && langDict["Lang"] != nil {
+		// Lang is required; without a usable value the dictionary is dropped
+		langStr, err := c.TextString(langDict["Lang"])
+		if err != nil && !pdf.IsMalformed(err) {
 			return nil, err
-		} else if langStr != "" {
-			// parse language tag; the writer requires a non-root tag
-			tag, err := language.Parse(string(langStr))
-			if err == nil && !tag.IsRoot() {
-				info := &UsageLanguage{Lang: tag}
+		}
+		if err == nil {
+			info := &UsageLanguage{Lang: langtag.Parse(string(langStr))}
 
-				if preferred, err := pdf.Optional(c.Name(langDict["Preferred"])); err != nil {
-					return nil, err
-				} else if preferred == "ON" {
-					info.Preferred = true
-				}
-
-				usage.Language = info
+			if preferred, err := pdf.Optional(c.Name(langDict["Preferred"])); err != nil {
+				return nil, err
+			} else if preferred == "ON" {
+				info.Preferred = true
 			}
-			// silently ignore invalid language codes
+
+			usage.Language = info
 		}
 	}
 
@@ -312,10 +311,12 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if u.Language != nil {
 		langDict := pdf.Dict{}
 
-		if u.Language.Lang.IsRoot() {
-			return nil, errors.New("Language.Lang is required")
+		// an empty identifier means the language is unknown
+		var langStr string
+		if !u.Language.Lang.IsRoot() {
+			langStr = u.Language.Lang.String()
 		}
-		langDict["Lang"] = pdf.TextString(u.Language.Lang.String())
+		langDict["Lang"] = pdf.TextString(langStr)
 
 		if u.Language.Preferred {
 			langDict["Preferred"] = pdf.Name("ON")
@@ -512,6 +513,7 @@ type UsageCreator struct {
 // UsageLanguage specifies the language of the content controlled by an optional content group.
 type UsageLanguage struct {
 	// Lang specifies a language and possibly a locale.
+	// The root tag [language.Und] means the language is unknown.
 	Lang language.Tag
 
 	// Preferred indicates whether this language should be used when there is a partial

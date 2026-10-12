@@ -705,6 +705,29 @@ func TestEffectiveLanguage(t *testing.T) {
 		}
 	})
 
+	t.Run("unknown_language", func(t *testing.T) {
+		unknown := &Group{
+			Name: "Unknown",
+			Usage: &Usage{Language: &UsageLanguage{
+				Lang:      language.Und,
+				Preferred: true,
+			}},
+		}
+		c := &Configuration{
+			BaseState: BaseStateON,
+			AS: []*UsageApplication{{
+				Event:    EventView,
+				OCGs:     []*Group{unknown},
+				Category: []Category{CategoryLanguage},
+			}},
+		}
+		state := c.DefaultState([]*Group{unknown}, nil)
+		derived := state.Effective(&ViewerContext{Lang: language.English})
+		if derived.IsOn(unknown) {
+			t.Error("expected unknown-language group OFF with English locale")
+		}
+	})
+
 	t.Run("skip_when_und", func(t *testing.T) {
 		en := &Group{
 			Name:  "English",

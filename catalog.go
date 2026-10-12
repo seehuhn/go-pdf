@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"golang.org/x/text/language"
+	"seehuhn.de/go/pdf/internal/langtag"
 )
 
 // Catalog represents a PDF Document Catalog.  The only required field in this
@@ -106,6 +107,7 @@ type Catalog struct {
 
 	// Lang (optional, PDF 1.4) specifies the natural language for all text in
 	// the document.
+	// The root tag [language.Und] means no language is given.
 	Lang language.Tag
 
 	// SpiderInfo (optional, PDF 1.3) contains Web Capture information and state.
@@ -221,8 +223,8 @@ func DecodeCatalog(c Cursor, obj Object, _ bool) (*Catalog, error) {
 	var lang language.Tag
 	if dict["Lang"] != nil {
 		langStr, err := c.TextString(dict["Lang"])
-		if err == nil && langStr != "" {
-			lang, _ = language.Parse(string(langStr))
+		if err == nil {
+			lang = langtag.Parse(string(langStr))
 		}
 	}
 
