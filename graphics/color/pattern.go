@@ -97,10 +97,17 @@ func (s spacePatternColored) Convert(c stdcolor.Color) stdcolor.Color {
 	return s.Default()
 }
 
+// SourceBlackPoint returns zero, as the colour depends on the pattern
+// content.
+// This implements the [Space] interface.
+func (s spacePatternColored) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return [3]float64{}
+}
+
 // ToXYZ returns a placeholder mid-gray in CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point, since the actual
 // color depends on the pattern content.
-func (s spacePatternColored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s spacePatternColored) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
 	return srgbToXYZ(0.5, 0.5, 0.5)
 }
 
@@ -208,10 +215,16 @@ func (s SpacePatternUncolored) Convert(c stdcolor.Color) stdcolor.Color {
 	return s.Default()
 }
 
+// SourceBlackPoint returns the source black point of the base space.
+// This implements the [Space] interface.
+func (s SpacePatternUncolored) SourceBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	return s.Base.SourceBlackPoint(ri)
+}
+
 // ToXYZ converts the base color values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
-func (s SpacePatternUncolored) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	return s.Base.ToXYZ(values, ws)
+func (s SpacePatternUncolored) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
+	return s.Base.ToXYZ(values, ri, ws)
 }
 
 type colorPatternUncolored struct {

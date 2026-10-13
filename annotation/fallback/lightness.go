@@ -42,9 +42,9 @@ func newLabSpace() *color.SpaceLab {
 // rgbToLab converts a DeviceRGB colour to L*a*b*.
 func rgbToLab(r, g, b float64) (L, A, B float64) {
 	ws := &icc.Workspace{}
-	X, Y, Z := color.SpaceDeviceRGB.ToXYZ([]float64{r, g, b}, ws)
+	X, Y, Z := color.SpaceDeviceRGB.ToXYZ([]float64{r, g, b}, icc.RelativeColorimetric, ws)
 	var lab [3]float64
-	labSpace.FromXYZ(X, Y, Z, lab[:], ws)
+	labSpace.FromXYZ(X, Y, Z, icc.RelativeColorimetric, lab[:], ws)
 	return lab[0], lab[1], lab[2]
 }
 
@@ -53,9 +53,9 @@ func rgbToLab(r, g, b float64) (L, A, B float64) {
 // allows.
 func labToRGB(L, A, B float64) (r, g, b float64) {
 	ws := &icc.Workspace{}
-	X, Y, Z := labSpace.ToXYZ([]float64{L, A, B}, ws)
+	X, Y, Z := labSpace.ToXYZ([]float64{L, A, B}, icc.RelativeColorimetric, ws)
 	var rgb [3]float64
-	color.SpaceDeviceRGB.FromXYZ(X, Y, Z, rgb[:], ws)
+	color.SpaceDeviceRGB.FromXYZ(X, Y, Z, icc.RelativeColorimetric, rgb[:], ws)
 	return rgb[0], rgb[1], rgb[2]
 }
 
@@ -63,18 +63,18 @@ func labToRGB(L, A, B float64) (r, g, b float64) {
 // and b* are zero, since the colour is neutral.
 func grayToL(gray float64) float64 {
 	ws := &icc.Workspace{}
-	X, Y, Z := color.SpaceDeviceGray.ToXYZ([]float64{gray}, ws)
+	X, Y, Z := color.SpaceDeviceGray.ToXYZ([]float64{gray}, icc.RelativeColorimetric, ws)
 	var lab [3]float64
-	labSpace.FromXYZ(X, Y, Z, lab[:], ws)
+	labSpace.FromXYZ(X, Y, Z, icc.RelativeColorimetric, lab[:], ws)
 	return lab[0]
 }
 
 // lToGray is the inverse of [grayToL].
 func lToGray(L float64) float64 {
 	ws := &icc.Workspace{}
-	X, Y, Z := labSpace.ToXYZ([]float64{L, 0, 0}, ws)
+	X, Y, Z := labSpace.ToXYZ([]float64{L, 0, 0}, icc.RelativeColorimetric, ws)
 	var gray [1]float64
-	color.SpaceDeviceGray.FromXYZ(X, Y, Z, gray[:], ws)
+	color.SpaceDeviceGray.FromXYZ(X, Y, Z, icc.RelativeColorimetric, gray[:], ws)
 	return gray[0]
 }
 

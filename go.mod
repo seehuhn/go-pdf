@@ -9,10 +9,10 @@ require (
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.40.0
 	seehuhn.de/go/geom v0.7.6-0.20261011084854-1b67e6f5dba0
-	seehuhn.de/go/icc v0.7.6-0.20261011101458-961176260d0b
+	seehuhn.de/go/icc v0.7.6-0.20261013185807-b234924983cf
 	seehuhn.de/go/membudget v0.7.6-0.20261011100146-e17c3b50f000
 	seehuhn.de/go/postscript v0.7.6-0.20261011100654-ee3475ea74e6
-	seehuhn.de/go/sfnt v0.7.6-0.20261011100952-af43a49007d6
+	seehuhn.de/go/sfnt v0.7.6-0.20261012142722-7e83742bb445
 	seehuhn.de/go/xmp v0.7.6-0.20261011101831-31f8818fc65d
 )
 

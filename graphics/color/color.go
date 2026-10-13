@@ -32,6 +32,7 @@ type Color interface {
 	// ToXYZ returns the colour as CIE XYZ tristimulus values adapted to the
 	// white point of the ICC Profile Connection Space, [icc.PCSWhitePoint].
 	// This is close to but not the same as [WhitePointD50].
+	// The conversion uses [icc.RelativeColorimetric].
 	ToXYZ() (X, Y, Z float64)
 
 	gocolor.Color

@@ -100,10 +100,16 @@ func (s *SpaceIndexed) Default() Color {
 	return colorIndexed{Space: s, Index: 0}
 }
 
+// SourceBlackPoint returns the source black point of the base space.
+// This implements the [Space] interface.
+func (s *SpaceIndexed) SourceBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	return s.Base.SourceBlackPoint(ri)
+}
+
 // ToXYZ converts an indexed color value to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // An index outside [0, NumCol-1] is adjusted to the nearest valid value.
-func (s *SpaceIndexed) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s *SpaceIndexed) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	index := int(math.Round(values[0]))
 	if index < 0 {
 		index = 0
@@ -111,7 +117,7 @@ func (s *SpaceIndexed) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float
 		index = s.NumCol - 1
 	}
 	baseVals := s.lookupValues(index, ws)
-	return s.Base.ToXYZ(baseVals, ws)
+	return s.Base.ToXYZ(baseVals, ri, ws)
 }
 
 // Embed adds the color space to a PDF file.
@@ -222,7 +228,7 @@ func (c colorIndexed) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorIndexed) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{float64(c.Index)}, &icc.Workspace{})
+	return c.Space.ToXYZ([]float64{float64(c.Index)}, icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -310,16 +316,22 @@ func (s *SpaceSeparation) Default() Color {
 	return s.New(1)
 }
 
+// SourceBlackPoint returns the source black point of the alternate space.
+// This implements the [Space] interface.
+func (s *SpaceSeparation) SourceBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	return s.Alternate.SourceBlackPoint(ri)
+}
+
 // ToXYZ converts a separation tint value to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // A tint outside [0, 1] is adjusted to the nearest valid value.
-func (s *SpaceSeparation) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s *SpaceSeparation) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	_, n := s.Transform.Shape()
 	alt := ws.Scratch(slotAlt, n)
 	tint := ws.Scratch(slotTint, 1)
 	tint[0] = clip01(values[0])
 	s.Transform.Apply(alt, tint)
-	return s.Alternate.ToXYZ(alt, ws)
+	return s.Alternate.ToXYZ(alt, ri, ws)
 }
 
 // Embed adds the color space to a PDF file.
@@ -383,7 +395,7 @@ func (c colorSeparation) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorSeparation) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{c.Tint}, &icc.Workspace{})
+	return c.Space.ToXYZ([]float64{c.Tint}, icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -513,10 +525,16 @@ func (s *SpaceDeviceN) Default() Color {
 	return s.New(x)
 }
 
+// SourceBlackPoint returns the source black point of the alternate space.
+// This implements the [Space] interface.
+func (s *SpaceDeviceN) SourceBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	return s.Alternate.SourceBlackPoint(ri)
+}
+
 // ToXYZ converts DeviceN tint values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // Tints outside [0, 1] are adjusted to the nearest valid value.
-func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s *SpaceDeviceN) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	nIn, n := s.Transform.Shape()
 	tint := ws.Scratch(slotTint, nIn)
 	for i := range nIn {
@@ -524,7 +542,7 @@ func (s *SpaceDeviceN) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float
 	}
 	alt := ws.Scratch(slotAlt, n)
 	s.Transform.Apply(alt, tint)
-	return s.Alternate.ToXYZ(alt, ws)
+	return s.Alternate.ToXYZ(alt, ri, ws)
 }
 
 // Embed adds the color space to a PDF file.
@@ -628,7 +646,7 @@ func (c colorDeviceN) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorDeviceN) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.get(), &icc.Workspace{})
+	return c.Space.ToXYZ(c.get(), icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.

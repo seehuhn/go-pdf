@@ -16,7 +16,11 @@
 
 package graphics
 
-import "testing"
+import (
+	"testing"
+
+	"seehuhn.de/go/icc"
+)
 
 // TestLineCapValues checks the numeric values of the line cap styles.
 // These are written to PDF files as the operand of the "J" operator and as
@@ -56,6 +60,27 @@ func TestLineJoinValues(t *testing.T) {
 	for _, tc := range cases {
 		if uint8(tc.style) != tc.want {
 			t.Errorf("%s has value %d, want %d", tc.style, uint8(tc.style), tc.want)
+		}
+	}
+}
+
+// TestRenderingIntentICC checks the mapping to ICC rendering intents.
+// Unknown names, including the empty name, map to relative colorimetric.
+func TestRenderingIntentICC(t *testing.T) {
+	cases := []struct {
+		ri   RenderingIntent
+		want icc.RenderingIntent
+	}{
+		{AbsoluteColorimetric, icc.AbsoluteColorimetric},
+		{RelativeColorimetric, icc.RelativeColorimetric},
+		{Saturation, icc.Saturation},
+		{Perceptual, icc.Perceptual},
+		{"", icc.RelativeColorimetric},
+		{"Foo", icc.RelativeColorimetric},
+	}
+	for _, c := range cases {
+		if got := c.ri.ICC(); got != c.want {
+			t.Errorf("%q: got %v, want %v", string(c.ri), got, c.want)
 		}
 	}
 }

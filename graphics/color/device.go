@@ -79,10 +79,24 @@ func (s spaceDeviceGray) Convert(c stdcolor.Color) stdcolor.Color {
 	return DeviceGray(clip01(rgbToGray(r, g, b)))
 }
 
+// SourceBlackPoint returns zero, as the device space defines no black
+// point.
+// This implements the [Space] interface.
+func (s spaceDeviceGray) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return [3]float64{}
+}
+
+// DestinationBlackPoint returns zero, as the device space defines no black
+// point.
+// This implements the [BidirectionalSpace] interface.
+func (s spaceDeviceGray) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return [3]float64{}
+}
+
 // ToXYZ converts a gray value to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // A value outside [0, 1] is adjusted to the nearest valid value.
-func (s spaceDeviceGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s spaceDeviceGray) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
 	v := clip01(values[0])
 	return srgbToXYZ(v, v, v)
 }
@@ -93,7 +107,7 @@ func (s spaceDeviceGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z flo
 //
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
-func (s spaceDeviceGray) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
+func (s spaceDeviceGray) FromXYZ(X, Y, Z float64, _ icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
 	dst[0] = rgbToGray(xyzToSRGB(X, Y, Z))
 }
 
@@ -134,7 +148,7 @@ func (c DeviceGray) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c DeviceGray) ToXYZ() (X, Y, Z float64) {
-	return spaceDeviceGray{}.ToXYZ([]float64{float64(c)}, &icc.Workspace{})
+	return spaceDeviceGray{}.ToXYZ([]float64{float64(c)}, icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -199,10 +213,24 @@ func (s spaceDeviceRGB) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 }
 
+// SourceBlackPoint returns zero, as the device space defines no black
+// point.
+// This implements the [Space] interface.
+func (s spaceDeviceRGB) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return [3]float64{}
+}
+
+// DestinationBlackPoint returns zero, as the device space defines no black
+// point.
+// This implements the [BidirectionalSpace] interface.
+func (s spaceDeviceRGB) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return [3]float64{}
+}
+
 // ToXYZ converts RGB values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
-func (s spaceDeviceRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s spaceDeviceRGB) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
 	return srgbToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
 }
 
@@ -212,7 +240,7 @@ func (s spaceDeviceRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z floa
 //
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
-func (s spaceDeviceRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
+func (s spaceDeviceRGB) FromXYZ(X, Y, Z float64, _ icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
 	dst[0], dst[1], dst[2] = xyzToSRGB(X, Y, Z)
 }
 
@@ -228,7 +256,7 @@ func (c DeviceRGB) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c DeviceRGB) ToXYZ() (X, Y, Z float64) {
-	return spaceDeviceRGB{}.ToXYZ(c[:], &icc.Workspace{})
+	return spaceDeviceRGB{}.ToXYZ(c[:], icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -303,30 +331,58 @@ func (s spaceDeviceCMYK) Convert(c stdcolor.Color) stdcolor.Color {
 // ToXYZ converts CMYK values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
-func (s spaceDeviceCMYK) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s spaceDeviceCMYK) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	cmyk := ws.Scratch(slotClamp, 4)
 	for i := range 4 {
 		cmyk[i] = clip01(values[i])
 	}
-	return deviceCMYKToXYZ(cmyk, ws)
+	return deviceCMYKToXYZ(cmyk, ri, ws)
 }
 
-var (
-	cmykOnce      sync.Once
-	cmykTransform *icc.Transform
-)
+// cmykXforms holds the transforms for the built-in CMYK profile, by
+// rendering intent.
+var cmykXforms [4]struct {
+	once sync.Once
+	t    *icc.Transform
+}
 
 // cmykXform returns the cached bidirectional transform for the built-in CMYK
-// profile, or nil if it cannot be decoded.
-func cmykXform() *icc.Transform {
-	cmykOnce.Do(func() {
+// profile under the rendering intent ri, or nil if it cannot be decoded.
+// A rendering intent outside the four defined values is treated as
+// [icc.RelativeColorimetric].
+func cmykXform(ri icc.RenderingIntent) *icc.Transform {
+	if ri > icc.AbsoluteColorimetric {
+		ri = icc.RelativeColorimetric
+	}
+	e := &cmykXforms[ri]
+	e.once.Do(func() {
 		p, err := icc.Decode(icc.CMYKProfile)
 		if err != nil {
 			return
 		}
-		cmykTransform, _ = icc.NewTransform(p, icc.Perceptual)
+		e.t, _ = icc.NewTransform(p, ri)
 	})
-	return cmykTransform
+	return e.t
+}
+
+// SourceBlackPoint returns the black point of the built-in CMYK profile as
+// the source of a conversion under ri.
+// This implements the [Space] interface.
+func (s spaceDeviceCMYK) SourceBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	if t := cmykXform(ri); t != nil {
+		return t.SourceBlackPoint()
+	}
+	return [3]float64{}
+}
+
+// DestinationBlackPoint returns the black point of the built-in CMYK profile
+// as the destination of a conversion under ri.
+// This implements the [BidirectionalSpace] interface.
+func (s spaceDeviceCMYK) DestinationBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	if t := cmykXform(ri); t != nil {
+		return t.DestinationBlackPoint()
+	}
+	return [3]float64{}
 }
 
 // FromXYZ converts PCS-adapted CIE XYZ to DeviceCMYK component values.
@@ -336,8 +392,8 @@ func cmykXform() *icc.Transform {
 // ws supplies reusable scratch buffers to avoid per-call allocation in a
 // hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
 // and must not be used from more than one goroutine at a time.
-func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64, dst []float64, ws *icc.Workspace) {
-	if t := cmykXform(); t != nil && t.CanFromXYZ() {
+func (s spaceDeviceCMYK) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, ws *icc.Workspace) {
+	if t := cmykXform(ri); t != nil && t.CanFromXYZ() {
 		t.FromXYZ(X, Y, Z, dst[:4], ws)
 		return
 	}
@@ -360,11 +416,11 @@ func (c DeviceCMYK) ColorSpace() Space {
 // It uses the built-in CMYK profile when available, otherwise falls back
 // to a naive CMYK to sRGB conversion.
 func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
-	return spaceDeviceCMYK{}.ToXYZ(c[:], &icc.Workspace{})
+	return spaceDeviceCMYK{}.ToXYZ(c[:], icc.RelativeColorimetric, &icc.Workspace{})
 }
 
-func deviceCMYKToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
-	if t := cmykXform(); t != nil && t.CanToXYZ() {
+func deviceCMYKToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
+	if t := cmykXform(ri); t != nil && t.CanToXYZ() {
 		return t.ToXYZ(values, ws)
 	}
 

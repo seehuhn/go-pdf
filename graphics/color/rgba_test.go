@@ -78,7 +78,7 @@ func TestSRGBWhiteIsPCSWhite(t *testing.T) {
 	}
 
 	// the same value reached through the colour space
-	X, Y, Z = SpaceDeviceRGB.ToXYZ([]float64{1, 1, 1}, &icc.Workspace{})
+	X, Y, Z = SpaceDeviceRGB.ToXYZ([]float64{1, 1, 1}, icc.RelativeColorimetric, &icc.Workspace{})
 	if math.Abs(X-pcsWhitePoint[0]) > 1e-14 ||
 		math.Abs(Y-pcsWhitePoint[1]) > 1e-14 ||
 		math.Abs(Z-pcsWhitePoint[2]) > 1e-14 {
@@ -243,7 +243,7 @@ func TestCIERoundTrip(t *testing.T) {
 	for _, val := range []float64{0, 0.25, 0.5, 0.75, 1} {
 		c := s.New(val)
 		X, Y, Z := c.ToXYZ()
-		s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+		s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, v[:], &icc.Workspace{})
 		if math.Abs(v[0]-val) > 1e-6 {
 			t.Errorf("CalGray round-trip for %g: got %g", val, v[0])
 		}
@@ -259,7 +259,7 @@ func TestCalRGBRoundTrip(t *testing.T) {
 	c := s.New(0.3, 0.5, 0.7)
 	X, Y, Z := c.ToXYZ()
 	var v [3]float64
-	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, v[:], &icc.Workspace{})
 	if math.Abs(v[0]-0.3) > 1e-6 ||
 		math.Abs(v[1]-0.5) > 1e-6 ||
 		math.Abs(v[2]-0.7) > 1e-6 {
@@ -279,7 +279,7 @@ func TestLabRoundTrip(t *testing.T) {
 	}
 	X, Y, Z := c.ToXYZ()
 	var v [3]float64
-	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, v[:], &icc.Workspace{})
 	if math.Abs(v[0]-50) > 0.01 ||
 		math.Abs(v[1]-20) > 0.01 ||
 		math.Abs(v[2]+30) > 0.01 {
@@ -372,9 +372,9 @@ func TestGammaFastPath(t *testing.T) {
 	}
 	ws := &icc.Workspace{}
 	values := []float64{0.3, 0.5, 0.7}
-	X, Y, Z := s.ToXYZ(values, ws)
+	X, Y, Z := s.ToXYZ(values, icc.RelativeColorimetric, ws)
 	var dst [3]float64
-	s.FromXYZ(X, Y, Z, dst[:], ws)
+	s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, dst[:], ws)
 	for i, want := range values {
 		if math.Abs(dst[i]-want) > 1e-12 {
 			t.Errorf("round trip component %d: got %g, want %g", i, dst[i], want)
@@ -418,12 +418,12 @@ func TestCIEToXYZClampsComponents(t *testing.T) {
 		{"Lab ab outside", lab, []float64{50, -150, 150}, []float64{50, -100, 100}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			X, Y, Z := tc.space.ToXYZ(tc.out, ws)
+			X, Y, Z := tc.space.ToXYZ(tc.out, icc.RelativeColorimetric, ws)
 			if math.IsNaN(X) || math.IsNaN(Y) || math.IsNaN(Z) {
 				t.Fatalf("%v gave NaN: (%g, %g, %g)", tc.out, X, Y, Z)
 			}
 			// the clamped input must give exactly the same result
-			Xe, Ye, Ze := tc.space.ToXYZ(tc.edge, ws)
+			Xe, Ye, Ze := tc.space.ToXYZ(tc.edge, icc.RelativeColorimetric, ws)
 			if X != Xe || Y != Ye || Z != Ze {
 				t.Errorf("%v -> (%g, %g, %g), but %v -> (%g, %g, %g)",
 					tc.out, X, Y, Z, tc.edge, Xe, Ye, Ze)
@@ -474,8 +474,8 @@ func TestCalRGBMatrixInverse(t *testing.T) {
 	for _, abc := range [][3]float64{
 		{0.3, 0.5, 0.7}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.9, 0.9, 0.9},
 	} {
-		X, Y, Z := s.ToXYZ(abc[:], ws)
-		s.FromXYZ(X, Y, Z, dst[:], ws)
+		X, Y, Z := s.ToXYZ(abc[:], icc.RelativeColorimetric, ws)
+		s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, dst[:], ws)
 		for i := range 3 {
 			if math.Abs(dst[i]-abc[i]) > 1e-12 {
 				t.Errorf("%v -> XYZ -> %v", abc, dst)
@@ -492,7 +492,7 @@ func TestCalRGBMatrixInverse(t *testing.T) {
 		Gamma:      [3]float64{1, 1, 1},
 		Matrix:     [9]float64{1, 0, 0, 1, 0, 0, 1, 0, 0},
 	}
-	sing.FromXYZ(0.3, 0.4, 0.2, dst[:], ws)
+	sing.FromXYZ(0.3, 0.4, 0.2, icc.RelativeColorimetric, dst[:], ws)
 	if dst != [3]float64{0, 0, 0} {
 		t.Errorf("singular matrix gave %v, want black", dst)
 	}

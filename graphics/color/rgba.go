@@ -98,7 +98,8 @@ func srgbToXYZ(r, g, b float64) (X, Y, Z float64) {
 }
 
 // ColorToXYZ extracts PCS-adapted CIE XYZ from any Go color.Color.
-// For PDF colors, this uses the ToXYZ method directly.
+// For PDF colors, this uses the ToXYZ method directly, which converts with
+// [icc.RelativeColorimetric].
 // For other colors, the input is assumed to be in sRGB space.
 func ColorToXYZ(c stdcolor.Color) (X, Y, Z float64) {
 	if cc, ok := c.(Color); ok {

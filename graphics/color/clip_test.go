@@ -152,7 +152,7 @@ func TestToXYZAlwaysFinite(t *testing.T) {
 			for i := range values {
 				values[i] = bad
 			}
-			X, Y, Z := space.ToXYZ(values, ws)
+			X, Y, Z := space.ToXYZ(values, icc.RelativeColorimetric, ws)
 			if math.IsNaN(X) || math.IsNaN(Y) || math.IsNaN(Z) ||
 				math.IsInf(X, 0) || math.IsInf(Y, 0) || math.IsInf(Z, 0) {
 				t.Errorf("%s: ToXYZ(%g) = %g, %g, %g",

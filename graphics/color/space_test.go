@@ -1140,7 +1140,7 @@ func TestExtractSpaceRepairsCIEParameters(t *testing.T) {
 					t.Errorf("matrix = %v, want the identity", got)
 				}
 				// white must not come out black
-				X, Y, Z := s.ToXYZ([]float64{1, 1, 1}, &icc.Workspace{})
+				X, Y, Z := s.ToXYZ([]float64{1, 1, 1}, icc.RelativeColorimetric, &icc.Workspace{})
 				if X <= 0 || Y <= 0 || Z <= 0 {
 					t.Errorf("white -> (%g, %g, %g)", X, Y, Z)
 				}
@@ -1230,7 +1230,7 @@ func TestExtractSpaceRepairsCIEParameters(t *testing.T) {
 						vals[i] = lo
 					}
 				}
-				X, Y, Z := space.ToXYZ(vals, ws)
+				X, Y, Z := space.ToXYZ(vals, icc.RelativeColorimetric, ws)
 				if !allFinite([]float64{X, Y, Z}) {
 					t.Errorf("repaired space gave %v -> (%g, %g, %g)",
 						vals, X, Y, Z)
@@ -1390,8 +1390,8 @@ func TestToXYZClampsEveryImplementation(t *testing.T) {
 				}
 				keep := slices.Clone(out)
 
-				X, Y, Z := space.ToXYZ(out, ws)
-				Xe, Ye, Ze := space.ToXYZ(edge, ws)
+				X, Y, Z := space.ToXYZ(out, icc.RelativeColorimetric, ws)
+				Xe, Ye, Ze := space.ToXYZ(edge, icc.RelativeColorimetric, ws)
 
 				if X != Xe || Y != Ye || Z != Ze {
 					t.Errorf("%s: %v -> (%g, %g, %g), but %v -> (%g, %g, %g)",

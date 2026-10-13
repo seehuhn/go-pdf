@@ -19,6 +19,7 @@ package graphics
 import (
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/property"
@@ -295,6 +296,22 @@ const (
 	Saturation           RenderingIntent = "Saturation"
 	Perceptual           RenderingIntent = "Perceptual"
 )
+
+// ICC returns the ICC rendering intent corresponding to ri.  Names other
+// than the four standard intents, including the empty name, map to
+// icc.RelativeColorimetric.
+func (ri RenderingIntent) ICC() icc.RenderingIntent {
+	switch ri {
+	case AbsoluteColorimetric:
+		return icc.AbsoluteColorimetric
+	case Saturation:
+		return icc.Saturation
+	case Perceptual:
+		return icc.Perceptual
+	default:
+		return icc.RelativeColorimetric
+	}
+}
 
 // TextRenderingMode is the rendering mode for text.
 type TextRenderingMode uint8

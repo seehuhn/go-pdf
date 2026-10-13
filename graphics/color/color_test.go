@@ -245,7 +245,7 @@ func TestColorToXYZTreatsForeignColorsAsSRGB(t *testing.T) {
 		r, g, b, _ := c.RGBA()
 		wantX, wantY, wantZ := SpaceDeviceRGB.ToXYZ([]float64{
 			float64(r) / 65535, float64(g) / 65535, float64(b) / 65535,
-		}, &icc.Workspace{})
+		}, icc.RelativeColorimetric, &icc.Workspace{})
 
 		if X != wantX || Y != wantY || Z != wantZ {
 			t.Errorf("%v -> (%g, %g, %g), want (%g, %g, %g)",
@@ -277,7 +277,7 @@ func TestColorToXYZMatchesSpace(t *testing.T) {
 	} {
 		values, _ := Values(c)
 		X, Y, Z := c.ToXYZ()
-		wantX, wantY, wantZ := c.ColorSpace().ToXYZ(values, ws)
+		wantX, wantY, wantZ := c.ColorSpace().ToXYZ(values, icc.RelativeColorimetric, ws)
 		if X != wantX || Y != wantY || Z != wantZ {
 			t.Errorf("%v: colour gave (%g, %g, %g), space gave (%g, %g, %g)",
 				c, X, Y, Z, wantX, wantY, wantZ)

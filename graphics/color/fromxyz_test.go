@@ -23,19 +23,12 @@ import (
 	"seehuhn.de/go/icc"
 )
 
-// fromXYZSpace is implemented by the colour spaces which can convert in both
-// directions.
-type fromXYZSpace interface {
-	Space
-	FromXYZ(X, Y, Z float64, dst []float64, ws *icc.Workspace)
-}
-
 // TestDeviceFromXYZRoundTrip checks that a colour in a device space survives
 // the trip to XYZ and back.
 func TestDeviceFromXYZRoundTrip(t *testing.T) {
 	cases := []struct {
 		name   string
-		space  fromXYZSpace
+		space  BidirectionalSpace
 		values []float64
 	}{
 		{"gray black", SpaceDeviceGray, []float64{0}},
@@ -48,9 +41,9 @@ func TestDeviceFromXYZRoundTrip(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			X, Y, Z := tc.space.ToXYZ(tc.values, &icc.Workspace{})
+			X, Y, Z := tc.space.ToXYZ(tc.values, icc.RelativeColorimetric, &icc.Workspace{})
 			got := make([]float64, tc.space.Channels())
-			tc.space.FromXYZ(X, Y, Z, got, &icc.Workspace{})
+			tc.space.FromXYZ(X, Y, Z, icc.RelativeColorimetric, got, &icc.Workspace{})
 			for i, want := range tc.values {
 				if math.Abs(got[i]-want) > 1e-5 {
 					t.Errorf("component %d: got %g, want %g", i, got[i], want)
@@ -77,7 +70,7 @@ func TestDeviceGrayFromXYZ(t *testing.T) {
 	} {
 		X, Y, Z := tc.rgb.ToXYZ()
 		got := make([]float64, 1)
-		SpaceDeviceGray.FromXYZ(X, Y, Z, got, &icc.Workspace{})
+		SpaceDeviceGray.FromXYZ(X, Y, Z, icc.RelativeColorimetric, got, &icc.Workspace{})
 		if math.Abs(got[0]-tc.want) > 1e-5 {
 			t.Errorf("gray value of %v = %g, want %g", tc.rgb, got[0], tc.want)
 		}
@@ -87,17 +80,13 @@ func TestDeviceGrayFromXYZ(t *testing.T) {
 // TestDeviceCMYKFromXYZ checks that the CMYK profile is used, and that the
 // resulting ink mixture reproduces the requested colour.
 func TestDeviceCMYKFromXYZ(t *testing.T) {
-	if cmykXform() == nil {
-		t.Skip("built-in CMYK profile unavailable")
-	}
-
 	orig := DeviceCMYK{0.2, 0.4, 0.6, 0.1}
 	X, Y, Z := orig.ToXYZ()
 
 	got := make([]float64, 4)
-	SpaceDeviceCMYK.FromXYZ(X, Y, Z, got, &icc.Workspace{})
+	SpaceDeviceCMYK.FromXYZ(X, Y, Z, icc.RelativeColorimetric, got, &icc.Workspace{})
 
-	X2, Y2, Z2 := SpaceDeviceCMYK.ToXYZ(got, &icc.Workspace{})
+	X2, Y2, Z2 := SpaceDeviceCMYK.ToXYZ(got, icc.RelativeColorimetric, &icc.Workspace{})
 	const tol = 0.01
 	if math.Abs(X2-X) > tol || math.Abs(Y2-Y) > tol || math.Abs(Z2-Z) > tol {
 		t.Errorf("%v -> XYZ(%g,%g,%g) -> %v -> XYZ(%g,%g,%g)",

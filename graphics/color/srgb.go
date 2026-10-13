@@ -107,10 +107,24 @@ func (s spaceSRGB) Convert(c stdcolor.Color) stdcolor.Color {
 	}
 }
 
+// SourceBlackPoint returns zero, as sRGB is the working space of the
+// conversions.
+// This implements the [Space] interface.
+func (s spaceSRGB) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return [3]float64{}
+}
+
+// DestinationBlackPoint returns zero, as sRGB is the working space of the
+// conversions.
+// This implements the [BidirectionalSpace] interface.
+func (s spaceSRGB) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return [3]float64{}
+}
+
 // ToXYZ converts sRGB values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
-func (s spaceSRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s spaceSRGB) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
 	return srgbToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
 }
 
@@ -120,7 +134,7 @@ func (s spaceSRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) 
 //
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
-func (s spaceSRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
+func (s spaceSRGB) FromXYZ(X, Y, Z float64, _ icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
 	dst[0], dst[1], dst[2] = xyzToSRGB(X, Y, Z)
 }
 
@@ -143,7 +157,7 @@ func (c colorSRGB) ColorSpace() Space {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorSRGB) ToXYZ() (X, Y, Z float64) {
-	return spaceSRGB{}.ToXYZ(c[:], &icc.Workspace{})
+	return spaceSRGB{}.ToXYZ(c[:], icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.

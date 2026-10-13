@@ -38,9 +38,11 @@ type SpaceICCBased struct {
 
 	def []float64
 
-	// cached bidirectional transform for ToXYZ/FromXYZ
-	transformOnce sync.Once
-	transform     *icc.Transform
+	// cached bidirectional transforms for ToXYZ/FromXYZ, by rendering intent
+	xf [4]struct {
+		once sync.Once
+		t    *icc.Transform
+	}
 }
 
 // ICCBased returns a new ICC-based color space.
@@ -167,13 +169,39 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return pdf.Array{FamilyICCBased, sRef}, nil
 }
 
-// getTransform returns the cached bidirectional transform for this profile,
-// or nil if the profile cannot be turned into a transform.
-func (s *SpaceICCBased) getTransform() *icc.Transform {
-	s.transformOnce.Do(func() {
-		s.transform, _ = icc.NewTransform(s.Profile, icc.RelativeColorimetric)
+// Transform returns the cached bidirectional transform for the profile and
+// the rendering intent ri, or nil if the profile cannot be turned into a
+// transform.  A rendering intent outside the four defined values is treated
+// as [icc.RelativeColorimetric].
+func (s *SpaceICCBased) Transform(ri icc.RenderingIntent) *icc.Transform {
+	if ri > icc.AbsoluteColorimetric {
+		ri = icc.RelativeColorimetric
+	}
+	e := &s.xf[ri]
+	e.once.Do(func() {
+		e.t, _ = icc.NewTransform(s.Profile, ri)
 	})
-	return s.transform
+	return e.t
+}
+
+// SourceBlackPoint returns the black point of the profile as the source of a
+// conversion under ri, or zero if the profile is unusable.
+// This implements the [Space] interface.
+func (s *SpaceICCBased) SourceBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	if t := s.Transform(ri); t != nil {
+		return t.SourceBlackPoint()
+	}
+	return [3]float64{}
+}
+
+// DestinationBlackPoint returns the black point of the profile as the
+// destination of a conversion under ri, or zero if the profile is unusable.
+// This implements the [BidirectionalSpace] interface.
+func (s *SpaceICCBased) DestinationBlackPoint(ri icc.RenderingIntent) [3]float64 {
+	if t := s.Transform(ri); t != nil {
+		return t.DestinationBlackPoint()
+	}
+	return [3]float64{}
 }
 
 // FromXYZ converts PCS-adapted CIE XYZ to ICC-based component values.
@@ -183,8 +211,8 @@ func (s *SpaceICCBased) getTransform() *icc.Transform {
 // ws supplies reusable scratch buffers to avoid per-call allocation in a
 // hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
 // and must not be used from more than one goroutine at a time.
-func (s *SpaceICCBased) FromXYZ(X, Y, Z float64, dst []float64, ws *icc.Workspace) {
-	t := s.getTransform()
+func (s *SpaceICCBased) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, ws *icc.Workspace) {
+	t := s.Transform(ri)
 	if t != nil && t.CanFromXYZ() && t.Channels() == s.N {
 		t.FromXYZ(X, Y, Z, dst[:s.N], ws)
 	} else {
@@ -208,7 +236,7 @@ func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
 	X, Y, Z := ColorToXYZ(c)
 
 	result := colorICCBased{Space: s}
-	s.FromXYZ(X, Y, Z, result.Values[:s.N], &icc.Workspace{})
+	s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, result.Values[:s.N], &icc.Workspace{})
 	return result
 }
 
@@ -246,7 +274,7 @@ func (s *SpaceICCBased) New(values []float64) (Color, error) {
 // ToXYZ converts ICC-based color values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // Values outside Ranges are adjusted to the nearest valid value.
-func (s *SpaceICCBased) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+func (s *SpaceICCBased) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	// normalise values from Ranges to [0,1] using caller-provided scratch
 	norm := ws.Scratch(slotNorm, s.N)
 	for i := range s.N {
@@ -260,7 +288,7 @@ func (s *SpaceICCBased) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z floa
 	}
 
 	// try ICC profile transform
-	if t := s.getTransform(); t != nil && t.CanToXYZ() {
+	if t := s.Transform(ri); t != nil && t.CanToXYZ() {
 		return t.ToXYZ(norm, ws)
 	}
 
@@ -298,7 +326,7 @@ func (c colorICCBased) Components() []float64 {
 // ToXYZ returns the colour as CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:c.Space.N], &icc.Workspace{})
+	return c.Space.ToXYZ(c.Values[:c.Space.N], icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.

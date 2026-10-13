@@ -44,8 +44,8 @@ func TestToXYZWorkspaceEquivalence(t *testing.T) {
 				lo, hi := cs.ComponentRange(i)
 				values[i] = lo + frac*(hi-lo)
 			}
-			wantX, wantY, wantZ := cs.ToXYZ(values, &icc.Workspace{})
-			gotX, gotY, gotZ := cs.ToXYZ(values, dirty)
+			wantX, wantY, wantZ := cs.ToXYZ(values, icc.RelativeColorimetric, &icc.Workspace{})
+			gotX, gotY, gotZ := cs.ToXYZ(values, icc.RelativeColorimetric, dirty)
 			if gotX != wantX || gotY != wantY || gotZ != wantZ {
 				t.Errorf("%s ToXYZ(%v): reused ws (%v,%v,%v) != fresh (%v,%v,%v)",
 					cs.Family(), values, gotX, gotY, gotZ, wantX, wantY, wantZ)
@@ -78,18 +78,18 @@ func TestToXYZWorkspaceZeroAlloc(t *testing.T) {
 	idxIn := []float64{1}
 
 	// prime workspace buffers and the cached forward transform / ranges
-	iccCMYK.ToXYZ(cmykIn, ws)
-	idx.ToXYZ(idxIn, ws)
-	idxDN.ToXYZ(idxIn, ws)
+	iccCMYK.ToXYZ(cmykIn, icc.RelativeColorimetric, ws)
+	idx.ToXYZ(idxIn, icc.RelativeColorimetric, ws)
+	idxDN.ToXYZ(idxIn, icc.RelativeColorimetric, ws)
 
 	if n := testing.AllocsPerRun(100, func() {
-		iccCMYK.ToXYZ(cmykIn, ws)
+		iccCMYK.ToXYZ(cmykIn, icc.RelativeColorimetric, ws)
 	}); n != 0 {
 		t.Errorf("SpaceICCBased.ToXYZ with workspace: got %v allocs/op, want 0", n)
 	}
 
 	if n := testing.AllocsPerRun(100, func() {
-		idx.ToXYZ(idxIn, ws)
+		idx.ToXYZ(idxIn, icc.RelativeColorimetric, ws)
 	}); n != 0 {
 		t.Errorf("Indexed-of-ICCBased ToXYZ with workspace: got %v allocs/op, want 0", n)
 	}
@@ -98,15 +98,15 @@ func TestToXYZWorkspaceZeroAlloc(t *testing.T) {
 	// share the slotClamp buffer; both clamp through the workspace rather than
 	// a local slice, so this stays allocation-free too.
 	idxCMYK := indexedDeviceNCMYK()
-	idxCMYK.ToXYZ(idxIn, ws)
+	idxCMYK.ToXYZ(idxIn, icc.RelativeColorimetric, ws)
 	if n := testing.AllocsPerRun(100, func() {
-		idxCMYK.ToXYZ(idxIn, ws)
+		idxCMYK.ToXYZ(idxIn, icc.RelativeColorimetric, ws)
 	}); n != 0 {
 		t.Errorf("Indexed-of-DeviceN-of-DeviceCMYK ToXYZ: got %v allocs/op, want 0", n)
 	}
 
 	if n := testing.AllocsPerRun(100, func() {
-		idxDN.ToXYZ(idxIn, ws)
+		idxDN.ToXYZ(idxIn, icc.RelativeColorimetric, ws)
 	}); n != 0 {
 		t.Errorf("Indexed-of-DeviceN ToXYZ with workspace: got %v allocs/op, want 0", n)
 	}
@@ -119,15 +119,15 @@ func BenchmarkSpaceICCBasedToXYZ(b *testing.B) {
 	b.Run("fresh", func(b *testing.B) {
 		b.ReportAllocs()
 		for range b.N {
-			cs.ToXYZ(in, &icc.Workspace{})
+			cs.ToXYZ(in, icc.RelativeColorimetric, &icc.Workspace{})
 		}
 	})
 	b.Run("workspace", func(b *testing.B) {
 		ws := &icc.Workspace{}
-		cs.ToXYZ(in, ws)
+		cs.ToXYZ(in, icc.RelativeColorimetric, ws)
 		b.ReportAllocs()
 		for range b.N {
-			cs.ToXYZ(in, ws)
+			cs.ToXYZ(in, icc.RelativeColorimetric, ws)
 		}
 	})
 }

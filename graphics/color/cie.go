@@ -83,6 +83,27 @@ func CalGray(whitePoint, blackPoint []float64, gamma float64) (*SpaceCalGray, er
 	return res, nil
 }
 
+// SourceBlackPoint returns the BlackPoint of the space, adapted to the
+// Profile Connection Space white point.
+// This implements the [Space] interface.
+func (s *SpaceCalGray) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return adaptedBlackPoint(&s.adapt, s.WhitePoint, s.BlackPoint)
+}
+
+// DestinationBlackPoint returns the BlackPoint of the space, adapted to the
+// Profile Connection Space white point.
+// This implements the [BidirectionalSpace] interface.
+func (s *SpaceCalGray) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return adaptedBlackPoint(&s.adapt, s.WhitePoint, s.BlackPoint)
+}
+
+// adaptedBlackPoint adapts a black point from the white point wp to the
+// Profile Connection Space white point.
+func adaptedBlackPoint(c *paramCache[[3]float64, adaptation], wp, bp [3]float64) [3]float64 {
+	X, Y, Z := c.get(wp, newAdaptation).value.toPCS.apply(bp[0], bp[1], bp[2])
+	return [3]float64{X, Y, Z}
+}
+
 // Family returns /CalGray.
 // This implements the [Space] interface.
 func (s *SpaceCalGray) Family() pdf.Name {
@@ -132,15 +153,19 @@ func (s *SpaceCalGray) Convert(c stdcolor.Color) stdcolor.Color {
 //
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
-func (s *SpaceCalGray) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
-	_, Ya, _ := s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+func (s *SpaceCalGray) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
+	Ya := Y
+	if ri != icc.AbsoluteColorimetric {
+		_, Ya, _ = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+	}
 	dst[0] = invGamma(Ya/s.WhitePoint[1], s.Gamma)
 }
 
-// ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a CalGray color.
+// ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a CalGray color,
+// using [icc.RelativeColorimetric].
 func (s *SpaceCalGray) ColorFromXYZ(X, Y, Z float64) Color {
 	var v [1]float64
-	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, v[:], &icc.Workspace{})
 	return colorCalGray{Space: s, Value: v[0]}
 }
 
@@ -166,11 +191,16 @@ func (s *SpaceCalGray) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // ToXYZ converts a CalGray value to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // A value outside [0, 1] is adjusted to the nearest valid value.
-func (s *SpaceCalGray) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+// Under [icc.AbsoluteColorimetric] the result is relative to the space's own
+// white point and no adaptation is applied.
+func (s *SpaceCalGray) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	A := applyGamma(clip01(values[0]), s.Gamma)
 	X = s.WhitePoint[0] * A
 	Y = s.WhitePoint[1] * A
 	Z = s.WhitePoint[2] * A
+	if ri == icc.AbsoluteColorimetric {
+		return X, Y, Z
+	}
 	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.apply(X, Y, Z)
 }
 
@@ -187,7 +217,7 @@ func (c colorCalGray) ColorSpace() Space {
 // ToXYZ converts a CalGray color to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ([]float64{c.Value}, &icc.Workspace{})
+	return c.Space.ToXYZ([]float64{c.Value}, icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -319,8 +349,10 @@ func (s *SpaceCalRGB) Convert(c stdcolor.Color) stdcolor.Color {
 //
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
-func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
-	X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
+	if ri != icc.AbsoluteColorimetric {
+		X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+	}
 
 	inv := s.inv.get(s.Matrix, newMatrixInverse).value
 	if !inv.ok {
@@ -337,10 +369,11 @@ func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) 
 	dst[2] = clip01(invGamma(C, s.Gamma[2]))
 }
 
-// ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a CalRGB color.
+// ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a CalRGB color,
+// using [icc.RelativeColorimetric].
 func (s *SpaceCalRGB) ColorFromXYZ(X, Y, Z float64) Color {
 	var v [3]float64
-	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, v[:], &icc.Workspace{})
 	return colorCalRGB{Space: s, Values: v}
 }
 
@@ -384,6 +417,20 @@ func (s *SpaceCalRGB) Default() Color {
 	return colorCalRGB{Space: s}
 }
 
+// SourceBlackPoint returns the BlackPoint of the space, adapted to the
+// Profile Connection Space white point.
+// This implements the [Space] interface.
+func (s *SpaceCalRGB) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return adaptedBlackPoint(&s.adapt, s.WhitePoint, s.BlackPoint)
+}
+
+// DestinationBlackPoint returns the BlackPoint of the space, adapted to the
+// Profile Connection Space white point.
+// This implements the [BidirectionalSpace] interface.
+func (s *SpaceCalRGB) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return adaptedBlackPoint(&s.adapt, s.WhitePoint, s.BlackPoint)
+}
+
 // Family returns /CalRGB.
 // This implements the [Space] interface.
 func (s *SpaceCalRGB) Family() pdf.Name {
@@ -393,7 +440,9 @@ func (s *SpaceCalRGB) Family() pdf.Name {
 // ToXYZ converts CalRGB values to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
-func (s *SpaceCalRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+// Under [icc.AbsoluteColorimetric] the result is relative to the space's own
+// white point and no adaptation is applied.
+func (s *SpaceCalRGB) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	A := applyGamma(clip01(values[0]), s.Gamma[0])
 	B := applyGamma(clip01(values[1]), s.Gamma[1])
 	C := applyGamma(clip01(values[2]), s.Gamma[2])
@@ -402,6 +451,9 @@ func (s *SpaceCalRGB) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float6
 	X = m[0]*A + m[3]*B + m[6]*C
 	Y = m[1]*A + m[4]*B + m[7]*C
 	Z = m[2]*A + m[5]*B + m[8]*C
+	if ri == icc.AbsoluteColorimetric {
+		return X, Y, Z
+	}
 	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.apply(X, Y, Z)
 }
 
@@ -418,7 +470,7 @@ func (c colorCalRGB) ColorSpace() Space {
 // ToXYZ converts a CalRGB color to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:], &icc.Workspace{})
+	return c.Space.ToXYZ(c.Values[:], icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -435,11 +487,9 @@ func (c colorCalRGB) RGBA() (r, g, b, a uint32) {
 // (lightness, 0–100) and a*, b* (chromaticity, with configurable ranges).
 //
 // The color space is parameterized by a WhitePoint (required) and BlackPoint
-// (optional). The L*a*b* ↔ XYZ conversion uses only the WhitePoint; BlackPoint
-// does not affect this transformation. BlackPoint is instead used for black
-// point compensation during rendering, as specified in ISO 18619 and
-// controlled by the UseBlackPtComp entry in the graphics state (see ISO
-// 32000-1:2008, section 8.6.5.9).
+// (optional). The L*a*b* ↔ XYZ conversion uses only the WhitePoint;
+// BlackPoint does not affect this transformation.  BlackPoint is the source
+// or destination black point of the space for black point compensation.
 //
 // For further details on CIE-based color conversion in PDF, see ISO
 // 32000-1:2008, sections 8.6.5 (CIE-Based Colour Spaces) and 10.3 (CIE-Based
@@ -576,6 +626,20 @@ func (s *SpaceLab) Default() Color {
 	return colorLab{Space: s, Values: [3]float64{0, a, b}}
 }
 
+// SourceBlackPoint returns the BlackPoint of the space, adapted to the
+// Profile Connection Space white point.
+// This implements the [Space] interface.
+func (s *SpaceLab) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return adaptedBlackPoint(&s.adapt, s.WhitePoint, s.BlackPoint)
+}
+
+// DestinationBlackPoint returns the BlackPoint of the space, adapted to the
+// Profile Connection Space white point.
+// This implements the [BidirectionalSpace] interface.
+func (s *SpaceLab) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
+	return adaptedBlackPoint(&s.adapt, s.WhitePoint, s.BlackPoint)
+}
+
 // Embed adds the color space to a PDF file.
 // This implements the [Space] interface.
 func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -599,7 +663,9 @@ func (s *SpaceLab) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 100] for L* or outside Ranges for a* and b* are
 // adjusted to the nearest valid value.
-func (s *SpaceLab) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) {
+// Under [icc.AbsoluteColorimetric] the result is relative to the space's own
+// white point and no adaptation is applied.
+func (s *SpaceLab) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
 	LStar := ClipComponent(values[0], 0, 100)
 	aStar := ClipComponent(values[1], s.Ranges[0], s.Ranges[1])
 	bStar := ClipComponent(values[2], s.Ranges[2], s.Ranges[3])
@@ -613,6 +679,9 @@ func (s *SpaceLab) ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64) 
 	X = XW * labG(L)
 	Y = YW * labG(M)
 	Z = ZW * labG(N)
+	if ri == icc.AbsoluteColorimetric {
+		return X, Y, Z
+	}
 	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.apply(X, Y, Z)
 }
 
@@ -629,7 +698,7 @@ func (c colorLab) ColorSpace() Space {
 // ToXYZ converts a Lab color to CIE XYZ tristimulus values
 // adapted to the Profile Connection Space white point.
 func (c colorLab) ToXYZ() (X, Y, Z float64) {
-	return c.Space.ToXYZ(c.Values[:], &icc.Workspace{})
+	return c.Space.ToXYZ(c.Values[:], icc.RelativeColorimetric, &icc.Workspace{})
 }
 
 // RGBA implements the color.Color interface.
@@ -646,8 +715,10 @@ func (c colorLab) RGBA() (r, g, b, a uint32) {
 //
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
-func (s *SpaceLab) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
-	X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+func (s *SpaceLab) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
+	if ri != icc.AbsoluteColorimetric {
+		X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+	}
 
 	XW, YW, ZW := s.WhitePoint[0], s.WhitePoint[1], s.WhitePoint[2]
 
@@ -667,10 +738,11 @@ func (s *SpaceLab) FromXYZ(X, Y, Z float64, dst []float64, _ *icc.Workspace) {
 	dst[2] = ClipComponent(bStar, s.Ranges[2], s.Ranges[3])
 }
 
-// ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a Lab color.
+// ColorFromXYZ converts PCS-adapted CIE XYZ coordinates to a Lab color,
+// using [icc.RelativeColorimetric].
 func (s *SpaceLab) ColorFromXYZ(X, Y, Z float64) Color {
 	var v [3]float64
-	s.FromXYZ(X, Y, Z, v[:], &icc.Workspace{})
+	s.FromXYZ(X, Y, Z, icc.RelativeColorimetric, v[:], &icc.Workspace{})
 	return colorLab{Space: s, Values: v}
 }
 

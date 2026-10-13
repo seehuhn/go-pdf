@@ -54,7 +54,11 @@ type Space interface {
 
 	// ToXYZ converts component values to CIE XYZ tristimulus values adapted
 	// to the white point of the ICC Profile Connection Space,
-	// [icc.PCSWhitePoint].
+	// [icc.PCSWhitePoint].  The rendering intent ri selects the conversion;
+	// under [icc.AbsoluteColorimetric] a space with its own white point
+	// returns values relative to that white point instead.  DeviceGray and
+	// DeviceRGB have no white point of their own and ignore ri; DeviceCMYK
+	// converts through its built-in profile under ri.
 	//
 	// A component outside the range reported by ComponentRange is adjusted
 	// to the nearest value within it.  Callers therefore need not clamp, and
@@ -63,12 +67,51 @@ type Space interface {
 	// ws supplies reusable scratch buffers to avoid per-call allocation in a
 	// hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
 	// and must not be used from more than one goroutine at a time.
-	ToXYZ(values []float64, ws *icc.Workspace) (X, Y, Z float64)
+	ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64)
+
+	// SourceBlackPoint returns the black point of the space, as the source
+	// of a conversion under ri, for use in black point compensation.  The
+	// result is in media-relative PCS XYZ whatever ri is; black point
+	// compensation is not used with absolute colorimetric conversions.
+	SourceBlackPoint(ri icc.RenderingIntent) [3]float64
 
 	pdf.Embedder
 
 	gocolor.Model
 }
+
+// BidirectionalSpace is a colour space which converts in both directions
+// between its component values and CIE XYZ.  Such a space can be the
+// destination of a colour conversion, for example as a blending colour space.
+type BidirectionalSpace interface {
+	Space
+
+	// FromXYZ converts CIE XYZ tristimulus values adapted to the white
+	// point of the ICC Profile Connection Space to component values, which
+	// are written to dst.  dst must have length Channels().  The rendering
+	// intent ri selects the conversion as for ToXYZ.
+	//
+	// ws supplies reusable scratch buffers to avoid per-call allocation in a
+	// hot loop; it must be non-nil (the zero value &icc.Workspace{} is valid)
+	// and must not be used from more than one goroutine at a time.
+	FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, ws *icc.Workspace)
+
+	// DestinationBlackPoint returns the black point of the space, as the
+	// destination of a conversion under ri, for use in black point
+	// compensation.  The result is in media-relative PCS XYZ whatever ri is.
+	DestinationBlackPoint(ri icc.RenderingIntent) [3]float64
+}
+
+var (
+	_ BidirectionalSpace = SpaceDeviceGray
+	_ BidirectionalSpace = SpaceDeviceRGB
+	_ BidirectionalSpace = SpaceDeviceCMYK
+	_ BidirectionalSpace = SpaceSRGB
+	_ BidirectionalSpace = (*SpaceCalGray)(nil)
+	_ BidirectionalSpace = (*SpaceCalRGB)(nil)
+	_ BidirectionalSpace = (*SpaceLab)(nil)
+	_ BidirectionalSpace = (*SpaceICCBased)(nil)
+)
 
 // IsSpecial reports whether the color space is a special color space.
 // The special color spaces are Pattern, Indexed, Separation, and DeviceN.
