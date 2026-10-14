@@ -651,7 +651,10 @@ func (f FilterCCITTFax) toParams() *ccittfax.Params {
 //
 // The Go zero value [DCTColorTransformAuto] omits the ColorTransform
 // entry from the parameter dictionary, leaving the choice to the
-// JPEG markers (and, in their absence, the PDF default rules).
+// JPEG data (and, in its absence, the PDF default rules).
+//
+// The entry is used only when the JPEG data carries no Adobe APP14
+// marker; if the marker is present, it takes precedence.
 type DCTColorTransform int
 
 // DCTColorTransform values.  The numeric constant values are an
@@ -674,7 +677,8 @@ const (
 // This filter supports decoding only.
 type FilterDCT struct {
 	// ColorTransform specifies the colour-space transformation applied
-	// during decoding.
+	// during decoding.  It is used only when the JPEG data carries no
+	// Adobe APP14 marker; the marker takes precedence.
 	ColorTransform DCTColorTransform
 }
 

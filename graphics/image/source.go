@@ -19,7 +19,6 @@ package image
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -122,7 +121,7 @@ func (s *FlateSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict p
 
 	w, err := rm.Out().OpenStream(ref, dict, parms)
 	if err != nil {
-		return fmt.Errorf("cannot open image stream: %w", err)
+		return err
 	}
 	if err := s.WriteData(w); err != nil {
 		w.Close()
@@ -205,7 +204,7 @@ func (s *CCITTFaxSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dic
 
 	w, err := rm.Out().OpenStream(ref, dict, parms)
 	if err != nil {
-		return fmt.Errorf("cannot open image mask stream: %w", err)
+		return err
 	}
 	if err := s.WriteData(w); err != nil {
 		w.Close()

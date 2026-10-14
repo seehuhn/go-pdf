@@ -239,6 +239,12 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid BitsPerComponent %d", sm.BitsPerComponent)
 	}
 
+	if s, ok := sm.Source.(*DCTSource); ok {
+		if err := s.CheckGeometry(sm.Width, sm.Height, 1, sm.BitsPerComponent); err != nil {
+			return err
+		}
+	}
+
 	// Validate Decode array (must have exactly 2 elements for grayscale)
 	if sm.Decode != nil && len(sm.Decode) != 2 {
 		return fmt.Errorf("wrong Decode length: expected 2, got %d", len(sm.Decode))

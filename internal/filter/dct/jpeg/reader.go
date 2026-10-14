@@ -150,7 +150,6 @@ type headerInfo struct {
 	baseline    bool
 	progressive bool
 
-	jfif                bool
 	adobeTransformValid bool
 	adobeTransform      uint8
 
@@ -233,8 +232,9 @@ type outputState struct {
 type decoder struct {
 	r io.Reader
 
-	// colorTransformOverride, if non-nil, overrides the APP14-based
-	// color transform decision. 0 = no transform, 1 = YCbCr/YCCK.
+	// colorTransformOverride, if non-nil, is the ColorTransform value
+	// from the PDF filter parameters (0 = no transform, 1 = YCbCr/YCbCrK).
+	// It applies only when the JPEG has no valid Adobe APP14 marker.
 	colorTransformOverride *int
 
 	// streamOut is the destination writer for decoded pixel bytes; set
@@ -601,23 +601,6 @@ func (d *decoder) processDRI(n int) error {
 	return nil
 }
 
-func (d *decoder) processApp0Marker(n int) error {
-	if n < 5 {
-		return d.ignore(n)
-	}
-	if err := d.readFull(d.tmp[:5]); err != nil {
-		return err
-	}
-	n -= 5
-
-	d.jfif = d.tmp[0] == 'J' && d.tmp[1] == 'F' && d.tmp[2] == 'I' && d.tmp[3] == 'F' && d.tmp[4] == '\x00'
-
-	if n > 0 {
-		return d.ignore(n)
-	}
-	return nil
-}
-
 func (d *decoder) processApp14Marker(n int) error {
 	if n < 12 {
 		return d.ignore(n)
@@ -737,8 +720,6 @@ func (d *decoder) decode(r io.Reader) error {
 			err = d.processSOS(n)
 		case driMarker:
 			err = d.processDRI(n)
-		case app0Marker:
-			err = d.processApp0Marker(n)
 		case app14Marker:
 			err = d.processApp14Marker(n)
 		default:
@@ -774,18 +755,17 @@ func (d *decoder) decode(r io.Reader) error {
 	return d.emit(d.streamOut, 0, d.height)
 }
 
-// isRGB reports whether 3-component output should pass the YCbCr
-// component planes through positionally as RGB rather than applying
-// the YCbCr→RGB matrix.  Used by the per-stripe emitter in stream.go.
+// isRGB reports whether 3-component output should pass the component
+// planes through positionally as RGB rather than applying the
+// YCbCr→RGB matrix.  The Adobe APP14 marker takes precedence, then the
+// ColorTransform entry; by default the transform is applied.  Used by
+// the per-stripe emitter in stream.go.
 func (d *decoder) isRGB() bool {
+	if d.adobeTransformValid {
+		return d.adobeTransform == adobeTransformUnknown
+	}
 	if d.colorTransformOverride != nil {
 		return *d.colorTransformOverride == 0
 	}
-	if d.jfif {
-		return false
-	}
-	if d.adobeTransformValid && d.adobeTransform == adobeTransformUnknown {
-		return true
-	}
-	return d.comp[0].c == 'R' && d.comp[1].c == 'G' && d.comp[2].c == 'B'
+	return false
 }

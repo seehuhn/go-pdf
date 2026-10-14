@@ -244,7 +244,7 @@ func (d *decoder) processSOS(n int) error {
 			return err
 		}
 		// bind the per-stripe emission function: stable from here on
-		// since d.nComp, isRGB(), and useYCCK() are all set before SOS
+		// since d.nComp, isRGB(), and useYCbCrK() are all set before SOS
 		switch d.nComp {
 		case 1:
 			d.emit = d.emitGray
@@ -255,8 +255,8 @@ func (d *decoder) processSOS(n int) error {
 				d.emit = d.emitYCbCr
 			}
 		default: // nComp == 4
-			if d.useYCCK() {
-				d.emit = d.emitYCCK
+			if d.useYCbCrK() {
+				d.emit = d.emitYCbCrK
 			} else {
 				d.emit = d.emitRawCMYK
 			}

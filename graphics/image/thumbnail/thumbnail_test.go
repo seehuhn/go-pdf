@@ -521,3 +521,37 @@ func FuzzThumbnailRoundTrip(f *testing.F) {
 		roundTripThumbnail(t, version, thumb)
 	})
 }
+
+func TestThumbnailDCTSource(t *testing.T) {
+	cases := []struct {
+		name   string
+		colors int
+		bits   int
+		ok     bool
+	}{
+		{"match", 3, 8, true},
+		{"wrong colors", 1, 8, false},
+		{"wrong bits", 3, 16, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+			samples := make([]byte, 8*8*c.colors)
+			thumb := &thumbnail.Thumbnail{
+				Width:            8,
+				Height:           8,
+				ColorSpace:       color.SpaceDeviceRGB,
+				BitsPerComponent: c.bits,
+				Source: &image.DCTSource{
+					WriteData: func(w io.Writer) error { _, err := w.Write(samples); return err },
+					Width:     8, Height: 8, Colors: c.colors,
+				},
+			}
+			_, err := rm.Embed(thumb)
+			if (err == nil) != c.ok {
+				t.Errorf("got error %v, want ok=%t", err, c.ok)
+			}
+		})
+	}
+}

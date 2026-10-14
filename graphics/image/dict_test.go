@@ -1880,3 +1880,40 @@ func TestExtractDictMatteRepair(t *testing.T) {
 		})
 	}
 }
+
+func TestDictCheckDCTSource(t *testing.T) {
+	newDict := func(cs color.Space, colors, bpc, width int) *Dict {
+		return &Dict{
+			Width:            width,
+			Height:           8,
+			ColorSpace:       cs,
+			BitsPerComponent: bpc,
+			Data: &DCTSource{
+				WriteData: writerOf(dctTestSamples(8, 8, colors)),
+				Width:     8,
+				Height:    8,
+				Colors:    colors,
+			},
+		}
+	}
+	cases := []struct {
+		name string
+		d    *Dict
+		ok   bool
+	}{
+		{"gray, 3 colors", newDict(color.SpaceDeviceGray, 3, 8, 8), false},
+		{"CMYK, 3 colors", newDict(color.SpaceDeviceCMYK, 3, 8, 8), false},
+		{"1 bit", newDict(color.SpaceDeviceRGB, 3, 1, 8), false},
+		{"width mismatch", newDict(color.SpaceDeviceRGB, 3, 8, 9), false},
+		{"valid", newDict(color.SpaceDeviceRGB, 3, 8, 8), true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			err := c.d.check(w)
+			if (err == nil) != c.ok {
+				t.Errorf("check() = %v, want ok=%v", err, c.ok)
+			}
+		})
+	}
+}

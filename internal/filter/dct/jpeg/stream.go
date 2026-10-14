@@ -32,12 +32,12 @@ import (
 //   - 3 components, raw RGB pass-through (no APP14 transform, or
 //     ColorTransform=0 override): 3 bytes per pixel (component planes
 //     interpreted positionally).
-//   - 4 components, YCCK: 4 bytes per pixel (255-R, 255-G, 255-B, K).
+//   - 4 components, YCbCrK: 4 bytes per pixel (255-R, 255-G, 255-B, K).
 //   - 4 components, raw CMYK: 4 bytes per pixel (the four component
 //     planes in scan order, no inversion).
 //
 // If colorTransform is non-nil it overrides the JPEG's APP14-based
-// color transform decision (0 = no transform, 1 = YCbCr/YCCK).
+// color transform decision (0 = no transform, 1 = YCbCr/YCbCrK).
 //
 // For single-scan baseline JPEGs DecodeStream emits one MCU stripe at
 // a time directly from a stripe-sized internal buffer, so peak memory
@@ -52,16 +52,16 @@ func DecodeStream(r io.Reader, colorTransform *int, w io.Writer, budget *membudg
 	return d.decode(r)
 }
 
-// useYCCK reports whether 4-component output should go through the YCCK
+// useYCbCrK reports whether 4-component output should go through the YCbCrK
 // path (YCbCr → RGB inverted to CMY, with raw K) rather than being
-// emitted as raw CMYK planes.  Encodes the APP14 + colorTransformOverride
-// decision per PDF spec table 13.
-func (d *decoder) useYCCK() bool {
-	if d.colorTransformOverride != nil {
-		return *d.colorTransformOverride != 0
-	}
+// emitted as raw CMYK planes.  The Adobe APP14 marker takes precedence,
+// then the ColorTransform entry; by default no transform is applied.
+func (d *decoder) useYCbCrK() bool {
 	if d.adobeTransformValid {
 		return d.adobeTransform != adobeTransformUnknown
+	}
+	if d.colorTransformOverride != nil {
+		return *d.colorTransformOverride != 0
 	}
 	return false
 }
@@ -139,12 +139,12 @@ func (d *decoder) emitYCbCrAsRGB(w io.Writer, yStart, yEnd int) error {
 	return nil
 }
 
-// emitYCCK applies the YCCK → CMYK conversion (YCbCr → RGB, then
+// emitYCbCrK applies the YCbCrK → CMYK conversion (YCbCr → RGB, then
 // invert RGB to obtain CMY) and writes 4-bytes-per-pixel CMYK rows in
 // PDF convention (0 = no ink); K is taken from blackPix without
 // inversion since the Adobe-stored K is already PDF-convention after
 // the implicit double-inversion through the YCbCr/RGB matrix.
-func (d *decoder) emitYCCK(w io.Writer, yStart, yEnd int) error {
+func (d *decoder) emitYCbCrK(w io.Writer, yStart, yEnd int) error {
 	width := d.width
 	row := d.row
 	for y := yStart; y < yEnd; y++ {

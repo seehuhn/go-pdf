@@ -21,6 +21,7 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"log"
 	"os"
 
@@ -62,6 +63,20 @@ func main() {
 	}
 
 	b := imageData.Bounds()
+	writeRGB := func(w io.Writer) error {
+		row := make([]byte, 0, 3*b.Dx())
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			row = row[:0]
+			for x := b.Min.X; x < b.Max.X; x++ {
+				c := imageData.NRGBAAt(x, y)
+				row = append(row, c.R, c.G, c.B)
+			}
+			if _, err := w.Write(row); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	width := float64(b.Dx()) / dpi * 72
 	height := float64(b.Dy()) / dpi * 72
 	paper := &pdf.Rectangle{
@@ -78,7 +93,7 @@ func main() {
 		Height:           b.Dy(),
 		ColorSpace:       color.SpaceDeviceRGB,
 		BitsPerComponent: 8,
-		Data:             &pdfimage.DCTSource{Image: imageData},
+		Data:             pdfimage.NewDCTSource(b.Dx(), b.Dy(), color.SpaceDeviceRGB, writeRGB),
 	}
 
 	doc.Transform(matrix.Scale(width, height))

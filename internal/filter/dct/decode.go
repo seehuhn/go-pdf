@@ -49,10 +49,11 @@ import (
 // color images the output is RGB (3 bytes/pixel); for grayscale, 1
 // byte/pixel; for CMYK, 4 bytes/pixel in PDF convention.
 //
-// If colorTransform is non-nil it overrides the APP14-based color
-// transform decision per PDF spec table 13: 0 selects no transform
-// (raw YCbCr or CMYK pass-through), 1 selects YCbCr→RGB (or YCCK
-// transform for CMYK).
+// The color transform is chosen as follows.  A valid Adobe APP14
+// marker in the JPEG data decides; otherwise a non-nil colorTransform
+// decides (0 selects no transform, raw YCbCr or CMYK pass-through;
+// 1 selects YCbCr→RGB, or the YCbCrK transform for CMYK); otherwise
+// 3-component data is transformed and 4-component data is not.
 //
 // Decoding happens lazily as the returned reader is drained, so
 // malformed JPEGs surface their error on a Read call rather than from

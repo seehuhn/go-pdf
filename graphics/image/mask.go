@@ -523,6 +523,9 @@ func (m *Mask) check(out *pdf.Writer) error {
 	if m.Source == nil {
 		return errors.New("source cannot be nil")
 	}
+	if _, ok := m.Source.(*DCTSource); ok {
+		return errors.New("DCTSource cannot encode a 1-bit image mask")
+	}
 
 	if m.Alternates != nil {
 		if err := pdf.CheckVersion(out, "image alternates", pdf.V1_3); err != nil {

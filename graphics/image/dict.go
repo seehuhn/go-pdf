@@ -843,6 +843,13 @@ func (d *Dict) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid BitsPerComponent %d", d.BitsPerComponent)
 	}
 
+	if s, ok := d.Data.(*DCTSource); ok {
+		err := s.CheckGeometry(d.Width, d.Height, d.ColorSpace.Channels(), d.BitsPerComponent)
+		if err != nil {
+			return err
+		}
+	}
+
 	if d.Intent != "" {
 		if err := pdf.CheckVersion(out, "rendering intents", pdf.V1_1); err != nil {
 			return err

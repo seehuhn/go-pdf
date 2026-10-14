@@ -383,6 +383,16 @@ func (t *Thumbnail) check(out *pdf.Writer) error {
 		return errors.New("invalid thumbnail color space")
 	}
 
+	// DCT-encoded sources check their own geometry
+	if s, ok := t.Source.(interface {
+		CheckGeometry(width, height, channels, bitsPerComponent int) error
+	}); ok {
+		err := s.CheckGeometry(t.Width, t.Height, t.ColorSpace.Channels(), t.BitsPerComponent)
+		if err != nil {
+			return err
+		}
+	}
+
 	if t.Decode != nil {
 		expectedLen := 2 * t.ColorSpace.Channels()
 		if len(t.Decode) != expectedLen {

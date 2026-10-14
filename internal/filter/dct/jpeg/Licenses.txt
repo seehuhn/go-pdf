@@ -1,6 +1,10 @@
 The files in this directory are derived from the Go standard library's
 image/jpeg package (Go 1.26), with modifications to support the PDF
-ColorTransform parameter.
+ColorTransform parameter.  The encoder in writer.go and fdct.go is
+derived from writer.go and dct.go of the same package (Go 1.27), with
+modifications to read raw samples from a stream, to support 1, 3 and 4
+components with an optional colour transform, and to write an Adobe
+APP14 marker.
 
 The original code is licensed under the following terms:
 

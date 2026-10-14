@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/membudget"
+	fjpeg "seehuhn.de/go/pdf/internal/filter/dct/jpeg"
 	"seehuhn.de/go/pdf/internal/limits"
 )
 
@@ -578,4 +579,205 @@ func FuzzDecode(f *testing.F) {
 		_, _ = io.Copy(io.Discard, rc)
 		rc.Close()
 	})
+}
+
+// encodeSolidRGB returns an 8x8 JPEG of one colour, written by the
+// standard library encoder (no JFIF, no APP14, component ids 1,2,3).
+func encodeSolidRGB(t *testing.T, r, g, b uint8) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	for y := range 8 {
+		for x := range 8 {
+			img.Set(x, y, color.RGBA{R: r, G: g, B: b, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 100}); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// insertAfterSOI inserts seg directly after the SOI marker.
+func insertAfterSOI(jpg, seg []byte) []byte {
+	out := make([]byte, 0, len(jpg)+len(seg))
+	out = append(out, jpg[:2]...)
+	out = append(out, seg...)
+	return append(out, jpg[2:]...)
+}
+
+// withAdobeMarker inserts an APP14 "Adobe" segment with the given
+// transform flag directly after SOI.
+func withAdobeMarker(jpg []byte, transform byte) []byte {
+	seg := []byte{0xFF, 0xEE, 0x00, 0x0E, 'A', 'd', 'o', 'b', 'e', 0x00, 0x64, 0, 0, 0, 0, transform}
+	return insertAfterSOI(jpg, seg)
+}
+
+// withShortAdobeMarker inserts an APP14 segment with only 6 payload bytes.
+func withShortAdobeMarker(jpg []byte) []byte {
+	seg := []byte{0xFF, 0xEE, 0x00, 0x08, 'A', 'd', 'o', 'b', 'e', 0x00}
+	return insertAfterSOI(jpg, seg)
+}
+
+// withJFIF inserts a JFIF APP0 segment directly after SOI.
+func withJFIF(jpg []byte) []byte {
+	seg := []byte{0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 1, 1, 0, 0, 1, 0, 1, 0, 0}
+	return insertAfterSOI(jpg, seg)
+}
+
+// withComponentIDs rewrites the component identifiers in SOF0 and SOS.
+func withComponentIDs(jpg []byte, ids []byte) []byte {
+	out := bytes.Clone(jpg)
+	for i := 2; i+4 <= len(out); {
+		if out[i] != 0xFF {
+			break
+		}
+		marker := out[i+1]
+		n := int(out[i+2])<<8 | int(out[i+3])
+		seg := out[i+2:]
+		switch marker {
+		case 0xC0:
+			for k, id := range ids {
+				seg[8+3*k] = id
+			}
+		case 0xDA:
+			for k, id := range ids {
+				seg[3+2*k] = id
+			}
+			return out
+		}
+		i += 2 + n
+	}
+	return out
+}
+
+func TestDecodePrecedence(t *testing.T) {
+	base := encodeSolidRGB(t, 200, 100, 50)
+	transformed := [3]byte{200, 100, 50} // YCbCr→RGB applied
+	raw := [3]byte{124, 86, 182}         // stored YCbCr passed through
+	ct0, ct1 := 0, 1
+	cases := []struct {
+		name string
+		jpg  []byte
+		ct   *int
+		want [3]byte
+	}{
+		{"default", base, nil, transformed},
+		{"dict0", base, &ct0, raw},
+		{"dict1", base, &ct1, transformed},
+		{"app14=1 dict0", withAdobeMarker(base, 1), &ct0, transformed},
+		{"app14=0 dict1", withAdobeMarker(base, 0), &ct1, raw},
+		{"app14=0 default", withAdobeMarker(base, 0), nil, raw},
+		{"jfif dict0", withJFIF(base), &ct0, raw},
+		{"jfif app14=0", withJFIF(withAdobeMarker(base, 0)), nil, raw},
+		{"rgb ids default", withComponentIDs(base, []byte{'R', 'G', 'B'}), nil, transformed},
+		{"short-app14 dict0", withShortAdobeMarker(base), &ct0, raw},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rc, err := Decode(bytes.NewReader(c.jpg), c.ct, membudget.New(1<<30))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rc.Close()
+			data, err := io.ReadAll(rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(data) != 8*8*3 {
+				t.Fatalf("got %d bytes, want %d", len(data), 8*8*3)
+			}
+			for k := range 3 {
+				if d := int(data[k]) - int(c.want[k]); d < -2 || d > 2 {
+					t.Errorf("pixel 0: got %v, want %v", data[:3], c.want)
+					break
+				}
+			}
+		})
+	}
+}
+
+// encodeSolidCMYK returns an 8x8 four-component JPEG of one CMYK colour
+// (PDF convention), with the colour transform on or off.
+func encodeSolidCMYK(t *testing.T, cmyk [4]byte, transform bool) []byte {
+	t.Helper()
+	pix := make([]byte, 0, 8*8*4)
+	for range 8 * 8 {
+		pix = append(pix, cmyk[:]...)
+	}
+	var buf bytes.Buffer
+	err := fjpeg.EncodeStream(&buf, bytes.NewReader(pix), fjpeg.EncodeParams{
+		Width: 8, Height: 8, Components: 4, Transform: transform, Quality: 100,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// withoutAPP14 removes all APP14 segments.
+func withoutAPP14(jpg []byte) []byte {
+	out := bytes.Clone(jpg[:2])
+	i := 2
+	for i+4 <= len(jpg) && jpg[i] == 0xFF && jpg[i+1] != 0xDA {
+		end := i + 2 + int(jpg[i+2])<<8 + int(jpg[i+3])
+		if jpg[i+1] != 0xEE {
+			out = append(out, jpg[i:end]...)
+		}
+		i = end
+	}
+	return append(out, jpg[i:]...)
+}
+
+func TestDecodePrecedence4(t *testing.T) {
+	src := [4]byte{30, 90, 150, 60}
+	ycc := [3]byte{}
+	ycc[0], ycc[1], ycc[2] = color.RGBToYCbCr(255-src[0], 255-src[1], 255-src[2])
+	rawYCbCrK := [4]byte{ycc[0], ycc[1], ycc[2], src[3]}
+
+	ycbcrk := withoutAPP14(encodeSolidCMYK(t, src, true))
+	cmyk := withoutAPP14(encodeSolidCMYK(t, src, false))
+	ct0, ct1 := 0, 1
+
+	cases := []struct {
+		name    string
+		jpg     []byte
+		ct      *int
+		want    [4]byte
+		garbled bool // want must differ from the result
+	}{
+		{"ycbcrk default", ycbcrk, nil, rawYCbCrK, false},
+		{"ycbcrk dict1", ycbcrk, &ct1, src, false},
+		{"ycbcrk dict0", ycbcrk, &ct0, rawYCbCrK, false},
+		{"cmyk default", cmyk, nil, src, false},
+		{"cmyk dict0", cmyk, &ct0, src, false},
+		{"cmyk dict1", cmyk, &ct1, src, true},
+		{"marker=2 dict0", withAdobeMarker(ycbcrk, 2), &ct0, src, false},
+		{"marker=0 dict1", withAdobeMarker(cmyk, 0), &ct1, src, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rc, err := Decode(bytes.NewReader(c.jpg), c.ct, membudget.New(1<<30))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rc.Close()
+			data, err := io.ReadAll(rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(data) != 8*8*4 {
+				t.Fatalf("got %d bytes, want %d", len(data), 8*8*4)
+			}
+			match := true
+			for k := range 4 {
+				if d := int(data[k]) - int(c.want[k]); d < -2 || d > 2 {
+					match = false
+				}
+			}
+			if match == c.garbled {
+				t.Errorf("pixel 0: got %v, want %v (differ: %t)", data[:4], c.want, c.garbled)
+			}
+		})
+	}
 }
