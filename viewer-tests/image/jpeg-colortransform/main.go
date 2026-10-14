@@ -17,11 +17,11 @@
 // Command jpeg-colortransform generates a one-page PDF to probe how PDF
 // viewers pick the colour transform of DCTDecode images.
 //
-// Each row shows a JPEG image (left) and a Flate image holding go-pdf's
-// decode of the same data (right).  The JPEGs differ in the Adobe APP14
-// marker, the JFIF marker, the JPEG component IDs and the /ColorTransform
-// entry.  Where left and right differ, the viewer deviates from the
-// specification.
+// Each row shows a JPEG image as decoded by the viewer (left) and a Flate
+// image holding Quire's decode of the same data (right).  The JPEGs differ
+// in the Adobe APP14 marker, the JFIF marker, the JPEG component IDs and the
+// /ColorTransform entry.  Where left and right differ, the viewer picks a
+// different colour transform from Quire.
 package main
 
 import (
@@ -89,39 +89,39 @@ type row struct {
 var rows = []row{
 	{3, true, false, false, nil, absent, []string{
 		"1. RGB, stored as YCbCr; no markers, IDs 1,2,3; no entry",
-		"Default transform applies: original colours expected."}},
+		"Quire applies the default transform: original colours."}},
 	{3, false, false, false, []byte("RGB"), absent, []string{
 		"2. RGB, stored raw; no markers, IDs R,G,B; no entry",
-		"The spec-correct rendering is the WRONG-LOOKING one (the default",
-		"transform is applied to RGB data, and component IDs are ignored).",
-		"libjpeg/pdf.js-based viewers show the original colours instead."}},
+		"Quire ignores the component IDs and applies the default transform,",
+		"as the spec requires, so its colours look WRONG.  libjpeg- and",
+		"pdf.js-based viewers follow the IDs and show the original colours."}},
 	{3, false, false, true, nil, 0, []string{
 		"3. RGB, stored raw; JFIF marker; entry 0",
-		"Entry beats JFIF: original colours expected."}},
+		"Quire: the entry beats JFIF, giving the original colours."}},
 	{3, false, true, false, nil, 1, []string{
 		"4. RGB, stored raw; Adobe APP14 = 0; entry 1",
-		"Marker beats entry: original colours expected."}},
+		"Quire: the marker beats the entry, giving the original colours."}},
 	{3, true, true, false, nil, 0, []string{
 		"5. RGB, stored as YCbCr; Adobe APP14 = 1; entry 0",
-		"Marker beats entry: original colours expected."}},
+		"Quire: the marker beats the entry, giving the original colours."}},
 	{3, false, true, true, nil, absent, []string{
 		"6. RGB, stored raw; JFIF + Adobe APP14 = 0; no entry",
-		"Marker beats JFIF: original colours expected."}},
+		"Quire: the marker beats JFIF, giving the original colours."}},
 	{3, false, false, false, nil, 0, []string{
 		"7. RGB, stored raw; no markers; entry 0",
-		"Entry applies: original colours expected."}},
+		"Quire applies the entry: original colours."}},
 	{4, false, false, false, nil, absent, []string{
 		"8. CMYK, stored raw; no markers; no entry",
-		"Default for four components is no transform: original colours."}},
+		"Quire applies the default, no transform: original colours."}},
 	{4, true, false, false, nil, 1, []string{
 		"9. CMYK, stored as YCbCrK; no markers; entry 1",
-		"Entry applies: original colours expected."}},
+		"Quire applies the entry: original colours."}},
 	{4, true, true, false, nil, 0, []string{
 		"10. CMYK, stored as YCbCrK; Adobe APP14 = 2; entry 0",
-		"Marker beats entry: original colours expected."}},
+		"Quire: the marker beats the entry, giving the original colours."}},
 	{4, false, true, false, nil, 1, []string{
 		"11. CMYK, stored raw; Adobe APP14 = 0; entry 1",
-		"Marker beats entry: original colours expected."}},
+		"Quire: the marker beats the entry, giving the original colours."}},
 }
 
 func main() {
@@ -140,23 +140,28 @@ func run(filename string) error {
 	}
 
 	helv := font.Must(standard.Helvetica.New())
-	title := text.F{Font: helv, Size: 14}
+	helvBold := font.Must(standard.HelveticaBold.New())
+	title := text.F{Font: helvBold, Size: 13}
 	body := text.F{Font: helv, Size: 9}
+	head := text.F{Font: helvBold, Size: 10}
+	rowHead := text.F{Font: helvBold, Size: 8}
 	small := text.F{Font: helv, Size: 8}
 
-	showLines(page, title, 30, 805, 14, "DCTDecode colour-transform precedence")
-	showLines(page, body, 30, 785, 11,
-		"Left: DCT image.  Right: Flate image of the spec-mandated decode (Adobe marker >",
-		"ColorTransform entry > default: transform for three components, none for four).",
-		"Where left and right differ, the viewer deviates from the specification.",
-		"The JPEG JFIF marker and component IDs must not influence the decision.",
-		"Every image shows four stripes: red, gold/yellow, green, blue.")
-	showLines(page, small, dctX+imgW/2-18, firstRowY+imgH+6, 10, "DCT image")
-	showLines(page, small, refX+imgW/2-25, firstRowY+imgH+6, 10, "reference (Flate)")
+	showLines(page, title, labelX, 805, 14, "JPEG images: which colour transform applies?")
+	showLines(page, body, labelX, 785, 11,
+		"Left: a JPEG image (DCTDecode), decoded by your viewer.",
+		"Right: the same image as decoded by Quire, stored losslessly (FlateDecode).",
+		"Quire follows the PDF spec: an Adobe APP14 marker decides, otherwise the /ColorTransform entry,",
+		"otherwise the default (transform for three components, none for four).  The JFIF marker and the",
+		"JPEG component IDs play no part.  Where the two images differ, your viewer decides differently.",
+		"The images are meant to show four stripes: red, gold/yellow, green, blue.")
+	showLines(page, head, dctX, firstRowY+imgH+6, 10, "your viewer")
+	showLines(page, head, refX, firstRowY+imgH+6, 10, "Quire")
 
 	for i, r := range rows {
 		y := firstRowY - float64(i)*rowPitch
-		showLines(page, small, labelX, y+imgH-8, 10, r.label...)
+		showLines(page, rowHead, labelX, y+imgH-8, 10, r.label[0])
+		showLines(page, small, labelX, y+imgH-18, 10, r.label[1:]...)
 
 		jpg, ref, err := r.build()
 		if err != nil {
