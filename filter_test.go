@@ -669,6 +669,51 @@ func TestFilterCCITTFaxOutputBounded(t *testing.T) {
 	}
 }
 
+// TestFilterCCITTFaxRowsVsEndOfBlock checks that Rows bounds the decoded
+// output only when end-of-block detection is disabled.
+func TestFilterCCITTFaxRowsVsEndOfBlock(t *testing.T) {
+	const rowBytes = 2
+	image := []byte{0xF0, 0xFF, 0x0F, 0xF0, 0xAA, 0x55, 0xFF, 0x00, 0x00, 0x01}
+	for _, k := range []int{-1, 0, 2} {
+		for _, ignoreEOB := range []bool{false, true} {
+			f := FilterCCITTFax{K: k, Columns: 16, Rows: 3, EndOfLine: true, IgnoreEndOfBlock: ignoreEOB}
+
+			// the writer enforces Rows, so encode without the bound
+			f.Rows = 0
+			var encoded bytes.Buffer
+			w, err := f.Encode(V2_0, withDummyClose{&encoded})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := w.Write(image); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+			f.Rows = 3
+
+			budget := membudget.New(limits.StreamBudget(int64(encoded.Len())))
+			r, err := f.Decode(V2_0, bytes.NewReader(encoded.Bytes()), budget)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := io.ReadAll(r)
+			r.Close()
+			if err != nil {
+				t.Fatalf("K=%d ignoreEOB=%t: %v", k, ignoreEOB, err)
+			}
+			want := image
+			if ignoreEOB {
+				want = image[:3*rowBytes]
+			}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("K=%d ignoreEOB=%t (-want +got):\n%s", k, ignoreEOB, diff)
+			}
+		}
+	}
+}
+
 // TestFilterCCITTFaxNotTruncated checks that the output bound does not truncate
 // a legitimate CCITTFax stream whose decoded size is proportional to its input.
 func TestFilterCCITTFaxNotTruncated(t *testing.T) {

@@ -182,14 +182,22 @@ func (w *Writer) writeRow() error {
 		}
 	}
 
-	switch {
-	case w.K > 0:
-		if w.EndOfLine {
-			err := w.writeBits(0b000000000001, 12)
-			if err != nil {
-				return err
+	if w.EndOfLine {
+		if w.EncodedByteAlign {
+			// fill before the EOL, so that the row begins on a byte boundary
+			if pad := (4 - w.validBits + 8) % 8; pad > 0 {
+				if err := w.writeBits(0, uint8(pad)); err != nil {
+					return err
+				}
 			}
 		}
+		if err := w.writeBits(0b000000000001, 12); err != nil {
+			return err
+		}
+	}
+
+	switch {
+	case w.K > 0:
 		if w.count2D >= w.K-1 {
 			err := w.writeBits(0b1, 1) // 1 indicates a 1D-coded row
 			if err != nil {
@@ -212,12 +220,6 @@ func (w *Writer) writeRow() error {
 			w.count2D++
 		}
 	case w.K == 0:
-		if w.EndOfLine {
-			err := w.writeBits(0b000000000001, 12)
-			if err != nil {
-				return err
-			}
-		}
 		err := w.encode1DLine()
 		if err != nil {
 			return err
@@ -229,7 +231,8 @@ func (w *Writer) writeRow() error {
 		}
 	}
 
-	if w.EncodedByteAlign {
+	if w.EncodedByteAlign && !w.EndOfLine {
+		// without EOL codes, the fill goes after the row
 		if err := w.flushBits(); err != nil {
 			return err
 		}

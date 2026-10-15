@@ -508,6 +508,10 @@ type FilterCCITTFax struct {
 
 	// Rows is the height of the image in scan lines.
 	// A value of 0 means the height is not predetermined.
+	//
+	// On read, Rows bounds the output only if IgnoreEndOfBlock is set;
+	// otherwise the end-of-block pattern in the encoded data determines
+	// the number of rows.
 	Rows int
 
 	// IgnoreEndOfBlock causes the filter to ignore end-of-block bit
@@ -520,7 +524,9 @@ type FilterCCITTFax struct {
 	BlackIs1 bool
 
 	// DamagedRowsBeforeError is the number of damaged rows that may be
-	// tolerated before an error occurs.
+	// tolerated before an error occurs.  A damaged row is replaced by
+	// the previous row, and decoding resumes at the next end-of-line
+	// pattern.  This applies only if EndOfLine is set and K >= 0.
 	DamagedRowsBeforeError int
 }
 
@@ -586,6 +592,10 @@ func (f FilterCCITTFax) Encode(v Version, w io.WriteCloser) (io.WriteCloser, err
 // Decode implements the [Filter] interface.
 func (f FilterCCITTFax) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
 	params := f.toParams()
+	if !params.IgnoreEndOfBlock {
+		// the end-of-block pattern overrides Rows
+		params.MaxRows = 0
+	}
 	if err := budget.Charge(ccittfax.BufferBytes(params)); err != nil {
 		return asMalformedFilter(nil, err)
 	}

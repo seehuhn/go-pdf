@@ -38,10 +38,13 @@ type Params struct {
 	// (0 = use all rows).
 	MaxRows int
 
-	// EndOfLine indicates whether EOL codes are present in the stream
+	// EndOfLine indicates whether EOL codes precede each row.
+	// The reader accepts EOL codes regardless of this setting.
 	EndOfLine bool
 
-	// EncodedByteAlign indicates whether each scan line is padded to byte boundary
+	// EncodedByteAlign indicates that each row begins on a byte boundary.
+	// With EndOfLine, fill bits precede each EOL code so that the code
+	// ends on a byte boundary; otherwise fill bits follow each row.
 	EncodedByteAlign bool
 
 	// BlackIs1 controls the interpretation of bit values.
@@ -54,7 +57,10 @@ type Params struct {
 	IgnoreEndOfBlock bool
 
 	// DamagedRowsBeforeError is the number of damaged rows of data that shall
-	// be tolerated before an error occurs.
+	// be tolerated before an error occurs.  A damaged row is replaced by the
+	// previous row (or a white row, if the previous row was damaged too)
+	// and decoding resumes at the next EOL code.  This applies only if
+	// EndOfLine is set and K >= 0.
 	DamagedRowsBeforeError int
 }
 
