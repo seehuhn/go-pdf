@@ -128,14 +128,21 @@ func ExtractThumbnail(c pdf.Cursor, obj pdf.Object, _ bool) (*Thumbnail, error) 
 	}
 	thumb.ColorSpace = cs
 
-	// bits per component (required)
-	bpc, err := c.Integer(dict["BitsPerComponent"])
+	// bits per component (required); where the filter fixes the sample
+	// size, that size wins over the entry
+	filters, err := pdf.Optional(c.Filters(dict))
 	if err != nil {
+		return nil, err
+	}
+	if bits, ok := graphics.FilterSampleBits(filters); ok {
+		thumb.BitsPerComponent = bits
+	} else if bpc, err := c.Integer(dict["BitsPerComponent"]); err != nil {
 		return nil, err
 	} else if !isValidBitsPerComponent(int(bpc)) {
 		return nil, pdf.Error("invalid BitsPerComponent value")
+	} else {
+		thumb.BitsPerComponent = int(bpc)
 	}
-	thumb.BitsPerComponent = int(bpc)
 
 	// the pixel-count cap still admits a multi-GiB per-channel float32
 	// buffer at 4 channels; cap the decoded form separately
@@ -383,10 +390,7 @@ func (t *Thumbnail) check(out *pdf.Writer) error {
 		return errors.New("invalid thumbnail color space")
 	}
 
-	// DCT-encoded sources check their own geometry
-	if s, ok := t.Source.(interface {
-		CheckGeometry(width, height, channels, bitsPerComponent int) error
-	}); ok {
+	if s, ok := t.Source.(graphics.GeometryChecker); ok {
 		err := s.CheckGeometry(t.Width, t.Height, t.ColorSpace.Channels(), t.BitsPerComponent)
 		if err != nil {
 			return err

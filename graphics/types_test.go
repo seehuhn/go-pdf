@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/icc"
+	"seehuhn.de/go/pdf"
 )
 
 // TestLineCapValues checks the numeric values of the line cap styles.
@@ -82,5 +83,31 @@ func TestRenderingIntentICC(t *testing.T) {
 		if got := c.ri.ICC(); got != c.want {
 			t.Errorf("%q: got %v, want %v", string(c.ri), got, c.want)
 		}
+	}
+}
+
+func TestFilterSampleBits(t *testing.T) {
+	cases := []struct {
+		name    string
+		filters []pdf.Filter
+		bits    int
+		fixed   bool
+	}{
+		{"empty", nil, 0, false},
+		{"flate", []pdf.Filter{pdf.FilterFlate{}}, 0, false},
+		{"ccitt", []pdf.Filter{pdf.FilterCCITTFax{}}, 1, true},
+		{"jbig2", []pdf.Filter{&pdf.FilterJBIG2{}}, 1, true},
+		{"dct", []pdf.Filter{pdf.FilterDCT{}}, 8, true},
+		{"runlength keeps entry", []pdf.Filter{pdf.FilterRunLength{}}, 0, false},
+		{"last filter counts", []pdf.Filter{pdf.FilterASCIIHex{}, pdf.FilterDCT{}}, 8, true},
+		{"only last filter counts", []pdf.Filter{pdf.FilterDCT{}, pdf.FilterFlate{}}, 0, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			bits, fixed := FilterSampleBits(c.filters)
+			if bits != c.bits || fixed != c.fixed {
+				t.Errorf("got (%d, %t), want (%d, %t)", bits, fixed, c.bits, c.fixed)
+			}
+		})
 	}
 }

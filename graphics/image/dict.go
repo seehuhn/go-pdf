@@ -262,9 +262,12 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	// Extract BitsPerComponent.  For JPXDecode images the entry is
 	// optional and shall be ignored if present (spec §8.9.5); drop any
 	// value to keep round-trip parity with check() which requires
-	// img.BitsPerComponent == 0 for JPX.
+	// img.BitsPerComponent == 0 for JPX.  Where the filter fixes the
+	// sample size, that size wins over the entry.
 	if hasJPX {
 		img.BitsPerComponent = 0
+	} else if bits, ok := graphics.FilterSampleBits(filters); ok {
+		img.BitsPerComponent = bits
 	} else if bpc, err := pdf.Optional(c.Integer(dict["BitsPerComponent"])); err != nil {
 		return nil, err
 	} else if bpc != 0 {
@@ -843,8 +846,13 @@ func (d *Dict) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid BitsPerComponent %d", d.BitsPerComponent)
 	}
 
-	if s, ok := d.Data.(*DCTSource); ok {
-		err := s.CheckGeometry(d.Width, d.Height, d.ColorSpace.Channels(), d.BitsPerComponent)
+	var numChannels int
+	if d.ColorSpace != nil {
+		numChannels = d.ColorSpace.Channels()
+	}
+
+	if s, ok := d.Data.(graphics.GeometryChecker); ok {
+		err := s.CheckGeometry(d.Width, d.Height, numChannels, d.BitsPerComponent)
 		if err != nil {
 			return err
 		}
@@ -854,11 +862,6 @@ func (d *Dict) check(out *pdf.Writer) error {
 		if err := pdf.CheckVersion(out, "rendering intents", pdf.V1_1); err != nil {
 			return err
 		}
-	}
-
-	var numChannels int
-	if d.ColorSpace != nil {
-		numChannels = d.ColorSpace.Channels()
 	}
 	if d.MaskImage != nil || d.MaskColors != nil {
 		if err := pdf.CheckVersion(out, "image masks", pdf.V1_3); err != nil {

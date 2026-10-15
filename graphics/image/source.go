@@ -19,6 +19,7 @@ package image
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 
 	"seehuhn.de/go/pdf"
@@ -187,6 +188,18 @@ func (s *CCITTFaxSource) Pixels() ([]byte, error) {
 
 // IsJPX implements [graphics.ImageData].
 func (s *CCITTFaxSource) IsJPX() bool { return false }
+
+// CheckGeometry implements [graphics.GeometryChecker].  The CCITTFax filter
+// delivers 1-bit samples, with Width samples per row.
+func (s *CCITTFaxSource) CheckGeometry(width, height, channels, bitsPerComponent int) error {
+	if bitsPerComponent != 1 {
+		return fmt.Errorf("CCITTFaxSource requires 1 bit per component, got %d", bitsPerComponent)
+	}
+	if s.Width != width*channels {
+		return fmt.Errorf("CCITTFaxSource has %d columns, image needs %d", s.Width, width*channels)
+	}
+	return nil
+}
 
 // WriteStream implements [graphics.ImageData].
 func (s *CCITTFaxSource) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {

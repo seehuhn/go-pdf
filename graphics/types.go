@@ -83,6 +83,32 @@ type ImageData interface {
 	IsJPX() bool
 }
 
+// GeometryChecker is implemented by image data sources whose encoding fixes
+// the sample layout.  Image dictionaries call CheckGeometry before writing
+// and refuse a dictionary whose width, height, channel count or bits per
+// component disagree with the source.
+type GeometryChecker interface {
+	CheckGeometry(width, height, channels, bitsPerComponent int) error
+}
+
+// FilterSampleBits reports the sample size, in bits, which the last filter
+// of a stream's filter chain delivers, where the codec fixes that size:
+// CCITTFaxDecode and JBIG2Decode deliver 1-bit samples, and DCTDecode
+// delivers 8-bit samples (PDF admits no 12-bit JPEG data).  The second
+// return value is false for all other filters and for an empty chain.
+func FilterSampleBits(filters []pdf.Filter) (int, bool) {
+	if len(filters) == 0 {
+		return 0, false
+	}
+	switch filters[len(filters)-1].(type) {
+	case pdf.FilterCCITTFax, *pdf.FilterJBIG2:
+		return 1, true
+	case pdf.FilterDCT:
+		return 8, true
+	}
+	return 0, false
+}
+
 // ImageMask is an optional interface implemented by XObjects that are
 // stencil masks (PDF image XObjects with ImageMask=true).
 // Image masks are allowed in contexts where other images are forbidden

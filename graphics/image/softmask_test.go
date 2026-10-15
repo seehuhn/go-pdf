@@ -356,3 +356,38 @@ func FuzzSoftMaskRoundTrip(f *testing.F) {
 		_ = err
 	})
 }
+
+func TestExtractSoftMaskFilterSampleBits(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref := w.Alloc()
+	body, err := w.OpenStream(ref, pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(8),
+		"Height":           pdf.Integer(1),
+		"BitsPerComponent": pdf.Integer(8),
+		"ColorSpace":       pdf.Name("DeviceGray"),
+		"Filter":           pdf.Name("CCITTFaxDecode"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := body.Write([]byte{0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	sm, err := ExtractSoftMask(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sm.BitsPerComponent != 1 {
+		t.Errorf("BitsPerComponent = %d, want 1", sm.BitsPerComponent)
+	}
+}

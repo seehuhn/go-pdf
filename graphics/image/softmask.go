@@ -239,7 +239,7 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 		return fmt.Errorf("invalid BitsPerComponent %d", sm.BitsPerComponent)
 	}
 
-	if s, ok := sm.Source.(*DCTSource); ok {
+	if s, ok := sm.Source.(graphics.GeometryChecker); ok {
 		if err := s.CheckGeometry(sm.Width, sm.Height, 1, sm.BitsPerComponent); err != nil {
 			return err
 		}
@@ -325,12 +325,21 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 		return nil, err
 	}
 	// spec restricts BitsPerComponent to {1, 2, 4, 8, 16}; silently fall back
-	// to 8 for malformed values so the soft mask round-trips.
-	switch bpc {
-	case 1, 2, 4, 8, 16:
-		// pass
-	default:
-		bpc = 8
+	// to 8 for malformed values so the soft mask round-trips.  Where the
+	// filter fixes the sample size, that size wins over the entry.
+	filters, err := pdf.Optional(c.Filters(dict))
+	if err != nil {
+		return nil, err
+	}
+	if bits, ok := graphics.FilterSampleBits(filters); ok {
+		bpc = pdf.Integer(bits)
+	} else {
+		switch bpc {
+		case 1, 2, 4, 8, 16:
+			// pass
+		default:
+			bpc = 8
+		}
 	}
 
 	softMask := &SoftMask{

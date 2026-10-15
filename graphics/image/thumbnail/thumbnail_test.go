@@ -555,3 +555,38 @@ func TestThumbnailDCTSource(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractThumbnailFilterSampleBits(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref := w.Alloc()
+	body, err := w.OpenStream(ref, pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(8),
+		"Height":           pdf.Integer(1),
+		"BitsPerComponent": pdf.Integer(1),
+		"ColorSpace":       pdf.Name("DeviceGray"),
+		"Filter":           pdf.Name("DCTDecode"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := body.Write([]byte{0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	thumb, err := thumbnail.ExtractThumbnail(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if thumb.BitsPerComponent != 8 {
+		t.Errorf("BitsPerComponent = %d, want 8", thumb.BitsPerComponent)
+	}
+}

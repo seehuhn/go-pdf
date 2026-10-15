@@ -944,3 +944,24 @@ func TestTextRegionSymbolIDErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestImageCheckGeometry(t *testing.T) {
+	im := NewImage(32, 16, nil)
+	cases := []struct {
+		name                          string
+		width, height, channels, bits int
+		ok                            bool
+	}{
+		{"match", 32, 16, 1, 1, true},
+		{"bits", 32, 16, 1, 8, false},
+		{"channels", 32, 16, 3, 1, false},
+		{"width", 33, 16, 1, 1, false},
+		{"height", 32, 15, 1, 1, false},
+	}
+	for _, c := range cases {
+		err := im.CheckGeometry(c.width, c.height, c.channels, c.bits)
+		if (err == nil) != c.ok {
+			t.Errorf("%s: got error %v, want ok=%t", c.name, err, c.ok)
+		}
+	}
+}

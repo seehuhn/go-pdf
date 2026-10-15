@@ -102,8 +102,8 @@ func (s *DCTSource) check() error {
 	return nil
 }
 
-// CheckGeometry reports an error if the source does not match an image with
-// the given size, number of colour channels and bits per component.
+// CheckGeometry implements [graphics.GeometryChecker].  The DCT filter
+// delivers 8-bit samples.
 func (s *DCTSource) CheckGeometry(width, height, channels, bitsPerComponent int) error {
 	if bitsPerComponent != 8 {
 		return fmt.Errorf("DCTSource requires 8 bits per component, got %d", bitsPerComponent)

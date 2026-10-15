@@ -876,6 +876,19 @@ func (im *Image) Pixels() ([]byte, error) {
 // IsJPX implements [graphics.ImageData].
 func (im *Image) IsJPX() bool { return false }
 
+// CheckGeometry implements [graphics.GeometryChecker].  The JBIG2 filter
+// delivers one 1-bit sample per pixel.
+func (im *Image) CheckGeometry(width, height, channels, bitsPerComponent int) error {
+	if channels != 1 || bitsPerComponent != 1 {
+		return errors.New("JBIG2 image data requires one 1-bit channel")
+	}
+	if im.width != width || im.height != height {
+		return fmt.Errorf("JBIG2 image size %dx%d differs from image size %dx%d",
+			im.width, im.height, width, height)
+	}
+	return nil
+}
+
 // WriteStream implements [graphics.ImageData].  It writes the JBIG2
 // encoded data to the PDF stream and embeds any referenced globals
 // stream.

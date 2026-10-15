@@ -1917,3 +1917,138 @@ func TestDictCheckDCTSource(t *testing.T) {
 		})
 	}
 }
+
+func TestDictCheckCCITTFaxSource(t *testing.T) {
+	newDict := func(cs color.Space, bpc, columns int) *Dict {
+		return &Dict{
+			Width:            8,
+			Height:           8,
+			ColorSpace:       cs,
+			BitsPerComponent: bpc,
+			Data:             NewCCITTFaxSource(columns, writerOf(make([]byte, 8))),
+		}
+	}
+	cases := []struct {
+		name string
+		d    *Dict
+		ok   bool
+	}{
+		{"valid", newDict(color.SpaceDeviceGray, 1, 8), true},
+		{"8 bit", newDict(color.SpaceDeviceGray, 8, 8), false},
+		{"columns", newDict(color.SpaceDeviceGray, 1, 9), false},
+		{"RGB columns", newDict(color.SpaceDeviceRGB, 1, 24), true},
+		{"RGB columns mismatch", newDict(color.SpaceDeviceRGB, 1, 8), false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			err := c.d.check(w)
+			if (err == nil) != c.ok {
+				t.Errorf("check() = %v, want ok=%v", err, c.ok)
+			}
+		})
+	}
+}
+
+func TestMaskCheckSourceGeometry(t *testing.T) {
+	cases := []struct {
+		name   string
+		source graphics.ImageData
+		ok     bool
+	}{
+		{"ccitt", NewCCITTFaxSource(8, writerOf(make([]byte, 8))), true},
+		{"ccitt columns", NewCCITTFaxSource(9, writerOf(make([]byte, 8))), false},
+		{"dct", &DCTSource{WriteData: writerOf(make([]byte, 64)), Width: 8, Height: 8, Colors: 1}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			m := &Mask{Width: 8, Height: 8, Source: c.source}
+			err := m.check(w)
+			if (err == nil) != c.ok {
+				t.Errorf("check() = %v, want ok=%v", err, c.ok)
+			}
+		})
+	}
+}
+
+// writeRawImage writes an image stream whose data is stored as-is under the
+// given filter name, and extracts it again.
+func writeRawImage(t *testing.T, filter pdf.Name, bpc pdf.Object) *Dict {
+	t.Helper()
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref := w.Alloc()
+	dict := pdf.Dict{
+		"Type":       pdf.Name("XObject"),
+		"Subtype":    pdf.Name("Image"),
+		"Width":      pdf.Integer(8),
+		"Height":     pdf.Integer(1),
+		"ColorSpace": pdf.Name("DeviceGray"),
+		"Filter":     filter,
+	}
+	if bpc != nil {
+		dict["BitsPerComponent"] = bpc
+	}
+	body, err := w.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := body.Write([]byte{0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(w)
+	img, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return img
+}
+
+func TestExtractDictFilterSampleBits(t *testing.T) {
+	cases := []struct {
+		name   string
+		filter pdf.Name
+		bpc    pdf.Object
+		want   int
+	}{
+		{"ccitt 8", "CCITTFaxDecode", pdf.Integer(8), 1},
+		{"ccitt missing", "CCITTFaxDecode", nil, 1},
+		{"jbig2 16", "JBIG2Decode", pdf.Integer(16), 1},
+		{"dct 1", "DCTDecode", pdf.Integer(1), 8},
+		{"runlength keeps entry", "RunLengthDecode", pdf.Integer(4), 4},
+		{"flate keeps entry", "FlateDecode", pdf.Integer(4), 4},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			img := writeRawImage(t, c.filter, c.bpc)
+			if img.BitsPerComponent != c.want {
+				t.Errorf("BitsPerComponent = %d, want %d", img.BitsPerComponent, c.want)
+			}
+
+			// the repaired value must write back and read the same
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+			ref, err := rm.Embed(img)
+			if err != nil {
+				t.Fatalf("re-embed failed: %v", err)
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatal(err)
+			}
+			x := pdf.NewExtractor(w)
+			img2, err := ExtractDict(pdf.CursorAt(x, nil), ref, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if img2.BitsPerComponent != c.want {
+				t.Errorf("second read BitsPerComponent = %d, want %d", img2.BitsPerComponent, c.want)
+			}
+		})
+	}
+}

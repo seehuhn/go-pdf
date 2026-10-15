@@ -523,8 +523,10 @@ func (m *Mask) check(out *pdf.Writer) error {
 	if m.Source == nil {
 		return errors.New("source cannot be nil")
 	}
-	if _, ok := m.Source.(*DCTSource); ok {
-		return errors.New("DCTSource cannot encode a 1-bit image mask")
+	if s, ok := m.Source.(graphics.GeometryChecker); ok {
+		if err := s.CheckGeometry(m.Width, m.Height, 1, 1); err != nil {
+			return err
+		}
 	}
 
 	if m.Alternates != nil {
