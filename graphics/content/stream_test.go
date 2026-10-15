@@ -1012,3 +1012,18 @@ func TestInlineImageWhiteSpaceBeforeEI(t *testing.T) {
 		}
 	}
 }
+
+// TestReadNameNullEscape checks that "#00" is kept literally, since a name
+// cannot contain a null byte.
+func TestReadNameNullEscape(t *testing.T) {
+	got, err := collectStream(NewScanner(bytesOpener([]byte("/A#00B 12 Tf\n"))))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	want := []Operator{
+		{Name: OpTextSetFont, Args: []pdf.Object{pdf.Name("A#00B"), pdf.Integer(12)}},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}

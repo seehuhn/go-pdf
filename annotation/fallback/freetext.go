@@ -19,7 +19,6 @@ package fallback
 import (
 	"fmt"
 	"slices"
-	"strconv"
 
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
@@ -233,7 +232,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	// set DA to match the font/size/color used in the appearance stream
 	fontName := b.FontName(g.freeTextFont(a))
 	a.DefaultAppearance = fmt.Sprintf("/%s %s Tf %s",
-		fontName, strconv.FormatFloat(size, 'f', -1, 64), daColorOperator(textCol))
+		fontName, daNum(size), daColorOperator(textCol))
 
 	return g.harvest(b, outer, a.GetCommon())
 }

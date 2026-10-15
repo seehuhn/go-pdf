@@ -472,6 +472,9 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 
 func formatName(w io.Writer, name Name) error {
 	l := []byte(name)
+	if bytes.IndexByte(l, 0) >= 0 {
+		return errors.New("name contains a null byte")
+	}
 
 	var funny []int
 	for i, c := range l {
@@ -1211,8 +1214,8 @@ func (x *Placeholder) Set(val Native) error {
 //
 // AsString panics if obj cannot be formatted as PDF text.  This is the case
 // for direct stream objects, for content-stream operators outside a content
-// stream, and for numbers PDF cannot represent (infinities and NaN); ordinary
-// PDF objects never panic.
+// stream, for names containing a null byte, and for numbers PDF cannot
+// represent (infinities and NaN); ordinary PDF objects never panic.
 func AsString(obj Object) string {
 	buf := &bytes.Buffer{}
 	err := Format(buf, OptPretty, obj)

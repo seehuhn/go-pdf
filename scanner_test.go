@@ -608,7 +608,8 @@ var testCases = []struct {
 	{"/A#", Name("A#"), true},
 	{"/A#9", Name("A#9"), true},
 	{"/##41", Name("#A"), true},
-	{"/#00", Name("\x00"), true},
+	{"/#00", Name("#00"), true},
+	{"/A#00B", Name("A#00B"), true},
 	{"/ß", Name("ß"), true},
 	{"/", Name(""), true},
 

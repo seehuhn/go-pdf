@@ -17,7 +17,6 @@
 package fallback
 
 import (
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -820,12 +819,18 @@ func daFloat(s string) (float64, bool) {
 func daColorOperator(col color.Color) string {
 	switch c := col.(type) {
 	case color.DeviceGray:
-		return fmt.Sprintf("%g g", float64(c))
+		return daNum(float64(c)) + " g"
 	case color.DeviceRGB:
-		return fmt.Sprintf("%g %g %g rg", c[0], c[1], c[2])
+		return daNum(c[0]) + " " + daNum(c[1]) + " " + daNum(c[2]) + " rg"
 	case color.DeviceCMYK:
-		return fmt.Sprintf("%g %g %g %g k", c[0], c[1], c[2], c[3])
+		return daNum(c[0]) + " " + daNum(c[1]) + " " + daNum(c[2]) + " " + daNum(c[3]) + " k"
 	default:
-		return fmt.Sprintf("%g %g %g rg", quireInk[0], quireInk[1], quireInk[2])
+		return daNum(quireInk[0]) + " " + daNum(quireInk[1]) + " " + daNum(quireInk[2]) + " rg"
 	}
+}
+
+// daNum formats a number for a default-appearance string.  A default
+// appearance holds content-stream syntax, which has no exponent form.
+func daNum(x float64) string {
+	return strconv.FormatFloat(x, 'f', -1, 64)
 }

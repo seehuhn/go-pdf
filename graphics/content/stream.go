@@ -1013,6 +1013,10 @@ func (s *scanner) tryHex() (byte, bool) {
 	if high == 255 || low == 255 {
 		return 0, false
 	}
+	// a name cannot contain a null byte, so "#00" stays literal
+	if high == 0 && low == 0 {
+		return 0, false
+	}
 	s.SkipN(3)
 	return high<<4 | low, true
 }

@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/annotation/colorenc"
+	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/form"
 )
 
@@ -265,5 +266,20 @@ func TestResolveWidgetFieldChoiceValue(t *testing.T) {
 				t.Errorf("Value = %q, want %q", fld.Value, tc.want)
 			}
 		})
+	}
+}
+
+// TestDAColorOperatorNoExponent checks that small colour components are
+// written in plain decimal notation.
+func TestDAColorOperatorNoExponent(t *testing.T) {
+	for _, col := range []color.Color{
+		color.DeviceGray(0.00001),
+		color.DeviceRGB{0.00001, 0, 0.5},
+		color.DeviceCMYK{0, 0, 0, 0.00002},
+	} {
+		s := daColorOperator(col)
+		if strings.ContainsAny(s, "eE") {
+			t.Errorf("%T: exponent notation in %q", col, s)
+		}
 	}
 }

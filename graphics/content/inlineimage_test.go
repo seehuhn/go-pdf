@@ -378,3 +378,19 @@ func deflate(t *testing.T, data []byte) []byte {
 	}
 	return buf.Bytes()
 }
+
+// TestInlineImageKeyEscaped checks that inline-image dictionary keys are
+// written with the same escaping as every other name.
+func TestInlineImageKeyEscaped(t *testing.T) {
+	op := Operator{
+		Name: OpInlineImage,
+		Args: []pdf.Object{pdf.Dict{"a b": pdf.Integer(5)}, pdf.String("x")},
+	}
+	buf := &bytes.Buffer{}
+	if err := op.Format(buf); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(buf.Bytes(), []byte("/a#20b 5")) {
+		t.Errorf("key not escaped: %q", buf.String())
+	}
+}

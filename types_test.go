@@ -475,3 +475,15 @@ func TestIsDirectNull(t *testing.T) {
 		}
 	}
 }
+
+// TestFormatNameNull checks that a name containing a null byte is refused.
+func TestFormatNameNull(t *testing.T) {
+	err := Format(io.Discard, 0, Name("A\x00B"))
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	err = Format(io.Discard, 0, Dict{"A\x00B": Integer(1)})
+	if err == nil {
+		t.Error("expected error for dict key, got nil")
+	}
+}

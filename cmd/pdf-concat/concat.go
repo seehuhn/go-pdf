@@ -390,7 +390,9 @@ func rewriteDA(da pdf.String, rename map[pdf.Name]pdf.Name) pdf.String {
 		j := i + 1
 		var name []byte
 		for j < len(s) && !isNameDelim(s[j]) {
-			if s[j] == '#' && j+2 < len(s) && isHexDigit(s[j+1]) && isHexDigit(s[j+2]) {
+			// "#00" stays literal, since a name cannot contain a null byte
+			if s[j] == '#' && j+2 < len(s) && isHexDigit(s[j+1]) && isHexDigit(s[j+2]) &&
+				(s[j+1] != '0' || s[j+2] != '0') {
 				name = append(name, hexNibble(s[j+1])<<4|hexNibble(s[j+2]))
 				j += 3
 			} else {

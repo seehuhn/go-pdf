@@ -611,7 +611,7 @@ func countLeadingSpaces(s string) int64 {
 var (
 	startRegexp = regexp.MustCompile(`%PDF-([1-9]\.[0-9])[^0-9]`)
 
-	whiteSpacePat = `[\000\011\014 ]+`
+	whiteSpacePat = `[\000\011\012\014\015 ]+`
 	eolPat        = `(?:\r\n|\r|\n|^)`
 	objectPat     = `([0-9]+)` + whiteSpacePat + `([0-9]+)` + whiteSpacePat + `obj`
 	markerPat     = eolPat + `(` + objectPat + `|xref|trailer|startxref|%%EOF)\b`

@@ -106,7 +106,7 @@ func TestConcatMergesForms(t *testing.T) {
 }
 
 func TestRewriteDA(t *testing.T) {
-	rename := map[pdf.Name]pdf.Name{"Helv": "Helv_2"}
+	rename := map[pdf.Name]pdf.Name{"Helv": "Helv_2", "A#00B": "A#00B_2"}
 	cases := []struct {
 		in, want string
 	}{
@@ -115,6 +115,7 @@ func TestRewriteDA(t *testing.T) {
 		{"/Cour 12 Tf", "/Cour 12 Tf"},                     // unrelated font untouched
 		{"/He#6cv 12 Tf 0 g", "/He#6cv_2 12 Tf 0 g"},       // escaped name matches
 		{"0 0 1 rg /Helv 10 Tf", "0 0 1 rg /Helv_2 10 Tf"}, // name after color ops
+		{"/A#00B 12 Tf", "/A#00B_2 12 Tf"},                 // #00 is not an escape
 	}
 	for _, tc := range cases {
 		got := string(rewriteDA(pdf.String(tc.in), rename))

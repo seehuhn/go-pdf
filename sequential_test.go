@@ -299,3 +299,29 @@ func TestSequentialObjStm(t *testing.T) {
 		}
 	}
 }
+
+// TestSequentialEOLInHeader checks that the scan finds an object whose header
+// separates the number, generation and "obj" keyword with newlines, which are
+// white-space like any other.
+func TestSequentialEOLInHeader(t *testing.T) {
+	for _, header := range []string{"3 0 obj\n", "3 0\nobj\n", "3\r\n0 obj\n", "3\r0\robj\r"} {
+		file := "%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n" +
+			"2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\n" +
+			header + "<< /A 1 >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n"
+		info, err := SequentialScan(strings.NewReader(file), int64(len(file)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, sect := range info.Sections {
+			for _, obj := range sect.Objects {
+				if obj.Reference.Number() == 3 && !obj.Broken {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Errorf("header %q: object 3 not found", header)
+		}
+	}
+}

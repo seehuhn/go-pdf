@@ -57,10 +57,7 @@ func (op Operator) Format(out io.Writer) error {
 			slices.Sort(keys)
 			for _, key := range keys {
 				val := dict[key]
-				if _, err := out.Write([]byte("/")); err != nil {
-					return err
-				}
-				if _, err := out.Write([]byte(key)); err != nil {
+				if err := pdf.Format(out, pdf.OptContentStream, key); err != nil {
 					return err
 				}
 				if _, err := out.Write([]byte(" ")); err != nil {
