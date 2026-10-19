@@ -21,6 +21,7 @@ import (
 	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 func toPDF(x []float64) pdf.Array {
@@ -188,7 +189,7 @@ func repairWhitePoint(x []float64) []float64 {
 			return scaled
 		}
 	}
-	return slices.Clone(pcsWhitePoint)
+	return slices.Clone(cie.PCSWhitePoint)
 }
 
 // repairBlackPoint returns a black point with non-negative, finite entries.

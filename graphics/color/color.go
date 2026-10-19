@@ -228,3 +228,23 @@ var (
 	// https://en.wikipedia.org/wiki/Standard_illuminant#Illuminant_series_D
 	WhitePointD65 = []float64{0.9504559, 1.0, 1.0890578}
 )
+
+// WhitePointDaylight returns the white point of the CIE daylight illuminant
+// with the given correlated colour temperature in Kelvin.
+// The result can be used for the white point argument of the [CalGray],
+// [CalRGB], and [Lab] functions.  The temperature must be in the range from
+// 4000 K to 25000 K.
+func WhitePointDaylight(kelvin float64) ([]float64, error) {
+	var x float64
+	t := kelvin
+	switch {
+	case t >= 4000 && t <= 7000:
+		x = -4.6070e9/(t*t*t) + 2.9678e6/(t*t) + 0.09911e3/t + 0.244063
+	case t > 7000 && t <= 25000:
+		x = -2.0064e9/(t*t*t) + 1.9018e6/(t*t) + 0.24748e3/t + 0.237040
+	default:
+		return nil, fmt.Errorf("daylight temperature %g K out of range", kelvin)
+	}
+	y := -3.000*x*x + 2.870*x - 0.275
+	return []float64{x / y, 1, (1 - x - y) / y}, nil
+}

@@ -21,128 +21,10 @@ import (
 	"testing"
 
 	"seehuhn.de/go/icc"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
-func TestBradfordAdaptIdentity(t *testing.T) {
-	// adapting with identical whitepoints should be the identity
-	X, Y, Z := 0.4, 0.5, 0.3
-	Xo, Yo, Zo := bradfordMatrix(WhitePointD65, WhitePointD65).apply(X, Y, Z)
-	if math.Abs(Xo-X) > 1e-10 || math.Abs(Yo-Y) > 1e-10 || math.Abs(Zo-Z) > 1e-10 {
-		t.Errorf("identity adaptation failed: got (%g,%g,%g), want (%g,%g,%g)",
-			Xo, Yo, Zo, X, Y, Z)
-	}
-}
-
-func TestBradfordAdaptD65White(t *testing.T) {
-	// D65 white adapted to D50 should give D50 white.  The adaptation scales
-	// the source white's cone response into the destination's, so this is
-	// exact up to the accuracy of the inverse cone-response matrix.
-	Xo, Yo, Zo := bradfordMatrix(WhitePointD65, WhitePointD50).apply(
-		WhitePointD65[0], WhitePointD65[1], WhitePointD65[2])
-	if math.Abs(Xo-WhitePointD50[0]) > 1e-14 ||
-		math.Abs(Yo-WhitePointD50[1]) > 1e-14 ||
-		math.Abs(Zo-WhitePointD50[2]) > 1e-14 {
-		t.Errorf("D65 white -> D50: got (%g,%g,%g), want (%g,%g,%g)",
-			Xo, Yo, Zo, WhitePointD50[0], WhitePointD50[1], WhitePointD50[2])
-	}
-}
-
-// TestBradfordInverse checks that the cone-response matrix and its inverse are
-// inverse to each other.  Rounding the inverse to the seven decimals usually
-// quoted for it moves the largest element by 4.8e-8, enough to keep an
-// adaptation from reproducing the destination white point.
-func TestBradfordInverse(t *testing.T) {
-	got := bradford.mul(bradfordInv)
-	for i := range 3 {
-		for j := range 3 {
-			want := 0.0
-			if i == j {
-				want = 1
-			}
-			if math.Abs(got[i*3+j]-want) > 1e-14 {
-				t.Errorf("element (%d,%d) = %g, want %g", i, j, got[i*3+j], want)
-			}
-		}
-	}
-}
-
-// TestSRGBWhiteIsPCSWhite checks that sRGB white lands on the white point of
-// the Profile Connection Space.  Compositing depends on the exact value:
-// blend modes such as colour burn test their operands against 0 and 1.
-func TestSRGBWhiteIsPCSWhite(t *testing.T) {
-	X, Y, Z := srgbToXYZ(1, 1, 1)
-	if math.Abs(X-pcsWhitePoint[0]) > 1e-14 ||
-		math.Abs(Y-pcsWhitePoint[1]) > 1e-14 ||
-		math.Abs(Z-pcsWhitePoint[2]) > 1e-14 {
-		t.Errorf("sRGB white -> (%g, %g, %g), want %v", X, Y, Z, pcsWhitePoint)
-	}
-
-	// the same value reached through the colour space
-	X, Y, Z = SpaceDeviceRGB.ToXYZ([]float64{1, 1, 1}, icc.RelativeColorimetric, &icc.Workspace{})
-	if math.Abs(X-pcsWhitePoint[0]) > 1e-14 ||
-		math.Abs(Y-pcsWhitePoint[1]) > 1e-14 ||
-		math.Abs(Z-pcsWhitePoint[2]) > 1e-14 {
-		t.Errorf("DeviceRGB white -> (%g, %g, %g), want %v", X, Y, Z, pcsWhitePoint)
-	}
-}
-
-// TestSRGBMatrixRowSums checks the property TestSRGBWhiteIsPCSWhite relies on:
-// the rows of the conversion matrix add up to the white point.
-func TestSRGBMatrixRowSums(t *testing.T) {
-	for i := range 3 {
-		sum := srgbToPCS[i*3] + srgbToPCS[i*3+1] + srgbToPCS[i*3+2]
-		if math.Abs(sum-pcsWhitePoint[i]) > 1e-14 {
-			t.Errorf("row %d sums to %g, want %g", i, sum, pcsWhitePoint[i])
-		}
-	}
-}
-
-// TestSRGBPrimariesMatchPublishedMatrix compares the derived sRGB primaries,
-// before chromatic adaptation, against the sRGB to XYZ (D65) matrix as it is
-// published.  This is what justifies taking [srgbWhitePoint] from the
-// tabulated D65 tristimulus values rather than from the chromaticity pair the
-// sRGB standard quotes: substituting [WhitePointD65] here moves the matrix
-// 2.3e-4 away from the published values, well outside their rounding.
-func TestSRGBPrimariesMatchPublishedMatrix(t *testing.T) {
-	published := mat3{
-		0.4124564, 0.3575761, 0.1804375,
-		0.2126729, 0.7151522, 0.0721750,
-		0.0193339, 0.1191920, 0.9503041,
-	}
-	got := primaryMatrix(srgbPrimaries, srgbWhitePoint)
-	for i := range got {
-		if math.Abs(got[i]-published[i]) > 1e-7 {
-			t.Errorf("element %d = %.8f, want %.8f", i, got[i], published[i])
-		}
-	}
-}
-
-// TestSRGBMatrixInverse checks that the two directions invert each other, so
-// that a colour survives a conversion to XYZ and back.
-func TestSRGBMatrixInverse(t *testing.T) {
-	for _, rgb := range [][3]float64{
-		{0, 0, 0}, {1, 1, 1}, {1, 0, 0}, {0.2, 0.4, 0.6}, {0.5, 0.5, 0.5},
-	} {
-		X, Y, Z := srgbToXYZ(rgb[0], rgb[1], rgb[2])
-		r, g, b := xyzToSRGB(X, Y, Z)
-		if math.Abs(r-rgb[0]) > 1e-12 ||
-			math.Abs(g-rgb[1]) > 1e-12 ||
-			math.Abs(b-rgb[2]) > 1e-12 {
-			t.Errorf("%v -> (%g, %g, %g)", rgb, r, g, b)
-		}
-	}
-}
-
-func TestBradfordAdaptRoundTrip(t *testing.T) {
-	// adapting D50->D65->D50 should be the identity
-	X, Y, Z := 0.3, 0.4, 0.2
-	X2, Y2, Z2 := bradfordMatrix(WhitePointD50, WhitePointD65).apply(X, Y, Z)
-	X3, Y3, Z3 := bradfordMatrix(WhitePointD65, WhitePointD50).apply(X2, Y2, Z2)
-	if math.Abs(X3-X) > 1e-7 || math.Abs(Y3-Y) > 1e-7 || math.Abs(Z3-Z) > 1e-7 {
-		t.Errorf("round-trip failed: got (%g,%g,%g), want (%g,%g,%g)",
-			X3, Y3, Z3, X, Y, Z)
-	}
-}
+func near(a, b, tol float64) bool { return math.Abs(a-b) <= tol }
 
 // TestAdaptationCacheFollowsWhitePoint checks that the cached adaptation is
 // tied to the white point it was derived from, so that a colour space built as
@@ -162,7 +44,7 @@ func TestAdaptationCacheFollowsWhitePoint(t *testing.T) {
 		t.Fatal("changed white point reused the cached adaptation")
 	}
 
-	want := bradfordMatrix(WhitePointD50, pcsWhitePoint)
+	want := cie.BradfordMatrix(WhitePointD50, cie.PCSWhitePoint)
 	if got := c.get(d50, newAdaptation).value.toPCS; got != want {
 		t.Errorf("toPCS = %v, want %v", got, want)
 	}
@@ -172,18 +54,18 @@ func TestAdaptationCacheFollowsWhitePoint(t *testing.T) {
 // is the PCS white point converts without any rounding.  Real files commonly
 // declare Lab and CalRGB spaces with exactly this white point.
 func TestPCSWhitePointAdaptsExactly(t *testing.T) {
-	s, err := Lab(pcsWhitePoint, nil, nil)
+	s, err := Lab(cie.PCSWhitePoint, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	a := s.adapt.get(s.WhitePoint, newAdaptation).value
-	if a.toPCS != identity3 || a.fromPCS != identity3 {
+	if a.toPCS != cie.Identity || a.fromPCS != cie.Identity {
 		t.Errorf("adaptation is not the identity: %v, %v", a.toPCS, a.fromPCS)
 	}
 
 	X, Y, Z := 0.3, 0.4, 0.2
-	if Xo, Yo, Zo := a.toPCS.apply(X, Y, Z); Xo != X || Yo != Y || Zo != Z {
+	if Xo, Yo, Zo := a.toPCS.Apply(X, Y, Z); Xo != X || Yo != Y || Zo != Z {
 		t.Errorf("got (%g,%g,%g), want (%g,%g,%g)", Xo, Yo, Zo, X, Y, Z)
 	}
 }
@@ -199,11 +81,11 @@ func TestCalGrayD65White(t *testing.T) {
 	// the adaptation maps the source white onto the PCS white point exactly,
 	// so no tolerance beyond floating-point rounding is needed here
 	X, Y, Z := c.ToXYZ()
-	if math.Abs(X-pcsWhitePoint[0]) > 1e-14 ||
-		math.Abs(Y-pcsWhitePoint[1]) > 1e-14 ||
-		math.Abs(Z-pcsWhitePoint[2]) > 1e-14 {
+	if math.Abs(X-cie.PCSWhitePoint[0]) > 1e-14 ||
+		math.Abs(Y-cie.PCSWhitePoint[1]) > 1e-14 ||
+		math.Abs(Z-cie.PCSWhitePoint[2]) > 1e-14 {
 		t.Errorf("CalGray(D65, 1).ToXYZ() = (%g,%g,%g), want %v",
-			X, Y, Z, pcsWhitePoint)
+			X, Y, Z, cie.PCSWhitePoint)
 	}
 
 	// RGBA should return (near-)pure white, allowing tolerance of 1 for
@@ -288,7 +170,7 @@ func TestLabRoundTrip(t *testing.T) {
 }
 
 func TestToXYZRGBAConsistency(t *testing.T) {
-	// for every color type: ToXYZ -> xyzToSRGB -> toUint32 should match RGBA
+	// for every color type: ToXYZ -> cie.XYZToSRGB -> toUint32 should match RGBA
 	calGray, _ := CalGray(WhitePointD65, nil, 1)
 	calRGB, _ := CalRGB(WhitePointD65, nil, nil, nil)
 	lab, _ := Lab(WhitePointD65, nil, nil)
@@ -311,7 +193,7 @@ func TestToXYZRGBAConsistency(t *testing.T) {
 
 	for _, c := range testColors {
 		X, Y, Z := c.ToXYZ()
-		rf, gf, bf := xyzToSRGB(X, Y, Z)
+		rf, gf, bf := cie.XYZToSRGB(X, Y, Z)
 		r1, g1, b1 := toUint32(rf), toUint32(gf), toUint32(bf)
 		r2, g2, b2, _ := c.RGBA()
 

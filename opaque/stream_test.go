@@ -18,6 +18,7 @@ package opaque
 
 import (
 	"bytes"
+	"compress/zlib"
 	"io"
 	"testing"
 
@@ -67,27 +68,33 @@ func TestStreamReader(t *testing.T) {
 	}
 }
 
-// TestStreamWriteAtCrossFile verifies that WriteAt translates internal
-// references in the stream dict and copies the body verbatim, and that
-// caller-supplied extras overlay the translated dict.
+// TestStreamWriteAtCrossFile verifies that WriteAt keeps the
+// stream-mechanics entries, copies the body verbatim,
+// and replaces all other source entries by the caller-supplied extras.
 func TestStreamWriteAtCrossFile(t *testing.T) {
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 
 	// build a stream whose dict references another indirect dict.
 	innerRef := src.Alloc()
-	if err := src.Put(innerRef, pdf.Dict{"Y": pdf.Integer(99)}); err != nil {
+	if err := src.Put(innerRef, pdf.Dict{"Predictor": pdf.Integer(1)}); err != nil {
 		t.Fatalf("Put inner: %v", err)
 	}
 	body := bytes.Repeat([]byte{0xa5}, 32)
+	var encoded bytes.Buffer
+	zw := zlib.NewWriter(&encoded)
+	zw.Write(body)
+	zw.Close()
 	streamRef := src.Alloc()
 	w, err := src.OpenStream(streamRef, pdf.Dict{
-		"Profile": innerRef,
-		"Tag":     pdf.Name("Demo"),
+		"Filter":      pdf.Name("FlateDecode"),
+		"DecodeParms": innerRef,
+		"Profile":     innerRef,
+		"Tag":         pdf.Name("Demo"),
 	})
 	if err != nil {
 		t.Fatalf("OpenStream: %v", err)
 	}
-	if _, err := w.Write(body); err != nil {
+	if _, err := w.Write(encoded.Bytes()); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 	if err := w.Close(); err != nil {
@@ -130,23 +137,19 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 		t.Fatalf("dst GetStream: %v", err)
 	}
 
-	// Profile reference must be translated to a fresh dest reference.
-	dstProfileRef, ok := dstStream.Dict["Profile"].(pdf.Reference)
-	if !ok {
-		t.Fatalf("dst Profile is %T, want Reference", dstStream.Dict["Profile"])
-	}
-	if dstProfileRef == innerRef {
-		t.Error("dst reused source Profile reference; expected translation")
-	}
-	dstProfile, err := pdf.CursorAt(dstX, nil).Dict(dstProfileRef)
+	// DecodeParms must survive the copy.
+	dstParms, err := pdf.CursorAt(dstX, nil).Dict(dstStream.Dict["DecodeParms"])
 	if err != nil {
-		t.Fatalf("dst Profile GetDict: %v", err)
+		t.Fatalf("dst DecodeParms: %v", err)
 	}
-	if dstProfile["Y"] != pdf.Integer(99) {
-		t.Errorf("dst Profile.Y = %v, want 99", dstProfile["Y"])
+	if dstParms["Predictor"] != pdf.Integer(1) {
+		t.Errorf("dst DecodeParms.Predictor = %v, want 1", dstParms["Predictor"])
 	}
 
-	// Caller's extras overlay source dict.
+	// Caller's extras replace the other source entries.
+	if _, ok := dstStream.Dict["Profile"]; ok {
+		t.Error("dst kept source Profile entry")
+	}
 	if dstStream.Dict["Tag"] != pdf.Name("Override") {
 		t.Errorf("dst Tag = %v, want Override", dstStream.Dict["Tag"])
 	}
@@ -307,9 +310,9 @@ func (c *streamCarrier) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return c.ref, nil
 }
 
-// TestStreamWriteAtUnreadable checks that a stream whose dict holds a
-// reference to an unreadable object can still be copied; the reference then
-// points to null in the destination (PDF 2.0, 7.3.10).
+// TestStreamWriteAtUnreadable checks that a stream whose /DecodeParms holds
+// a reference to an unreadable object can still be copied; the reference
+// then points to null in the destination (PDF 2.0, 7.3.10).
 func TestStreamWriteAtUnreadable(t *testing.T) {
 	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	bad := src.Alloc()
@@ -318,12 +321,13 @@ func TestStreamWriteAtUnreadable(t *testing.T) {
 	}
 	streamRef := src.Alloc()
 	w, err := src.OpenStream(streamRef, pdf.Dict{
-		"Junk": pdf.Array{pdf.Dict{"K": bad}},
+		"Filter":      pdf.Array{pdf.Name("ASCIIHexDecode")},
+		"DecodeParms": pdf.Array{pdf.Dict{"K": bad}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.Write([]byte("data")); err != nil {
+	if _, err := w.Write([]byte("64617461>")); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.Close(); err != nil {
@@ -352,11 +356,11 @@ func TestStreamWriteAtUnreadable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	junk, err := c.Array(dstStream.Dict["Junk"])
-	if err != nil || len(junk) != 1 {
-		t.Fatalf("Junk = %v, %v", junk, err)
+	parms, err := c.Array(dstStream.Dict["DecodeParms"])
+	if err != nil || len(parms) != 1 {
+		t.Fatalf("DecodeParms = %v, %v", parms, err)
 	}
-	inner, err := c.Dict(junk[0])
+	inner, err := c.Dict(parms[0])
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -31,7 +31,6 @@ import (
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
-	"seehuhn.de/go/pdf/opaque"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/webcapture"
 )
@@ -56,8 +55,9 @@ type Mask struct {
 	Inverted bool
 
 	// Source writes the body of the mask stream when the Mask is embedded.
-	// For raw 1-bit data use [CCITTFaxSource]; pre-encoded formats such as
-	// JBIG2 provide their own Source implementations.
+	// For raw 1-bit data use [CCITTFaxSource]; for JPEG 2000 data with a
+	// single 1-bit colour channel use [JPXSource].  Other pre-encoded
+	// formats such as JBIG2 provide their own Source implementations.
 	Source graphics.ImageData
 
 	// Interpolate enables edge smoothing for the mask to reduce jagged
@@ -221,10 +221,17 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 		Height: int(height),
 	}
 
-	// BitsPerComponent is optional for image masks, but if present must be 1
+	filters, err := pdf.Optional(c.Filters(dict))
+	if err != nil {
+		return nil, err
+	}
+	jpxIndex := jpxFilterIndex(filters)
+
+	// BitsPerComponent is optional for image masks, but if present must
+	// be 1.  For JPXDecode masks the entry is ignored.
 	if bpc, err := pdf.Optional(c.Integer(dict["BitsPerComponent"])); err != nil {
 		return nil, err
-	} else if bpc > 0 && bpc != 1 {
+	} else if jpxIndex < 0 && bpc > 0 && bpc != 1 {
 		return nil, pdf.Errorf("invalid BitsPerComponent %d for image mask (must be 1)", bpc)
 	}
 
@@ -337,9 +344,10 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 		}
 	}
 
-	mask.Source = &streamData{
-		inner:    opaque.ExtractStream(c.Extractor(), stream),
-		maxBytes: imageMaskDataLimit(mask.Width, mask.Height),
+	mask.Source, err = newStreamData(c, stream, jpxIndex,
+		imageMaskDataLimit(mask.Width, mask.Height))
+	if err != nil {
+		return nil, err
 	}
 
 	return mask, nil
@@ -486,10 +494,16 @@ func (m *Mask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 // LoadAlpha decodes the 1-bit mask data and returns an alpha image.
 // Opaque pixels get alpha 255, transparent pixels get alpha 0.
 // The [Mask.Inverted] flag controls which bit value means opaque.
+//
+// For JPXDecode masks, the size of the result is taken from the JPEG 2000
+// data, which must have a single colour channel with 1-bit samples.
 func (m *Mask) LoadAlpha() (*image.Alpha, error) {
 	raw, err := m.Source.Pixels()
 	if err != nil {
 		return nil, err
+	}
+	if m.Source.IsJPX() {
+		return m.loadAlphaJPX(raw)
 	}
 
 	width, height := m.Width, m.Height
@@ -513,6 +527,33 @@ func (m *Mask) LoadAlpha() (*image.Alpha, error) {
 	return alpha, nil
 }
 
+// loadAlphaJPX implements [Mask.LoadAlpha] for JPXDecode masks.
+//
+// Samples of other depths are rejected rather than reduced to one bit:
+// the spec gives stencil masks 1-bit samples only, and any threshold
+// would invent a meaning the file does not state.
+func (m *Mask) loadAlphaJPX(raw []byte) (*image.Alpha, error) {
+	im, err := decodeJPXMask(raw)
+	if err != nil {
+		return nil, err
+	}
+	if im.BitsPerComponent != 1 {
+		return nil, fmt.Errorf("JPEG 2000 stencil mask has %d-bit samples", im.BitsPerComponent)
+	}
+
+	var opaqueBit int32
+	if m.Inverted {
+		opaqueBit = 1
+	}
+	alpha := image.NewAlpha(image.Rect(0, 0, im.Width, im.Height))
+	for i, v := range im.Color[0] {
+		if v == opaqueBit {
+			alpha.Pix[i] = 255
+		}
+	}
+	return alpha, nil
+}
+
 func (m *Mask) check(out *pdf.Writer) error {
 	if m.Width <= 0 {
 		return fmt.Errorf("invalid image mask width %d", m.Width)
@@ -524,7 +565,16 @@ func (m *Mask) check(out *pdf.Writer) error {
 		return errors.New("source cannot be nil")
 	}
 	if s, ok := m.Source.(graphics.GeometryChecker); ok {
-		if err := s.CheckGeometry(m.Width, m.Height, 1, 1); err != nil {
+		bpc := 1
+		if m.Source.IsJPX() {
+			bpc = 0 // the depth is given by the JPEG 2000 data
+		}
+		if err := s.CheckGeometry(m.Width, m.Height, 1, bpc); err != nil {
+			return err
+		}
+	}
+	if s, ok := m.Source.(*JPXSource); ok {
+		if err := s.checkMask(1); err != nil {
 			return err
 		}
 	}

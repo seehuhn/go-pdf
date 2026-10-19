@@ -28,7 +28,6 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/limits"
-	"seehuhn.de/go/pdf/opaque"
 )
 
 // PDF 2.0 sections: 11.6.5 8.9.5
@@ -49,7 +48,9 @@ type SoftMask struct {
 	Height int
 
 	// BitsPerComponent is the number of bits used to represent each grayscale
-	// component. The value must be 1, 2, 4, 8, or 16.
+	// component. The value must be 1, 2, 4, 8, or 16.  For JPXDecode soft
+	// masks, BitsPerComponent is 0, since the bit depth is given by the
+	// JPEG 2000 data.
 	BitsPerComponent int
 
 	// Decode (optional) is an array of numbers describing how to map mask
@@ -59,7 +60,8 @@ type SoftMask struct {
 	Decode []float64
 
 	// Source writes the body of the soft-mask stream when the SoftMask is
-	// embedded.  For raw grayscale pixel data use [FlateSource];
+	// embedded.  For raw grayscale pixel data use [FlateSource]; for JPEG
+	// 2000 data with a single colour channel use [JPXSource].  Other
 	// pre-encoded formats provide their own Source implementations.
 	Source graphics.ImageData
 
@@ -117,12 +119,16 @@ func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
+	// For JPXDecode soft masks, ColorSpace makes the colour specification
+	// of the JPEG 2000 data irrelevant, and BitsPerComponent is omitted.
 	dict := pdf.Dict{
-		"Subtype":          pdf.Name("Image"),
-		"Width":            pdf.Integer(sm.Width),
-		"Height":           pdf.Integer(sm.Height),
-		"ColorSpace":       csEmbedded,
-		"BitsPerComponent": pdf.Integer(sm.BitsPerComponent),
+		"Subtype":    pdf.Name("Image"),
+		"Width":      pdf.Integer(sm.Width),
+		"Height":     pdf.Integer(sm.Height),
+		"ColorSpace": csEmbedded,
+	}
+	if sm.BitsPerComponent != 0 {
+		dict["BitsPerComponent"] = pdf.Integer(sm.BitsPerComponent)
 	}
 	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("XObject")
@@ -160,21 +166,38 @@ func (sm *SoftMask) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // LoadAlpha decodes the soft mask pixel data and returns an alpha image.
 // Sample values are mapped through the Decode array (default [0, 1])
-// so that 0 = transparent and 1 = fully opaque.
+// so that 0 = transparent and 1 = fully opaque.  Values outside this
+// range are clamped.
+//
+// For JPXDecode soft masks, the size of the result and the bit depth are
+// taken from the JPEG 2000 data, which must have a single colour channel.
 func (sm *SoftMask) LoadAlpha() (*image.Alpha, error) {
 	raw, err := sm.Source.Pixels()
 	if err != nil {
 		return nil, err
 	}
 
-	width, height := sm.Width, sm.Height
-	bpc := sm.BitsPerComponent
-	raw = normalizeData(raw, expectedDataSize(width, 1, bpc, height))
-
 	dMin, dMax := 0.0, 1.0
 	if len(sm.Decode) >= 2 {
 		dMin, dMax = sm.Decode[0], sm.Decode[1]
 	}
+
+	if sm.Source.IsJPX() {
+		im, err := decodeJPXMask(raw)
+		if err != nil {
+			return nil, err
+		}
+		maxVal := float64(int(1)<<im.BitsPerComponent - 1)
+		alpha := image.NewAlpha(image.Rect(0, 0, im.Width, im.Height))
+		for i, v := range im.Color[0] {
+			alpha.Pix[i] = softMaskAlpha(float64(v)/maxVal, dMin, dMax)
+		}
+		return alpha, nil
+	}
+
+	width, height := sm.Width, sm.Height
+	bpc := sm.BitsPerComponent
+	raw = normalizeData(raw, expectedDataSize(width, 1, bpc, height))
 
 	alpha := image.NewAlpha(image.Rect(0, 0, width, height))
 
@@ -184,7 +207,7 @@ func (sm *SoftMask) LoadAlpha() (*image.Alpha, error) {
 			rowStart := y * width
 			for x := range width {
 				s := float64(raw[rowStart+x]) / 255
-				alpha.Pix[y*alpha.Stride+x] = uint8((dMin + s*(dMax-dMin)) * 255)
+				alpha.Pix[y*alpha.Stride+x] = softMaskAlpha(s, dMin, dMax)
 			}
 		}
 	case 16:
@@ -193,7 +216,7 @@ func (sm *SoftMask) LoadAlpha() (*image.Alpha, error) {
 			for x := range width {
 				idx := rowStart + x*2
 				s := float64(uint16(raw[idx])<<8|uint16(raw[idx+1])) / 65535
-				alpha.Pix[y*alpha.Stride+x] = uint8((dMin + s*(dMax-dMin)) * 255)
+				alpha.Pix[y*alpha.Stride+x] = softMaskAlpha(s, dMin, dMax)
 			}
 		}
 	case 1, 2, 4:
@@ -207,12 +230,18 @@ func (sm *SoftMask) LoadAlpha() (*image.Alpha, error) {
 				byteIdx := rowStart + x/samplesPerByte
 				bitOffset := (samplesPerByte - 1 - x%samplesPerByte) * bpc
 				s := float64((raw[byteIdx]>>bitOffset)&mask) / maxVal
-				alpha.Pix[y*alpha.Stride+x] = uint8((dMin + s*(dMax-dMin)) * 255)
+				alpha.Pix[y*alpha.Stride+x] = softMaskAlpha(s, dMin, dMax)
 			}
 		}
 	}
 
 	return alpha, nil
+}
+
+// softMaskAlpha maps a sample s, scaled to [0, 1], through the Decode
+// range [dMin, dMax] to an 8-bit alpha value.
+func softMaskAlpha(s, dMin, dMax float64) uint8 {
+	return uint8(min(max(dMin+s*(dMax-dMin), 0), 1) * 255)
 }
 
 // check validates the soft mask according to PDF specification requirements.
@@ -228,19 +257,27 @@ func (sm *SoftMask) check(out *pdf.Writer) error {
 	}
 
 	// Validate BitsPerComponent
-	switch sm.BitsPerComponent {
-	case 1, 2, 4, 8:
-		// pass
-	case 16:
+	switch {
+	case sm.Source.IsJPX():
+		if sm.BitsPerComponent != 0 {
+			return errors.New("BitsPerComponent must be 0 for JPXDecode soft masks")
+		}
+	case sm.BitsPerComponent == 16:
 		if err := pdf.CheckVersion(out, "16 bits per soft mask component", pdf.V1_5); err != nil {
 			return err
 		}
-	default:
+	case sm.BitsPerComponent != 1 && sm.BitsPerComponent != 2 &&
+		sm.BitsPerComponent != 4 && sm.BitsPerComponent != 8:
 		return fmt.Errorf("invalid BitsPerComponent %d", sm.BitsPerComponent)
 	}
 
 	if s, ok := sm.Source.(graphics.GeometryChecker); ok {
 		if err := s.CheckGeometry(sm.Width, sm.Height, 1, sm.BitsPerComponent); err != nil {
+			return err
+		}
+	}
+	if s, ok := sm.Source.(*JPXSource); ok {
+		if err := s.checkMask(0); err != nil {
 			return err
 		}
 	}
@@ -276,8 +313,15 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 		return nil, pdf.Errorf("invalid Subtype %q for soft mask XObject", subtypeName)
 	}
 
+	filters, err := pdf.Optional(c.Filters(dict))
+	if err != nil {
+		return nil, err
+	}
+	jpxIndex := jpxFilterIndex(filters)
+
 	// validate ColorSpace is DeviceGray (required for soft masks)
-	if csObj, ok := dict["ColorSpace"]; ok {
+	csObj, hasColorSpace := dict["ColorSpace"]
+	if hasColorSpace {
 		cs, err := c.Decode(csObj, color.ExtractSpace)
 		if err != nil {
 			return nil, err
@@ -288,11 +332,8 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 	}
 	// missing ColorSpace defaults to DeviceGray (the only valid value)
 
-	// ignore forbidden fields per Table 143 (permissive reading)
-	delete(dict, "ImageMask")
-	delete(dict, "Mask")
-	delete(dict, "SMask")
-	delete(dict, "SMaskInData")
+	// ImageMask, Mask, SMask and SMaskInData are forbidden by Table 143
+	// and ignored here (permissive reading)
 
 	// extract required fields
 	width, err := c.Integer(dict["Width"])
@@ -320,23 +361,25 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 		return nil, pdf.Error("soft mask pixel count exceeds limit")
 	}
 
-	bpc, err := c.Integer(dict["BitsPerComponent"])
-	if err != nil {
-		return nil, err
-	}
 	// spec restricts BitsPerComponent to {1, 2, 4, 8, 16}; silently fall back
 	// to 8 for malformed values so the soft mask round-trips.  Where the
-	// filter fixes the sample size, that size wins over the entry.
-	filters, err := pdf.Optional(c.Filters(dict))
-	if err != nil {
-		return nil, err
-	}
-	if bits, ok := graphics.FilterSampleBits(filters); ok {
-		bpc = pdf.Integer(bits)
-	} else {
-		switch bpc {
+	// filter fixes the sample size, that size wins over the entry.  For
+	// JPXDecode soft masks the entry is ignored.
+	var bpc int
+	bits, fixed := graphics.FilterSampleBits(filters)
+	switch {
+	case jpxIndex >= 0:
+		// the bit depth is given by the JPEG 2000 data
+	case fixed:
+		bpc = bits
+	default:
+		val, err := c.Integer(dict["BitsPerComponent"])
+		if err != nil {
+			return nil, err
+		}
+		switch val {
 		case 1, 2, 4, 8, 16:
-			// pass
+			bpc = int(val)
 		default:
 			bpc = 8
 		}
@@ -345,11 +388,16 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 	softMask := &SoftMask{
 		Width:            int(width),
 		Height:           int(height),
-		BitsPerComponent: int(bpc),
+		BitsPerComponent: bpc,
 	}
 
-	// Extract Decode array
-	if decodeArray, err := pdf.Optional(c.Array(dict["Decode"])); err != nil {
+	// Extract Decode array.  For JPXDecode soft masks without ColorSpace,
+	// the array is ignored.
+	var decodeObj pdf.Object
+	if jpxIndex < 0 || hasColorSpace {
+		decodeObj = dict["Decode"]
+	}
+	if decodeArray, err := pdf.Optional(c.Array(decodeObj)); err != nil {
 		return nil, err
 	} else if decodeArray != nil {
 		if len(decodeArray) != 2 {
@@ -388,9 +436,10 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 		}
 	}
 
-	softMask.Source = &streamData{
-		inner:    opaque.ExtractStream(c.Extractor(), stm),
-		maxBytes: ImageDataLimit(softMask.Width, softMask.Height, softMask.BitsPerComponent, color.SpaceDeviceGray),
+	softMask.Source, err = newStreamData(c, stm, jpxIndex,
+		ImageDataLimit(softMask.Width, softMask.Height, softMask.BitsPerComponent, color.SpaceDeviceGray))
+	if err != nil {
+		return nil, err
 	}
 
 	return softMask, nil

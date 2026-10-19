@@ -53,13 +53,15 @@ func (s *Stream) Reader() (io.ReadCloser, error) {
 }
 
 // WriteAt writes the stream to the output of rm, under the reference ref.
-// Indirect references in the stream dictionary are translated to the output
-// file.  The stream data is copied without decode/re-encode, keeping the
+// The stream data is copied without decode/re-encode, keeping the
 // original filters.
 //
-// Entries in extras are added to the stream dictionary, replacing entries
-// with the same key.  WriteAt returns an error if extras contains Length,
-// Filter, DecodeParms, F, FFilter or FDecodeParms.
+// The written stream dictionary consists of the source entries Filter,
+// DecodeParms, F, FFilter and FDecodeParms, with indirect references
+// translated to the output file, together with the entries in extras.
+// All other source entries are dropped, so extras must give every entry
+// the stream should carry.  WriteAt returns an error if extras contains
+// Length, Filter, DecodeParms, F, FFilter or FDecodeParms.
 func (s *Stream) WriteAt(rm *pdf.EmbedHelper, ref pdf.Reference, extras pdf.Dict) error {
 	for _, key := range streamMechanicsKeys {
 		if _, ok := extras[key]; ok {
@@ -67,8 +69,18 @@ func (s *Stream) WriteAt(rm *pdf.EmbedHelper, ref pdf.Reference, extras pdf.Dict
 		}
 	}
 
+	// Copying only the stream-mechanics entries avoids copying objects
+	// which are referenced by dropped entries.
+	src := *s.stream
+	src.Dict = pdf.Dict{}
+	for _, key := range streamMechanicsKeys {
+		if val, ok := s.stream.Dict[key]; ok {
+			src.Dict[key] = val
+		}
+	}
+
 	cp := rm.CopierFrom(s.src)
-	copied, err := cp.Copy(s.stream)
+	copied, err := cp.Copy(&src)
 	if err != nil {
 		return err
 	}

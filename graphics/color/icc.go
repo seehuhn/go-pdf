@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 // PDF 2.0 sections: 8.6.5.5
@@ -126,6 +127,12 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		"N": pdf.Integer(s.N),
 	}
 
+	err := pdf.CheckVersion(w, "ICC profile version "+s.Profile.Version.String(),
+		minPDFVersion(s.Profile.Version))
+	if err != nil {
+		return nil, err
+	}
+
 	needsRange := false
 	for i := range s.N {
 		if math.Abs(s.Ranges[2*i]-0) >= ε || math.Abs(s.Ranges[2*i+1]-1) >= ε {
@@ -167,6 +174,39 @@ func (s *SpaceICCBased) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	return pdf.Array{FamilyICCBased, sRef}, nil
+}
+
+// SpaceROMMRGB is the ROMM RGB (ProPhoto RGB) colour space, an ICCBased
+// colour space with an ICC version 4 profile.  Embedding it requires
+// PDF 1.7 or later; for older files, construct the space from
+// [icc.ROMMv2Profile] using [ICCBased].
+var SpaceROMMRGB = mustICCBased(icc.ROMMv4Profile)
+
+// mustICCBased returns the ICC-based colour space for a built-in profile.
+func mustICCBased(profile []byte) *SpaceICCBased {
+	s, err := ICCBased(profile, nil)
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+// minPDFVersion returns the first PDF version which allows ICC profiles
+// of the given version to be embedded.  PDF 2.0 allows profiles of any
+// ICC version; earlier PDF versions each support the ICC versions
+// current at the time.
+func minPDFVersion(v icc.Version) pdf.Version {
+	switch {
+	case v>>24 == 2:
+		return pdf.V1_3
+	case v>>24 == 4 && v < icc.Version4_1_0:
+		return pdf.V1_5
+	case v>>24 == 4 && v < icc.Version4_2_0:
+		return pdf.V1_6
+	case v>>24 == 4 && v < icc.Version4_3_0:
+		return pdf.V1_7
+	}
+	return pdf.V2_0
 }
 
 // Transform returns the cached bidirectional transform for the profile and
@@ -242,7 +282,7 @@ func (s *SpaceICCBased) Convert(c stdcolor.Color) stdcolor.Color {
 
 func (s *SpaceICCBased) fallbackFromXYZ(X, Y, Z float64, dst []float64) {
 	// simple fallback: convert XYZ to sRGB-like values
-	r, g, b := xyzToSRGB(X, Y, Z)
+	r, g, b := cie.XYZToSRGB(X, Y, Z)
 	switch s.N {
 	case 1:
 		dst[0] = rgbToGray(r, g, b)
@@ -295,17 +335,17 @@ func (s *SpaceICCBased) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.
 	// fallback without profile: treat as sRGB-like
 	switch s.N {
 	case 1:
-		return srgbToXYZ(norm[0], norm[0], norm[0])
+		return cie.SRGBToXYZ(norm[0], norm[0], norm[0])
 	case 3:
-		return srgbToXYZ(norm[0], norm[1], norm[2])
+		return cie.SRGBToXYZ(norm[0], norm[1], norm[2])
 	case 4:
 		cyan, magenta, yellow, black := norm[0], norm[1], norm[2], norm[3]
 		rf := (1 - cyan) * (1 - black)
 		gf := (1 - magenta) * (1 - black)
 		bf := (1 - yellow) * (1 - black)
-		return srgbToXYZ(rf, gf, bf)
+		return cie.SRGBToXYZ(rf, gf, bf)
 	default:
-		return srgbToXYZ(0.5, 0.5, 0.5)
+		return cie.SRGBToXYZ(0.5, 0.5, 0.5)
 	}
 }
 
@@ -332,6 +372,6 @@ func (c colorICCBased) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorICCBased) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := cie.XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

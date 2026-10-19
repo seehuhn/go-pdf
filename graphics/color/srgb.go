@@ -21,6 +21,7 @@ import (
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 // PDF 2.0 sections: 8.6.5.5
@@ -125,7 +126,7 @@ func (s spaceSRGB) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
 func (s spaceSRGB) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
-	return srgbToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
+	return cie.SRGBToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
 }
 
 // FromXYZ converts PCS-adapted CIE XYZ to sRGB component values.
@@ -135,7 +136,7 @@ func (s spaceSRGB) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspa
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
 func (s spaceSRGB) FromXYZ(X, Y, Z float64, _ icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
-	dst[0], dst[1], dst[2] = xyzToSRGB(X, Y, Z)
+	dst[0], dst[1], dst[2] = cie.XYZToSRGB(X, Y, Z)
 }
 
 type colorSRGB [3]float64

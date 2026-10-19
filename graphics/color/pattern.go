@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 // Pattern represents a PDF pattern.
@@ -108,7 +109,7 @@ func (s spacePatternColored) SourceBlackPoint(_ icc.RenderingIntent) [3]float64 
 // adapted to the Profile Connection Space white point, since the actual
 // color depends on the pattern content.
 func (s spacePatternColored) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
-	return srgbToXYZ(0.5, 0.5, 0.5)
+	return cie.SRGBToXYZ(0.5, 0.5, 0.5)
 }
 
 type colorPatternColored struct {
@@ -133,7 +134,7 @@ func (colorPatternColored) ColorSpace() Space {
 // For colored patterns, returns a neutral mid-gray since the actual color
 // depends on the pattern content which is not available here.
 func (colorPatternColored) ToXYZ() (X, Y, Z float64) {
-	return srgbToXYZ(0.5, 0.5, 0.5)
+	return cie.SRGBToXYZ(0.5, 0.5, 0.5)
 }
 
 // RGBA implements the color.Color interface.

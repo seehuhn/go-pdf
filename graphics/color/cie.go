@@ -24,6 +24,7 @@ import (
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 // == CalGray ================================================================
@@ -100,7 +101,7 @@ func (s *SpaceCalGray) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 {
 // adaptedBlackPoint adapts a black point from the white point wp to the
 // Profile Connection Space white point.
 func adaptedBlackPoint(c *paramCache[[3]float64, adaptation], wp, bp [3]float64) [3]float64 {
-	X, Y, Z := c.get(wp, newAdaptation).value.toPCS.apply(bp[0], bp[1], bp[2])
+	X, Y, Z := c.get(wp, newAdaptation).value.toPCS.Apply(bp[0], bp[1], bp[2])
 	return [3]float64{X, Y, Z}
 }
 
@@ -156,7 +157,7 @@ func (s *SpaceCalGray) Convert(c stdcolor.Color) stdcolor.Color {
 func (s *SpaceCalGray) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
 	Ya := Y
 	if ri != icc.AbsoluteColorimetric {
-		_, Ya, _ = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+		_, Ya, _ = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.Apply(X, Y, Z)
 	}
 	dst[0] = invGamma(Ya/s.WhitePoint[1], s.Gamma)
 }
@@ -201,7 +202,7 @@ func (s *SpaceCalGray) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.W
 	if ri == icc.AbsoluteColorimetric {
 		return X, Y, Z
 	}
-	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.apply(X, Y, Z)
+	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.Apply(X, Y, Z)
 }
 
 type colorCalGray struct {
@@ -223,7 +224,7 @@ func (c colorCalGray) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorCalGray) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := cie.XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
@@ -351,7 +352,7 @@ func (s *SpaceCalRGB) Convert(c stdcolor.Color) stdcolor.Color {
 // spaces; the zero value &icc.Workspace{} is valid.
 func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
 	if ri != icc.AbsoluteColorimetric {
-		X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+		X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.Apply(X, Y, Z)
 	}
 
 	inv := s.inv.get(s.Matrix, newMatrixInverse).value
@@ -361,7 +362,7 @@ func (s *SpaceCalRGB) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []flo
 	}
 
 	// linear RGB values
-	A, B, C := inv.inverse.applyT(X, Y, Z)
+	A, B, C := inv.inverse.ApplyT(X, Y, Z)
 
 	// apply inverse gamma
 	dst[0] = clip01(invGamma(A, s.Gamma[0]))
@@ -454,7 +455,7 @@ func (s *SpaceCalRGB) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Wo
 	if ri == icc.AbsoluteColorimetric {
 		return X, Y, Z
 	}
-	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.apply(X, Y, Z)
+	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.Apply(X, Y, Z)
 }
 
 type colorCalRGB struct {
@@ -476,7 +477,7 @@ func (c colorCalRGB) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorCalRGB) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := cie.XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
@@ -682,7 +683,7 @@ func (s *SpaceLab) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Works
 	if ri == icc.AbsoluteColorimetric {
 		return X, Y, Z
 	}
-	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.apply(X, Y, Z)
+	return s.adapt.get(s.WhitePoint, newAdaptation).value.toPCS.Apply(X, Y, Z)
 }
 
 type colorLab struct {
@@ -704,7 +705,7 @@ func (c colorLab) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c colorLab) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := cie.XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }
 
@@ -717,7 +718,7 @@ func (c colorLab) RGBA() (r, g, b, a uint32) {
 // spaces; the zero value &icc.Workspace{} is valid.
 func (s *SpaceLab) FromXYZ(X, Y, Z float64, ri icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
 	if ri != icc.AbsoluteColorimetric {
-		X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.apply(X, Y, Z)
+		X, Y, Z = s.adapt.get(s.WhitePoint, newAdaptation).value.fromPCS.Apply(X, Y, Z)
 	}
 
 	XW, YW, ZW := s.WhitePoint[0], s.WhitePoint[1], s.WhitePoint[2]

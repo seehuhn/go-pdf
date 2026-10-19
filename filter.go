@@ -813,8 +813,8 @@ func (f *FilterJBIG2) Decode(_ Version, r io.Reader, budget *membudget.Budget) (
 }
 
 // FilterJPX is the JPXDecode filter for JPEG 2000-compressed data.
-// JPXDecode is not implemented; this type exists so PDF files using
-// the filter survive a read/write cycle.
+// The filter neither encodes nor decodes stream data: JPEG 2000 data is
+// decoded by the image dictionary using it, when its pixels are loaded.
 type FilterJPX struct{}
 
 // Info implements the [Filter] interface.

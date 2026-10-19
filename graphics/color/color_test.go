@@ -284,3 +284,39 @@ func TestColorToXYZMatchesSpace(t *testing.T) {
 		}
 	}
 }
+
+func TestWhitePointDaylight(t *testing.T) {
+	cases := []struct {
+		kelvin float64
+		want   []float64
+	}{
+		{5003, WhitePointD50},
+		{6504, WhitePointD65},
+	}
+	for _, c := range cases {
+		got, err := WhitePointDaylight(c.kelvin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !isValidWhitePoint(got) {
+			t.Errorf("%g K: invalid white point %v", c.kelvin, got)
+		}
+		for i := range got {
+			if math.Abs(got[i]-c.want[i]) > 2e-3 {
+				t.Errorf("%g K: got %v, want %v", c.kelvin, got, c.want)
+				break
+			}
+		}
+	}
+
+	for _, k := range []float64{3999, 25001, math.NaN()} {
+		if _, err := WhitePointDaylight(k); err == nil {
+			t.Errorf("%g K: expected error", k)
+		}
+	}
+	for _, k := range []float64{4000, 7000, 7001, 25000} {
+		if wp, err := WhitePointDaylight(k); err != nil || !isValidWhitePoint(wp) {
+			t.Errorf("%g K: %v %v", k, wp, err)
+		}
+	}
+}

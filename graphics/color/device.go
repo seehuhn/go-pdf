@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 // PDF 2.0 sections: 8.6.4
@@ -98,7 +99,7 @@ func (s spaceDeviceGray) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64
 // A value outside [0, 1] is adjusted to the nearest valid value.
 func (s spaceDeviceGray) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
 	v := clip01(values[0])
-	return srgbToXYZ(v, v, v)
+	return cie.SRGBToXYZ(v, v, v)
 }
 
 // FromXYZ converts PCS-adapted CIE XYZ to a DeviceGray component value.
@@ -108,7 +109,7 @@ func (s spaceDeviceGray) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.W
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
 func (s spaceDeviceGray) FromXYZ(X, Y, Z float64, _ icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
-	dst[0] = rgbToGray(xyzToSRGB(X, Y, Z))
+	dst[0] = rgbToGray(cie.XYZToSRGB(X, Y, Z))
 }
 
 // rgbToGray converts DeviceRGB components to a DeviceGray value, using the
@@ -231,7 +232,7 @@ func (s spaceDeviceRGB) DestinationBlackPoint(_ icc.RenderingIntent) [3]float64 
 // adapted to the Profile Connection Space white point.
 // Values outside [0, 1] are adjusted to the nearest valid value.
 func (s spaceDeviceRGB) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Workspace) (X, Y, Z float64) {
-	return srgbToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
+	return cie.SRGBToXYZ(clip01(values[0]), clip01(values[1]), clip01(values[2]))
 }
 
 // FromXYZ converts PCS-adapted CIE XYZ to DeviceRGB component values.
@@ -241,7 +242,7 @@ func (s spaceDeviceRGB) ToXYZ(values []float64, _ icc.RenderingIntent, _ *icc.Wo
 // ws is unused, but must be non-nil for consistency with the other colour
 // spaces; the zero value &icc.Workspace{} is valid.
 func (s spaceDeviceRGB) FromXYZ(X, Y, Z float64, _ icc.RenderingIntent, dst []float64, _ *icc.Workspace) {
-	dst[0], dst[1], dst[2] = xyzToSRGB(X, Y, Z)
+	dst[0], dst[1], dst[2] = cie.XYZToSRGB(X, Y, Z)
 }
 
 // DeviceRGB is a color in the DeviceRGB color space.
@@ -418,6 +419,6 @@ func (c DeviceCMYK) ToXYZ() (X, Y, Z float64) {
 // RGBA implements the color.Color interface.
 func (c DeviceCMYK) RGBA() (r, g, b, a uint32) {
 	X, Y, Z := c.ToXYZ()
-	rf, gf, bf := xyzToSRGB(X, Y, Z)
+	rf, gf, bf := cie.XYZToSRGB(X, Y, Z)
 	return toUint32(rf), toUint32(gf), toUint32(bf), 0xffff
 }

@@ -127,6 +127,79 @@ func StreamBudget(rawLen int64) int64 {
 	return StreamBudgetBase + add
 }
 
+// JPXBudget returns the memory and work budget for decoding a JPXDecode
+// image of rawLen stream bytes, whose codestream header declares
+// width × height pixels, image components of the given bit depths, and
+// the given numbers of channels and tiles.  The budget is
+//
+//	[StreamBudgetBase] + [JPXBudgetPerByte]·rawLen
+//	+ [JPXBudgetPerTile]·tiles·len(depths)
+//	+ width·height·(Σ_c ([JPXBudgetPerSample] + [JPXBudgetPerBit]·depths[c])
+//	                + [JPXBudgetPerChannel]·channels),
+//
+// capped at [JPXBudgetHardCap].
+//
+// The JPEG 2000 decoder charges the copy of its input, its working
+// buffers, the decoded planes and its decoding work (one byte per
+// coefficient per coding pass) to the budget.  Decoding work is not
+// proportional to the input size, since a few bits of packet header can
+// announce many coding passes, so the budget is sized mainly from the
+// declared image size, which callers cap at [MaxImagePixels].
+// Negative arguments are treated as zero.
+func JPXBudget(rawLen int64, width, height int, depths []int, channels, tiles int) int64 {
+	rawLen = max(rawLen, 0)
+	pixels := max(int64(width), 0) * max(int64(height), 0)
+	perPixel := JPXBudgetPerChannel * int64(max(channels, 0))
+	for _, d := range depths {
+		perPixel += JPXBudgetPerSample + JPXBudgetPerBit*int64(max(d, 0))
+	}
+	tileComps := max(int64(tiles), 0) * int64(len(depths))
+	if rawLen > JPXBudgetHardCap/JPXBudgetPerByte ||
+		tileComps > JPXBudgetHardCap/JPXBudgetPerTile ||
+		pixels > 0 && perPixel > JPXBudgetHardCap/pixels {
+		return JPXBudgetHardCap
+	}
+	total := StreamBudgetBase + JPXBudgetPerByte*rawLen + JPXBudgetPerTile*tileComps + perPixel*pixels
+	return min(total, JPXBudgetHardCap)
+}
+
+// The JPXDecode budget constants are set from the budget use of
+// legitimate codestreams.  Losslessly coded noise, the most expensive
+// content, uses about 3.5 bytes per bit plus a few bytes per sample;
+// a region of interest doubles the coded bit planes.  Each tile adds a
+// fixed cost per component.  Small precincts or code-blocks add a fixed
+// cost per packet and code-block, up to several hundred bytes per
+// sample, but each of these also takes space in the codestream.
+const (
+	// JPXBudgetPerByte is the part of the JPXDecode budget granted per
+	// byte of stream data.  It covers the copy of the input and the
+	// structural overhead of precincts and code-blocks.
+	JPXBudgetPerByte = 256
+
+	// JPXBudgetPerTile is the part of the JPXDecode budget granted per
+	// tile and image component, for the per-tile working state.
+	JPXBudgetPerTile = 16 << 10
+
+	// JPXBudgetPerSample is the part of the JPXDecode budget granted per
+	// sample of each image component, for the planes and working
+	// buffers.
+	JPXBudgetPerSample = 16
+
+	// JPXBudgetPerBit is the part of the JPXDecode budget granted per
+	// bit of each sample, for the decoding work.
+	JPXBudgetPerBit = 8
+
+	// JPXBudgetPerChannel is the part of the JPXDecode budget granted per
+	// pixel and channel, for the unsigned and palette-expanded copies of
+	// the samples.
+	JPXBudgetPerChannel = 16
+
+	// JPXBudgetHardCap caps the JPXDecode budget.  It admits the decoded
+	// planes of the largest image that [MaxImageDecodedBytes] allows,
+	// together with the decoding work.
+	JPXBudgetHardCap = 2 * MaxImageDecodedBytes
+)
+
 // ShadingBudget returns the memory budget for holding the decoded vertices or
 // patches of a mesh shading whose stream is rawLen decoded bytes.  The budget
 // is sized as [StreamBudgetBase] + [MaxShadingExpansion]·rawLen, so the 8 MiB

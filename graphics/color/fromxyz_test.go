@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"seehuhn.de/go/icc"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 // TestDeviceFromXYZRoundTrip checks that a colour in a device space survives
@@ -98,7 +99,7 @@ func TestDeviceCMYKFromXYZ(t *testing.T) {
 // supply the reverse transform.
 func TestICCFallbackFromXYZ(t *testing.T) {
 	X, Y, Z := DeviceRGB{0.2, 0.4, 0.6}.ToXYZ()
-	r, g, b := xyzToSRGB(X, Y, Z)
+	r, g, b := cie.XYZToSRGB(X, Y, Z)
 
 	for _, n := range []int{1, 3, 4, 2} {
 		s := &SpaceICCBased{N: n}

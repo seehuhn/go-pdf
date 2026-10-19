@@ -114,3 +114,34 @@ func TestShadingBudget(t *testing.T) {
 		t.Error("bound does not grow with input size")
 	}
 }
+
+func TestJPXBudget(t *testing.T) {
+	rgb := []int{8, 8, 8}
+	rgbPerPixel := int64(3*(JPXBudgetPerSample+8*JPXBudgetPerBit) + 3*JPXBudgetPerChannel)
+	cases := []struct {
+		name          string
+		rawLen        int64
+		width, height int
+		depths        []int
+		channels      int
+		tiles         int
+		want          int64
+	}{
+		{"negative", -1, -5, 10, []int{-3}, -1, -1, StreamBudgetBase},
+		{"zero", 0, 0, 0, nil, 0, 0, StreamBudgetBase},
+		{"small", 1000, 20, 10, rgb, 3, 2, StreamBudgetBase + JPXBudgetPerByte*1000 + JPXBudgetPerTile*6 + rgbPerPixel*200},
+		{"below cap", 0, 1 << 20, 1, rgb, 3, 1, StreamBudgetBase + JPXBudgetPerTile*3 + rgbPerPixel<<20},
+		{"large image", 1000, MaxImageWidth, MaxImageHeight, rgb, 3, 1, JPXBudgetHardCap},
+		{"many components", 0, 1 << 10, 1 << 10, make([]int, 1<<14), 1 << 14, 1, JPXBudgetHardCap},
+		{"many tiles", 0, 1, 1, make([]int, 1<<14), 1, 65535, JPXBudgetHardCap},
+		{"large stream", 1 << 40, 1, 1, rgb, 3, 1, JPXBudgetHardCap},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := JPXBudget(tc.rawLen, tc.width, tc.height, tc.depths, tc.channels, tc.tiles)
+			if got != tc.want {
+				t.Errorf("JPXBudget = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}

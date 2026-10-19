@@ -52,6 +52,21 @@ type Data struct {
 
 	// NComp is the number of color components per pixel.
 	NComp int
+
+	// Alpha (optional) holds the opacity of each pixel, as values in the
+	// range [0, 1].  The pixel at (x, y) has opacity
+	// Alpha[(y-Rect.Min.Y)*Rect.Dx() + (x-Rect.Min.X)].
+	// Alpha is nil if the image has no opacity information.
+	// The colour values in Pix are not premultiplied by the opacity.
+	Alpha []float32
+
+	// KeyMask (optional) is the colour key mask given by the MaskColors
+	// entry of the image dictionary, evaluated on the samples of this
+	// image: 0 at pixels where every component lies in its key range,
+	// and 255 elsewhere.  It has the bounds Rect.  KeyMask is nil if the
+	// dictionary has no colour key, or one which does not have two
+	// entries per colour component.
+	KeyMask *image.Alpha
 }
 
 // NewData creates a new Data image with the given color space and dimensions.
@@ -90,7 +105,7 @@ func (d *Data) Bounds() image.Rectangle {
 	return d.Rect
 }
 
-// At returns the color at position (x, y).
+// At returns the color at position (x, y), ignoring any opacity.
 // If (x, y) is out of bounds, the default color is returned.
 func (d *Data) At(x, y int) gocolor.Color {
 	w := d.Rect.Dx()
@@ -180,6 +195,8 @@ func (d *Data) SampleBilinear(x, y float64, dst []float32) {
 }
 
 // ToRGBA converts the image to sRGB, returning an [*image.RGBA].
+// If d.Alpha is set, the result carries the opacity, premultiplied
+// into the colour values as [image.RGBA] requires.
 func (d *Data) ToRGBA() *image.RGBA {
 	w := d.Rect.Dx()
 	h := d.Rect.Dy()
@@ -193,6 +210,13 @@ func (d *Data) ToRGBA() *image.RGBA {
 			}
 			c := color.FromValues(d.CS, vals, nil)
 			r, g, b, a := c.RGBA()
+			if d.Alpha != nil {
+				alpha := min(max(float64(d.Alpha[y*w+x]), 0), 1)
+				r = uint32(float64(r)*alpha + 0.5)
+				g = uint32(float64(g)*alpha + 0.5)
+				b = uint32(float64(b)*alpha + 0.5)
+				a = uint32(float64(a)*alpha + 0.5)
+			}
 			i := out.PixOffset(x+d.Rect.Min.X, y+d.Rect.Min.Y)
 			out.Pix[i+0] = uint8(r >> 8)
 			out.Pix[i+1] = uint8(g >> 8)
@@ -215,13 +239,42 @@ func clampInt(v, lo, hi int) int {
 
 // Load decodes the pixel data from a Dict into a Data image.
 //
-// Load is unsupported for JPXDecode images: their pixel data, colour
-// space and bit depth live in the JPEG 2000 codestream and must be
-// decoded by a JPX-aware consumer, not via PDF-level sample
-// decomposition.
+// For JPXDecode images, the image size and bit depth are taken from the
+// JPEG 2000 data, and so is the colour space unless the dictionary
+// specifies one.  If SMaskInData is non-zero, the opacity channel of the
+// JPEG 2000 data, if any, is returned in [Data.Alpha].  Consumers must
+// therefore not assume that [Data.Rect] matches d.Width and d.Height.
+//
+// If d.MaskColors gives a colour key, [Data.KeyMask] holds the mask it
+// defines.  The key refers to the raw samples, before the Decode array
+// is applied; samples missing from short data count as 0.  For a
+// JPXDecode image, the samples are those of the JPEG 2000 data, at a
+// common depth: that of the deepest colour component, at most 16 bits.
+// Components of other depths are rescaled to it.  For an image with a
+// palette whose colour space is Indexed, either given by d.ColorSpace or
+// derived from the palette, the key refers to the palette indices; where
+// the palette has to be applied to give the colour space its number of
+// components, the key refers to the palette entries, at the depth of the
+// palette.  Opacity channels are ignored.  Key values beyond the sample
+// range never match.
+//
+// Load is equivalent to LoadReduced(0).
 func (d *Dict) Load() (*Data, error) {
+	return d.LoadReduced(0)
+}
+
+// LoadReduced is like [Dict.Load], but decodes JPXDecode images at
+// reduced resolution: the result has roughly 1/2^reduce of the full
+// width and height, where reduce is clamped to the resolution levels the
+// JPEG 2000 data offers.  [Data.Rect] and [Data.Alpha] have the reduced
+// size; the colour space, the Decode array and the colour key are
+// handled as in Load.  Consumers must not assume that Data.Rect matches
+// d.Width and d.Height.
+//
+// For all other encodings, LoadReduced returns the same result as Load.
+func (d *Dict) LoadReduced(reduce int) (*Data, error) {
 	if d.Data != nil && d.Data.IsJPX() {
-		return nil, errors.New("JPXDecode decoding not supported")
+		return d.loadJPX(reduce)
 	}
 	cs := d.ColorSpace
 	if cs == nil {
@@ -272,13 +325,19 @@ func (d *Dict) Load() (*Data, error) {
 		}
 	}
 
+	var keyMask *image.Alpha
+	if len(d.MaskColors) == 2*ncomp {
+		keyMask = rawColorKey(data, width, height, ncomp, bpc, d.MaskColors)
+	}
+
 	stride := width * ncomp
 	return &Data{
-		Pix:    pix,
-		Stride: stride,
-		Rect:   image.Rect(0, 0, width, height),
-		CS:     cs,
-		NComp:  ncomp,
+		Pix:     pix,
+		Stride:  stride,
+		Rect:    image.Rect(0, 0, width, height),
+		CS:      cs,
+		NComp:   ncomp,
+		KeyMask: keyMask,
 	}, nil
 }
 

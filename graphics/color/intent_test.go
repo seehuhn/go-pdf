@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/icc/icctest"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/function"
+	"seehuhn.de/go/pdf/internal/cie"
 )
 
 var allIntents = []icc.RenderingIntent{
@@ -371,7 +372,7 @@ func TestICCBasedUnusableProfile(t *testing.T) {
 
 	ws := &icc.Workspace{}
 	X, Y, Z := s.ToXYZ([]float64{0.2, 0.4, 0.6}, icc.RelativeColorimetric, ws)
-	wantX, wantY, wantZ := srgbToXYZ(0.2, 0.4, 0.6)
+	wantX, wantY, wantZ := cie.SRGBToXYZ(0.2, 0.4, 0.6)
 	if X != wantX || Y != wantY || Z != wantZ {
 		t.Errorf("ToXYZ: got %g %g %g, want %g %g %g", X, Y, Z, wantX, wantY, wantZ)
 	}

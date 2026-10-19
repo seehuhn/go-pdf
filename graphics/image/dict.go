@@ -34,7 +34,6 @@ import (
 	"seehuhn.de/go/pdf/measure"
 
 	"seehuhn.de/go/pdf/oc"
-	"seehuhn.de/go/pdf/opaque"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/webcapture"
 )
@@ -73,7 +72,8 @@ type Dict struct {
 	// the ColorSpace.
 	//
 	// On write, nil can be used as a shorthand for the color space dependent
-	// default Decode array.
+	// default Decode array.  For JPXDecode images, nil means the default
+	// for the bit depth of the JPEG 2000 data.
 	Decode []float64
 
 	// Data holds the image pixel component values and controls how they are
@@ -94,6 +94,7 @@ type Dict struct {
 	// Each value must be in the range 0 to (2^BitsPerComponent - 1) and
 	// represents raw color values before any Decode array processing. Pixels
 	// with all components in their respective ranges become transparent.
+	// [Dict.Load] evaluates the resulting mask into [Data.KeyMask].
 	//
 	// For JPXDecode images without an explicit ColorSpace, the channel
 	// count is determined by the JPEG 2000 codestream and only a
@@ -202,17 +203,8 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	if err != nil {
 		return nil, err
 	}
-	hasJPX := false
-	for _, f := range filters {
-		name, _, err := f.Info(c.Version())
-		if err != nil {
-			return nil, err
-		}
-		if name == "JPXDecode" {
-			hasJPX = true
-			break
-		}
-	}
+	jpxIndex := jpxFilterIndex(filters)
+	hasJPX := jpxIndex >= 0
 
 	// Extract required fields
 	width, err := c.Integer(dict["Width"])
@@ -338,19 +330,20 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 			numChannels = len(maskObj) / 2
 		}
 
+		// JPX samples (BitsPerComponent 0) may be up to 16 bits deep
+		limit := pdf.Integer(1) << 16
+		if img.BitsPerComponent > 0 && img.BitsPerComponent < 16 {
+			limit = 1 << img.BitsPerComponent
+		}
 		maskColors := make([]uint16, len(maskObj))
 		valid := true
 		for i, val := range maskObj {
 			num, err := c.Integer(val)
-			if err != nil || num < 0 || num > 0xFFFF {
+			if err != nil || num < 0 || num >= limit {
 				valid = false
 				break
 			}
-			if img.BitsPerComponent > 0 && img.BitsPerComponent < 16 {
-				maskColors[i] = uint16(num) % (1 << img.BitsPerComponent)
-			} else {
-				maskColors[i] = uint16(num)
-			}
+			maskColors[i] = uint16(num)
 		}
 		for i := 0; valid && i < numChannels; i++ {
 			if maskColors[2*i] > maskColors[2*i+1] {
@@ -366,7 +359,8 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	// For JPXDecode images without an explicit ColorSpace, the spec
 	// (§7.4.9, §8.9.5) says the Decode array shall be ignored unless
 	// ImageMask is true.  Skip extraction entirely in that case and
-	// leave img.Decode nil.
+	// leave img.Decode nil.  For JPXDecode images the default depends on
+	// the bit depth of the JPEG 2000 data, so an absent array stays nil.
 	if img.ColorSpace != nil {
 		// honor a Decode array with at least 2*ncomp entries, ignoring any
 		// surplus; a shorter array falls back to the default
@@ -390,7 +384,7 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 				img.Decode = decode
 			}
 		}
-		if img.Decode == nil {
+		if img.Decode == nil && !hasJPX {
 			img.Decode = DefaultDecode(img.ColorSpace, img.BitsPerComponent)
 		}
 	}
@@ -518,10 +512,10 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// lazily read from the original stream, preserving the encoding
-	img.Data = &streamData{
-		inner:    opaque.ExtractStream(c.Extractor(), stream),
-		isJPX:    hasJPX,
-		maxBytes: ImageDataLimit(img.Width, img.Height, img.BitsPerComponent, img.ColorSpace),
+	img.Data, err = newStreamData(c, stream, jpxIndex,
+		ImageDataLimit(img.Width, img.Height, img.BitsPerComponent, img.ColorSpace))
+	if err != nil {
+		return nil, err
 	}
 
 	return img, nil
@@ -666,8 +660,10 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 		dict["Mask"] = mask
 	}
-	if d.Decode != nil && d.ColorSpace != nil &&
-		!slices.Equal(d.Decode, DefaultDecode(d.ColorSpace, d.BitsPerComponent)) {
+	// the default Decode array of a JPXDecode image depends on the bit
+	// depth of the JPEG 2000 data, so an explicit array is always kept
+	if d.Decode != nil && d.ColorSpace != nil && (d.Data.IsJPX() ||
+		!slices.Equal(d.Decode, DefaultDecode(d.ColorSpace, d.BitsPerComponent))) {
 		var decode pdf.Array
 		for _, v := range d.Decode {
 			decode = append(decode, pdf.Number(v))

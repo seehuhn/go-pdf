@@ -730,6 +730,27 @@ var testCases = []struct {
 			}),
 		},
 	},
+	{
+		name:    "JPXDecode without ColorSpace",
+		version: pdf.V1_7,
+		data: &Dict{
+			Width:  6,
+			Height: 5,
+			Data:   NewJPXSource(mustEncodeJPX(jpxTestImage(6, 5, []int{8, 8, 8}, 40))),
+		},
+	},
+	{
+		name:    "JPXDecode with ColorSpace, Decode and SMaskInData",
+		version: pdf.V2_0,
+		data: &Dict{
+			Width:       5,
+			Height:      4,
+			ColorSpace:  color.SpaceDeviceRGB,
+			Decode:      []float64{1, 0, 1, 0, 1, 0},
+			SMaskInData: 2,
+			Data:        NewJPXSource(mustEncodeJPX(opacityImage(true))),
+		},
+	},
 }
 
 // checkDictData validates that all image data in a Dict can be read.
@@ -830,15 +851,16 @@ func roundTripTest(t *testing.T, version pdf.Version, data *Dict) {
 		decoded.WebCaptureID.SingleUse = data.WebCaptureID.SingleUse
 	}
 
-	// normalize Decode (read fills in the default)
-	if data.Decode == nil {
+	// normalize Decode (read fills in the default, except for JPXDecode
+	// images, where the default depends on the JPEG 2000 data)
+	if data.Decode == nil && !data.Data.IsJPX() {
 		data.Decode = DefaultDecode(data.ColorSpace, data.BitsPerComponent)
 	}
 	for _, alt := range data.Alternates {
 		if alt == nil {
 			continue
 		}
-		if img, ok := alt.Image.(*Dict); ok && img.Decode == nil {
+		if img, ok := alt.Image.(*Dict); ok && img.Decode == nil && !img.Data.IsJPX() {
 			img.Decode = DefaultDecode(img.ColorSpace, img.BitsPerComponent)
 		}
 	}
@@ -900,9 +922,8 @@ func FuzzDictRoundTrip(f *testing.F) {
 	}
 
 	// Seed: JPXDecode image without /ColorSpace, a case that previously
-	// panicked.  We do not embed via the ResourceManager because there
-	// is no JPXSource for API-side construction; instead, write the
-	// dict directly.
+	// panicked.  The dict is written directly, since its empty stream is
+	// no JPEG 2000 file and [JPXSource] would refuse it.
 	{
 		w, buf := memfile.NewPDFWriter(f, pdf.V1_7, opt)
 		ref := w.Alloc()
@@ -1393,6 +1414,53 @@ func TestExtractDictJPXMaskOverLength(t *testing.T) {
 	}
 	if img.MaskColors != nil {
 		t.Errorf("MaskColors = %v, want nil (over-length array should be dropped)", img.MaskColors)
+	}
+}
+
+// TestExtractDictMaskSampleRange verifies that a colour-key /Mask with a
+// value beyond the sample range is dropped as a whole.
+func TestExtractDictMaskSampleRange(t *testing.T) {
+	tests := []struct {
+		name   string
+		bpc    int
+		mask   pdf.Array
+		expect []uint16
+	}{
+		{"8 bit in range", 8, pdf.Array{pdf.Integer(0), pdf.Integer(255)}, []uint16{0, 255}},
+		{"8 bit too large", 8, pdf.Array{pdf.Integer(0), pdf.Integer(300)}, nil},
+		{"1 bit too large", 1, pdf.Array{pdf.Integer(0), pdf.Integer(2)}, nil},
+		{"16 bit in range", 16, pdf.Array{pdf.Integer(0), pdf.Integer(0xFFFF)}, []uint16{0, 0xFFFF}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			ref := w.Alloc()
+			body, err := w.OpenStream(ref, pdf.Dict{
+				"Type":             pdf.Name("XObject"),
+				"Subtype":          pdf.Name("Image"),
+				"Width":            pdf.Integer(1),
+				"Height":           pdf.Integer(1),
+				"ColorSpace":       pdf.Name("DeviceGray"),
+				"BitsPerComponent": pdf.Integer(tc.bpc),
+				"Mask":             tc.mask,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := body.Write([]byte{0, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			img, err := ExtractDict(pdf.CursorAt(pdf.NewExtractor(w), nil), ref, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.expect, img.MaskColors); diff != "" {
+				t.Errorf("MaskColors (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 

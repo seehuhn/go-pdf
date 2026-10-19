@@ -61,7 +61,7 @@ type Image interface {
 //
 // Concrete types are provided by
 // [seehuhn.de/go/pdf/graphics/image] (FlateSource, CCITTFaxSource,
-// DCTSource) and [seehuhn.de/go/pdf/graphics/image/jbig2] (Image).
+// DCTSource, JPXSource) and [seehuhn.de/go/pdf/graphics/image/jbig2] (Image).
 type ImageData interface {
 	// WriteStream opens a PDF stream on ref, writes the encoded image
 	// data, and closes it.  The dict is pre-populated with
@@ -73,6 +73,9 @@ type ImageData interface {
 	// stream data if necessary.  Each row occupies a whole number of
 	// bytes; within a row, each pixel is a sequence of component
 	// values, one per colour channel, each BitsPerComponent bits wide.
+	//
+	// For JPXDecode-encoded data, Pixels instead returns the JPEG 2000
+	// data, with all filters before JPXDecode applied.
 	Pixels() ([]byte, error)
 
 	// IsJPX reports whether the image data is JPXDecode-encoded.  JPX
@@ -86,7 +89,8 @@ type ImageData interface {
 // GeometryChecker is implemented by image data sources whose encoding fixes
 // the sample layout.  Image dictionaries call CheckGeometry before writing
 // and refuse a dictionary whose width, height, channel count or bits per
-// component disagree with the source.
+// component disagree with the source.  A bitsPerComponent of 0 indicates
+// that the depth comes from the data, as for JPXDecode.
 type GeometryChecker interface {
 	CheckGeometry(width, height, channels, bitsPerComponent int) error
 }
