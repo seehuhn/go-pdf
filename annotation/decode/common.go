@@ -18,6 +18,7 @@ package decode
 
 import (
 	"math"
+	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -137,9 +138,16 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 		common.BlendMode = bm
 	}
 
-	// Lang (optional)
-	if lang, err := c.TextString(dict["Lang"]); err == nil {
-		common.Lang = langtag.Parse(lang.String())
+	// Lang (optional).  An empty string or "und" states that the language
+	// is unknown; a malformed value is dropped.
+	if obj := dict["Lang"]; obj != nil {
+		if lang, err := c.TextString(obj); err == nil {
+			s := lang.String()
+			unknown := s == "" || strings.EqualFold(s, "und")
+			if tag := langtag.Parse(s); unknown || !tag.IsRoot() {
+				common.Lang.Set(tag)
+			}
+		}
 	}
 
 	return nil

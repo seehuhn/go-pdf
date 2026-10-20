@@ -2986,7 +2986,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '2.0'
-    goType: language.Tag
+    goType: optional.Value[language.Tag]
     purpose: Language identifier.
   goPackage: annotation
   goRepr: struct

@@ -46,6 +46,12 @@ func TestParse(t *testing.T) {
 		{"en-abcde", language.English},
 		{"en-US-abcde-abcde", language.AmericanEnglish},
 
+		// private-use and special tags survive
+		{"x-foo", language.MustParse("x-foo")},
+		{"en-x-foo", language.MustParse("en-x-foo")},
+		{"qaa-DE", language.MustParse("qaa-DE")},
+		{"zxx", language.MustParse("zxx")},
+
 		// unknown primary language
 		{"qq", language.Und},
 		{"qq-en", language.Und},

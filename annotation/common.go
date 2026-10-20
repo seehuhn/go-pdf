@@ -103,9 +103,9 @@ type Common struct {
 	Contents pdf.TextString
 
 	// Lang (optional) is a language identifier specifying the natural language
-	// for all text in the annotation.
-	// The root tag [language.Und] means no language is given.
-	Lang language.Tag
+	// for all text in the annotation.  If unset, the document language
+	// applies; a set [language.Und] states that the language is unknown.
+	Lang optional.Value[language.Tag]
 
 	// LastModified (optional) is the date and time when the annotation was
 	// most recently modified.  This can either be a PDF date string or a
@@ -361,11 +361,16 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 		dict["BM"] = c.BlendMode
 	}
 
-	if !c.Lang.IsRoot() {
+	if lang, ok := c.Lang.Get(); ok {
 		if err := pdf.CheckVersion(w, "annotation Lang entry", pdf.V2_0); err != nil {
 			return err
 		}
-		dict["Lang"] = pdf.Text(c.Lang.String())
+		// the empty string is the spec's spelling of "unknown"
+		s := ""
+		if !lang.IsRoot() {
+			s = lang.String()
+		}
+		dict["Lang"] = pdf.Text(s)
 	}
 
 	return nil

@@ -35,6 +35,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/measure"
 	"seehuhn.de/go/pdf/movie"
+	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/sound"
 )
 
@@ -111,7 +112,7 @@ var testCases = map[pdf.Name][]testCase{
 					Width:         1.0,
 					DashArray:     []float64{3.0, 2.0},
 				},
-				Lang:      language.MustParse("en-US"),
+				Lang:      optional.New(language.MustParse("en-US")),
 				User:      pdf.Text("Test User"),
 				Subject:   pdf.Text("Complete annotation test"),
 				RT:        "R",
