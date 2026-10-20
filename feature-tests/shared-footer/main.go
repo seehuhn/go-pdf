@@ -65,10 +65,10 @@ func doit(fname string) error {
 		return err
 	}
 	doc.Out.GetMeta().Info = &pdf.Info{
-		Title:    "Shared footer demo",
-		Subject:  "One content stream referenced from every page",
-		Creator:  "seehuhn.de/go/pdf/feature-tests/shared-footer",
-		Producer: "Quire",
+		Title:    pdf.Text("Shared footer demo"),
+		Subject:  pdf.Text("One content stream referenced from every page"),
+		Creator:  pdf.Text("seehuhn.de/go/pdf/feature-tests/shared-footer"),
+		Producer: pdf.Text("Quire"),
 	}
 
 	footerFont := font.Must(standard.HelveticaOblique.New())

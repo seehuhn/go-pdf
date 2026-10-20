@@ -56,7 +56,7 @@ func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 
 	// OverlayText (optional)
 	if overlayText, err := c.TextString(dict["OverlayText"]); err == nil {
-		redact.OverlayText = string(overlayText)
+		redact.OverlayText = overlayText
 	}
 
 	// Repeat (optional) - default false
@@ -70,7 +70,7 @@ func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 	}
 
 	// If OverlayText is present but DA is missing/empty, provide a reasonable default
-	if redact.OverlayText != "" && redact.DefaultAppearance == "" {
+	if !redact.OverlayText.IsZero() && redact.DefaultAppearance == "" {
 		// Default to 12pt Helvetica black text
 		redact.DefaultAppearance = "/Helvetica 12 Tf 0 0 0 rg"
 	}

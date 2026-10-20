@@ -17,6 +17,7 @@
 package acroform
 
 import (
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action/triggers"
 )
 
@@ -34,7 +35,7 @@ type Common struct {
 	// interface and for accessibility.
 	//
 	// This corresponds to the /TU entry in the PDF field dictionary.
-	AltName string
+	AltName pdf.TextString
 
 	// ExportName (optional) is the mapping name used when exporting field data.
 	//

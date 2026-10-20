@@ -185,7 +185,7 @@ func captionLine(above bool, offset []float64) *annotation.Line {
 	return &annotation.Line{
 		Color:         color.DeviceRGB{0, 0, 1},
 		Border:        &annotation.Border{Width: 1},
-		Contents:      "caption",
+		Contents:      pdf.Text("caption"),
 		Coords:        [4]float64{100, 100, 300, 100},
 		Caption:       true,
 		CaptionAbove:  above,
@@ -298,7 +298,7 @@ func TestLineCaptionFollowsDirection(t *testing.T) {
 // its own, one below the other.
 func TestLineCaptionMultiLine(t *testing.T) {
 	a := captionLine(false, nil)
-	a.Contents = "one\r\ntwo\rthree"
+	a.Contents = pdf.Text("one\r\ntwo\rthree")
 	g := newGen(t, pdf.V2_0)
 	capt := g.layoutCaption(a, newLineGeometry(a).main, 1)
 
@@ -317,7 +317,7 @@ func TestLineCaptionMultiLine(t *testing.T) {
 func TestLineCaptionWiderThanLine(t *testing.T) {
 	a := captionLine(false, nil)
 	a.Coords = [4]float64{100, 100, 110, 100}
-	a.Contents = "a caption much wider than the line"
+	a.Contents = pdf.Text("a caption much wider than the line")
 	a.LineEndingStyle = [2]annotation.LineEndingStyle{
 		annotation.LineEndingStyleClosedArrow,
 		annotation.LineEndingStyleClosedArrow,

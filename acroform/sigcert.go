@@ -71,7 +71,7 @@ type SigCertSeedValue struct {
 	// their required values.
 	//
 	// This entry requires PDF 1.7.
-	SubjectDN []map[pdf.Name]string
+	SubjectDN []map[pdf.Name]pdf.TextString
 
 	// KeyUsage holds acceptable key-usage extension patterns. Each string
 	// encodes the required state of the key-usage bits using the characters
@@ -200,12 +200,12 @@ func (c *SigCertSeedValue) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // writeSubjectDN encodes the /SubjectDN array of attribute dictionaries.
-func writeSubjectDN(dns []map[pdf.Name]string) pdf.Array {
+func writeSubjectDN(dns []map[pdf.Name]pdf.TextString) pdf.Array {
 	arr := make(pdf.Array, len(dns))
 	for i, attrs := range dns {
 		d := pdf.Dict{}
 		for k, v := range attrs {
-			d[k] = pdf.TextString(v)
+			d[k] = v
 		}
 		arr[i] = d
 	}

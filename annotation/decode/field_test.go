@@ -98,11 +98,11 @@ func fieldTestCases() []struct {
 			f.Flags = acroform.FieldReadOnly | acroform.FieldRequired | acroform.FieldNoExport
 		})},
 		{"direct values", tx("v", func(f *acroform.TextField) {
-			f.V = &pdf.StringOrStream{Value: "hello"}
-			f.DV = &pdf.StringOrStream{Value: "world"}
+			f.V = &pdf.StringOrStream{Value: pdf.Text("hello")}
+			f.DV = &pdf.StringOrStream{Value: pdf.Text("world")}
 		})},
 		{"stream value", tx("vs", func(f *acroform.TextField) {
-			f.V = &pdf.StringOrStream{Value: "streamed value", IsStream: true}
+			f.V = &pdf.StringOrStream{Value: pdf.Text("streamed value"), IsStream: true}
 		})},
 		{"text variable text", tx("vt", func(f *acroform.TextField) {
 			f.DefaultAppearance = "/Helv 12 Tf 0 g"
@@ -110,23 +110,23 @@ func fieldTestCases() []struct {
 			f.MaxLen = 24
 		})},
 		{"comb", tx("comb", func(f *acroform.TextField) { f.Flags = acroform.FieldComb; f.MaxLen = 6 })},
-		{"alternate names", ch("choice", func(f *acroform.ChoiceField) { f.AltName = "Choose one"; f.ExportName = "choice_map" })},
+		{"alternate names", ch("choice", func(f *acroform.ChoiceField) { f.AltName = pdf.Text("Choose one"); f.ExportName = "choice_map" })},
 		{"choice options", ch("fonts", func(f *acroform.ChoiceField) {
 			f.Flags = acroform.FieldCombo
-			f.Opt = []acroform.ChoiceOption{{Export: "h", Display: "Helvetica"}, {Export: "Times", Display: "Times"}}
+			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("h"), Display: pdf.Text("Helvetica")}, {Export: pdf.Text("Times"), Display: pdf.Text("Times")}}
 			f.Selected = []int{1}
-			f.V = []string{"Times"}
+			f.V = []pdf.TextString{pdf.Text("Times")}
 		})},
 		{"multi-select", ch("colors", func(f *acroform.ChoiceField) {
 			f.Flags = acroform.FieldMultiSelect
-			f.Opt = []acroform.ChoiceOption{{Export: "r", Display: "Red"}, {Export: "g", Display: "Green"}, {Export: "b", Display: "Blue"}}
+			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("r"), Display: pdf.Text("Red")}, {Export: pdf.Text("g"), Display: pdf.Text("Green")}, {Export: pdf.Text("b"), Display: pdf.Text("Blue")}}
 			f.Selected = []int{0, 2}
-			f.V = []string{"Red", "Blue"}
+			f.V = []pdf.TextString{pdf.Text("Red"), pdf.Text("Blue")}
 		})},
 		{"list box selection", ch("sizes", func(f *acroform.ChoiceField) {
-			f.Opt = []acroform.ChoiceOption{{Export: "S", Display: "Small"}, {Export: "L", Display: "Large"}}
+			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("S"), Display: pdf.Text("Small")}, {Export: pdf.Text("L"), Display: pdf.Text("Large")}}
 			f.Selected = []int{1}
-			f.V = []string{"Large"}
+			f.V = []pdf.TextString{pdf.Text("Large")}
 		})},
 		{"checkbox", btn("agree", func(f *acroform.ButtonField) { f.V = "Yes"; f.DV = "Off" })},
 		{"radio with export values", btn("size", func(f *acroform.ButtonField) {
@@ -148,14 +148,14 @@ func fieldTestCases() []struct {
 				Filter:           "Adobe.PPKLite",
 				SubFilter:        []pdf.Name{"adbe.pkcs7.detached", "ETSI.CAdES.detached"},
 				V:                2,
-				Reasons:          []string{"I agree", "I approve"},
+				Reasons:          []pdf.TextString{pdf.Text("I agree"), pdf.Text("I approve")},
 				TimeStamp:        &acroform.SigSeedValueTimeStamp{URL: "https://ts.example.com", Required: true},
-				LegalAttestation: []string{"attestation"},
+				LegalAttestation: []pdf.TextString{pdf.Text("attestation")},
 				AddRevInfo:       true,
 			}
 		})},
 		{"additional actions", tx("calc", func(f *acroform.TextField) {
-			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: "event.value = 0;"}}}
+			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("event.value = 0;")}}}
 		})},
 		{"group of sub-fields", &acroform.Group{Name: "address", Children: []acroform.Node{
 			newTextField("street"),
@@ -168,15 +168,15 @@ func fieldTestCases() []struct {
 		}()},
 		{"merged widget with mixed AA", func() acroform.Node {
 			f := btn("submitAA", func(f *acroform.ButtonField) {
-				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: "calc();"}}}
+				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("calc();")}}}
 			})
 			withAnnotAA(addWidget(f, 0, 0, 72, 24),
-				&triggers.Annotation{Focus: &action.JavaScript{JS: &pdf.StringOrStream{Value: "focus();"}}})
+				&triggers.Annotation{Focus: &action.JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("focus();")}}})
 			return f
 		}()},
 		{"merged widget field-only AA", func() acroform.Node {
 			f := btn("calcOnly", func(f *acroform.ButtonField) {
-				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: "calc();"}}}
+				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("calc();")}}}
 			})
 			addWidget(f, 0, 0, 72, 24)
 			return f
@@ -295,7 +295,7 @@ func TestDecodeFieldNameStripsPeriod(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
-	if err := w.Put(ref, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.TextString("a.b.c")}); err != nil {
+	if err := w.Put(ref, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.Text("a.b.c")}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -364,7 +364,7 @@ func TestDecodeFieldInheritedType(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a *acroform.TextField kid, got %T", g.Children[0])
 	}
-	if kid.V == nil || kid.V.Value != "hello" {
+	if kid.V == nil || kid.V.Value.String() != "hello" {
 		t.Errorf("kid V = %v, want \"hello\"", kid.V)
 	}
 }
@@ -472,7 +472,7 @@ func TestDecodeGroupDropsOwnEntries(t *testing.T) {
 	parentRef := w.Alloc()
 	kidRef := w.Alloc()
 	if err := w.Put(parentRef, pdf.Dict{
-		"FT": pdf.Name("Tx"), "T": pdf.String("p"), "TU": pdf.TextString("dropped"),
+		"FT": pdf.Name("Tx"), "T": pdf.String("p"), "TU": pdf.Text("dropped"),
 		"Kids": pdf.Array{kidRef},
 	}); err != nil {
 		t.Fatal(err)
@@ -604,9 +604,9 @@ func TestDecodeChoiceOptSkipsNonStrings(t *testing.T) {
 		t.Fatalf("expected *acroform.ChoiceField, got %T", node)
 	}
 	want := []acroform.ChoiceOption{
-		{Export: "plain", Display: "plain"},
-		{Export: "exp", Display: "disp"},
-		{Export: "", Display: ""},
+		{Export: pdf.Text("plain"), Display: pdf.Text("plain")},
+		{Export: pdf.Text("exp"), Display: pdf.Text("disp")},
+		{Export: pdf.Text(""), Display: pdf.Text("")},
 	}
 	if diff := cmp.Diff(want, ch.Opt); diff != "" {
 		t.Errorf("Opt mismatch (-want +got):\n%s", diff)
@@ -617,13 +617,13 @@ func TestDecodeChoiceValueNormalises(t *testing.T) {
 	cases := []struct {
 		name string
 		v    pdf.Object
-		want []string
+		want []pdf.TextString
 	}{
 		{"absent", nil, nil},
-		{"single string", pdf.String("one"), []string{"one"}},
-		{"length-one array", pdf.Array{pdf.String("one")}, []string{"one"}},
-		{"multi array", pdf.Array{pdf.String("a"), pdf.String("b")}, []string{"a", "b"}},
-		{"array skips non-strings", pdf.Array{pdf.String("a"), pdf.Integer(7), pdf.String("b")}, []string{"a", "b"}},
+		{"single string", pdf.String("one"), []pdf.TextString{pdf.Text("one")}},
+		{"length-one array", pdf.Array{pdf.String("one")}, []pdf.TextString{pdf.Text("one")}},
+		{"multi array", pdf.Array{pdf.String("a"), pdf.String("b")}, []pdf.TextString{pdf.Text("a"), pdf.Text("b")}},
+		{"array skips non-strings", pdf.Array{pdf.String("a"), pdf.Integer(7), pdf.String("b")}, []pdf.TextString{pdf.Text("a"), pdf.Text("b")}},
 		{"non-string scalar dropped", pdf.Integer(7), nil},
 	}
 	for _, tc := range cases {
@@ -699,7 +699,7 @@ func TestDecodeFieldInheritanceIgnoresInvalid(t *testing.T) {
 	if f.DefaultAppearance != "/Helv 12 Tf 0 g" {
 		t.Errorf("DA = %q, want the inherited value", f.DefaultAppearance)
 	}
-	if f.V == nil || f.V.Value != "inherited" {
+	if f.V == nil || f.V.Value.String() != "inherited" {
 		t.Errorf("V = %v, want \"inherited\"", f.V)
 	}
 	if f.Align != pdf.TextAlignRight {
@@ -746,7 +746,7 @@ func TestDecodeSignatureValue(t *testing.T) {
 	sigDict := pdf.Dict{
 		"Type":   pdf.Name("Sig"),
 		"Filter": pdf.Name("Adobe.PPKLite"),
-		"Name":   pdf.TextString("A. Signer"),
+		"Name":   pdf.Text("A. Signer"),
 	}
 	if err := w.Put(sigRef, sigDict); err != nil {
 		t.Fatal(err)
@@ -858,7 +858,7 @@ func TestDecodeFieldRepairs(t *testing.T) {
 	if f.V != nil {
 		t.Errorf("password V = %v, want nil", f.V)
 	}
-	if f.DV == nil || f.DV.Value != "default" {
+	if f.DV == nil || f.DV.Value.String() != "default" {
 		t.Errorf("password DV = %v, want \"default\"", f.DV)
 	}
 	if f.DefaultAppearance == "" {
@@ -1037,7 +1037,7 @@ func TestDecodeChoiceValueOrder(t *testing.T) {
 		t.Fatalf("decode failed: %v", err)
 	}
 	ch := node.(*acroform.ChoiceField)
-	if diff := cmp.Diff([]string{"B", "A"}, ch.V); diff != "" {
+	if diff := cmp.Diff([]pdf.TextString{pdf.Text("B"), pdf.Text("A")}, ch.V); diff != "" {
 		t.Errorf("V mismatch (-want +got):\n%s", diff)
 	}
 	if diff := cmp.Diff([]int{0, 1}, ch.Selected); diff != "" {

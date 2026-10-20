@@ -36,7 +36,7 @@ type Movie struct {
 
 	// Title (optional) is the title of the movie annotation. Movie actions may
 	// use this title to reference the movie annotation.
-	Title string
+	Title pdf.TextString
 
 	// Movie is the movie dictionary that describes the movie's static
 	// characteristics.
@@ -77,8 +77,8 @@ func (m *Movie) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// T (optional)
-	if m.Title != "" {
-		dict["T"] = pdf.TextString(m.Title)
+	if !m.Title.IsZero() {
+		dict["T"] = m.Title
 	}
 
 	// Movie (required)

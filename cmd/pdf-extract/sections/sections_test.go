@@ -73,19 +73,19 @@ func TestPages(t *testing.T) {
 	tree := &outline.Outline{
 		Items: []*outline.Item{
 			{
-				Title:       "Introduction",
+				Title:       pdf.Text("Introduction"),
 				Destination: &destination.XYZ{Page: page0Ref, Left: 0, Top: 700, Zoom: 0},
 			},
 			{
-				Title:       "Chapter 1: Getting Started",
+				Title:       pdf.Text("Chapter 1: Getting Started"),
 				Destination: &destination.XYZ{Page: page1Ref, Left: 0, Top: 750, Zoom: 0},
 			},
 			{
-				Title:       "Chapter 2: Advanced Topics",
+				Title:       pdf.Text("Chapter 2: Advanced Topics"),
 				Destination: &destination.XYZ{Page: page2Ref, Left: 0, Top: 600, Zoom: 0},
 			},
 			{
-				Title:       "Conclusion",
+				Title:       pdf.Text("Conclusion"),
 				Destination: &destination.XYZ{Page: page3Ref, Left: 0, Top: 500, Zoom: 0},
 			},
 		},
@@ -209,15 +209,15 @@ func TestPagesSpanningMultiplePages(t *testing.T) {
 	tree := &outline.Outline{
 		Items: []*outline.Item{
 			{
-				Title:       "Preface",
+				Title:       pdf.Text("Preface"),
 				Destination: &destination.XYZ{Page: pageRefs[0], Left: 0, Top: 700, Zoom: 0},
 			},
 			{
-				Title:       "Long Chapter",
+				Title:       pdf.Text("Long Chapter"),
 				Destination: &destination.XYZ{Page: pageRefs[1], Left: 0, Top: 600, Zoom: 0},
 			},
 			{
-				Title:       "Epilogue",
+				Title:       pdf.Text("Epilogue"),
 				Destination: &destination.XYZ{Page: pageRefs[5], Left: 0, Top: 400, Zoom: 0},
 			},
 		},

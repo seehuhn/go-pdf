@@ -94,7 +94,7 @@ func (v *VariableText) fillVarTextDict(rm *pdf.ResourceManager, dict pdf.Dict) e
 		if err := pdf.CheckVersion(w, "field DS entry", pdf.V1_5); err != nil {
 			return err
 		}
-		dict["DS"] = pdf.TextString(v.DefaultStyle)
+		dict["DS"] = pdf.Text(v.DefaultStyle)
 	}
 
 	if v.RichValue != nil {

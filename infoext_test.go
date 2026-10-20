@@ -43,26 +43,26 @@ var infoTestCases = []struct {
 		name:    "title_only",
 		version: pdf.V1_7,
 		info: &pdf.Info{
-			Title: "Test Title",
+			Title: pdf.Text("Test Title"),
 		},
 	},
 	{
 		name:    "all_text_fields",
 		version: pdf.V1_7,
 		info: &pdf.Info{
-			Title:    "Test Title",
-			Author:   "Test Author",
-			Subject:  "Test Subject",
-			Keywords: "test, keywords",
-			Creator:  "Test Creator",
-			Producer: "Test Producer",
+			Title:    pdf.Text("Test Title"),
+			Author:   pdf.Text("Test Author"),
+			Subject:  pdf.Text("Test Subject"),
+			Keywords: pdf.Text("test, keywords"),
+			Creator:  pdf.Text("Test Creator"),
+			Producer: pdf.Text("Test Producer"),
 		},
 	},
 	{
 		name:    "dates",
 		version: pdf.V1_7,
 		info: &pdf.Info{
-			Title:        "Test",
+			Title:        pdf.Text("Test"),
 			CreationDate: pdf.Date(time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)),
 			ModDate:      pdf.Date(time.Date(2024, 6, 20, 14, 30, 0, 0, time.UTC)),
 		},
@@ -71,7 +71,7 @@ var infoTestCases = []struct {
 		name:    "trapped_true",
 		version: pdf.V1_7,
 		info: &pdf.Info{
-			Title:   "Test",
+			Title:   pdf.Text("Test"),
 			Trapped: optional.NewBool(true),
 		},
 	},
@@ -79,7 +79,7 @@ var infoTestCases = []struct {
 		name:    "trapped_false",
 		version: pdf.V1_7,
 		info: &pdf.Info{
-			Title:   "Test",
+			Title:   pdf.Text("Test"),
 			Trapped: optional.NewBool(false),
 		},
 	},
@@ -87,7 +87,7 @@ var infoTestCases = []struct {
 		name:    "trapped_unknown",
 		version: pdf.V1_7,
 		info: &pdf.Info{
-			Title: "Test",
+			Title: pdf.Text("Test"),
 			// Trapped unset = unknown
 		},
 	},
@@ -95,9 +95,9 @@ var infoTestCases = []struct {
 		name:    "custom_fields",
 		version: pdf.V1_7,
 		info: &pdf.Info{
-			Custom: map[string]string{
-				"grumpy": "bärbeißig",
-				"funny":  "\000\001\002 \\<>'\")(",
+			Custom: map[string]pdf.TextString{
+				"grumpy": pdf.Text("bärbeißig"),
+				"funny":  pdf.Text("\000\001\002 \\<>'\")("),
 			},
 		},
 	},
@@ -105,17 +105,17 @@ var infoTestCases = []struct {
 		name:    "full",
 		version: pdf.V2_0,
 		info: &pdf.Info{
-			Title:        "Test Title",
-			Author:       "Test Author",
-			Subject:      "Test Subject",
-			Keywords:     "test, keywords",
-			Creator:      "Test Creator",
-			Producer:     "Test Producer",
+			Title:        pdf.Text("Test Title"),
+			Author:       pdf.Text("Test Author"),
+			Subject:      pdf.Text("Test Subject"),
+			Keywords:     pdf.Text("test, keywords"),
+			Creator:      pdf.Text("Test Creator"),
+			Producer:     pdf.Text("Test Producer"),
 			CreationDate: pdf.Date(time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)),
 			ModDate:      pdf.Date(time.Date(2024, 6, 20, 14, 30, 0, 0, time.UTC)),
 			Trapped:      optional.NewBool(true),
-			Custom: map[string]string{
-				"CustomField": "CustomValue",
+			Custom: map[string]pdf.TextString{
+				"CustomField": pdf.Text("CustomValue"),
 			},
 		},
 	},
@@ -145,7 +145,7 @@ func infoRoundTripTest(t *testing.T, version pdf.Version, original *pdf.Info) {
 
 	// empty Info returns nil
 	if embedded == nil {
-		if original.Title != "" || original.Author != "" || original.Custom != nil {
+		if !original.Title.IsZero() || !original.Author.IsZero() || original.Custom != nil {
 			t.Fatal("unexpected nil for non-empty Info")
 		}
 		return

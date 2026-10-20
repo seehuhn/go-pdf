@@ -106,7 +106,7 @@ func createDocument(filename string) error {
 				URx: pdf.Round(leftColEnd+10, 2),
 				URy: pdf.Round(w.yPos+10, 2),
 			},
-			Contents: string(style),
+			Contents: pdf.Text(string(style)),
 			Color:    color.Black,
 			Flags:    annotation.FlagPrint,
 			Coords: [4]float64{
@@ -140,7 +140,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+10, 2),
 		},
-		Contents: "Common.Border with dash",
+		Contents: pdf.Text("Common.Border with dash"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Border:   &annotation.Border{Width: 2, DashArray: []float64{10, 2}, SingleUse: true},
@@ -166,7 +166,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+10, 2),
 		},
-		Contents: "BorderStyle with dash",
+		Contents: pdf.Text("BorderStyle with dash"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -192,7 +192,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+10, 2),
 		},
-		Contents: "no line style specified",
+		Contents: pdf.Text("no line style specified"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		// the PDF default, which is written by leaving Border out
@@ -220,7 +220,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+10, 2),
 		},
-		Contents: "Border width 0",
+		Contents: pdf.Text("Border width 0"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -248,7 +248,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+15, 2),
 		},
-		Contents: "inline caption",
+		Contents: pdf.Text("inline caption"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -275,7 +275,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+30, 2),
 		},
-		Contents: "shifted inline caption",
+		Contents: pdf.Text("shifted inline caption"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -303,7 +303,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+20, 2),
 		},
-		Contents: "top caption",
+		Contents: pdf.Text("top caption"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -342,7 +342,7 @@ func createDocument(filename string) error {
 				URx: pdf.Round(leftColEnd+10, 2),
 				URy: pdf.Round(w.yPos+30, 2),
 			},
-			Contents: c.contents,
+			Contents: pdf.Text(c.contents),
 			Color:    color.Black,
 			Flags:    annotation.FlagPrint,
 			Coords: [4]float64{
@@ -383,7 +383,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+30, 2),
 		},
-		Contents: "LL=24 (positive)",
+		Contents: pdf.Text("LL=24 (positive)"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -412,7 +412,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+30, 2),
 		},
-		Contents: "LL=-24 (negative)",
+		Contents: pdf.Text("LL=-24 (negative)"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -441,7 +441,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+75, 2),
 		},
-		Contents: "LL=50, LLE=10, LLO=10",
+		Contents: pdf.Text("LL=50, LLE=10, LLO=10"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{
@@ -472,7 +472,7 @@ func createDocument(filename string) error {
 			URx: pdf.Round(leftColEnd+10, 2),
 			URy: pdf.Round(w.yPos+40, 2),
 		},
-		Contents: "LL=24 with caption",
+		Contents: pdf.Text("LL=24 with caption"),
 		Color:    color.Black,
 		Flags:    annotation.FlagPrint,
 		Coords: [4]float64{

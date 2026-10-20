@@ -178,7 +178,7 @@ func (b *formBuilder) addText(name, value string, flags acroform.FieldFlags, rec
 	f.Flags = flags
 	f.DefaultAppearance = textAppearance
 	if value != "" {
-		f.V = &pdf.StringOrStream{Value: value}
+		f.V = &pdf.StringOrStream{Value: pdf.Text(value)}
 	}
 	b.form.Fields = append(b.form.Fields, f)
 	b.attach(f, rect, b.style)
@@ -189,10 +189,10 @@ func (b *formBuilder) addCombo(name string, options []string, value string, rect
 	f.Flags = acroform.FieldCombo
 	f.DefaultAppearance = textAppearance
 	for _, option := range options {
-		f.Opt = append(f.Opt, acroform.ChoiceOption{Display: option, Export: option})
+		f.Opt = append(f.Opt, acroform.ChoiceOption{Display: pdf.Text(option), Export: pdf.Text(option)})
 	}
 	if value != "" {
-		f.V = []string{value}
+		f.V = []pdf.TextString{pdf.Text(value)}
 	}
 	b.form.Fields = append(b.form.Fields, f)
 	b.attach(f, rect, b.style)
@@ -206,7 +206,7 @@ func (b *formBuilder) addCheckBox(name, label string, checked bool, x, top float
 	b.form.Fields = append(b.form.Fields, f)
 
 	mk := fieldStyle()
-	mk.Caption = "4"
+	mk.Caption = pdf.Text("4")
 	b.attach(f, box(x, top, boxSize, boxSize), mk)
 	b.inlineLabel(label, x+boxSize+7, top-boxSize+4)
 }
@@ -221,7 +221,7 @@ func (b *formBuilder) addRadio(name string, options []string, selected pdf.Name,
 	for i, option := range options {
 		x := contentLeft + float64(i)*slot
 		mk := fieldStyle()
-		mk.Caption = "l"
+		mk.Caption = pdf.Text("l")
 		b.attach(f, box(x, top, boxSize, boxSize), mk)
 		b.inlineLabel(option, x+boxSize+7, top-boxSize+4)
 	}
@@ -239,7 +239,7 @@ func (b *formBuilder) addButton(name, caption string, border color.Color, act pd
 	f.Flags = acroform.FieldPushbutton
 	b.form.Fields = append(b.form.Fields, f)
 
-	mk := &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: border, Caption: caption}
+	mk := &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: border, Caption: pdf.Text(caption)}
 	if w := b.attach(f, rect, mk); w != nil {
 		w.Action = act
 	}

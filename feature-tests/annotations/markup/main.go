@@ -80,11 +80,11 @@ func pageReplyThreading(doc *document.MultiPage) error {
 
 	parent := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
-		Contents:     "This paragraph needs revision.\rPlease check the references.",
+		Contents:     pdf.Text("This paragraph needs revision.\rPlease check the references."),
 		Color:        color.DeviceRGB{1, 0.8, 0},
-		User:         "Alice",
+		User:         pdf.Text("Alice"),
 		CreationDate: date(2025, 3, 10),
-		Subject:      "Note",
+		Subject:      pdf.Text("Note"),
 		Icon:         annotation.TextIconComment,
 	}
 
@@ -93,21 +93,21 @@ func pageReplyThreading(doc *document.MultiPage) error {
 
 	reply1 := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
-		Contents:     "I've checked references 3 and 7. Reference 3 is outdated.",
-		User:         "Bob",
+		Contents:     pdf.Text("I've checked references 3 and 7. Reference 3 is outdated."),
+		User:         pdf.Text("Bob"),
 		CreationDate: date(2025, 3, 11),
 		InReplyTo:    parentRef,
-		Subject:      "Reply",
+		Subject:      pdf.Text("Reply"),
 		Icon:         annotation.TextIconComment,
 	}
 
 	reply2 := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
-		Contents:     "Thanks Bob. I've updated reference 3 to the 2024 edition.",
-		User:         "Alice",
+		Contents:     pdf.Text("Thanks Bob. I've updated reference 3 to the 2024 edition."),
+		User:         pdf.Text("Alice"),
 		CreationDate: date(2025, 3, 12),
 		InReplyTo:    parentRef,
-		Subject:      "Reply",
+		Subject:      pdf.Text("Reply"),
 		Icon:         annotation.TextIconComment,
 	}
 
@@ -122,11 +122,11 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 	// caret + strikeout group: a replacement edit
 	caret := &annotation.Caret{
 		Rect:         pdf.Rectangle{LLx: 200, LLy: 600, URx: 209, URy: 607},
-		Contents:     "colour",
+		Contents:     pdf.Text("colour"),
 		Color:        color.DeviceRGB{0, 0, 1},
-		User:         "Editor",
+		User:         pdf.Text("Editor"),
 		CreationDate: date(2025, 1, 15),
-		Subject:      "Replacement",
+		Subject:      pdf.Text("Replacement"),
 	}
 
 	// reserve the caret's reference so the group members can target it via IRT
@@ -135,7 +135,7 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 	strikeout := &annotation.TextMarkup{
 		Rect:         pdf.Rectangle{LLx: 150, LLy: 600, URx: 195, URy: 612},
 		Color:        color.DeviceRGB{0, 0, 1},
-		User:         "Editor",
+		User:         pdf.Text("Editor"),
 		CreationDate: date(2025, 1, 15),
 		InReplyTo:    caretRef,
 		RT:           "Group",
@@ -151,11 +151,11 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 	// reply to the caret
 	replyToCaret := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 200, LLy: 600, URx: 224, URy: 624},
-		Contents:     "Should we use British or American spelling throughout?",
-		User:         "Author",
+		Contents:     pdf.Text("Should we use British or American spelling throughout?"),
+		User:         pdf.Text("Author"),
 		CreationDate: date(2025, 1, 16),
 		InReplyTo:    caretRef,
-		Subject:      "Question",
+		Subject:      pdf.Text("Question"),
 		Icon:         annotation.TextIconHelp,
 	}
 
@@ -165,18 +165,18 @@ func pageGroupingAndNesting(doc *document.MultiPage) error {
 	// nested reply (reply to the reply)
 	nestedReply := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 200, LLy: 600, URx: 224, URy: 624},
-		Contents:     "British spelling for this document.",
-		User:         "Editor",
+		Contents:     pdf.Text("British spelling for this document."),
+		User:         pdf.Text("Editor"),
 		CreationDate: date(2025, 1, 17),
 		InReplyTo:    replyToCaretRef,
-		Subject:      "Answer",
+		Subject:      pdf.Text("Answer"),
 		Icon:         annotation.TextIconComment,
 	}
 
 	// state annotation (review state on the caret)
 	stateAnnot := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 200, LLy: 600, URx: 224, URy: 624},
-		User:         "Author",
+		User:         pdf.Text("Author"),
 		CreationDate: date(2025, 1, 18),
 		InReplyTo:    caretRef,
 		State:        annotation.TextStateAccepted,
@@ -195,11 +195,11 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// highlight
 	hl := &annotation.TextMarkup{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: y - 12, URx: 300, URy: y},
-		Contents:     "This definition is key to the argument.",
+		Contents:     pdf.Text("This definition is key to the argument."),
 		Color:        color.DeviceRGB{1, 1, 0},
-		User:         "Reviewer",
+		User:         pdf.Text("Reviewer"),
 		CreationDate: date(2025, 2, 1),
-		Subject:      "Highlight",
+		Subject:      pdf.Text("Highlight"),
 		Type:         annotation.TextMarkupTypeHighlight,
 		QuadPoints: []vec.Vec2{
 			{X: 72, Y: y}, {X: 300, Y: y},
@@ -212,11 +212,11 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// underline
 	ul := &annotation.TextMarkup{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: y - 12, URx: 250, URy: y},
-		Contents:     "Verify this claim with the source data.",
+		Contents:     pdf.Text("Verify this claim with the source data."),
 		Color:        color.DeviceRGB{0, 0.5, 0},
-		User:         "Reviewer",
+		User:         pdf.Text("Reviewer"),
 		CreationDate: date(2025, 2, 1),
-		Subject:      "Underline",
+		Subject:      pdf.Text("Underline"),
 		Type:         annotation.TextMarkupTypeUnderline,
 		QuadPoints: []vec.Vec2{
 			{X: 72, Y: y}, {X: 250, Y: y},
@@ -229,11 +229,11 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// squiggly
 	sq := &annotation.TextMarkup{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: y - 12, URx: 220, URy: y},
-		Contents:     "Possible grammatical error here.",
+		Contents:     pdf.Text("Possible grammatical error here."),
 		Color:        color.DeviceRGB{1, 0, 0},
-		User:         "Proofreader",
+		User:         pdf.Text("Proofreader"),
 		CreationDate: date(2025, 2, 2),
-		Subject:      "Grammar",
+		Subject:      pdf.Text("Grammar"),
 		Type:         annotation.TextMarkupTypeSquiggly,
 		QuadPoints: []vec.Vec2{
 			{X: 72, Y: y}, {X: 220, Y: y},
@@ -246,10 +246,10 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// freetext
 	ft := &annotation.FreeText{
 		Rect:              pdf.Rectangle{LLx: 72, LLy: y - 40, URx: 350, URy: y},
-		Contents:          "TODO: Add a figure showing the data flow between components.",
-		User:              "Author",
+		Contents:          pdf.Text("TODO: Add a figure showing the data flow between components."),
+		User:              pdf.Text("Author"),
 		CreationDate:      date(2025, 2, 3),
-		Subject:           "FreeText",
+		Subject:           pdf.Text("FreeText"),
 		DefaultAppearance: "/Helvetica 10 Tf 0 0 0 rg",
 	}
 	p.Page.AddAnnots(ft)
@@ -258,11 +258,11 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// stamp
 	st := &annotation.Stamp{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: y - 50, URx: 200, URy: y},
-		Contents:     "Approved by the review board on 2025-02-05.",
+		Contents:     pdf.Text("Approved by the review board on 2025-02-05."),
 		Color:        color.DeviceRGB{0, 0.6, 0},
-		User:         "Chair",
+		User:         pdf.Text("Chair"),
 		CreationDate: date(2025, 2, 5),
-		Subject:      "Approval",
+		Subject:      pdf.Text("Approval"),
 		Icon:         "Approved",
 	}
 	p.Page.AddAnnots(st)
@@ -271,11 +271,11 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// line
 	ln := &annotation.Line{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: y - 30, URx: 300, URy: y},
-		Contents:     "This measurement seems incorrect.",
+		Contents:     pdf.Text("This measurement seems incorrect."),
 		Color:        color.DeviceRGB{1, 0, 0},
-		User:         "Reviewer",
+		User:         pdf.Text("Reviewer"),
 		CreationDate: date(2025, 2, 4),
-		Subject:      "Line",
+		Subject:      pdf.Text("Line"),
 		Coords:       [4]float64{72, y - 15, 300, y - 15},
 	}
 	p.Page.AddAnnots(ln)
@@ -284,11 +284,11 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// square
 	sqr := &annotation.Square{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: y - 60, URx: 200, URy: y},
-		Contents:     "This diagram needs updating.",
+		Contents:     pdf.Text("This diagram needs updating."),
 		Color:        color.DeviceRGB{0, 0, 1},
-		User:         "Reviewer",
+		User:         pdf.Text("Reviewer"),
 		CreationDate: date(2025, 2, 4),
-		Subject:      "Box",
+		Subject:      pdf.Text("Box"),
 	}
 	p.Page.AddAnnots(sqr)
 	y -= 80
@@ -296,11 +296,11 @@ func pageMarkupTypes(doc *document.MultiPage) error {
 	// ink
 	ink := &annotation.Ink{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: y - 40, URx: 200, URy: y},
-		Contents:     "See my handwritten note.",
+		Contents:     pdf.Text("See my handwritten note."),
 		Color:        color.DeviceRGB{0.5, 0, 0.5},
-		User:         "Reviewer",
+		User:         pdf.Text("Reviewer"),
 		CreationDate: date(2025, 2, 6),
-		Subject:      "Ink",
+		Subject:      pdf.Text("Ink"),
 		InkList: [][]vec.Vec2{
 			{{X: 80, Y: y - 10}, {X: 100, Y: y - 30}, {X: 120, Y: y - 10}, {X: 140, Y: y - 30}},
 		},
@@ -317,9 +317,9 @@ func pageEdgeCases(doc *document.MultiPage) error {
 	// annotation without a date (should sort first)
 	nodate := &annotation.Text{
 		Rect:     pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
-		Contents: "This annotation has no creation date.",
-		User:     "Legacy",
-		Subject:  "Undated",
+		Contents: pdf.Text("This annotation has no creation date."),
+		User:     pdf.Text("Legacy"),
+		Subject:  pdf.Text("Undated"),
 		Icon:     annotation.TextIconNote,
 	}
 
@@ -329,34 +329,34 @@ func pageEdgeCases(doc *document.MultiPage) error {
 	// annotation with long multi-paragraph text
 	longText := &annotation.Text{
 		Rect: pdf.Rectangle{LLx: 72, LLy: 650, URx: 96, URy: 674},
-		Contents: "First paragraph of a long annotation. " +
+		Contents: pdf.Text("First paragraph of a long annotation. " +
 			"This contains enough text to require word wrapping " +
 			"when displayed by the pdf-annotations tool. " +
 			"The tool should break lines at 78 characters.\r" +
 			"Second paragraph after a carriage return. " +
 			"This tests the PDF spec requirement that CR (0x0D) " +
 			"separates paragraphs in the Contents string.\r" +
-			"Third and final paragraph.",
-		User:         "Verbose",
+			"Third and final paragraph."),
+		User:         pdf.Text("Verbose"),
 		CreationDate: date(2025, 4, 1),
-		Subject:      "Long Note",
+		Subject:      pdf.Text("Long Note"),
 		Icon:         annotation.TextIconNote,
 	}
 
 	// annotation with empty contents but with subject
 	empty := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: 600, URx: 96, URy: 624},
-		User:         "Marker",
+		User:         pdf.Text("Marker"),
 		CreationDate: date(2025, 4, 2),
-		Subject:      "Empty Note",
+		Subject:      pdf.Text("Empty Note"),
 		Icon:         annotation.TextIconKey,
 	}
 
 	// reply to the undated annotation
 	reply := &annotation.Text{
 		Rect:         pdf.Rectangle{LLx: 72, LLy: 700, URx: 96, URy: 724},
-		Contents:     "Adding a date stamp now.",
-		User:         "Admin",
+		Contents:     pdf.Text("Adding a date stamp now."),
+		User:         pdf.Text("Admin"),
 		CreationDate: date(2025, 5, 1),
 		InReplyTo:    nodateRef,
 		Icon:         annotation.TextIconComment,

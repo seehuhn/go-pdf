@@ -32,7 +32,7 @@ type Viewport struct {
 	BBox pdf.Rectangle
 
 	// Name is a descriptive title of the viewport (optional).
-	Name string
+	Name pdf.TextString
 
 	// Measure specifies the scale and units for measurements within the viewport (optional).
 	Measure Measure
@@ -66,10 +66,10 @@ func ExtractViewport(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Viewport, er
 	}
 	vp.BBox = *bbox
 
-	if name, err := pdf.Optional(c.String(dict["Name"])); err != nil {
+	if name, err := pdf.Optional(c.TextString(dict["Name"])); err != nil {
 		return nil, err
 	} else {
-		vp.Name = string(name)
+		vp.Name = name
 	}
 
 	if measure, err := c.DecodeOptional(dict["Measure"], Extract); err != nil {
@@ -103,8 +103,8 @@ func (v *Viewport) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict["BBox"] = &v.BBox
 
-	if v.Name != "" {
-		dict["Name"] = pdf.String(v.Name)
+	if !v.Name.IsZero() {
+		dict["Name"] = v.Name
 	}
 
 	if v.Measure != nil {

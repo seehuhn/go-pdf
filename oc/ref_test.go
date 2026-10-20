@@ -33,7 +33,7 @@ func TestOCGPointerIdentity(t *testing.T) {
 	// create an OCG dictionary as an indirect object
 	ocgDict := pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString("TestLayer"),
+		"Name": pdf.Text("TestLayer"),
 	}
 	ocgRef := w.Alloc()
 	err := w.Put(ocgRef, ocgDict)
@@ -75,7 +75,7 @@ func TestVEGroupPointerIdentity(t *testing.T) {
 	// create an OCG
 	ocgDict := pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString("Layer"),
+		"Name": pdf.Text("Layer"),
 	}
 	ocgRef := w.Alloc()
 	if err := w.Put(ocgRef, ocgDict); err != nil {
@@ -131,7 +131,7 @@ func TestMembershipSingleRefGroupPointerIdentity(t *testing.T) {
 
 	ocgDict := pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString("Layer"),
+		"Name": pdf.Text("Layer"),
 	}
 	ocgRef := w.Alloc()
 	if err := w.Put(ocgRef, ocgDict); err != nil {
@@ -175,7 +175,7 @@ func TestConditionalPointerIdentity(t *testing.T) {
 	ocgRef := w.Alloc()
 	err := w.Put(ocgRef, pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString("Layer"),
+		"Name": pdf.Text("Layer"),
 	})
 	if err != nil {
 		t.Fatal(err)

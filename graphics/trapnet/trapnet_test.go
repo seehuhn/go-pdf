@@ -50,7 +50,7 @@ var testCases = []struct {
 		name: "trap styles",
 		attrs: &Attributes{
 			PCM:        "DeviceGray",
-			TrapStyles: "default trapping",
+			TrapStyles: pdf.Text("default trapping"),
 		},
 	},
 	{
@@ -70,7 +70,7 @@ var testCases = []struct {
 			TrapRegions: []*opaque.Object{
 				opaque.Direct(pdf.Dict{"Bar": pdf.Name("baz")}),
 			},
-			TrapStyles: "wide traps",
+			TrapStyles: pdf.Text("wide traps"),
 		},
 	},
 }
@@ -162,7 +162,7 @@ func TestExtractRepairsPCM(t *testing.T) {
 	}{
 		{
 			name: "missing PCM",
-			dict: pdf.Dict{"TrapStyles": pdf.TextString("some traps")},
+			dict: pdf.Dict{"TrapStyles": pdf.Text("some traps")},
 		},
 		{
 			name: "unknown PCM",

@@ -68,17 +68,17 @@ var testCases = []testCase{
 	{
 		Name: "Span-Text",
 		Dict: pdf.Dict{
-			"Alt":        pdf.TextString("Alternative text"),
-			"ActualText": pdf.TextString("Actual text"),
-			"E":          pdf.TextString("Expansion"),
-			"Lang":       pdf.TextString("en-US"),
+			"Alt":        pdf.Text("Alternative text"),
+			"ActualText": pdf.Text("Actual text"),
+			"E":          pdf.Text("Expansion"),
+			"Lang":       pdf.Text("en-US"),
 		},
 	},
 	{
 		Name: "OC-OCG",
 		Dict: pdf.Dict{
 			"Type": pdf.Name("OCG"),
-			"Name": pdf.TextString("Layer 1"),
+			"Name": pdf.Text("Layer 1"),
 		},
 	},
 	{

@@ -49,7 +49,7 @@ func borderlessCombWidget(value string, maxLen int, align pdf.TextAlign) *annota
 	f.Flags = acroform.FieldComb
 	f.MaxLen = maxLen
 	f.Align = align
-	f.V = &pdf.StringOrStream{Value: value}
+	f.V = &pdf.StringOrStream{Value: pdf.Text(value)}
 
 	return annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 62, URy: 20})
 }
@@ -243,18 +243,18 @@ func TestWidgetTransparentChrome(t *testing.T) {
 func TestResolveWidgetFieldChoiceValue(t *testing.T) {
 	tests := []struct {
 		name     string
-		v        []string
+		v        []pdf.TextString
 		selected []int
 		want     string
 	}{
-		{"V wins over Selected", []string{"A"}, []int{1}, "A"},
+		{"V wins over Selected", []pdf.TextString{pdf.Text("A")}, []int{1}, "A"},
 		{"Selected alone", nil, []int{1}, "B"},
 		{"nothing selected", nil, nil, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			f := acroform.NewChoiceField("c")
-			f.Opt = []acroform.ChoiceOption{{Export: "a", Display: "A"}, {Export: "b", Display: "B"}}
+			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("a"), Display: pdf.Text("A")}, {Export: pdf.Text("b"), Display: pdf.Text("B")}}
 			f.V = tc.v
 			f.Selected = tc.selected
 			w := annotation.AddWidget(f, pdf.Rectangle{URx: 100, URy: 20})

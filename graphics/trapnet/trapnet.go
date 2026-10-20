@@ -68,7 +68,7 @@ type Attributes struct {
 	TrapRegions []*opaque.Object
 
 	// TrapStyles (optional) describes the trap network to the user.
-	TrapStyles string
+	TrapStyles pdf.TextString
 }
 
 // isValidPCM reports whether name is one of the process colour models
@@ -143,8 +143,8 @@ func (a *Attributes) FillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
 		dict["TrapRegions"] = regions
 	}
 
-	if a.TrapStyles != "" {
-		dict["TrapStyles"] = pdf.TextString(a.TrapStyles)
+	if !a.TrapStyles.IsZero() {
+		dict["TrapStyles"] = a.TrapStyles
 	}
 
 	return nil
@@ -205,7 +205,7 @@ func ExtractAttributes(c pdf.Cursor, dict pdf.Dict) (*Attributes, error) {
 	if styles, err := pdf.Optional(c.TextString(dict["TrapStyles"])); err != nil {
 		return nil, err
 	} else {
-		a.TrapStyles = string(styles)
+		a.TrapStyles = styles
 	}
 
 	return a, nil

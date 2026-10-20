@@ -103,7 +103,7 @@ func TestCryptV1(t *testing.T) {
 }
 
 func TestAuthentication(t *testing.T) {
-	msg := TextString("super secret")
+	msg := Text("super secret")
 	for _, v := range []Version{V1_6, V1_4, V1_3, V1_1} {
 		t.Run("PDF-"+v.String(), func(t *testing.T) {
 			buf := &bytes.Buffer{}
@@ -592,7 +592,7 @@ func TestAuthEmbed(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
-	err = w.Put(ref, TextString("Hello, World!"))
+	err = w.Put(ref, Text("Hello, World!"))
 	if err != nil {
 		t.Fatal(err)
 	}

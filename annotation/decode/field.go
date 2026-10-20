@@ -328,7 +328,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 	switch eff.ft {
 	case "Tx":
 		f := acroform.NewTextField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
+		f.AltName, f.ExportName, f.Flags, f.AA = tu, tm.String(), eff.ff.Normalize(eff.ft), aa
 		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
 			return nil, err
 		}
@@ -357,7 +357,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 
 	case "Btn":
 		f := acroform.NewButtonField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
+		f.AltName, f.ExportName, f.Flags, f.AA = tu, tm.String(), eff.ff.Normalize(eff.ft), aa
 		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
 			return nil, err
 		}
@@ -378,7 +378,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 
 	case "Ch":
 		f := acroform.NewChoiceField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
+		f.AltName, f.ExportName, f.Flags, f.AA = tu, tm.String(), eff.ff.Normalize(eff.ft), aa
 		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
 			return nil, err
 		}
@@ -449,7 +449,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 
 	case "Sig":
 		f := acroform.NewSignatureField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = string(tu), string(tm), eff.ff.Normalize(eff.ft), aa
+		f.AltName, f.ExportName, f.Flags, f.AA = tu, tm.String(), eff.ff.Normalize(eff.ft), aa
 		f.V = sigValue(c, eff.v)
 		f.DV = sigValue(c, eff.dv)
 		if lock, err := c.DecodeOptional(dict["Lock"], sigFieldLock); err != nil {
@@ -527,7 +527,7 @@ func fillVariableText(c pdf.Cursor, dict pdf.Dict, eff inherited, v *acroform.Va
 	v.DefaultAppearance = eff.da
 	v.Align = eff.q
 	if ds, err := pdf.Optional(c.TextString(dict["DS"])); err == nil {
-		v.DefaultStyle = string(ds)
+		v.DefaultStyle = ds.String()
 	}
 	rv, err := stringOrStreamPtr(c, dict["RV"])
 	if err != nil {
@@ -565,7 +565,7 @@ func joinName(prefix, partial string) string {
 // in fully qualified names).
 func partialName(c pdf.Cursor, dict pdf.Dict) string {
 	t, _ := pdf.Optional(c.TextString(dict["T"]))
-	return strings.ReplaceAll(string(t), ".", "")
+	return strings.ReplaceAll(t.String(), ".", "")
 }
 
 // isValidFieldType reports whether name is one of the defined field types.
@@ -594,7 +594,7 @@ func decodeExportValues(c pdf.Cursor, obj pdf.Object, out *[]string) error {
 		if err != nil {
 			return err
 		}
-		opt = append(opt, string(s))
+		opt = append(opt, s.String())
 	}
 	*out = opt
 	return nil
@@ -638,7 +638,7 @@ func remapOptIndex(idx, numOpt int, dropped []int) (int, bool) {
 // string for a single selection or an array of text strings for multiple
 // selections. A malformed length-one array is accepted as a single selection;
 // non-string entries are skipped. The result is nil when nothing is selected.
-func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]string, error) {
+func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]pdf.TextString, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -647,20 +647,20 @@ func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]string, error) {
 		return nil, err
 	}
 	if arr, ok := resolved.(pdf.Array); ok {
-		var vals []string
+		var vals []pdf.TextString
 		for _, el := range arr {
 			s, err := c.Resolve(el)
 			if err != nil {
 				return nil, err
 			}
 			if str, ok := s.(pdf.String); ok {
-				vals = append(vals, string(str.AsTextString()))
+				vals = append(vals, str.AsTextString())
 			}
 		}
 		return vals, nil
 	}
 	if str, ok := resolved.(pdf.String); ok {
-		return []string{string(str.AsTextString())}, nil
+		return []pdf.TextString{str.AsTextString()}, nil
 	}
 	return nil, nil
 }
@@ -668,16 +668,16 @@ func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]string, error) {
 // choiceOptionString reads obj as a text string. It returns false if obj is
 // absent or not a string, so that a non-string /Opt entry is skipped rather
 // than silently turned into an empty option.
-func choiceOptionString(c pdf.Cursor, obj pdf.Object) (string, bool) {
+func choiceOptionString(c pdf.Cursor, obj pdf.Object) (pdf.TextString, bool) {
 	resolved, err := c.Resolve(obj)
 	if err != nil {
-		return "", false
+		return pdf.TextString{}, false
 	}
 	s, ok := resolved.(pdf.String)
 	if !ok {
-		return "", false
+		return pdf.TextString{}, false
 	}
-	return string(s.AsTextString()), true
+	return s.AsTextString(), true
 }
 
 // acroFormDefaults returns the interactive form dictionary's document-wide /DA

@@ -106,10 +106,10 @@ func createDocument(filename string) error {
 		}
 		screen := &annotation.Screen{
 			Rect:       rect,
-			Contents:   "Screen, fit mode " + v.label,
+			Contents:   pdf.Text("Screen, fit mode " + v.label),
 			Flags:      annotation.FlagPrint,
 			Appearance: &appearance.Dict{Normal: app},
-			Title:      v.label,
+			Title:      pdf.Text(v.label),
 		}
 		ref := doc.RM.GetReference(screen)
 
@@ -126,7 +126,7 @@ func createDocument(filename string) error {
 		}
 		screen.Action = &action.Rendition{
 			R: &media.MediaRendition{
-				Name: "form " + v.label,
+				Name: pdf.Text("form " + v.label),
 				Clip: &media.MediaClipData{DataForm: clip},
 				Play: &media.MediaPlayParameters{MustHonour: entries},
 			},

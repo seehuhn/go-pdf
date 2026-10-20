@@ -29,7 +29,7 @@ func TestCustomAnnotation(t *testing.T) {
 	customDict := pdf.Dict{
 		"Subtype":     pdf.Name("CustomType"),
 		"Rect":        pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(100), pdf.Number(50)},
-		"CustomField": pdf.TextString("custom value"),
+		"CustomField": pdf.Text("custom value"),
 	}
 
 	buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)

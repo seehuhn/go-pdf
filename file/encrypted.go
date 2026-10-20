@@ -37,7 +37,7 @@ type EncryptedPayload struct {
 	// used to encrypt the encrypted payload referenced by this dictionary. The
 	// value should consists of integers separated by period characters (e.g.,
 	// "1.0", "2.1.1").
-	Version string
+	Version pdf.Name
 
 	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
@@ -67,10 +67,10 @@ func ExtractEncryptedPayload(c pdf.Cursor, obj pdf.Object, _ bool) (*EncryptedPa
 	}
 
 	// Version (optional)
-	if version, err := pdf.Optional(c.TextString(dict["Version"])); err != nil {
+	if version, err := pdf.Optional(c.Name(dict["Version"])); err != nil {
 		return nil, err
 	} else {
-		ep.Version = string(version)
+		ep.Version = version
 	}
 
 	return ep, nil
@@ -98,7 +98,7 @@ func (ep *EncryptedPayload) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Version (optional)
 	if ep.Version != "" {
-		dict["Version"] = pdf.TextString(ep.Version)
+		dict["Version"] = ep.Version
 	}
 
 	if ep.SingleUse {

@@ -350,9 +350,10 @@ func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 		if r.actualTextStartDepth == -1 && mc.Properties != nil {
 			if at, err := property.ListGet(mc.Properties, property.ExtractActualText); err == nil {
 				r.actualTextStartDepth = r.State.MarkedContentDepth()
-				r.actualTextValue = at.Text
+				text := at.Text.String()
+				r.actualTextValue = text
 				if r.ActualText != nil {
-					if err := r.ActualText(ActualTextBegin, at.Text); err != nil {
+					if err := r.ActualText(ActualTextBegin, text); err != nil {
 						return err
 					}
 				}

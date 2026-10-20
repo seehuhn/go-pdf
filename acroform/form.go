@@ -250,7 +250,7 @@ func (f *InteractiveForm) buildEncNode(rm *pdf.ResourceManager, node Node, seenN
 		}
 		dict := pdf.Dict{}
 		if t.Name != "" {
-			dict["T"] = pdf.TextString(t.Name)
+			dict["T"] = pdf.Text(t.Name)
 		}
 		n := &encNode{group: t, dict: dict}
 		for _, kid := range t.Children {

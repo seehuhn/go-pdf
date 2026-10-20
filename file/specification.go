@@ -42,7 +42,7 @@ type Specification struct {
 	// FileName.
 	//
 	// This corresponds to the /UF entry in the PDF dictionary.
-	FileNameUnicode string
+	FileNameUnicode pdf.TextString
 
 	// FileName specifies the file path in platform-independent format.
 	// Components are separated by forward slashes.
@@ -82,7 +82,7 @@ type Specification struct {
 	// specification. Used for display in user interfaces.
 	//
 	// This corresponds to the /Desc entry in the PDF dictionary.
-	Description string
+	Description pdf.TextString
 
 	// Thumbnail (PDF 2.0) references a thumbnail image stream for the file.
 	//
@@ -151,13 +151,13 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 	if fileName, err := pdf.Optional(c.TextString(dict["F"])); err != nil {
 		return nil, err
 	} else {
-		spec.FileName = string(fileName)
+		spec.FileName = fileName.String()
 	}
 
 	if fileNameUnicode, err := pdf.Optional(c.TextString(dict["UF"])); err != nil {
 		return nil, err
 	} else {
-		spec.FileNameUnicode = string(fileNameUnicode)
+		spec.FileNameUnicode = fileNameUnicode
 	}
 
 	if fileNameDOS, err := pdf.Optional(c.String(dict["DOS"])); err != nil {
@@ -182,7 +182,7 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 	if description, err := pdf.Optional(c.TextString(dict["Desc"])); err != nil {
 		return nil, err
 	} else {
-		spec.Description = string(description)
+		spec.Description = description
 	}
 
 	// ID array
@@ -262,8 +262,8 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 
 	// Ensure at least one filename is set for round-trip compatibility.
 	if spec.FileName == "" && len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
-		if _, ok := pdf.PDFDocEncode(spec.FileNameUnicode); ok && spec.FileNameUnicode != "" {
-			spec.FileName = spec.FileNameUnicode
+		if _, ok := pdf.PDFDocEncode(spec.FileNameUnicode.String()); ok && !spec.FileNameUnicode.IsZero() {
+			spec.FileName = spec.FileNameUnicode.String()
 		} else {
 			spec.FileName = "file"
 		}
@@ -277,7 +277,7 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 // Embed converts the file specification to a PDF dictionary.
 func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// Check version requirements for various fields
-	if spec.FileNameUnicode != "" || spec.CollectionItem != nil {
+	if !spec.FileNameUnicode.IsZero() || spec.CollectionItem != nil {
 		if err := pdf.CheckVersion(rm.Out(), "file specification UF/CI entries", pdf.V1_7); err != nil {
 			return nil, err
 		}
@@ -315,11 +315,11 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// File names
 	if spec.FileName != "" {
-		dict["F"] = pdf.TextString(spec.FileName)
+		dict["F"] = pdf.Text(spec.FileName)
 	}
 
-	if spec.FileNameUnicode != "" {
-		dict["UF"] = pdf.TextString(spec.FileNameUnicode)
+	if !spec.FileNameUnicode.IsZero() {
+		dict["UF"] = spec.FileNameUnicode
 	}
 
 	if len(spec.FileNameDOS) > 0 {
@@ -335,8 +335,8 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// Description
-	if spec.Description != "" {
-		dict["Desc"] = pdf.TextString(spec.Description)
+	if !spec.Description.IsZero() {
+		dict["Desc"] = spec.Description
 	}
 
 	// ID array
@@ -432,7 +432,7 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 // RelatedFile represents an entry in a related files array.
 type RelatedFile struct {
-	Name   string
+	Name   pdf.TextString
 	Stream *Stream
 }
 
@@ -461,7 +461,7 @@ func extractRelatedFiles(c pdf.Cursor, rfDict pdf.Dict) (map[string][]RelatedFil
 				continue // skip malformed stream
 			} else if stream != nil {
 				relatedFiles = append(relatedFiles, RelatedFile{
-					Name:   string(name),
+					Name:   name,
 					Stream: stream,
 				})
 			}
@@ -483,7 +483,7 @@ func encodeRelatedFiles(rm *pdf.EmbedHelper, relatedFiles map[string][]RelatedFi
 		files := relatedFiles[key]
 		var array pdf.Array
 		for _, file := range files {
-			array = append(array, pdf.TextString(file.Name))
+			array = append(array, file.Name)
 			if file.Stream != nil {
 				ref, err := rm.Embed(file.Stream)
 				if err != nil {
@@ -523,7 +523,7 @@ func (spec *Specification) CanBeAF(v pdf.Version) error {
 	}
 
 	// Must have at least one file name
-	if spec.FileName == "" && spec.FileNameUnicode == "" &&
+	if spec.FileName == "" && spec.FileNameUnicode.IsZero() &&
 		len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
 		return pdf.Errorf("file specification must have at least one file name")
 	}

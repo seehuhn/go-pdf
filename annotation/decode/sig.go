@@ -53,8 +53,12 @@ func sigFieldLock(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.SigFieldLock,
 		if _, ok := fieldsObj.(pdf.Array); !ok {
 			return nil, pdf.Error("missing signature field lock Fields entry")
 		}
-		if lock.Fields, err = readTextStringArray(c, fieldsObj); err != nil {
+		names, err := readTextStringArray(c, fieldsObj)
+		if err != nil {
 			return nil, err
+		}
+		for _, n := range names {
+			lock.Fields = append(lock.Fields, n.String())
 		}
 	default:
 		return nil, pdf.Error("invalid signature field lock Action entry")
@@ -164,7 +168,7 @@ func sigSeedValue(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.SigSeedValue,
 	if af, err := pdf.Optional(c.TextString(dict["AppearanceFilter"])); err != nil {
 		return nil, err
 	} else {
-		sv.AppearanceFilter = string(af)
+		sv.AppearanceFilter = af.String()
 	}
 
 	return sv, nil
@@ -246,13 +250,13 @@ func sigCertSeedValue(c pdf.Cursor, obj pdf.Object, isDirect bool) (*acroform.Si
 // readSubjectDN reads the /SubjectDN array of attribute dictionaries.
 // Attributes whose value is not a text string are dropped, as are dictionaries
 // left without attributes.
-func readSubjectDN(c pdf.Cursor, obj pdf.Object) ([]map[pdf.Name]string, error) {
-	return readArray(c, obj, func(el pdf.Object) (map[pdf.Name]string, error) {
+func readSubjectDN(c pdf.Cursor, obj pdf.Object) ([]map[pdf.Name]pdf.TextString, error) {
+	return readArray(c, obj, func(el pdf.Object) (map[pdf.Name]pdf.TextString, error) {
 		d, err := c.Dict(el)
 		if err != nil {
 			return nil, err
 		}
-		attrs := make(map[pdf.Name]string, len(d))
+		attrs := make(map[pdf.Name]pdf.TextString, len(d))
 		for k, v := range d {
 			s, err := c.TextString(v)
 			if pdf.IsMalformed(err) {
@@ -260,7 +264,7 @@ func readSubjectDN(c pdf.Cursor, obj pdf.Object) ([]map[pdf.Name]string, error) 
 			} else if err != nil {
 				return nil, err
 			}
-			attrs[k] = string(s)
+			attrs[k] = s
 		}
 		if len(attrs) == 0 {
 			return nil, pdf.Error("empty SubjectDN attribute dictionary")
@@ -302,10 +306,9 @@ func readNameArray(c pdf.Cursor, obj pdf.Object) ([]pdf.Name, error) {
 }
 
 // readTextStringArray reads an array of text strings.
-func readTextStringArray(c pdf.Cursor, obj pdf.Object) ([]string, error) {
-	return readArray(c, obj, func(el pdf.Object) (string, error) {
-		s, err := c.TextString(el)
-		return string(s), err
+func readTextStringArray(c pdf.Cursor, obj pdf.Object) ([]pdf.TextString, error) {
+	return readArray(c, obj, func(el pdf.Object) (pdf.TextString, error) {
+		return c.TextString(el)
 	})
 }
 

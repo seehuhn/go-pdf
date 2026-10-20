@@ -57,7 +57,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		dict := pdf.Dict{
 			"Subtype":      pdf.Name("TrapNet"),
 			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-			"LastModified": pdf.TextString("D:20231215103000Z"),
+			"LastModified": pdf.Text("D:20231215103000Z"),
 			"Version":      pdf.Array{pdf.NewReference(1, 0)},
 			"AnnotStates":  pdf.Array{pdf.Name("N")},
 		}
@@ -80,7 +80,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		dict := pdf.Dict{
 			"Subtype":      pdf.Name("TrapNet"),
 			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-			"LastModified": pdf.TextString("D:20231215103000Z"),
+			"LastModified": pdf.Text("D:20231215103000Z"),
 			"Version":      pdf.Array{pdf.NewReference(1, 0)},
 		}
 		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
@@ -99,7 +99,7 @@ func TestTrapNetDecodeRepair(t *testing.T) {
 		dict := pdf.Dict{
 			"Subtype":      pdf.Name("TrapNet"),
 			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-			"LastModified": pdf.TextString("D:20231215103000Z"),
+			"LastModified": pdf.Text("D:20231215103000Z"),
 			"AnnotStates":  pdf.Array{pdf.Name("N")},
 		}
 		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
@@ -181,7 +181,7 @@ func TestTrapNetFlagRepair(t *testing.T) {
 		dict := pdf.Dict{
 			"Subtype":      pdf.Name("TrapNet"),
 			"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-			"LastModified": pdf.TextString("D:20231215103000Z"),
+			"LastModified": pdf.Text("D:20231215103000Z"),
 			"F":            flags,
 		}
 		tn, err := decodeTrapNet(pdf.CursorAt(x, nil), dict)
@@ -224,7 +224,7 @@ func TestTrapNetAppearanceRepair(t *testing.T) {
 	dict := pdf.Dict{
 		"Subtype":      pdf.Name("TrapNet"),
 		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-		"LastModified": pdf.TextString("D:20231215103000Z"),
+		"LastModified": pdf.Text("D:20231215103000Z"),
 		"AP":           pdf.Dict{"N": formRef},
 	}
 	if err := w.Close(); err != nil {
@@ -267,7 +267,7 @@ func TestTrapNetRepairKeepsAppearanceShared(t *testing.T) {
 	dict := pdf.Dict{
 		"Subtype":      pdf.Name("TrapNet"),
 		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-		"LastModified": pdf.TextString("D:20231215103000Z"),
+		"LastModified": pdf.Text("D:20231215103000Z"),
 	}
 
 	x := pdf.NewExtractor(mock.Getter)
@@ -317,7 +317,7 @@ func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
 	dict := pdf.Dict{
 		"Subtype":      pdf.Name("TrapNet"),
 		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-		"LastModified": pdf.TextString("D:20231215103000Z"),
+		"LastModified": pdf.Text("D:20231215103000Z"),
 		"AP": pdf.Dict{
 			"N": pdf.Dict{"On": formRef},
 			"D": pdf.Dict{"On": formRef},
@@ -362,12 +362,12 @@ func TestTrapNetAppearanceRepairIsLocal(t *testing.T) {
 // discard data the file legitimately carries.
 func TestTrapNetAppearanceKeepsPrinterMark(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	formRef := writeFormStream(t, w, pdf.Dict{"MarkStyle": pdf.TextString("Colour bar")})
+	formRef := writeFormStream(t, w, pdf.Dict{"MarkStyle": pdf.Text("Colour bar")})
 
 	dict := pdf.Dict{
 		"Subtype":      pdf.Name("TrapNet"),
 		"Rect":         &pdf.Rectangle{URx: 612, URy: 792},
-		"LastModified": pdf.TextString("D:20231215103000Z"),
+		"LastModified": pdf.Text("D:20231215103000Z"),
 		"AP":           pdf.Dict{"N": formRef},
 	}
 	if err := w.Close(); err != nil {

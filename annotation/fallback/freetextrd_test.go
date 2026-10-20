@@ -38,7 +38,7 @@ func TestCalloutNegativeRD(t *testing.T) {
 	// nearest moves it inwards, past the text box's own right edge
 	a := &annotation.FreeText{
 		Rect:              pdf.Rectangle{LLx: 100.1158, LLy: 200, URx: 280.1142, URy: 240},
-		Contents:          "a line of text",
+		Contents:          pdf.Text("a line of text"),
 		Border:            &annotation.Border{Width: 1},
 		Intent:            annotation.FreeTextIntentCallout,
 		DefaultAppearance: "/Helv 12 Tf 0 0 0 rg",
@@ -79,7 +79,7 @@ func TestCalloutRDAtArbitraryCoordinates(t *testing.T) {
 		y := rng.Float64() * 700
 		a := &annotation.FreeText{
 			Rect:              pdf.Rectangle{LLx: x, LLy: y, URx: x + 180, URy: y + 40},
-			Contents:          "a line of text",
+			Contents:          pdf.Text("a line of text"),
 			Border:            &annotation.Border{Width: 1},
 			Intent:            annotation.FreeTextIntentCallout,
 			DefaultAppearance: "/Helv 12 Tf 0 0 0 rg",

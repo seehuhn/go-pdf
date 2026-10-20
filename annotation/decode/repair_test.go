@@ -132,14 +132,14 @@ func TestMissingAppearanceStateFromFieldValue(t *testing.T) {
 	// a field merged with its single widget carries the value itself
 	merged := pdf.Dict{
 		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
-		"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"), "V": pdf.Name("Yes"),
+		"FT": pdf.Name("Btn"), "T": pdf.Text("cb"), "V": pdf.Name("Yes"),
 		"AP": apRef,
 	}
 
 	// a widget kid takes the value from its parent field
 	fieldRef, kidRef := w.Alloc(), w.Alloc()
 	err = w.Put(fieldRef, pdf.Dict{
-		"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"), "V": pdf.Name("Yes"),
+		"FT": pdf.Name("Btn"), "T": pdf.Text("cb"), "V": pdf.Name("Yes"),
 		"Kids": pdf.Array{kidRef},
 	})
 	if err != nil {
@@ -154,14 +154,14 @@ func TestMissingAppearanceStateFromFieldValue(t *testing.T) {
 	otherRadio := pdf.Dict{
 		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
 		"FT": pdf.Name("Btn"), "Ff": pdf.Integer(acroform.FieldRadio),
-		"T": pdf.TextString("r"), "V": pdf.Name("Other"), "AP": apRef,
+		"T": pdf.Text("r"), "V": pdf.Name("Other"), "AP": apRef,
 	}
 
 	// a push button holds no value, so there is no state to take from it
 	pushButton := pdf.Dict{
 		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
 		"FT": pdf.Name("Btn"), "Ff": pdf.Integer(acroform.FieldPushbutton),
-		"T": pdf.TextString("p"), "AP": apRef,
+		"T": pdf.Text("p"), "AP": apRef,
 	}
 
 	cases := []struct {
@@ -264,7 +264,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 		ref := w.Alloc()
 		err := w.Put(ref, pdf.Dict{
 			"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
-			"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"),
+			"FT": pdf.Name("Btn"), "T": pdf.Text("cb"),
 			"V": pdf.Name("Yes"), "AS": pdf.Name("Off"), "AP": apRef,
 		})
 		if err != nil {
@@ -285,7 +285,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 		ref := w.Alloc()
 		err := w.Put(ref, pdf.Dict{
 			"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
-			"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"),
+			"FT": pdf.Name("Btn"), "T": pdf.Text("cb"),
 			"V": pdf.Name("Yes"), "AS": pdf.Name("Maybe"), "AP": apRef,
 		})
 		if err != nil {
@@ -304,7 +304,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 	t.Run("kid", func(t *testing.T) {
 		fieldRef, kidRef := w.Alloc(), w.Alloc()
 		err := w.Put(fieldRef, pdf.Dict{
-			"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"), "V": pdf.Name("Off"),
+			"FT": pdf.Name("Btn"), "T": pdf.Text("cb"), "V": pdf.Name("Off"),
 			"Kids": pdf.Array{kidRef},
 		})
 		if err != nil {
@@ -347,7 +347,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 			ref := w.Alloc()
 			dict := pdf.Dict{
 				"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": &rect,
-				"FT": pdf.Name("Btn"), "T": pdf.TextString("cb"),
+				"FT": pdf.Name("Btn"), "T": pdf.Text("cb"),
 				"V": pdf.Name("Off"), "AP": yesOnly,
 			}
 			if tc.as != nil {
@@ -387,7 +387,7 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 		fieldRef, kidA, kidB := w.Alloc(), w.Alloc(), w.Alloc()
 		err := w.Put(fieldRef, pdf.Dict{
 			"FT": pdf.Name("Btn"), "Ff": pdf.Integer(acroform.FieldRadio),
-			"T": pdf.TextString("rb"), "V": pdf.Name("B"),
+			"T": pdf.Text("rb"), "V": pdf.Name("B"),
 			"Kids": pdf.Array{kidA, kidB},
 		})
 		if err != nil {

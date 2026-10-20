@@ -33,7 +33,7 @@ type Screen struct {
 	// Title is the title of the screen annotation.
 	//
 	// This corresponds to the /T entry in the PDF annotation dictionary.
-	Title string
+	Title pdf.TextString
 
 	// Style (optional) is an appearance characteristics dictionary. Its Icon
 	// provides the icon used in generating the appearance referred to by the
@@ -79,8 +79,8 @@ func (s *Screen) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 	// Add screen-specific fields
 	// T (optional)
-	if s.Title != "" {
-		dict["T"] = pdf.TextString(s.Title)
+	if !s.Title.IsZero() {
+		dict["T"] = s.Title
 	}
 
 	// MK (optional)

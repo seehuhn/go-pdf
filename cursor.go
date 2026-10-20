@@ -239,16 +239,6 @@ func (c Cursor) Date(obj Object) (Date, error) {
 	return s.AsDate()
 }
 
-// TextString resolves any indirect reference and returns the object as a
-// utf-8 encoded text string.
-func (c Cursor) TextString(obj Object) (TextString, error) {
-	s, err := c.String(obj)
-	if err != nil {
-		return "", err
-	}
-	return s.AsTextString(), nil
-}
-
 // StreamReader resolves obj to a stream and returns a reader for its decoded
 // contents. A nil obj, or one that does not resolve to a stream, yields an
 // error wrapping [os.ErrNotExist].

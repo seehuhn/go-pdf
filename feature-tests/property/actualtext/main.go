@@ -120,7 +120,7 @@ func writeTestContent(b *builder.Builder, F font.Layouter) {
 	b.MarkedContentStart(&graphics.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
-			Text:      "replaced",
+			Text:      pdf.Text("replaced"),
 			SingleUse: true,
 		},
 		Inline: true,
@@ -143,7 +143,7 @@ func writeTestContent(b *builder.Builder, F font.Layouter) {
 	b.MarkedContentStart(&graphics.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
-			Text:      "replaced",
+			Text:      pdf.Text("replaced"),
 			SingleUse: true,
 		},
 		Inline: true,
@@ -154,7 +154,7 @@ func writeTestContent(b *builder.Builder, F font.Layouter) {
 	b.MarkedContentStart(&graphics.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
-			Text:      "inner",
+			Text:      pdf.Text("inner"),
 			SingleUse: true,
 		},
 		Inline: true,

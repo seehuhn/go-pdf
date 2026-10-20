@@ -31,21 +31,21 @@ func TestActualTextRoundTrip(t *testing.T) {
 		{
 			name: "SingleUse true, no MCID",
 			at: &ActualText{
-				Text:      "replacement text",
+				Text:      pdf.Text("replacement text"),
 				SingleUse: true,
 			},
 		},
 		{
 			name: "SingleUse false, no MCID",
 			at: &ActualText{
-				Text:      "indirect text",
+				Text:      pdf.Text("indirect text"),
 				SingleUse: false,
 			},
 		},
 		{
 			name: "with MCID",
 			at: func() *ActualText {
-				a := &ActualText{Text: "text with mcid"}
+				a := &ActualText{Text: pdf.Text("text with mcid")}
 				a.MCID.Set(42)
 				return a
 			}(),
@@ -85,10 +85,9 @@ func TestActualTextRoundTrip(t *testing.T) {
 				if obj == nil {
 					t.Fatal("ActualText not found in dict")
 				}
-				// the value may be pdf.TextString or pdf.String depending on path
 				got := obj.AsPDF(0).(pdf.String).AsTextString()
-				if string(got) != tc.at.Text {
-					t.Errorf("Text = %q, want %q", got, tc.at.Text)
+				if got != tc.at.Text {
+					t.Errorf("Text = %q, want %q", got.String(), tc.at.Text.String())
 				}
 			} else {
 				if decoded.AsDirectDict() != nil {
@@ -108,19 +107,19 @@ func TestActualTextAsDirectDict(t *testing.T) {
 	}{
 		{
 			name:     "SingleUse true",
-			at:       &ActualText{Text: "test", SingleUse: true},
+			at:       &ActualText{Text: pdf.Text("test"), SingleUse: true},
 			wantNil:  false,
 			wantKeys: []pdf.Name{"ActualText"},
 		},
 		{
 			name:    "SingleUse false",
-			at:      &ActualText{Text: "test", SingleUse: false},
+			at:      &ActualText{Text: pdf.Text("test"), SingleUse: false},
 			wantNil: true,
 		},
 		{
 			name: "SingleUse true with MCID",
 			at: func() *ActualText {
-				a := &ActualText{Text: "test", SingleUse: true}
+				a := &ActualText{Text: pdf.Text("test"), SingleUse: true}
 				a.MCID.Set(7)
 				return a
 			}(),

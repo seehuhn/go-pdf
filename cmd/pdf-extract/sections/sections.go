@@ -120,7 +120,7 @@ func findMatches(r pdf.Getter, pageNumbers map[pdf.Reference]int, item *outline.
 	}
 
 	// check if current item matches
-	if regex.MatchString(item.Title) {
+	if regex.MatchString(item.Title.String()) {
 		pageNo, yCoord, hasCoord, err := extractDestination(r, pageNumbers, item)
 		if err != nil {
 			return err
@@ -425,8 +425,8 @@ func collectSections(r pdf.Getter, pageNumbers map[pdf.Reference]int, item *outl
 		return
 	}
 
-	if item.Title != "" {
-		line := indent + item.Title
+	if !item.Title.IsZero() {
+		line := indent + item.Title.String()
 
 		pageNo, _, _, err := extractDestination(r, pageNumbers, item)
 		if err == nil {
@@ -493,5 +493,5 @@ func FindNext(r pdf.Getter, pattern string) (string, error) {
 		return "", nil // no next section
 	}
 
-	return nextSection.Title, nil
+	return nextSection.Title.String(), nil
 }

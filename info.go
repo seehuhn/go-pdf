@@ -52,7 +52,7 @@ type Info struct {
 	Trapped optional.Bool
 
 	// Custom contains non-standard fields from the Info dictionary.
-	Custom map[string]string
+	Custom map[string]TextString
 }
 
 // ExtractInfo reads an Info dictionary from a PDF file.
@@ -148,11 +148,11 @@ func ExtractInfo(c Cursor, obj Object, _ bool) (*Info, error) {
 		if standardKeys[key] {
 			continue
 		}
-		if ts, err := c.TextString(val); err == nil && len(ts) > 0 {
+		if ts, err := c.TextString(val); err == nil && !ts.IsZero() {
 			if info.Custom == nil {
-				info.Custom = make(map[string]string)
+				info.Custom = make(map[string]TextString)
 			}
-			info.Custom[string(key)] = string(ts)
+			info.Custom[string(key)] = ts
 		}
 	}
 
@@ -171,8 +171,8 @@ func (info *Info) isEmpty() bool {
 	if info == nil {
 		return true
 	}
-	if info.Title != "" || info.Author != "" || info.Subject != "" ||
-		info.Keywords != "" || info.Creator != "" || info.Producer != "" {
+	if !info.Title.IsZero() || !info.Author.IsZero() || !info.Subject.IsZero() ||
+		!info.Keywords.IsZero() || !info.Creator.IsZero() || !info.Producer.IsZero() {
 		return false
 	}
 	if !info.CreationDate.IsZero() || !info.ModDate.IsZero() {
@@ -194,22 +194,22 @@ func (info *Info) encode(w *Writer) (Dict, error) {
 
 	dict := Dict{}
 
-	if info.Title != "" {
+	if !info.Title.IsZero() {
 		dict["Title"] = info.Title
 	}
-	if info.Author != "" {
+	if !info.Author.IsZero() {
 		dict["Author"] = info.Author
 	}
-	if info.Subject != "" {
+	if !info.Subject.IsZero() {
 		dict["Subject"] = info.Subject
 	}
-	if info.Keywords != "" {
+	if !info.Keywords.IsZero() {
 		dict["Keywords"] = info.Keywords
 	}
-	if info.Creator != "" {
+	if !info.Creator.IsZero() {
 		dict["Creator"] = info.Creator
 	}
-	if info.Producer != "" {
+	if !info.Producer.IsZero() {
 		dict["Producer"] = info.Producer
 	}
 	if !info.CreationDate.IsZero() {
@@ -230,7 +230,7 @@ func (info *Info) encode(w *Writer) (Dict, error) {
 	}
 	// unset Trapped is not written - PDF default is Unknown
 	for key, val := range info.Custom {
-		dict[Name(key)] = TextString(val)
+		dict[Name(key)] = val
 	}
 
 	return dict, nil

@@ -92,7 +92,7 @@ func createDocument(filename string) error {
 
 	// 1. default (Draft), no color
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "Draft (default, no color)",
+		Contents: pdf.Text("Draft (default, no color)"),
 		Flags:    annotation.FlagPrint,
 	})
 	if err != nil {
@@ -101,7 +101,7 @@ func createDocument(filename string) error {
 
 	// 2. Approved
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "Approved",
+		Contents: pdf.Text("Approved"),
 		Flags:    annotation.FlagPrint,
 		Icon:     annotation.StampIconApproved,
 	})
@@ -111,7 +111,7 @@ func createDocument(filename string) error {
 
 	// 3. Confidential
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "Confidential",
+		Contents: pdf.Text("Confidential"),
 		Flags:    annotation.FlagPrint,
 		Icon:     annotation.StampIconConfidential,
 	})
@@ -121,7 +121,7 @@ func createDocument(filename string) error {
 
 	// 4. NotForPublicRelease (longest name)
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "NotForPublicRelease",
+		Contents: pdf.Text("NotForPublicRelease"),
 		Flags:    annotation.FlagPrint,
 		Icon:     annotation.StampIconNotForPublicRelease,
 	})
@@ -131,7 +131,7 @@ func createDocument(filename string) error {
 
 	// 5. TopSecret with blue color
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "TopSecret, blue",
+		Contents: pdf.Text("TopSecret, blue"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		Icon:     annotation.StampIconTopSecret,
@@ -142,7 +142,7 @@ func createDocument(filename string) error {
 
 	// 6. Final with green color
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "Final, green",
+		Contents: pdf.Text("Final, green"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.DeviceRGB{0, 0.5, 0},
 		Icon:     annotation.StampIconFinal,
@@ -153,7 +153,7 @@ func createDocument(filename string) error {
 
 	// 7. Draft with border
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "Draft, Border.Width=3",
+		Contents: pdf.Text("Draft, Border.Width=3"),
 		Flags:    annotation.FlagPrint,
 		Border:   &annotation.Border{Width: 3, SingleUse: true},
 		Icon:     annotation.StampIconDraft,
@@ -164,7 +164,7 @@ func createDocument(filename string) error {
 
 	// 8. Expired
 	err = w.addStampPair(&annotation.Stamp{
-		Contents: "Expired",
+		Contents: pdf.Text("Expired"),
 		Flags:    annotation.FlagPrint,
 		Icon:     annotation.StampIconExpired,
 	})
@@ -190,7 +190,7 @@ func (w *writer) addStampPair(left *annotation.Stamp) error {
 	w.page.TextBegin()
 	w.page.TextSetFont(w.font, 9)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-stampH/2-3))
-	w.page.TextShow(left.Contents)
+	w.page.TextShow(left.Contents.String())
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -201,7 +201,7 @@ func (w *writer) addStampPair(left *annotation.Stamp) error {
 		URx: leftColStart + stampW,
 		URy: w.yPos,
 	}
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightColStart,
@@ -209,7 +209,7 @@ func (w *writer) addStampPair(left *annotation.Stamp) error {
 		URx: rightColStart + stampW,
 		URy: w.yPos,
 	}
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	err := w.style.AddAppearance(right)
 	if err != nil {

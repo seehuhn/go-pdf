@@ -131,20 +131,20 @@ func TestRangeFormat(t *testing.T) {
 		offset int
 		want   string
 	}{
-		{Range{Decimal, "", 1}, 0, "1"},
-		{Range{Decimal, "", 1}, 4, "5"},
-		{Range{LowerRoman, "", 1}, 0, "i"},
-		{Range{LowerRoman, "", 1}, 3, "iv"},
-		{Range{UpperRoman, "", 1}, 0, "I"},
-		{Range{Decimal, "A-", 8}, 0, "A-8"},
-		{Range{Decimal, "A-", 8}, 2, "A-10"},
-		{Range{None, "Contents", 1}, 0, "Contents"},
-		{Range{None, "Contents", 1}, 5, "Contents"},
-		{Range{LowerAlpha, "", 1}, 0, "a"},
-		{Range{LowerAlpha, "", 1}, 25, "z"},
-		{Range{LowerAlpha, "", 1}, 26, "aa"},
-		{Range{UpperAlpha, "", 1}, 0, "A"},
-		{Range{UpperAlpha, "", 1}, 26, "AA"},
+		{Range{Decimal, pdf.Text(""), 1}, 0, "1"},
+		{Range{Decimal, pdf.Text(""), 1}, 4, "5"},
+		{Range{LowerRoman, pdf.Text(""), 1}, 0, "i"},
+		{Range{LowerRoman, pdf.Text(""), 1}, 3, "iv"},
+		{Range{UpperRoman, pdf.Text(""), 1}, 0, "I"},
+		{Range{Decimal, pdf.Text("A-"), 8}, 0, "A-8"},
+		{Range{Decimal, pdf.Text("A-"), 8}, 2, "A-10"},
+		{Range{None, pdf.Text("Contents"), 1}, 0, "Contents"},
+		{Range{None, pdf.Text("Contents"), 1}, 5, "Contents"},
+		{Range{LowerAlpha, pdf.Text(""), 1}, 0, "a"},
+		{Range{LowerAlpha, pdf.Text(""), 1}, 25, "z"},
+		{Range{LowerAlpha, pdf.Text(""), 1}, 26, "aa"},
+		{Range{UpperAlpha, pdf.Text(""), 1}, 0, "A"},
+		{Range{UpperAlpha, pdf.Text(""), 1}, 26, "AA"},
 	}
 	for _, tc := range tests {
 		got := tc.r.Format(tc.offset)
@@ -222,7 +222,7 @@ func TestExtract(t *testing.T) {
 			pdf.Integer(4), pdf.Dict{"S": pdf.Name("D")},
 			pdf.Integer(7), pdf.Dict{
 				"S":  pdf.Name("D"),
-				"P":  pdf.TextString("A-"),
+				"P":  pdf.Text("A-"),
 				"St": pdf.Integer(8),
 			},
 		},
@@ -236,7 +236,7 @@ func TestExtract(t *testing.T) {
 	want := []Entry{
 		{FirstPage: 0, Style: LowerRoman, Start: 1},
 		{FirstPage: 4, Style: Decimal, Start: 1},
-		{FirstPage: 7, Style: Decimal, Prefix: "A-", Start: 8},
+		{FirstPage: 7, Style: Decimal, Prefix: pdf.Text("A-"), Start: 8},
 	}
 	if diff := cmp.Diff(want, labels.Ranges); diff != "" {
 		t.Errorf("wrong ranges (-want +got):\n%s", diff)
@@ -312,7 +312,7 @@ func TestExtractNegativeKey(t *testing.T) {
 // Extract → Embed → Extract unchanged, so read/write parity holds.
 func TestRoundTripClampedStart(t *testing.T) {
 	labels, err := New(
-		Entry{0, Range{LowerAlpha, "", limits.MaxPageLabelStart}},
+		Entry{0, Range{LowerAlpha, pdf.Text(""), limits.MaxPageLabelStart}},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -403,9 +403,9 @@ func TestRangeAt(t *testing.T) {
 func newTestLabels(t *testing.T) *Labels {
 	t.Helper()
 	labels, err := New(
-		Entry{0, Range{LowerRoman, "", 1}},
-		Entry{4, Range{Decimal, "", 1}},
-		Entry{7, Range{Decimal, "A-", 8}},
+		Entry{0, Range{LowerRoman, pdf.Text(""), 1}},
+		Entry{4, Range{Decimal, pdf.Text(""), 1}},
+		Entry{7, Range{Decimal, pdf.Text("A-"), 8}},
 	)
 	if err != nil {
 		t.Fatal(err)

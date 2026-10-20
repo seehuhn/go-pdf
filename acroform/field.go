@@ -94,18 +94,18 @@ func terminalEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 	if strings.Contains(b.Name, ".") {
 		return nil, errors.New("field partial name must not contain a period")
 	}
-	dict["T"] = pdf.TextString(b.Name)
-	if b.AltName != "" {
+	dict["T"] = pdf.Text(b.Name)
+	if !b.AltName.IsZero() {
 		if err := pdf.CheckVersion(rm.Out, "field TU entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["TU"] = pdf.TextString(b.AltName)
+		dict["TU"] = b.AltName
 	}
 	if b.ExportName != "" {
 		if err := pdf.CheckVersion(rm.Out, "field TM entry", pdf.V1_3); err != nil {
 			return nil, err
 		}
-		dict["TM"] = pdf.TextString(b.ExportName)
+		dict["TM"] = pdf.Text(b.ExportName)
 	}
 	if b.Flags != 0 {
 		if err := checkFlags(f.FieldType(), b.Flags); err != nil {

@@ -43,7 +43,7 @@ type Dict struct {
 
 	// PageLabel (optional) selects the target page by its page label.
 	// A non-empty value takes precedence over PageIndex.
-	PageLabel string
+	PageLabel pdf.TextString
 
 	// ID (optional) is the file identifier of the target file: a slice of
 	// two byte strings, as in the target file's trailer.
@@ -92,8 +92,8 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	dict := pdf.Dict{"F": fObj}
 
-	if d.PageLabel != "" {
-		dict["Page"] = pdf.TextString(d.PageLabel)
+	if !d.PageLabel.IsZero() {
+		dict["Page"] = d.PageLabel
 	} else {
 		dict["Page"] = pdf.Integer(d.PageIndex)
 	}
@@ -142,7 +142,7 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Dict, error) {
 			d.PageIndex = int(p)
 		}
 	case pdf.String:
-		d.PageLabel = string(p.AsTextString())
+		d.PageLabel = p.AsTextString()
 	}
 
 	if idArray, err := pdf.Optional(c.Array(dict["ID"])); err != nil {

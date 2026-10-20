@@ -864,7 +864,7 @@ types:
     required: true
     introduced: '2.0'
   - goName: Version
-    goType: string
+    goType: pdf.Name
     pdfKey: Version
     pdfType: name
     required: false
@@ -1214,7 +1214,7 @@ types:
     required: fn:IsRequired(fn:Not(fn:IsPresent(DOS)) && fn:Not(fn:IsPresent(Mac)) && fn:Not(fn:IsPresent(Unix)))
     introduced: '1.1'
   - goName: FileNameUnicode
-    goType: string
+    goType: pdf.TextString
     pdfKey: UF
     pdfType: text-string
     required: false
@@ -1271,9 +1271,9 @@ types:
     refTypes:
     - FileSpecRF
   - goName: Description
-    goType: string
+    goType: pdf.TextString
     pdfKey: Desc
-    pdfType: string
+    pdfType: text-string
     required: false
     introduced: '1.6'
   - goName: CollectionItem
@@ -2130,7 +2130,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.3'
-    goType: string
+    goType: pdf.TextString
   - goName: Start
     pdfKey: St
     pdfType: integer
@@ -3272,7 +3272,7 @@ types:
     required: fn:IsRequired(fn:Not(fn:IsPresent(DOS)) && fn:Not(fn:IsPresent(Mac)) && fn:Not(fn:IsPresent(Unix)))
     introduced: '1.7'
   - goName: FileNameUnicode
-    goType: string
+    goType: pdf.TextString
     pdfKey: UF
     pdfType: text-string
     required: false
@@ -3329,9 +3329,9 @@ types:
     refTypes:
     - FileSpecRF
   - goName: Description
-    goType: string
+    goType: pdf.TextString
     pdfKey: Desc
-    pdfType: string
+    pdfType: text-string
     required: false
     introduced: '1.7'
   - goName: CollectionItem

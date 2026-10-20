@@ -112,7 +112,7 @@ func createDocument(filename string) error {
 	// different ways of setting the border width
 
 	a := &annotation.Link{
-		Contents:  "default border width",
+		Contents:  pdf.Text("default border width"),
 		Flags:     annotation.FlagPrint,
 		Color:     w.LinkCol,
 		Border:    &annotation.Border{Width: 1, SingleUse: true},
@@ -125,7 +125,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Contents: "Common.Border.Width=2",
+		Contents: pdf.Text("Common.Border.Width=2"),
 		Flags:    annotation.FlagPrint,
 		Color:    w.LinkCol,
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
@@ -137,7 +137,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Contents:    "BorderStyle.Width=2",
+		Contents:    pdf.Text("BorderStyle.Width=2"),
 		Flags:       annotation.FlagPrint,
 		Color:       w.LinkCol,
 		Action:      &action.URI{URI: "https://www.example.com/"},
@@ -149,7 +149,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Contents:    "default border color",
+		Contents:    pdf.Text("default border color"),
 		Flags:       annotation.FlagPrint,
 		Action:      &action.URI{URI: "https://www.example.com/"},
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
@@ -160,7 +160,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Link{
-		Contents:    "transparent border",
+		Contents:    pdf.Text("transparent border"),
 		Flags:       annotation.FlagPrint,
 		Color:       nil,
 		Action:      &action.URI{URI: "https://www.example.com/"},
@@ -184,7 +184,7 @@ func createDocument(filename string) error {
 		}
 
 		a := &annotation.Link{
-			Contents:    "frame style " + string(style),
+			Contents:    pdf.Text("frame style " + string(style)),
 			Flags:       annotation.FlagPrint,
 			Color:       w.LinkCol,
 			Action:      &action.URI{URI: "https://www.example.com/"},
@@ -350,7 +350,7 @@ func (w *writer) makeLink(text string) []vec.Vec2 {
 func (w *writer) addAnnotationPair(left *annotation.Link) error {
 	page := w.Page
 
-	text := left.Common.Contents
+	text := left.Common.Contents.String()
 
 	const (
 		margin = 30.0
@@ -380,7 +380,7 @@ func (w *writer) addAnnotationPair(left *annotation.Link) error {
 		URx: pdf.Round(leftX+boxW, 2),
 		URy: pdf.Round(w.yPos+14, 2),
 	}
-	left.Common.Contents = "www.example.com (viewer)"
+	left.Common.Contents = pdf.Text("www.example.com (viewer)")
 	w.addAnnotation(left)
 
 	right.Common.Rect = pdf.Rectangle{
@@ -389,7 +389,7 @@ func (w *writer) addAnnotationPair(left *annotation.Link) error {
 		URx: pdf.Round(rightX+boxW, 2),
 		URy: pdf.Round(w.yPos+14, 2),
 	}
-	right.Common.Contents = "www.example.com (quire)"
+	right.Common.Contents = pdf.Text("www.example.com (quire)")
 	err := w.style.AddAppearance(right)
 	if err != nil {
 		return err
@@ -459,7 +459,7 @@ func (w *writer) MakeAnnotation(url string, title string, bs *annotation.BorderS
 	}
 
 	link := &annotation.Link{
-		Contents:    title,
+		Contents:    pdf.Text(title),
 		Flags:       annotation.FlagPrint,
 		Action:      &action.URI{URI: url},
 		Highlight:   annotation.HighlightInvert,

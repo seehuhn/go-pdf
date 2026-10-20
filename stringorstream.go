@@ -28,7 +28,7 @@ import (
 type StringOrStream struct {
 	// Value is the logical text content, decoded from whichever form the file
 	// used.
-	Value string
+	Value TextString
 
 	// IsStream reports whether the value is held as a stream rather than an
 	// inline text string.  It is preserved across a read so that a value stored
@@ -44,7 +44,7 @@ type StringOrStream struct {
 func (s StringOrStream) Embed(e *EmbedHelper) (Native, error) {
 	// the stream form is a text stream, so both forms share the text-string
 	// encoding (PDF 32000-2 §7.9.3)
-	encoded := TextString(s.Value).AsPDF(e.Out().GetOptions()).(String)
+	encoded := s.Value.AsPDF(e.Out().GetOptions()).(String)
 	if !s.IsStream {
 		return encoded, nil
 	}
@@ -80,13 +80,13 @@ func (c Cursor) StringOrStream(obj Object) (StringOrStream, error) {
 	}
 	switch v := resolved.(type) {
 	case String:
-		return StringOrStream{Value: string(v.AsTextString())}, nil
+		return StringOrStream{Value: v.AsTextString()}, nil
 	case *Stream:
 		data, err := ReadAll(c.x.R, c.path, v, limits.MaxStringOrStreamBytes)
 		if err != nil {
 			return StringOrStream{}, err
 		}
-		return StringOrStream{Value: string(String(data).AsTextString()), IsStream: true}, nil
+		return StringOrStream{Value: String(data).AsTextString(), IsStream: true}, nil
 	default:
 		return StringOrStream{}, nil
 	}

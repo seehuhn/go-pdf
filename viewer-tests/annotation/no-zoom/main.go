@@ -363,7 +363,7 @@ func writePage(doc *document.MultiPage, F, B font.Instance, rotate page.Rotation
 		p.Page.AddAnnots(&annotation.Text{
 			Rect:     rect,
 			Flags:    annotation.FlagPrint,
-			Contents: string(icon),
+			Contents: pdf.Text(string(icon)),
 			Icon:     icon,
 		})
 		u, v := f.point(rect.LLx, rect.URy)

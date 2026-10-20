@@ -95,7 +95,7 @@ func run() error {
 
 	ft := &annotation.FreeText{
 		Rect:     rect,
-		Contents: message,
+		Contents: pdf.Text(message),
 		// Lock the annotation so viewers do not let the user edit the text.
 		// Editing would make the viewer regenerate the appearance, which
 		// cannot reproduce this annotation's frame colour or vertical

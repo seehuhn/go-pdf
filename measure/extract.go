@@ -64,7 +64,7 @@ func extractRectilinearMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Rec
 		return nil, err
 	}
 	if len(rm.XAxis) == 0 {
-		rm.XAxis = []*NumberFormat{{Unit: "pt", ConversionFactor: 1, Precision: 100, DecimalSeparator: "."}}
+		rm.XAxis = []*NumberFormat{{Unit: pdf.Text("pt"), ConversionFactor: 1, Precision: 100, DecimalSeparator: pdf.Text(".")}}
 	}
 
 	// Extract Y axis - if missing, leave as nil
@@ -81,8 +81,8 @@ func extractRectilinearMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Rec
 	// Note: YAxis remains nil if not present in PDF
 
 	// Extract ScaleRatio - if missing or empty, autogenerate from X/Y arrays
-	scaleRatio, _ := pdf.Optional(c.String(dict["R"]))
-	if string(scaleRatio) == "" {
+	scaleRatio, _ := pdf.Optional(c.TextString(dict["R"]))
+	if scaleRatio.IsZero() {
 		// autogenerate scale ratio from X (and Y if different)
 		if len(rm.XAxis) > 0 {
 			xFactor := rm.XAxis[0].ConversionFactor
@@ -93,18 +93,18 @@ func extractRectilinearMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Rec
 				// X and Y differ
 				yFactor := rm.YAxis[0].ConversionFactor
 				yUnit := rm.YAxis[0].Unit
-				scaleRatio = pdf.String(fmt.Sprintf("in X 1 pt = %g %s, in Y 1 pt = %g %s",
+				scaleRatio = pdf.Text(fmt.Sprintf("in X 1 pt = %g %s, in Y 1 pt = %g %s",
 					xFactor, xUnit, yFactor, yUnit))
 			} else {
 				// X and Y same (or Y not present)
-				scaleRatio = pdf.String(fmt.Sprintf("1 pt = %g %s", xFactor, xUnit))
+				scaleRatio = pdf.Text(fmt.Sprintf("1 pt = %g %s", xFactor, xUnit))
 			}
 		} else {
 			// fallback if XAxis is empty or malformed
-			scaleRatio = pdf.String("1:1")
+			scaleRatio = pdf.Text("1:1")
 		}
 	}
-	rm.ScaleRatio = string(scaleRatio)
+	rm.ScaleRatio = scaleRatio
 
 	// Extract Distance
 	dArray, err := c.Array(dict["D"])
@@ -116,7 +116,7 @@ func extractRectilinearMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Rec
 		return nil, err
 	}
 	if len(rm.Distance) == 0 {
-		rm.Distance = []*NumberFormat{{Unit: "pt", ConversionFactor: 1, Precision: 100, DecimalSeparator: "."}}
+		rm.Distance = []*NumberFormat{{Unit: pdf.Text("pt"), ConversionFactor: 1, Precision: 100, DecimalSeparator: pdf.Text(".")}}
 	}
 
 	// Extract Area
@@ -129,7 +129,7 @@ func extractRectilinearMeasure(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Rec
 		return nil, err
 	}
 	if len(rm.Area) == 0 {
-		rm.Area = []*NumberFormat{{Unit: "pt²", ConversionFactor: 1, Precision: 100, DecimalSeparator: "."}}
+		rm.Area = []*NumberFormat{{Unit: pdf.Text("pt²"), ConversionFactor: 1, Precision: 100, DecimalSeparator: pdf.Text(".")}}
 	}
 
 	// Extract optional fields

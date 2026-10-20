@@ -67,7 +67,7 @@ type V20 struct {
 // Tag20 is a TIFF tag number paired with one or more ASCII values.
 type Tag20 struct {
 	Num  int
-	Text []string
+	Text []pdf.TextString
 }
 
 // Inks20 specifies the colourants applied to an OPI 2.0 proxy image. Exactly
@@ -153,11 +153,11 @@ func (v *V20) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		for _, t := range v.Tags {
 			arr = append(arr, pdf.Integer(t.Num))
 			if len(t.Text) == 1 {
-				arr = append(arr, pdf.TextString(t.Text[0]))
+				arr = append(arr, t.Text[0])
 			} else {
 				texts := make(pdf.Array, len(t.Text))
 				for i, s := range t.Text {
-					texts[i] = pdf.TextString(s)
+					texts[i] = s
 				}
 				arr = append(arr, texts)
 			}
@@ -286,7 +286,7 @@ func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
 
 // readTagText reads an OPI 2.0 tag value, which is a single ASCII string or an
 // array of ASCII strings.  The result is nil if the value is malformed.
-func readTagText(c pdf.Cursor, obj pdf.Object) ([]string, error) {
+func readTagText(c pdf.Cursor, obj pdf.Object) ([]pdf.TextString, error) {
 	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
@@ -296,19 +296,19 @@ func readTagText(c pdf.Cursor, obj pdf.Object) ([]string, error) {
 		if len(t) == 0 {
 			return nil, nil
 		}
-		out := make([]string, 0, len(t))
+		out := make([]pdf.TextString, 0, len(t))
 		for _, el := range t {
-			s, err := c.String(el)
+			s, err := c.TextString(el)
 			if pdf.IsMalformed(err) {
 				return nil, nil
 			} else if err != nil {
 				return nil, err
 			}
-			out = append(out, string(s.AsTextString()))
+			out = append(out, s)
 		}
 		return out, nil
 	case pdf.String:
-		return []string{string(t.AsTextString())}, nil
+		return []pdf.TextString{t.AsTextString()}, nil
 	default:
 		return nil, nil
 	}

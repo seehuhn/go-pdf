@@ -380,7 +380,7 @@ func writeBaseFile(t *testing.T, opt *WriterOptions, title string) []byte {
 	if err := addPage(w); err != nil {
 		t.Fatal(err)
 	}
-	w.GetMeta().Info.Title = TextString(title)
+	w.GetMeta().Info.Title = Text(title)
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}

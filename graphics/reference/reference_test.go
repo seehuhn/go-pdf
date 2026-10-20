@@ -48,7 +48,7 @@ var testCases = []struct {
 		name: "page label",
 		dict: &Dict{
 			F:         &file.Specification{FileName: "target.pdf", AFRelationship: file.RelationshipUnspecified},
-			PageLabel: "iv",
+			PageLabel: pdf.Text("iv"),
 		},
 	},
 	{

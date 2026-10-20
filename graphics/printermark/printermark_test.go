@@ -50,7 +50,7 @@ var testCases = []struct {
 }{
 	{
 		name:  "mark style only",
-		attrs: &Attributes{MarkStyle: "Registration target"},
+		attrs: &Attributes{MarkStyle: pdf.Text("Registration target")},
 	},
 	{
 		name: "single colorant",
@@ -63,7 +63,7 @@ var testCases = []struct {
 	{
 		name: "mark style and colorants",
 		attrs: &Attributes{
-			MarkStyle: "Colour bar",
+			MarkStyle: pdf.Text("Colour bar"),
 			Colorants: map[pdf.Name]*color.SpaceSeparation{
 				"Spot1": separation("Spot1"),
 				"Spot2": separation("Spot2"),
@@ -238,7 +238,7 @@ func TestFillDictVersion(t *testing.T) {
 	buf, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(buf)
 
-	_, err := rm.Embed(&carrier{attrs: &Attributes{MarkStyle: "x"}})
+	_, err := rm.Embed(&carrier{attrs: &Attributes{MarkStyle: pdf.Text("x")}})
 	if !pdf.IsWrongVersion(err) {
 		t.Errorf("expected a version error, got %v", err)
 	}
@@ -325,7 +325,7 @@ func TestExtractEmptyIsAbsent(t *testing.T) {
 		},
 		{
 			name: "empty MarkStyle",
-			dict: pdf.Dict{"MarkStyle": pdf.TextString("")},
+			dict: pdf.Dict{"MarkStyle": pdf.Text("")},
 		},
 		{
 			name: "Colorants of the wrong type",

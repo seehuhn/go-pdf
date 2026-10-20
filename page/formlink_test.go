@@ -55,10 +55,10 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 
 	put(mergedRef, pdf.Dict{
 		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"),
-		"FT": pdf.Name("Tx"), "T": pdf.TextString("merged"), "Rect": rect,
+		"FT": pdf.Name("Tx"), "T": pdf.Text("merged"), "Rect": rect,
 	})
 	put(multiRef, pdf.Dict{
-		"FT": pdf.Name("Tx"), "T": pdf.TextString("multi"),
+		"FT": pdf.Name("Tx"), "T": pdf.Text("multi"),
 		"Kids": pdf.Array{wA, wB},
 	})
 	put(wA, pdf.Dict{"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": rect, "Parent": multiRef})

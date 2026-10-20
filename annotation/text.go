@@ -93,7 +93,7 @@ func (t *Text) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "text annotation State entry", pdf.V1_5); err != nil {
 			return nil, err
 		}
-		if t.Markup.User == "" {
+		if t.Markup.User.IsZero() {
 			return nil, errors.New("missing User")
 		}
 		if t.Markup.InReplyTo == 0 {
@@ -102,27 +102,27 @@ func (t *Text) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 
 		switch t.State {
 		case TextStateUnmarked:
-			dict["StateModel"] = pdf.TextString("Marked")
-			// dict["State"] = pdf.TextString("Unmarked")
+			dict["StateModel"] = pdf.Text("Marked")
+			// dict["State"] = pdf.Text("Unmarked")
 		case TextStateMarked:
-			dict["StateModel"] = pdf.TextString("Marked")
-			dict["State"] = pdf.TextString("Marked")
+			dict["StateModel"] = pdf.Text("Marked")
+			dict["State"] = pdf.Text("Marked")
 
 		case TextStateAccepted:
-			dict["StateModel"] = pdf.TextString("Review")
-			dict["State"] = pdf.TextString("Accepted")
+			dict["StateModel"] = pdf.Text("Review")
+			dict["State"] = pdf.Text("Accepted")
 		case TextStateRejected:
-			dict["StateModel"] = pdf.TextString("Review")
-			dict["State"] = pdf.TextString("Rejected")
+			dict["StateModel"] = pdf.Text("Review")
+			dict["State"] = pdf.Text("Rejected")
 		case TextStateCancelled:
-			dict["StateModel"] = pdf.TextString("Review")
-			dict["State"] = pdf.TextString("Cancelled")
+			dict["StateModel"] = pdf.Text("Review")
+			dict["State"] = pdf.Text("Cancelled")
 		case TextStateCompleted:
-			dict["StateModel"] = pdf.TextString("Review")
-			dict["State"] = pdf.TextString("Completed")
+			dict["StateModel"] = pdf.Text("Review")
+			dict["State"] = pdf.Text("Completed")
 		case TextStateNone:
-			dict["StateModel"] = pdf.TextString("Review")
-			// dict["State"] = pdf.TextString("None")
+			dict["StateModel"] = pdf.Text("Review")
+			// dict["State"] = pdf.Text("None")
 		}
 	}
 

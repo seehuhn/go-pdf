@@ -36,9 +36,9 @@ var characteristicsCases = []*Characteristics{
 		Rotation:        90,
 	},
 	{
-		Caption:         "OK",
-		RolloverCaption: "Hover",
-		DownCaption:     "Down",
+		Caption:         pdf.Text("OK"),
+		RolloverCaption: pdf.Text("Hover"),
+		DownCaption:     pdf.Text("Down"),
 		TextPosition:    TextPositionCaptionBelowIcon,
 		SingleUse:       true,
 	},

@@ -213,7 +213,7 @@ func printEntry(e *annotEntry, prefix, contPrefix string, children map[pdf.Refer
 	}
 
 	// line 1: type, contents summary, rect
-	contents := e.common.Contents
+	contents := e.common.Contents.String()
 	fmt.Printf("%s%s%s %s\n", prefix, label, typeName, rect)
 
 	// line 2: date and user
@@ -221,10 +221,10 @@ func printEntry(e *annotEntry, prefix, contPrefix string, children map[pdf.Refer
 	if !e.markup.CreationDate.IsZero() {
 		meta = append(meta, e.markup.CreationDate.Format(time.DateOnly))
 	}
-	if e.markup.User != "" {
-		meta = append(meta, e.markup.User)
+	if !e.markup.User.IsZero() {
+		meta = append(meta, e.markup.User.String())
 	}
-	if e.markup.Subject != "" {
+	if !e.markup.Subject.IsZero() {
 		meta = append(meta, fmt.Sprintf("[%s]", e.markup.Subject))
 	}
 	if len(meta) > 0 {

@@ -41,7 +41,7 @@ var testCases = []testCase{
 		version: pdf.V1_7,
 		outline: &Outline{
 			Items: []*Item{
-				{Title: "Chapter 1"},
+				{Title: pdf.Text("Chapter 1")},
 			},
 		},
 	},
@@ -50,9 +50,9 @@ var testCases = []testCase{
 		version: pdf.V1_7,
 		outline: &Outline{
 			Items: []*Item{
-				{Title: "Chapter 1"},
-				{Title: "Chapter 2"},
-				{Title: "Chapter 3"},
+				{Title: pdf.Text("Chapter 1")},
+				{Title: pdf.Text("Chapter 2")},
+				{Title: pdf.Text("Chapter 3")},
 			},
 		},
 	},
@@ -62,16 +62,16 @@ var testCases = []testCase{
 		outline: &Outline{
 			Items: []*Item{
 				{
-					Title: "Part I",
+					Title: pdf.Text("Part I"),
 					Children: []*Item{
-						{Title: "Chapter 1"},
-						{Title: "Chapter 2"},
+						{Title: pdf.Text("Chapter 1")},
+						{Title: pdf.Text("Chapter 2")},
 					},
 				},
 				{
-					Title: "Part II",
+					Title: pdf.Text("Part II"),
 					Children: []*Item{
-						{Title: "Chapter 3"},
+						{Title: pdf.Text("Chapter 3")},
 					},
 				},
 			},
@@ -83,15 +83,15 @@ var testCases = []testCase{
 		outline: &Outline{
 			Items: []*Item{
 				{
-					Title: "Level 1",
+					Title: pdf.Text("Level 1"),
 					Children: []*Item{
 						{
-							Title: "Level 2",
+							Title: pdf.Text("Level 2"),
 							Children: []*Item{
 								{
-									Title: "Level 3",
+									Title: pdf.Text("Level 3"),
 									Children: []*Item{
-										{Title: "Level 4"},
+										{Title: pdf.Text("Level 4")},
 									},
 								},
 							},
@@ -107,18 +107,18 @@ var testCases = []testCase{
 		outline: &Outline{
 			Items: []*Item{
 				{
-					Title: "Open Section",
+					Title: pdf.Text("Open Section"),
 					Open:  true,
 					Children: []*Item{
-						{Title: "Visible Child 1"},
-						{Title: "Visible Child 2"},
+						{Title: pdf.Text("Visible Child 1")},
+						{Title: pdf.Text("Visible Child 2")},
 					},
 				},
 				{
-					Title: "Closed Section",
+					Title: pdf.Text("Closed Section"),
 					Open:  false,
 					Children: []*Item{
-						{Title: "Hidden Child"},
+						{Title: pdf.Text("Hidden Child")},
 					},
 				},
 			},
@@ -129,12 +129,12 @@ var testCases = []testCase{
 		version: pdf.V1_7,
 		outline: &Outline{
 			Items: []*Item{
-				{Title: "Normal"},
-				{Title: "Bold", Bold: true},
-				{Title: "Italic", Italic: true},
-				{Title: "Bold Italic", Bold: true, Italic: true},
-				{Title: "Red", Color: color.DeviceRGB{1, 0, 0}},
-				{Title: "Green Bold", Color: color.DeviceRGB{0, 1, 0}, Bold: true},
+				{Title: pdf.Text("Normal")},
+				{Title: pdf.Text("Bold"), Bold: true},
+				{Title: pdf.Text("Italic"), Italic: true},
+				{Title: pdf.Text("Bold Italic"), Bold: true, Italic: true},
+				{Title: pdf.Text("Red"), Color: color.DeviceRGB{1, 0, 0}},
+				{Title: pdf.Text("Green Bold"), Color: color.DeviceRGB{0, 1, 0}, Bold: true},
 			},
 		},
 	},
@@ -144,7 +144,7 @@ var testCases = []testCase{
 		outline: &Outline{
 			Items: []*Item{
 				{
-					Title:  "External Link",
+					Title:  pdf.Text("External Link"),
 					Action: &action.URI{URI: "https://example.com/"},
 				},
 			},
@@ -156,25 +156,25 @@ var testCases = []testCase{
 		outline: &Outline{
 			Items: []*Item{
 				{
-					Title: "Contents",
+					Title: pdf.Text("Contents"),
 					Open:  true,
 					Children: []*Item{
-						{Title: "Introduction"},
-						{Title: "Chapter 1", Bold: true},
-						{Title: "Chapter 2", Bold: true},
+						{Title: pdf.Text("Introduction")},
+						{Title: pdf.Text("Chapter 1"), Bold: true},
+						{Title: pdf.Text("Chapter 2"), Bold: true},
 					},
 				},
 				{
-					Title:  "External Resources",
+					Title:  pdf.Text("External Resources"),
 					Action: &action.URI{URI: "https://example.com/"},
 					Color:  color.DeviceRGB{0, 0, 1},
 					Italic: true,
 				},
 				{
-					Title: "Appendix",
+					Title: pdf.Text("Appendix"),
 					Children: []*Item{
-						{Title: "A", Color: color.DeviceRGB{0.5, 0.5, 0.5}},
-						{Title: "B", Color: color.DeviceRGB{0.5, 0.5, 0.5}},
+						{Title: pdf.Text("A"), Color: color.DeviceRGB{0.5, 0.5, 0.5}},
+						{Title: pdf.Text("B"), Color: color.DeviceRGB{0.5, 0.5, 0.5}},
 					},
 				},
 			},
@@ -186,11 +186,11 @@ var testCases = []testCase{
 		outline: &Outline{
 			Items: []*Item{
 				{
-					Title: "Modern Document",
+					Title: pdf.Text("Modern Document"),
 					Open:  true,
 					Children: []*Item{
-						{Title: "Section 1", Bold: true, Color: color.DeviceRGB{0.2, 0.4, 0.6}},
-						{Title: "Section 2", Italic: true},
+						{Title: pdf.Text("Section 1"), Bold: true, Color: color.DeviceRGB{0.2, 0.4, 0.6}},
+						{Title: pdf.Text("Section 2"), Italic: true},
 					},
 				},
 			},
@@ -313,7 +313,7 @@ func TestStructEntry(t *testing.T) {
 
 	o := &Outline{
 		Items: []*Item{
-			{Title: "With SE", StructEntry: seRef},
+			{Title: pdf.Text("With SE"), StructEntry: seRef},
 		},
 	}
 
@@ -364,7 +364,7 @@ func TestReadLoop(t *testing.T) {
 		var A pdf.Dict
 		if good {
 			A = pdf.Dict{
-				"Title":  pdf.TextString("A"),
+				"Title":  pdf.Text("A"),
 				"Next":   refB,
 				"Parent": refRoot,
 			}
@@ -373,20 +373,20 @@ func TestReadLoop(t *testing.T) {
 			// This causes Acrobat reader to hang (version 2022.003.20310).
 			// Let's make sure we do better.
 			A = pdf.Dict{
-				"Title":  pdf.TextString("A"),
+				"Title":  pdf.Text("A"),
 				"Next":   refA,
 				"Prev":   refA,
 				"Parent": refRoot,
 			}
 		}
 		B := pdf.Dict{
-			"Title":  pdf.TextString("B"),
+			"Title":  pdf.Text("B"),
 			"Prev":   refA,
 			"Next":   refC,
 			"Parent": refRoot,
 		}
 		C := pdf.Dict{
-			"Title":  pdf.TextString("C"),
+			"Title":  pdf.Text("C"),
 			"Prev":   refB,
 			"Parent": refRoot,
 		}
@@ -452,7 +452,7 @@ func TestDeepFirstChainBounded(t *testing.T) {
 	t.Run("deep First chain", func(t *testing.T) {
 		n := limits.MaxOutlineDepth + 10
 		r := buildOutline(t, n, func(i int, refs []pdf.Reference) pdf.Dict {
-			d := pdf.Dict{"Title": pdf.TextString("x")}
+			d := pdf.Dict{"Title": pdf.Text("x")}
 			if i+1 < n {
 				d["First"] = refs[i+1]
 			}
@@ -476,7 +476,7 @@ func TestDeepFirstChainBounded(t *testing.T) {
 	t.Run("wide Next list", func(t *testing.T) {
 		n := 2*limits.MaxOutlineDepth + 50
 		r := buildOutline(t, n, func(i int, refs []pdf.Reference) pdf.Dict {
-			d := pdf.Dict{"Title": pdf.TextString("x")}
+			d := pdf.Dict{"Title": pdf.Text("x")}
 			if i+1 < n {
 				d["Next"] = refs[i+1]
 			}
@@ -537,7 +537,7 @@ func TestColorOutOfRange(t *testing.T) {
 	rootRef := w.Alloc()
 	itemRef := w.Alloc()
 	err := w.Put(itemRef, pdf.Dict{
-		"Title":  pdf.TextString("out of range"),
+		"Title":  pdf.Text("out of range"),
 		"Parent": rootRef,
 		"C":      pdf.Array{pdf.Number(2.5), pdf.Number(-1), pdf.Number(0.5)},
 	})
@@ -579,7 +579,7 @@ func TestColorOutOfRange(t *testing.T) {
 func TestColorNaN(t *testing.T) {
 	o := &Outline{
 		Items: []*Item{{
-			Title: "not a number",
+			Title: pdf.Text("not a number"),
 			Color: color.DeviceRGB{math.NaN(), 0, 0},
 		}},
 	}

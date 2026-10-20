@@ -50,9 +50,9 @@ func createDocument(fname string) error {
 	}
 
 	doc.Out.GetMeta().Info = &pdf.Info{
-		Title:   "Quire Font Library - Glyph Reference",
-		Subject: "Display of all glyphs in extended and Go fonts",
-		Creator: "seehuhn.de/go/pdf/examples/feature-tests/included-glyphs",
+		Title:   pdf.Text("Quire Font Library - Glyph Reference"),
+		Subject: pdf.Text("Display of all glyphs in extended and Go fonts"),
+		Creator: pdf.Text("seehuhn.de/go/pdf/examples/feature-tests/included-glyphs"),
 	}
 
 	headerFont := font.Must(standard.HelveticaBold.New())
@@ -233,7 +233,7 @@ func getNonBlankGlyphs(fontInstance font.Layouter) []glyph.ID {
 
 func (w *DocumentWriter) createFontPages(entry fontEntry) error {
 	// Add to outline
-	oFont := w.outline.AddItem(entry.name)
+	oFont := w.outline.AddItem(pdf.Text(entry.name))
 
 	// Get all non-blank glyphs from this font
 	nonBlankGlyphs := getNonBlankGlyphs(entry.fontInstance)

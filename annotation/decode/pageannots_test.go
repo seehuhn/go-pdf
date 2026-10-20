@@ -131,8 +131,8 @@ func TestPageAnnotationsLinksWidgets(t *testing.T) {
 	fieldRef := w.Alloc()
 	widgetRef := w.Alloc()
 	w.Put(fieldRef, pdf.Dict{
-		"FT": pdf.Name("Tx"), "T": pdf.TextString("split"),
-		"V":    pdf.TextString("hello"),
+		"FT": pdf.Name("Tx"), "T": pdf.Text("split"),
+		"V":    pdf.Text("hello"),
 		"Kids": pdf.Array{widgetRef},
 	})
 	w.Put(widgetRef, pdf.Dict{
@@ -159,7 +159,7 @@ func TestPageAnnotationsLinksWidgets(t *testing.T) {
 	if !ok {
 		t.Fatalf("widget field is %T, want *acroform.TextField", wa.Field)
 	}
-	if f.V == nil || f.V.Value != "hello" {
+	if f.V == nil || f.V.Value.String() != "hello" {
 		t.Errorf("field value = %v, want %q", f.V, "hello")
 	}
 }
@@ -177,8 +177,8 @@ func TestAnnotationReadsFormFirst(t *testing.T) {
 		w.Put(ref, pdf.Dict{
 			"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"),
 			"Rect": pageAnnotRect,
-			"FT":   pdf.Name("Tx"), "T": pdf.TextString("a"),
-			"V": pdf.TextString(v), "DA": pdf.String("/Helv 0 Tf"),
+			"FT":   pdf.Name("Tx"), "T": pdf.Text("a"),
+			"V": pdf.Text(v), "DA": pdf.String("/Helv 0 Tf"),
 		})
 		refs = append(refs, ref)
 	}
@@ -200,7 +200,7 @@ func TestAnnotationReadsFormFirst(t *testing.T) {
 		if !ok {
 			t.Fatalf("widget field is %T, want *acroform.TextField", wa.Field)
 		}
-		if f.V == nil || f.V.Value != "first" {
+		if f.V == nil || f.V.Value.String() != "first" {
 			t.Errorf("field value = %v, want %q", f.V, "first")
 		}
 	}
@@ -249,7 +249,7 @@ func TestAnnotationDirectWidget(t *testing.T) {
 	widget := pdf.Dict{
 		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"),
 		"Rect": pageAnnotRect,
-		"FT":   pdf.Name("Tx"), "T": pdf.TextString("a"),
+		"FT":   pdf.Name("Tx"), "T": pdf.Text("a"),
 		"DA": pdf.String("/Helv 0 Tf"),
 	}
 	pageRef := w.Alloc()

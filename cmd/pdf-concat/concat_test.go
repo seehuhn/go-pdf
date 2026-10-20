@@ -95,7 +95,7 @@ func TestConcatMergesForms(t *testing.T) {
 			t.Fatal(err)
 		}
 		name, _ := pdf.NewCursor(r).TextString(fd["T"])
-		names[string(name)] = true
+		names[name.String()] = true
 		if subtype, _ := pdf.NewCursor(r).Name(fd["Subtype"]); subtype != "Widget" {
 			t.Errorf("field %q is not a merged widget (Subtype=%q)", name, subtype)
 		}

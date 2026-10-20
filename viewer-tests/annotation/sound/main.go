@@ -102,10 +102,10 @@ func createDocument(filename string) error {
 		{annotation.SoundIconMic, "Icon: Mic"},
 	} {
 		a := &annotation.Sound{
-			Contents: "Sound annotation",
+			Contents: pdf.Text("Sound annotation"),
 			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
-			User:     "Test User",
+			User:     pdf.Text("Test User"),
 			Icon:     row.icon,
 			Sound:    iconSnd,
 		}
@@ -138,10 +138,10 @@ func createDocument(filename string) error {
 	}
 	for _, e := range encodings {
 		a := &annotation.Sound{
-			Contents: "Sound annotation: " + e.label,
+			Contents: pdf.Text("Sound annotation: " + e.label),
 			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
-			User:     "Test User",
+			User:     pdf.Text("Test User"),
 			Icon:     annotation.SoundIconSpeaker,
 			Sound:    buildSound(e.rate, e.channels, e.bits, e.enc),
 		}
@@ -183,7 +183,7 @@ func (w *writer) addPair(left *annotation.Sound, label string) error {
 		URx: leftCenter + iconSize/2,
 		URy: w.yPos,
 	}
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightCenter - iconSize/2,
@@ -191,7 +191,7 @@ func (w *writer) addPair(left *annotation.Sound, label string) error {
 		URx: rightCenter + iconSize/2,
 		URy: w.yPos,
 	}
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	if err := w.style.AddAppearance(right); err != nil {
 		return err

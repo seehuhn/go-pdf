@@ -27,9 +27,9 @@ import (
 )
 
 var (
-	confGroup1 = &Group{Name: "Layer 1", Intent: []pdf.Name{"View"}}
-	confGroup2 = &Group{Name: "Layer 2", Intent: []pdf.Name{"View"}}
-	confGroup3 = &Group{Name: "Layer 3", Intent: []pdf.Name{"Design"}}
+	confGroup1 = &Group{Name: pdf.Text("Layer 1"), Intent: []pdf.Name{"View"}}
+	confGroup2 = &Group{Name: pdf.Text("Layer 2"), Intent: []pdf.Name{"View"}}
+	confGroup3 = &Group{Name: pdf.Text("Layer 3"), Intent: []pdf.Name{"Design"}}
 
 	confTestCases = []struct {
 		name    string
@@ -48,8 +48,8 @@ var (
 			name:    "with_name_and_creator",
 			version: pdf.V1_5,
 			data: &Configuration{
-				Name:      "Default",
-				Creator:   "TestApp",
+				Name:      pdf.Text("Default"),
+				Creator:   pdf.Text("TestApp"),
 				BaseState: BaseStateON,
 				Intent:    []pdf.Name{"View"},
 			},
@@ -121,7 +121,7 @@ var (
 				Intent:    []pdf.Name{"View"},
 				Order: []OrderItem{
 					&OrderGroup{
-						Label:    "Anatomy",
+						Label:    pdf.Text("Anatomy"),
 						Children: []OrderItem{confGroup1, confGroup2},
 					},
 					confGroup3,
@@ -198,8 +198,8 @@ var (
 			name:    "complex_v17",
 			version: pdf.V1_7,
 			data: &Configuration{
-				Name:      "Full Config",
-				Creator:   "TestApp",
+				Name:      pdf.Text("Full Config"),
+				Creator:   pdf.Text("TestApp"),
 				BaseState: BaseStateOFF,
 				ON:        []*Group{confGroup1},
 				OFF:       []*Group{confGroup2},
@@ -207,7 +207,7 @@ var (
 				Order: []OrderItem{
 					confGroup1,
 					&OrderGroup{
-						Label:    "Others",
+						Label:    pdf.Text("Others"),
 						Children: []OrderItem{confGroup2, confGroup3},
 					},
 				},
@@ -220,8 +220,8 @@ var (
 			name:    "complex_v20",
 			version: pdf.V2_0,
 			data: &Configuration{
-				Name:      "Full Config",
-				Creator:   "TestApp",
+				Name:      pdf.Text("Full Config"),
+				Creator:   pdf.Text("TestApp"),
 				BaseState: BaseStateUnchanged,
 				ON:        []*Group{confGroup1, confGroup3},
 				OFF:       []*Group{confGroup2},
@@ -263,8 +263,8 @@ var (
 			name:    "complex",
 			version: pdf.V1_6,
 			data: &Configuration{
-				Name:      "Full Config",
-				Creator:   "TestApp",
+				Name:      pdf.Text("Full Config"),
+				Creator:   pdf.Text("TestApp"),
 				BaseState: BaseStateOFF,
 				ON:        []*Group{confGroup1},
 				OFF:       []*Group{confGroup2},
@@ -280,7 +280,7 @@ var (
 				Order: []OrderItem{
 					confGroup1,
 					&OrderGroup{
-						Label:    "Others",
+						Label:    pdf.Text("Others"),
 						Children: []OrderItem{confGroup2, confGroup3},
 					},
 				},
@@ -404,12 +404,12 @@ func TestConfigurationONOFFOverlap(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	shared := w.Alloc()
-	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("shared")})
+	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("shared")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	onlyOn := w.Alloc()
-	err = w.Put(onlyOn, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("only on")})
+	err = w.Put(onlyOn, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("only on")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,10 +430,10 @@ func TestConfigurationONOFFOverlap(t *testing.T) {
 		t.Fatalf("extract: %v", err)
 	}
 
-	if len(cfg.ON) != 1 || cfg.ON[0].Name != "only on" {
+	if len(cfg.ON) != 1 || cfg.ON[0].Name.String() != "only on" {
 		t.Errorf("ON = %v, want the group listed in ON alone", cfg.ON)
 	}
-	if len(cfg.OFF) != 1 || cfg.OFF[0].Name != "shared" {
+	if len(cfg.OFF) != 1 || cfg.OFF[0].Name.String() != "shared" {
 		t.Errorf("OFF = %v, want the shared group", cfg.OFF)
 	}
 
@@ -451,7 +451,7 @@ func TestConfigurationONOFFOverlapAll(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
 	shared := w.Alloc()
-	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("shared")})
+	err := w.Put(shared, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("shared")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -488,14 +488,14 @@ func TestConfigurationRBGroupsCap(t *testing.T) {
 
 	inner := make(pdf.Array, maxRBGroupsItems+5)
 	for i := range inner {
-		inner[i] = pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("g")}
+		inner[i] = pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("g")}
 	}
 
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{
 		"RBGroups": pdf.Array{
 			inner,
-			pdf.Array{pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("late")}},
+			pdf.Array{pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("late")}},
 		},
 	})
 	if err != nil {
@@ -622,7 +622,7 @@ func (g failingGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error
 func TestGroupArrayReadError(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	good := w.Alloc()
-	if err := w.Put(good, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Layer")}); err != nil {
+	if err := w.Put(good, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("Layer")}); err != nil {
 		t.Fatal(err)
 	}
 	broken := w.Alloc()
@@ -630,7 +630,7 @@ func TestGroupArrayReadError(t *testing.T) {
 		t.Fatal(err)
 	}
 	unreadable := w.Alloc()
-	if err := w.Put(unreadable, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Other")}); err != nil {
+	if err := w.Put(unreadable, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("Other")}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -641,7 +641,7 @@ func TestGroupArrayReadError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("malformed element: unexpected error %v", err)
 	}
-	if len(groups) != 1 || groups[0].Name != "Layer" {
+	if len(groups) != 1 || groups[0].Name.String() != "Layer" {
 		t.Errorf("malformed element: got %v, want only the good group", groups)
 	}
 
@@ -661,8 +661,8 @@ func TestConfigurationReadErrors(t *testing.T) {
 		}
 		return ref
 	}
-	good := put(pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Layer")})
-	unreadable := put(pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Other")})
+	good := put(pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("Layer")})
+	unreadable := put(pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("Other")})
 	malformed := pdf.Integer(1)
 
 	x := pdf.NewExtractor(failingGetter{Getter: w, bad: unreadable})
@@ -701,7 +701,7 @@ func TestConfigurationReadErrors(t *testing.T) {
 			key:  "Order",
 			bad: []pdf.Array{
 				{unreadable},
-				{pdf.Array{pdf.TextString("label"), unreadable}},
+				{pdf.Array{pdf.Text("label"), unreadable}},
 				{pdf.Array{unreadable}},
 			},
 			skip: pdf.Array{malformed, pdf.Array{malformed, good}, good},
@@ -736,11 +736,11 @@ func TestConfigurationReadErrors(t *testing.T) {
 func TestPropertiesConfigsReadError(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	group := w.Alloc()
-	if err := w.Put(group, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.TextString("Layer")}); err != nil {
+	if err := w.Put(group, pdf.Dict{"Type": pdf.Name("OCG"), "Name": pdf.Text("Layer")}); err != nil {
 		t.Fatal(err)
 	}
 	unreadable := w.Alloc()
-	if err := w.Put(unreadable, pdf.Dict{"Name": pdf.TextString("Alt")}); err != nil {
+	if err := w.Put(unreadable, pdf.Dict{"Name": pdf.Text("Alt")}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -755,7 +755,7 @@ func TestPropertiesConfigsReadError(t *testing.T) {
 		}
 	}
 
-	p, err := ExtractProperties(c, props(pdf.Array{pdf.Integer(1), pdf.Dict{"Name": pdf.TextString("Alt")}}), true)
+	p, err := ExtractProperties(c, props(pdf.Array{pdf.Integer(1), pdf.Dict{"Name": pdf.Text("Alt")}}), true)
 	if err != nil {
 		t.Fatalf("malformed entry: unexpected error %v", err)
 	}

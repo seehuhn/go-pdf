@@ -36,7 +36,7 @@ func decodeScreen(c pdf.Cursor, dict pdf.Dict) (*annotation.Screen, error) {
 	if t, err := pdf.Optional(c.TextString(dict["T"])); err != nil {
 		return nil, err
 	} else {
-		screen.Title = string(t)
+		screen.Title = t
 	}
 
 	// MK (optional)

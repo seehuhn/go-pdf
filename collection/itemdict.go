@@ -41,7 +41,7 @@ type ItemDict struct {
 type ItemValue struct {
 	// Val is the value associated with the key in the item dictionary.
 	// Values must be one of the following types:
-	//   - string
+	//   - pdf.TextString
 	//   - time.Time
 	//   - int64
 	//   - float64
@@ -49,7 +49,7 @@ type ItemValue struct {
 
 	// Prefix is an optional prefix to be applied when the value is displayed.
 	// The prefix string is ignored when sorting items.
-	Prefix string
+	Prefix pdf.TextString
 }
 
 // ExtractItemDict extracts a collection item dictionary from a PDF object.
@@ -95,7 +95,7 @@ func extractItemValue(c pdf.Cursor, obj pdf.Object) (*ItemValue, error) {
 	}
 
 	var data pdf.Object
-	var prefix string
+	var prefix pdf.TextString
 	var val any
 
 	// Check if it's a dictionary (subitem)
@@ -109,7 +109,7 @@ func extractItemValue(c pdf.Cursor, obj pdf.Object) (*ItemValue, error) {
 			if prefixStr, err := pdf.Optional(c.TextString(prefixObj)); err != nil {
 				return nil, err
 			} else {
-				prefix = string(prefixStr)
+				prefix = prefixStr
 			}
 		}
 
@@ -141,7 +141,7 @@ func extractItemValue(c pdf.Cursor, obj pdf.Object) (*ItemValue, error) {
 		if dateObj, err := c.Date(v); err == nil && !dateObj.IsZero() {
 			val = time.Time(dateObj)
 		} else {
-			val = string(v.AsTextString())
+			val = v.AsTextString()
 		}
 
 	case pdf.Integer:
@@ -208,8 +208,8 @@ func embedItemValue(rm *pdf.EmbedHelper, value ItemValue) (pdf.Object, error) {
 
 	// Convert the Go value to PDF object
 	switch v := value.Val.(type) {
-	case string:
-		pdfVal = pdf.TextString(v)
+	case pdf.TextString:
+		pdfVal = v
 
 	case time.Time:
 		pdfVal = pdf.Date(v).AsPDF(rm.Out().GetOptions())
@@ -225,14 +225,14 @@ func embedItemValue(rm *pdf.EmbedHelper, value ItemValue) (pdf.Object, error) {
 	}
 
 	// If no prefix, return the direct value
-	if value.Prefix == "" {
+	if value.Prefix.IsZero() {
 		return pdfVal, nil
 	}
 
 	// Create subitem dictionary with prefix
 	subitemDict := pdf.Dict{
 		"D": pdfVal,
-		"P": pdf.TextString(value.Prefix),
+		"P": value.Prefix,
 	}
 
 	if rm.Out().GetOptions().HasAny(pdf.OptDictTypes) {

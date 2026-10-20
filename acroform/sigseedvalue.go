@@ -104,7 +104,7 @@ type SigSeedValue struct {
 	Cert *SigCertSeedValue
 
 	// Reasons (optional) lists permitted reasons for signing.
-	Reasons []string
+	Reasons []pdf.TextString
 
 	// MDP holds the modification-detection permission level, as a value from 0
 	// to 3.
@@ -120,7 +120,7 @@ type SigSeedValue struct {
 	// LegalAttestation (optional) lists permitted legal attestations.
 	//
 	// This entry requires PDF 1.6.
-	LegalAttestation []string
+	LegalAttestation []pdf.TextString
 
 	// AddRevInfo indicates that revocation information shall be embedded in the
 	// signature.
@@ -242,7 +242,7 @@ func (s *SigSeedValue) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		if err := pdf.CheckVersion(e.Out(), "seed value AppearanceFilter entry", pdf.V2_0); err != nil {
 			return nil, err
 		}
-		dict["AppearanceFilter"] = pdf.TextString(s.AppearanceFilter)
+		dict["AppearanceFilter"] = pdf.Text(s.AppearanceFilter)
 	}
 
 	ref := e.Alloc()

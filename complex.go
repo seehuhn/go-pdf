@@ -20,13 +20,11 @@ package pdf
 // of the elementary types from "objects.go".
 
 import (
-	"bytes"
 	"fmt"
 	"iter"
 	"math"
 	"strings"
 	"time"
-	"unicode/utf16"
 
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/geom/vec"
@@ -44,65 +42,6 @@ func (x Number) AsPDF(opt OutputOptions) Native {
 		obj = Real(x)
 	}
 	return obj
-}
-
-type TextString string
-
-var utf16Marker = []byte{254, 255}
-var utf8Marker = []byte{239, 187, 191}
-
-func (s TextString) AsPDF(opt OutputOptions) Native {
-	// use PDFDocEncoding where possible, because it is smallest
-	if buf, ok := PDFDocEncode(string(s)); ok && !bytes.HasPrefix(buf, utf16Marker) && !bytes.HasPrefix(buf, utf8Marker) {
-		return buf
-	}
-
-	// Otherwise, use UTF-8 if supported.
-	if opt.HasAny(OptTextStringUtf8) {
-		obj := make(String, 0, 3+len(s))
-		obj = append(obj, 239, 187, 191)
-		obj = append(obj, []byte(s)...)
-		return obj
-	}
-
-	// Otherwise, use UTF-16.
-	var buf = []uint16{0xFEFF}
-	for _, r := range s {
-		buf = utf16.AppendRune(buf, r)
-	}
-	out := make(String, 0, 2*len(buf)+2)
-	for _, x := range buf {
-		out = append(out, byte(x>>8), byte(x))
-	}
-	return out
-}
-
-func (x String) AsTextString() TextString {
-	b := []byte(x)
-
-	var s string
-	if bytes.HasPrefix(b, utf16Marker) {
-		buf := make([]uint16, 0, (len(b)-2)/2)
-		for i := 2; i+1 < len(b); i += 2 {
-			buf = append(buf, uint16(b[i])<<8|uint16(b[i+1]))
-		}
-		rr := utf16.Decode(buf)
-		s = string(rr)
-	} else if bytes.HasPrefix(b, utf8Marker) {
-		s = string(b[3:])
-	} else {
-		s = PDFDocDecode(x)
-	}
-
-	return TextString(s)
-}
-
-func (s TextString) AsTextString() TextString {
-	return s
-}
-
-func (x Name) AsTextString() TextString {
-	return TextString(x)
 }
 
 type Date time.Time
@@ -137,7 +76,7 @@ func (d Date) AsPDF(opt OutputOptions) Native {
 func (x String) AsDate() (Date, error) {
 	var zero Date
 
-	s := string(x.AsTextString())
+	s := x.AsTextString().String()
 
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, "'", "")

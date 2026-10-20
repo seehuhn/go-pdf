@@ -83,7 +83,7 @@ type Range struct {
 	Style Style
 
 	// Prefix is the label prefix prepended to the numeric portion.
-	Prefix string
+	Prefix pdf.TextString
 
 	// Start is the value of the numeric portion for the first page in the
 	// range.  Subsequent pages are numbered sequentially from this value.
@@ -98,7 +98,7 @@ func (r *Range) Format(offset int) string {
 	var numeric string
 	switch r.Style {
 	case None:
-		return r.Prefix
+		return r.Prefix.String()
 	case Decimal:
 		numeric = formatDecimal(n)
 	case UpperRoman:
@@ -110,7 +110,7 @@ func (r *Range) Format(offset int) string {
 	case LowerAlpha:
 		numeric = formatAlpha(n)
 	}
-	return r.Prefix + numeric
+	return r.Prefix.String() + numeric
 }
 
 // Entry is a labelling range together with the page where it starts.
@@ -216,7 +216,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 
 		p, err := c.TextString(dict["P"])
 		if err == nil {
-			lr.Prefix = string(p)
+			lr.Prefix = p
 		}
 
 		st, err := pdf.Optional(c.Integer(dict["St"]))
@@ -260,8 +260,8 @@ func (l *Labels) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			if lr.Style != None {
 				dict["S"] = styleToPDFName[lr.Style]
 			}
-			if lr.Prefix != "" {
-				dict["P"] = pdf.TextString(lr.Prefix)
+			if !lr.Prefix.IsZero() {
+				dict["P"] = lr.Prefix
 			}
 			if lr.Start != 1 {
 				dict["St"] = pdf.Integer(lr.Start)

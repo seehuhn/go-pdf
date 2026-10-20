@@ -92,7 +92,7 @@ func createDocument(filename string) error {
 
 	// blue caret
 	a := &annotation.Caret{
-		Contents: "blue caret",
+		Contents: pdf.Text("blue caret"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 	}
@@ -103,7 +103,7 @@ func createDocument(filename string) error {
 
 	// paragraph symbol, large rect with RD
 	err = w.addWidePair(&annotation.Caret{
-		Contents: "Sy=P, large rect",
+		Contents: pdf.Text("Sy=P, large rect"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		Symbol:   "P",
@@ -115,7 +115,7 @@ func createDocument(filename string) error {
 
 	// nil color
 	a = &annotation.Caret{
-		Contents: "nil color",
+		Contents: pdf.Text("nil color"),
 		Flags:    annotation.FlagPrint,
 	}
 	err = w.addAnnotationPair(a)
@@ -125,7 +125,7 @@ func createDocument(filename string) error {
 
 	// border width
 	a = &annotation.Caret{
-		Contents: "Border.Width=2",
+		Contents: pdf.Text("Border.Width=2"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
@@ -159,7 +159,7 @@ func (w *writer) addAnnotationPair(left *annotation.Caret) error {
 	w.page.TextBegin()
 	w.page.TextSetFont(w.font, 10)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-caretSize/2-3))
-	w.page.TextShow(left.Contents)
+	w.page.TextShow(left.Contents.String())
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -170,7 +170,7 @@ func (w *writer) addAnnotationPair(left *annotation.Caret) error {
 		URx: leftColEnd,
 		URy: w.yPos,
 	}
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightColStart,
@@ -178,7 +178,7 @@ func (w *writer) addAnnotationPair(left *annotation.Caret) error {
 		URx: rightColEnd,
 		URy: w.yPos,
 	}
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	err := w.style.AddAppearance(right)
 	if err != nil {
@@ -206,7 +206,7 @@ func (w *writer) addWidePair(left *annotation.Caret) error {
 	w.page.TextBegin()
 	w.page.TextSetFont(w.font, 10)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-caretSize/2-3))
-	w.page.TextShow(left.Contents)
+	w.page.TextShow(left.Contents.String())
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -219,7 +219,7 @@ func (w *writer) addWidePair(left *annotation.Caret) error {
 		URx: leftColEnd + m[2],
 		URy: w.yPos + m[3],
 	}
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightColStart - m[0],
@@ -227,7 +227,7 @@ func (w *writer) addWidePair(left *annotation.Caret) error {
 		URx: rightColEnd + m[2],
 		URy: w.yPos + m[3],
 	}
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	err := w.style.AddAppearance(right)
 	if err != nil {
@@ -251,12 +251,12 @@ func (w *writer) addTallCaret() error {
 	w.page.TextEnd()
 
 	left := &annotation.Caret{
-		Contents: "tall rect (viewer)",
+		Contents: pdf.Text("tall rect (viewer)"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 	}
 	right := &annotation.Caret{
-		Contents: "tall rect (quire)",
+		Contents: pdf.Text("tall rect (quire)"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 	}

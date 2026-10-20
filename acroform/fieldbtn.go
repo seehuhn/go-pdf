@@ -100,7 +100,7 @@ func (f *ButtonField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		}
 		arr := make(pdf.Array, len(f.Opt))
 		for i, s := range f.Opt {
-			arr[i] = pdf.TextString(s)
+			arr[i] = pdf.Text(s)
 		}
 		dict["Opt"] = arr
 	}

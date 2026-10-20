@@ -36,8 +36,8 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// Contents (optional)
-	if contents, err := c.TextString(dict["Contents"]); err == nil && contents != "" {
-		common.Contents = string(contents)
+	if contents, err := c.TextString(dict["Contents"]); err == nil && !contents.IsZero() {
+		common.Contents = contents
 	}
 
 	// P (optional)
@@ -46,13 +46,13 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// NM (optional)
-	if nm, err := c.TextString(dict["NM"]); err == nil && nm != "" {
-		common.Name = string(nm)
+	if nm, err := c.TextString(dict["NM"]); err == nil && !nm.IsZero() {
+		common.Name = nm.String()
 	}
 
 	// M (optional)
-	if m, err := c.TextString(dict["M"]); err == nil && m != "" {
-		common.LastModified = string(m)
+	if m, err := c.TextString(dict["M"]); err == nil && !m.IsZero() {
+		common.LastModified = m.String()
 	}
 
 	// F (optional)
@@ -139,7 +139,7 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 
 	// Lang (optional)
 	if lang, err := c.TextString(dict["Lang"]); err == nil {
-		common.Lang = langtag.Parse(string(lang))
+		common.Lang = langtag.Parse(lang.String())
 	}
 
 	return nil

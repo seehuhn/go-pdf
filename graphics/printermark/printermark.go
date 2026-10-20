@@ -43,7 +43,7 @@ import (
 // Attributes holds the form dictionary entries specific to a printer's mark.
 type Attributes struct {
 	// MarkStyle (optional) describes the printer's mark to the user.
-	MarkStyle string
+	MarkStyle pdf.TextString
 
 	// Colorants (optional) identifies the individual colourants associated
 	// with the printer's mark, such as a colour bar.  Each key must equal the
@@ -77,8 +77,8 @@ func (a *Attributes) FillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
 		return err
 	}
 
-	if a.MarkStyle != "" {
-		dict["MarkStyle"] = pdf.TextString(a.MarkStyle)
+	if !a.MarkStyle.IsZero() {
+		dict["MarkStyle"] = a.MarkStyle
 	}
 
 	if len(a.Colorants) > 0 {
@@ -122,7 +122,7 @@ func ExtractAttributes(c pdf.Cursor, dict pdf.Dict) (*Attributes, error) {
 	if style, err := pdf.Optional(c.TextString(dict["MarkStyle"])); err != nil {
 		return nil, err
 	} else {
-		a.MarkStyle = string(style)
+		a.MarkStyle = style
 	}
 
 	colorants, err := pdf.Optional(c.Dict(dict["Colorants"]))
@@ -150,7 +150,7 @@ func ExtractAttributes(c pdf.Cursor, dict pdf.Dict) (*Attributes, error) {
 	// Both entries are optional, so a dictionary whose printer's mark entries
 	// are all empty or unusable is indistinguishable from one which has none.
 	// Report it as such, so that reading the result back gives the same value.
-	if a.MarkStyle == "" && len(a.Colorants) == 0 {
+	if a.MarkStyle.IsZero() && len(a.Colorants) == 0 {
 		return nil, nil
 	}
 

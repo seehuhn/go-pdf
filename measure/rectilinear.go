@@ -25,7 +25,7 @@ import (
 // RectilinearMeasure represents a rectilinear coordinate system.
 type RectilinearMeasure struct {
 	// ScaleRatio expresses the scale ratio of the drawing.
-	ScaleRatio string
+	ScaleRatio pdf.TextString
 
 	// XAxis specifies units for the x-axis.
 	XAxis []*NumberFormat
@@ -77,7 +77,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// Validate required fields
-	if rm.ScaleRatio == "" {
+	if rm.ScaleRatio.IsZero() {
 		return nil, pdf.Errorf("missing required ScaleRatio")
 	}
 	if len(rm.XAxis) == 0 {
@@ -101,7 +101,7 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 	dict["Subtype"] = pdf.Name("RL")
 
 	// Required fields
-	dict["R"] = pdf.String(rm.ScaleRatio)
+	dict["R"] = rm.ScaleRatio
 
 	// X axis
 	xArray, err := embedNumberFormatArray(res, rm.XAxis)

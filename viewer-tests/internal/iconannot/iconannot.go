@@ -67,10 +67,10 @@ func New(kind, icon string, common annotation.Common, x, y float64) annotation.A
 		LLx: x, LLy: y - Size,
 		URx: x + Size, URy: y,
 	}
-	common.Contents = kind + " " + icon
+	common.Contents = pdf.Text(kind + " " + icon)
 	common.Flags |= annotation.FlagPrint
 
-	markup := annotation.Markup{User: "Test User"}
+	markup := annotation.Markup{User: pdf.Text("Test User")}
 
 	switch kind {
 	case "FileAttachment":
@@ -109,7 +109,7 @@ func File(name string) *file.Specification {
 	}
 	return &file.Specification{
 		FileName:        name,
-		FileNameUnicode: name,
+		FileNameUnicode: pdf.Text(name),
 		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
 	}
 }

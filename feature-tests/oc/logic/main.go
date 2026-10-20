@@ -62,9 +62,9 @@ func run() error {
 	F := font.Must(standard.Helvetica.New())
 
 	// input OCGs
-	groupA := &oc.Group{Name: "Input A"}
-	groupB := &oc.Group{Name: "Input B"}
-	groupC := &oc.Group{Name: "Input C"}
+	groupA := &oc.Group{Name: pdf.Text("Input A")}
+	groupB := &oc.Group{Name: pdf.Text("Input B")}
+	groupC := &oc.Group{Name: pdf.Text("Input C")}
 
 	// intermediate OCMDs
 	andResult := &oc.Membership{

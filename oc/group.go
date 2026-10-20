@@ -32,7 +32,7 @@ type Group struct {
 	// Name (optional) specifies the name of the optional content group,
 	// suitable for presentation in an interactive PDF processor's user
 	// interface.
-	Name string
+	Name pdf.TextString
 
 	// Intent (optional) represents the intended use of the graphics in the group.
 	// Common values include "View" and "Design". Default is ["View"].
@@ -64,7 +64,7 @@ func ExtractGroup(c pdf.Cursor, obj pdf.Object, _ bool) (*Group, error) {
 	if err != nil {
 		return nil, err
 	}
-	group.Name = string(name)
+	group.Name = name
 
 	// Intent (optional) can be either a single name or an array of names.
 	intent, err := c.Resolve(dict["Intent"])
@@ -103,7 +103,7 @@ func (g *Group) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// the Name key is required in the file, so it is written even when empty
 	dict := pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString(g.Name),
+		"Name": g.Name,
 	}
 
 	// embed Intent (omit when it equals the default "View")

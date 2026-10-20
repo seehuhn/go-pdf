@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/movie"
 	"seehuhn.de/go/pdf/viewer-tests/internal/moviepage"
@@ -56,10 +57,10 @@ func createDocument(filename string) error {
 
 	annot := &annotation.Movie{
 		Rect:       moviepage.Screen,
-		Contents:   moviepage.Description + ", external file movie.mp4.",
+		Contents:   pdf.Text(moviepage.Description + ", external file movie.mp4."),
 		Border:     &annotation.Border{Width: 1},
 		Flags:      annotation.FlagPrint,
-		Title:      "Tick movie",
+		Title:      pdf.Text("Tick movie"),
 		Movie:      newMovie(),
 		Activation: movie.DefaultActivation,
 	}

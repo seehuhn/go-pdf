@@ -34,15 +34,15 @@ var visibilityExpressionTestCases = []struct {
 	{
 		name:    "simple group",
 		version: pdf.V1_7,
-		ve:      &VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
+		ve:      &VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
 	},
 	{
 		name:    "And with two groups",
 		version: pdf.V1_7,
 		ve: &VisibilityExpressionAnd{
 			Args: []VisibilityExpression{
-				&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-				&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer2")}},
 			},
 		},
 	},
@@ -51,9 +51,9 @@ var visibilityExpressionTestCases = []struct {
 		version: pdf.V2_0,
 		ve: &VisibilityExpressionAnd{
 			Args: []VisibilityExpression{
-				&VisibilityExpressionGroup{Group: &Group{Name: "A"}},
-				&VisibilityExpressionGroup{Group: &Group{Name: "B"}},
-				&VisibilityExpressionGroup{Group: &Group{Name: "C"}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("A")}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("B")}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("C")}},
 			},
 		},
 	},
@@ -62,8 +62,8 @@ var visibilityExpressionTestCases = []struct {
 		version: pdf.V1_7,
 		ve: &VisibilityExpressionOr{
 			Args: []VisibilityExpression{
-				&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-				&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer2")}},
 			},
 		},
 	},
@@ -71,7 +71,7 @@ var visibilityExpressionTestCases = []struct {
 		name:    "Not with group",
 		version: pdf.V1_7,
 		ve: &VisibilityExpressionNot{
-			Arg: &VisibilityExpressionGroup{Group: &Group{Name: "HiddenLayer"}},
+			Arg: &VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("HiddenLayer")}},
 		},
 	},
 	{
@@ -79,11 +79,11 @@ var visibilityExpressionTestCases = []struct {
 		version: pdf.V2_0,
 		ve: &VisibilityExpressionOr{
 			Args: []VisibilityExpression{
-				&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
 				&VisibilityExpressionAnd{
 					Args: []VisibilityExpression{
-						&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
-						&VisibilityExpressionGroup{Group: &Group{Name: "Layer3"}},
+						&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer2")}},
+						&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer3")}},
 					},
 				},
 			},
@@ -94,9 +94,9 @@ var visibilityExpressionTestCases = []struct {
 		version: pdf.V1_7,
 		ve: &VisibilityExpressionAnd{
 			Args: []VisibilityExpression{
-				&VisibilityExpressionGroup{Group: &Group{Name: "Visible"}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Visible")}},
 				&VisibilityExpressionNot{
-					Arg: &VisibilityExpressionGroup{Group: &Group{Name: "Hidden"}},
+					Arg: &VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Hidden")}},
 				},
 			},
 		},
@@ -106,15 +106,15 @@ var visibilityExpressionTestCases = []struct {
 		version: pdf.V2_0,
 		ve: &VisibilityExpressionOr{
 			Args: []VisibilityExpression{
-				&VisibilityExpressionGroup{Group: &Group{Name: "OCG1"}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("OCG1")}},
 				&VisibilityExpressionNot{
-					Arg: &VisibilityExpressionGroup{Group: &Group{Name: "OCG2"}},
+					Arg: &VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("OCG2")}},
 				},
 				&VisibilityExpressionAnd{
 					Args: []VisibilityExpression{
-						&VisibilityExpressionGroup{Group: &Group{Name: "OCG3"}},
-						&VisibilityExpressionGroup{Group: &Group{Name: "OCG4"}},
-						&VisibilityExpressionGroup{Group: &Group{Name: "OCG5"}},
+						&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("OCG3")}},
+						&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("OCG4")}},
+						&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("OCG5")}},
 					},
 				},
 			},
@@ -128,12 +128,12 @@ var visibilityExpressionTestCases = []struct {
 				&VisibilityExpressionOr{
 					Args: []VisibilityExpression{
 						&VisibilityExpressionNot{
-							Arg: &VisibilityExpressionGroup{Group: &Group{Name: "Deep"}},
+							Arg: &VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Deep")}},
 						},
-						&VisibilityExpressionGroup{Group: &Group{Name: "Also"}},
+						&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Also")}},
 					},
 				},
-				&VisibilityExpressionGroup{Group: &Group{Name: "Top"}},
+				&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Top")}},
 			},
 		},
 	},
@@ -187,8 +187,8 @@ func TestVisibilityExpressionVersionCheck(t *testing.T) {
 
 	ve := &VisibilityExpressionAnd{
 		Args: []VisibilityExpression{
-			&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-			&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+			&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
+			&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer2")}},
 		},
 	}
 
@@ -255,7 +255,7 @@ func TestVisibilityExpressionCycle(t *testing.T) {
 				ocgRef := w.Alloc()
 				if err := w.Put(ocgRef, pdf.Dict{
 					"Type": pdf.Name("OCG"),
-					"Name": pdf.TextString("Layer"),
+					"Name": pdf.Text("Layer"),
 				}); err != nil {
 					t.Fatal(err)
 				}
@@ -276,7 +276,7 @@ func TestVisibilityExpressionCycle(t *testing.T) {
 				ocgRef := w.Alloc()
 				if err := w.Put(ocgRef, pdf.Dict{
 					"Type": pdf.Name("OCG"),
-					"Name": pdf.TextString("Layer"),
+					"Name": pdf.Text("Layer"),
 				}); err != nil {
 					t.Fatal(err)
 				}
@@ -318,16 +318,16 @@ func TestVisibilityExpressionCycle(t *testing.T) {
 }
 
 func TestVisibilityExpressionIsVisible(t *testing.T) {
-	layer1 := &Group{Name: "Layer1"}
-	layer2 := &Group{Name: "Layer2"}
-	layer3 := &Group{Name: "Layer3"}
+	layer1 := &Group{Name: pdf.Text("Layer1")}
+	layer2 := &Group{Name: pdf.Text("Layer2")}
+	layer3 := &Group{Name: pdf.Text("Layer3")}
 
 	mkState := func(m map[*Group]bool) *GroupStates {
 		return &GroupStates{state: m}
 	}
 
 	// nonParticipating is a group not in any state map, so it won't participate
-	nonParticipating := &Group{Name: "NonParticipating"}
+	nonParticipating := &Group{Name: pdf.Text("NonParticipating")}
 
 	tests := []struct {
 		name        string

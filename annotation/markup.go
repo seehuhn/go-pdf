@@ -32,7 +32,7 @@ type Markup struct {
 	// entry identifies the user who added the annotation.
 	//
 	// This corresponds to the /T entry in the PDF annotation dictionary.
-	User string
+	User pdf.TextString
 
 	// Popup (optional) is used for displaying the annotation's contents in a
 	// pop-up window when the annotation is open.
@@ -58,7 +58,7 @@ type Markup struct {
 	// in the title bar of the annotation's pop-up window.
 	//
 	// This corresponds to the /Subj entry in the PDF annotation dictionary.
-	Subject string
+	Subject pdf.TextString
 
 	// RT specifies the relationship between this annotation and the annotation
 	// specified by InReplyTo. Valid values are "R" (Reply) and "Group".
@@ -99,11 +99,11 @@ type MarkupAnnotation interface {
 func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 	w := rm.Out
 
-	if m.User != "" {
+	if !m.User.IsZero() {
 		if err := pdf.CheckVersion(w, "markup annotation T entry", pdf.V1_1); err != nil {
 			return err
 		}
-		d["T"] = pdf.TextString(m.User)
+		d["T"] = m.User
 	}
 
 	if m.Popup != 0 {
@@ -138,11 +138,11 @@ func (m *Markup) fillDict(rm *pdf.ResourceManager, d pdf.Dict) error {
 		d["IRT"] = m.InReplyTo
 	}
 
-	if m.Subject != "" {
+	if !m.Subject.IsZero() {
 		if err := pdf.CheckVersion(w, "markup annotation Subj entry", pdf.V1_5); err != nil {
 			return err
 		}
-		d["Subj"] = pdf.TextString(m.Subject)
+		d["Subj"] = m.Subject
 	}
 
 	if m.RT != "" {

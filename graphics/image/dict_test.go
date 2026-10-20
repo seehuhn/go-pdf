@@ -39,11 +39,11 @@ import (
 )
 
 var px = &measure.NumberFormat{
-	Unit:             "px",
+	Unit:             pdf.Text("px"),
 	ConversionFactor: 1,
 	FractionFormat:   measure.FractionRound,
 	SingleUse:        true,
-	DecimalSeparator: ".",
+	DecimalSeparator: pdf.Text("."),
 }
 
 var testCases = []struct {
@@ -414,7 +414,7 @@ var testCases = []struct {
 						}},
 					},
 					OC: &oc.Group{
-						Name:   "PrintLayer",
+						Name:   pdf.Text("PrintLayer"),
 						Intent: []pdf.Name{"View"},
 					},
 				},
@@ -459,7 +459,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			Measure: &measure.RectilinearMeasure{
-				ScaleRatio: "1:1000", // 1:1000 scale
+				ScaleRatio: pdf.Text("1:1000"), // 1:1000 scale
 				XAxis:      []*measure.NumberFormat{px},
 				Distance:   []*measure.NumberFormat{px},
 				Area:       []*measure.NumberFormat{px},
@@ -499,7 +499,7 @@ var testCases = []struct {
 			ColorSpace:       color.SpaceDeviceRGB,
 			BitsPerComponent: 8,
 			OptionalContent: &oc.Group{
-				Name:   "TestLayer",
+				Name:   pdf.Text("TestLayer"),
 				Intent: []pdf.Name{"View"},
 			},
 			Data: &FlateSource{Predictor: pdf.FlatePredictorPNGOptimum, Width: 10, Colors: 3, BitsPerComponent: 8, WriteData: func(w io.Writer) error {
@@ -593,7 +593,7 @@ var testCases = []struct {
 			AssociatedFiles: []*file.Specification{
 				{
 					FileName:        "image-data.xml",
-					FileNameUnicode: "image-data.xml",
+					FileNameUnicode: pdf.Text("image-data.xml"),
 					AFRelationship:  file.RelationshipData,
 				},
 			},

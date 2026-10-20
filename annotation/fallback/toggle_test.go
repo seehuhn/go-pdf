@@ -160,11 +160,11 @@ func TestToggleOnShowsMarker(t *testing.T) {
 // ones the same glyph.  A check box and a radio button which name no marker
 // fall back on different defaults, a tick and a dot.
 func TestToggleMarkerReachesThePage(t *testing.T) {
-	marker := func(t *testing.T, caption pdf.Name, radio bool) string {
+	marker := func(t *testing.T, caption string, radio bool) string {
 		t.Helper()
 		w := toggleWidget(t, "Yes", "Yes", radio)
 		if caption != "" {
-			w.Style = &appearance.Characteristics{Caption: string(caption)}
+			w.Style = &appearance.Characteristics{Caption: pdf.Text(caption)}
 		}
 		if err := newGen(t, pdf.V2_0).AddAppearance(w); err != nil {
 			t.Fatal(err)
@@ -222,7 +222,7 @@ func TestDingbatText(t *testing.T) {
 // characteristic comes from the file and may say anything.
 func TestToggleUnknownMarkerDrawsNothing(t *testing.T) {
 	w := toggleWidget(t, "Yes", "Yes", false)
-	w.Style = &appearance.Characteristics{Caption: "\x00"}
+	w.Style = &appearance.Characteristics{Caption: pdf.Text("\x00")}
 	if err := newGen(t, pdf.V2_0).AddAppearance(w); err != nil {
 		t.Fatal(err)
 	}

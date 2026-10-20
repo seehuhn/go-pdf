@@ -93,10 +93,10 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		field   Field
 	}{
 		{"field requires 1.2", pdf.V1_1, textField("x")},
-		{"TU requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.AltName = "label" })},
+		{"TU requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.AltName = pdf.Text("label") })},
 		{"TM requires 1.3", pdf.V1_2, tx(func(f *TextField) { f.ExportName = "map" })},
 		{"AA requires 1.3", pdf.V1_2, tx(func(f *TextField) {
-			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: "0;"}}}
+			f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("0;")}}}
 		})},
 		{"signature field requires 1.3", pdf.V1_2, NewSignatureField("x")},
 		{"button Opt requires 1.4", pdf.V1_3, func() Field {
@@ -200,7 +200,7 @@ func TestEncodeFieldValidation(t *testing.T) {
 		f.V, f.DV = v, dv
 		return f
 	}
-	value := &pdf.StringOrStream{Value: "secret"}
+	value := &pdf.StringOrStream{Value: pdf.Text("secret")}
 	richPassword := password(nil, nil)
 	richPassword.RichValue = value
 	tests := []struct {
@@ -237,7 +237,7 @@ func TestEncodeFieldValidation(t *testing.T) {
 func TestEncodeDuplicateNames(t *testing.T) {
 	text := func(v string) *TextField {
 		f := textField("b")
-		f.V = &pdf.StringOrStream{Value: v}
+		f.V = &pdf.StringOrStream{Value: pdf.Text(v)}
 		return f
 	}
 	tests := []struct {

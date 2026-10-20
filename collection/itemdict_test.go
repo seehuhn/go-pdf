@@ -36,8 +36,8 @@ var testCases = []struct {
 		version: pdf.V1_7,
 		item: &ItemDict{
 			Data: map[pdf.Name]ItemValue{
-				"Title":  {Val: "Document Title"},
-				"Author": {Val: "John Doe"},
+				"Title":  {Val: pdf.Text("Document Title")},
+				"Author": {Val: pdf.Text("John Doe")},
 			},
 		},
 	},
@@ -46,7 +46,7 @@ var testCases = []struct {
 		version: pdf.V1_7,
 		item: &ItemDict{
 			Data: map[pdf.Name]ItemValue{
-				"Name":     {Val: "Test Document"},
+				"Name":     {Val: pdf.Text("Test Document")},
 				"Size":     {Val: int64(1024)},
 				"Rating":   {Val: float64(4.5)},
 				"Modified": {Val: time.Date(2023, 12, 25, 10, 30, 0, 0, time.UTC)},
@@ -58,8 +58,8 @@ var testCases = []struct {
 		version: pdf.V1_7,
 		item: &ItemDict{
 			Data: map[pdf.Name]ItemValue{
-				"Size":     {Val: int64(1048576), Prefix: "Size: "},
-				"Category": {Val: "PDF Document", Prefix: "Type: "},
+				"Size":     {Val: int64(1048576), Prefix: pdf.Text("Size: ")},
+				"Category": {Val: pdf.Text("PDF Document"), Prefix: pdf.Text("Type: ")},
 			},
 		},
 	},
@@ -68,10 +68,10 @@ var testCases = []struct {
 		version: pdf.V2_0,
 		item: &ItemDict{
 			Data: map[pdf.Name]ItemValue{
-				"Title":    {Val: "My Document"},
-				"Size":     {Val: int64(2048), Prefix: "File size: "},
+				"Title":    {Val: pdf.Text("My Document")},
+				"Size":     {Val: int64(2048), Prefix: pdf.Text("File size: ")},
 				"Created":  {Val: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-				"Priority": {Val: float64(7.8), Prefix: "Priority: "},
+				"Priority": {Val: float64(7.8), Prefix: pdf.Text("Priority: ")},
 			},
 		},
 	},
@@ -80,7 +80,7 @@ var testCases = []struct {
 		version: pdf.V1_7,
 		item: &ItemDict{
 			Data: map[pdf.Name]ItemValue{
-				"Key": {Val: "Value"},
+				"Key": {Val: pdf.Text("Value")},
 			},
 			SingleUse: true,
 		},
@@ -91,7 +91,7 @@ var testCases = []struct {
 		item: &ItemDict{
 			Data: map[pdf.Name]ItemValue{
 				"Created":  {Val: time.Date(2023, 6, 15, 14, 30, 45, 0, time.UTC)},
-				"Modified": {Val: time.Date(2024, 12, 1, 9, 15, 30, 0, time.UTC), Prefix: "Last modified: "},
+				"Modified": {Val: time.Date(2024, 12, 1, 9, 15, 30, 0, time.UTC), Prefix: pdf.Text("Last modified: ")},
 			},
 		},
 	},
@@ -102,8 +102,8 @@ var testCases = []struct {
 			Data: map[pdf.Name]ItemValue{
 				"Count":      {Val: int64(42)},
 				"Percentage": {Val: float64(87.5)},
-				"Score":      {Val: int64(100), Prefix: "Score: "},
-				"Average":    {Val: float64(3.14159), Prefix: "Avg: "},
+				"Score":      {Val: int64(100), Prefix: pdf.Text("Score: ")},
+				"Average":    {Val: float64(3.14159), Prefix: pdf.Text("Avg: ")},
 			},
 		},
 	},
@@ -166,8 +166,8 @@ func TestItemDictValidation(t *testing.T) {
 	t.Run("type_key_forbidden", func(t *testing.T) {
 		item := &ItemDict{
 			Data: map[pdf.Name]ItemValue{
-				"Type": {Val: "should not be allowed"},
-				"Name": {Val: "Test"},
+				"Type": {Val: pdf.Text("should not be allowed")},
+				"Name": {Val: pdf.Text("Test")},
 			},
 		}
 
@@ -199,7 +199,7 @@ func TestItemDictValidation(t *testing.T) {
 	t.Run("version_requirement", func(t *testing.T) {
 		item := &ItemDict{
 			Data: map[pdf.Name]ItemValue{
-				"Test": {Val: "value"},
+				"Test": {Val: pdf.Text("value")},
 			},
 		}
 
@@ -230,7 +230,7 @@ func TestExtractItemDictMalformed(t *testing.T) {
 
 		dict := pdf.Dict{
 			"Type": pdf.Name("WrongType"),
-			"Key":  pdf.TextString("value"),
+			"Key":  pdf.Text("value"),
 		}
 
 		_, err := ExtractItemDict(pdf.CursorAt(x, nil), dict, false)

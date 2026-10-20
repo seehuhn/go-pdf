@@ -224,7 +224,7 @@ func DecodeCatalog(c Cursor, obj Object, _ bool) (*Catalog, error) {
 	if dict["Lang"] != nil {
 		langStr, err := c.TextString(dict["Lang"])
 		if err == nil {
-			lang = langtag.Parse(string(langStr))
+			lang = langtag.Parse(langStr.String())
 		}
 	}
 
@@ -407,7 +407,7 @@ func (c *Catalog) Encode(rm *ResourceManager) (Native, error) {
 		if err := CheckVersion(out, "Catalog Lang entry", V1_4); err != nil {
 			return nil, err
 		}
-		dict["Lang"] = TextString(c.Lang.String())
+		dict["Lang"] = Text(c.Lang.String())
 	}
 
 	if c.SpiderInfo != nil {

@@ -18,6 +18,8 @@ package measure
 
 import (
 	"testing"
+
+	"seehuhn.de/go/pdf"
 )
 
 func TestFormatMeasurement(t *testing.T) {
@@ -31,9 +33,9 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "spec example - 1.4505 miles",
 			value: 1.4505,
 			formats: []*NumberFormat{
-				{Unit: "mi", ConversionFactor: 1.0, Precision: 100000, FractionFormat: FractionDecimal, ThousandsSeparator: ",", SuffixSpacing: " "},
-				{Unit: "ft", ConversionFactor: 5280, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: ",", SuffixSpacing: " "},
-				{Unit: "in", ConversionFactor: 12, Precision: 8, FractionFormat: FractionFraction, ThousandsSeparator: ",", SuffixSpacing: " "},
+				{Unit: pdf.Text("mi"), ConversionFactor: 1.0, Precision: 100000, FractionFormat: FractionDecimal, ThousandsSeparator: pdf.Text(","), SuffixSpacing: pdf.Text(" ")},
+				{Unit: pdf.Text("ft"), ConversionFactor: 5280, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: pdf.Text(","), SuffixSpacing: pdf.Text(" ")},
+				{Unit: pdf.Text("in"), ConversionFactor: 12, Precision: 8, FractionFormat: FractionFraction, ThousandsSeparator: pdf.Text(","), SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: "1 mi 2,378 ft 7 5/8 in",
 		},
@@ -41,7 +43,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "simple single format",
 			value: 5.25,
 			formats: []*NumberFormat{
-				{Unit: "ft", ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal, SuffixSpacing: " "},
+				{Unit: pdf.Text("ft"), ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal, SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: "5.25 ft",
 		},
@@ -49,7 +51,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "whole number only",
 			value: 3.0,
 			formats: []*NumberFormat{
-				{Unit: "m", ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal, SuffixSpacing: " "},
+				{Unit: pdf.Text("m"), ConversionFactor: 1.0, Precision: 100, FractionFormat: FractionDecimal, SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: "3 m",
 		},
@@ -57,7 +59,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "zero value",
 			value: 0.0,
 			formats: []*NumberFormat{
-				{Unit: "cm", ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal, SuffixSpacing: " "},
+				{Unit: pdf.Text("cm"), ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal, SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: "0 cm",
 		},
@@ -65,7 +67,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "fraction rounding",
 			value: 2.6,
 			formats: []*NumberFormat{
-				{Unit: "units", ConversionFactor: 1.0, Precision: 0, FractionFormat: FractionRound, SuffixSpacing: " "},
+				{Unit: pdf.Text("units"), ConversionFactor: 1.0, Precision: 0, FractionFormat: FractionRound, SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: "3 units",
 		},
@@ -73,7 +75,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "fraction truncation",
 			value: 2.9,
 			formats: []*NumberFormat{
-				{Unit: "units", ConversionFactor: 1.0, Precision: 0, FractionFormat: FractionTruncate, SuffixSpacing: " "},
+				{Unit: pdf.Text("units"), ConversionFactor: 1.0, Precision: 0, FractionFormat: FractionTruncate, SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: "2 units",
 		},
@@ -81,7 +83,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "prefix label",
 			value: 1.5,
 			formats: []*NumberFormat{
-				{Unit: "kg", ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal, PrefixLabel: true, PrefixSpacing: " ", SuffixSpacing: " "},
+				{Unit: pdf.Text("kg"), ConversionFactor: 1.0, Precision: 10, FractionFormat: FractionDecimal, PrefixLabel: true, PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: " kg 1.5",
 		},
@@ -89,7 +91,7 @@ func TestFormatMeasurement(t *testing.T) {
 			name:  "no thousands separator",
 			value: 12345.0,
 			formats: []*NumberFormat{
-				{Unit: "units", ConversionFactor: 1.0, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: "", SuffixSpacing: " "},
+				{Unit: pdf.Text("units"), ConversionFactor: 1.0, Precision: 1, FractionFormat: FractionDecimal, ThousandsSeparator: pdf.Text(""), SuffixSpacing: pdf.Text(" ")},
 			},
 			expected: "12345 units",
 		},
@@ -124,25 +126,25 @@ func TestFormatInteger(t *testing.T) {
 	}{
 		{
 			name:     "basic suffix",
-			nf:       NumberFormat{Unit: "ft", ThousandsSeparator: "", PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:       NumberFormat{Unit: pdf.Text("ft"), ThousandsSeparator: pdf.Text(""), PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			value:    123,
 			expected: "123 ft",
 		},
 		{
 			name:     "with thousands separator",
-			nf:       NumberFormat{Unit: "m", ThousandsSeparator: ",", PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:       NumberFormat{Unit: pdf.Text("m"), ThousandsSeparator: pdf.Text(","), PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			value:    12345,
 			expected: "12,345 m",
 		},
 		{
 			name:     "prefix label",
-			nf:       NumberFormat{Unit: "kg", PrefixLabel: true, PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:       NumberFormat{Unit: pdf.Text("kg"), PrefixLabel: true, PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			value:    42,
 			expected: " kg 42",
 		},
 		{
 			name:     "zero value",
-			nf:       NumberFormat{Unit: "cm", PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:       NumberFormat{Unit: pdf.Text("cm"), PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			value:    0,
 			expected: "",
 		},
@@ -167,37 +169,37 @@ func TestFormatFraction(t *testing.T) {
 	}{
 		{
 			name:       "decimal fraction",
-			nf:         NumberFormat{Unit: "in", Precision: 100, FractionFormat: FractionDecimal, DecimalSeparator: ".", PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:         NumberFormat{Unit: pdf.Text("in"), Precision: 100, FractionFormat: FractionDecimal, DecimalSeparator: pdf.Text("."), PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			fractional: 0.75,
 			expected:   ".75 in",
 		},
 		{
 			name:       "simple fraction",
-			nf:         NumberFormat{Unit: "in", Precision: 8, FractionFormat: FractionFraction, PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:         NumberFormat{Unit: pdf.Text("in"), Precision: 8, FractionFormat: FractionFraction, PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			fractional: 0.625,
 			expected:   "5/8 in",
 		},
 		{
 			name:       "force exact fraction",
-			nf:         NumberFormat{Unit: "in", Precision: 8, FractionFormat: FractionFraction, ForceExactFraction: true, PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:         NumberFormat{Unit: pdf.Text("in"), Precision: 8, FractionFormat: FractionFraction, ForceExactFraction: true, PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			fractional: 0.25,
 			expected:   "2/8 in",
 		},
 		{
 			name:       "rounded fraction",
-			nf:         NumberFormat{Unit: "units", Precision: 1, FractionFormat: FractionRound, PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:         NumberFormat{Unit: pdf.Text("units"), Precision: 1, FractionFormat: FractionRound, PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			fractional: 0.6,
 			expected:   "1 units",
 		},
 		{
 			name:       "truncated fraction",
-			nf:         NumberFormat{Unit: "units", Precision: 1, FractionFormat: FractionTruncate, PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:         NumberFormat{Unit: pdf.Text("units"), Precision: 1, FractionFormat: FractionTruncate, PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			fractional: 0.9,
 			expected:   "",
 		},
 		{
 			name:       "zero fraction",
-			nf:         NumberFormat{Unit: "in", Precision: 8, FractionFormat: FractionFraction, PrefixSpacing: " ", SuffixSpacing: " "},
+			nf:         NumberFormat{Unit: pdf.Text("in"), Precision: 8, FractionFormat: FractionFraction, PrefixSpacing: pdf.Text(" "), SuffixSpacing: pdf.Text(" ")},
 			fractional: 0.0,
 			expected:   "",
 		},

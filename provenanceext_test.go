@@ -30,7 +30,7 @@ func TestTwoManagersShareObjects(t *testing.T) {
 	rm1 := pdf.NewResourceManager(w)
 	rm2 := pdf.NewResourceManager(w)
 
-	info := &pdf.Info{Title: "shared"}
+	info := &pdf.Info{Title: pdf.Text("shared")}
 	ref1, err := rm1.Embed(info)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestTwoManagersShareObjects(t *testing.T) {
 func newUpdateBase(t *testing.T) *memfile.MemFile {
 	t.Helper()
 	w, f := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	w.GetMeta().Info.Title = "base"
+	w.GetMeta().Info.Title = pdf.Text("base")
 	if err := w.Put(w.Alloc(), pdf.Name("extra")); err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestReplaceWritesInPlace(t *testing.T) {
 	}
 
 	repl := *old
-	repl.Title = "replaced"
+	repl.Title = pdf.Text("replaced")
 	rm := pdf.NewResourceManager(w)
 	ref, err := rm.Replace(old, &repl)
 	if err != nil {
@@ -268,7 +268,7 @@ func TestReplaceWritesInPlace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != "replaced" {
+	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != pdf.Text("replaced") {
 		t.Errorf("Info after update: %+v", r.GetMeta().Info)
 	}
 }

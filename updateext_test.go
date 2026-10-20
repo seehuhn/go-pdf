@@ -491,12 +491,12 @@ func TestUpdateInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.GetMeta().Info = &pdf.Info{Title: "first", Custom: map[string]string{"Team": "docs"}}
+	w.GetMeta().Info = &pdf.Info{Title: pdf.Text("first"), Custom: map[string]pdf.TextString{"Team": pdf.Text("docs")}}
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
 	r := reopen(t, f.Data)
-	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != "first" || r.GetMeta().Info.Custom["Team"] != "docs" {
+	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != pdf.Text("first") || r.GetMeta().Info.Custom["Team"] != pdf.Text("docs") {
 		t.Fatalf("Info after adding: %+v", r.GetMeta().Info)
 	}
 	infoRef, ok := r.GetMeta().Trailer["Info"].(pdf.Reference)
@@ -521,13 +521,13 @@ func TestUpdateInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := *w.GetMeta().Info
-	info.Title = "second"
+	info.Title = pdf.Text("second")
 	w.GetMeta().Info = &info
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
 	r = reopen(t, f.Data)
-	if r.GetMeta().Info.Title != "second" || r.GetMeta().Trailer["Info"] != infoRef {
+	if r.GetMeta().Info.Title != pdf.Text("second") || r.GetMeta().Trailer["Info"] != infoRef {
 		t.Errorf("changed Info: %+v at %v", r.GetMeta().Info, r.GetMeta().Trailer["Info"])
 	}
 
@@ -1045,7 +1045,7 @@ func TestUpdateInfoDirectDict(t *testing.T) {
 		size, root.Number(), prev, pos)
 	f := &memfile.MemFile{Data: buf.Bytes()}
 
-	if info := reopen(t, f.Data).GetMeta().Info; info == nil || info.Title != "x" {
+	if info := reopen(t, f.Data).GetMeta().Info; info == nil || info.Title != pdf.Text("x") {
 		t.Fatalf("base file Info = %+v, want direct dictionary with Title \"x\"", info)
 	}
 
@@ -1058,7 +1058,7 @@ func TestUpdateInfoDirectDict(t *testing.T) {
 	}
 
 	r := reopen(t, f.Data)
-	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != "x" {
+	if r.GetMeta().Info == nil || r.GetMeta().Info.Title != pdf.Text("x") {
 		t.Fatalf("Info = %+v, want Title \"x\"", r.GetMeta().Info)
 	}
 	ref, ok := r.GetMeta().Trailer["Info"].(pdf.Reference)
@@ -1169,7 +1169,7 @@ func FuzzUpdate(f *testing.F) {
 			w, file := memfile.NewPDFWriter(f, v, &pdf.WriterOptions{HumanReadable: i%2 == 0})
 			switch i {
 			case 1:
-				w.GetMeta().Info.Title = "test"
+				w.GetMeta().Info.Title = pdf.Text("test")
 			case 2:
 				w.GetMeta().Info.ModDate = pdf.Date(time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
 			case 3:

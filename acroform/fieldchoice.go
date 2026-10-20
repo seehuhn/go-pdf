@@ -28,8 +28,8 @@ import (
 // Export is the value used when the form is submitted; Display is the text
 // shown to the user.
 type ChoiceOption struct {
-	Export  string
-	Display string
+	Export  pdf.TextString
+	Display pdf.TextString
 }
 
 // ChoiceField is a choice form field: a list box, or a combo box when the
@@ -66,13 +66,13 @@ type ChoiceField struct {
 	//
 	// On write, a nil V is treated as the display strings of the options
 	// listed in Selected.
-	V []string
+	V []pdf.TextString
 
 	// DV (optional) holds the default selection, used when the form is reset.
 	// A single-selection field has at most one entry.
 	//
 	// This corresponds to the /DV entry in the PDF field dictionary.
-	DV []string
+	DV []pdf.TextString
 }
 
 var _ Field = (*ChoiceField)(nil)
@@ -91,9 +91,9 @@ func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		arr := make(pdf.Array, len(f.Opt))
 		for i, o := range f.Opt {
 			if o.Export == o.Display {
-				arr[i] = pdf.TextString(o.Display)
+				arr[i] = o.Display
 			} else {
-				arr[i] = pdf.Array{pdf.TextString(o.Export), pdf.TextString(o.Display)}
+				arr[i] = pdf.Array{o.Export, o.Display}
 			}
 		}
 		dict["Opt"] = arr
@@ -149,7 +149,7 @@ func (f *ChoiceField) SelectionAgrees() bool {
 	if len(f.V) != len(f.Selected) {
 		return false
 	}
-	count := make(map[string]int, len(f.V))
+	count := make(map[pdf.TextString]int, len(f.V))
 	for _, s := range f.V {
 		count[s]++
 	}
@@ -166,16 +166,16 @@ func (f *ChoiceField) SelectionAgrees() bool {
 // choiceValueObject converts a choice field's selection to its PDF
 // representation: nil when nothing is selected, a bare text string for a single
 // selection, and an array of text strings for multiple selections.
-func choiceValueObject(vals []string) pdf.Object {
+func choiceValueObject(vals []pdf.TextString) pdf.Object {
 	switch len(vals) {
 	case 0:
 		return nil
 	case 1:
-		return pdf.TextString(vals[0])
+		return vals[0]
 	default:
 		arr := make(pdf.Array, len(vals))
 		for i, s := range vals {
-			arr[i] = pdf.TextString(s)
+			arr[i] = s
 		}
 		return arr
 	}

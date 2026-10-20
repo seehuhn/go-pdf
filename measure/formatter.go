@@ -46,7 +46,7 @@ func Format(value float64, formats []*NumberFormat) (string, error) {
 			if integerPart != 0 || (i == len(formats)-1 && value == 0) {
 				if integerPart == 0 && value == 0 {
 					// Special case for zero - always format with unit
-					formatted := "0" + format.SuffixSpacing + format.Unit
+					formatted := "0" + format.SuffixSpacing.String() + format.Unit.String()
 					if result.Len() > 0 {
 						result.WriteString(" ")
 					}
@@ -79,7 +79,7 @@ func Format(value float64, formats []*NumberFormat) (string, error) {
 				} else {
 					rounded = int64(valueInUnits)
 				}
-				formatted := strconv.FormatInt(rounded, 10) + format.SuffixSpacing + format.Unit
+				formatted := strconv.FormatInt(rounded, 10) + format.SuffixSpacing.String() + format.Unit.String()
 				if result.Len() > 0 {
 					result.WriteString(" ")
 				}
@@ -96,7 +96,7 @@ func Format(value float64, formats []*NumberFormat) (string, error) {
 				if result.Len() > 0 {
 					result.WriteString(" ")
 				}
-				result.WriteString(intFormatted + " " + fracFormatted + format.SuffixSpacing + format.Unit)
+				result.WriteString(intFormatted + " " + fracFormatted + format.SuffixSpacing.String() + format.Unit.String())
 
 			} else if integerPart != 0 {
 				// Only integer part
@@ -151,17 +151,17 @@ func (nf *NumberFormat) formatInteger(value int64) string {
 	numStr := strconv.FormatInt(value, 10)
 
 	// Apply thousands separator if present
-	if nf.ThousandsSeparator != "" {
-		numStr = addThousandsSeparator(numStr, nf.ThousandsSeparator)
+	if !nf.ThousandsSeparator.IsZero() {
+		numStr = addThousandsSeparator(numStr, nf.ThousandsSeparator.String())
 	}
 
 	// Add unit label with appropriate spacing
-	spacing := nf.SuffixSpacing
+	spacing := nf.SuffixSpacing.String()
 	if nf.PrefixLabel {
-		spacing = nf.PrefixSpacing
-		return spacing + nf.Unit + spacing + numStr
+		spacing = nf.PrefixSpacing.String()
+		return spacing + nf.Unit.String() + spacing + numStr
 	} else {
-		return numStr + spacing + nf.Unit
+		return numStr + spacing + nf.Unit.String()
 	}
 }
 
@@ -212,7 +212,7 @@ func (nf *NumberFormat) formatDecimal(fractional float64) (string, error) {
 	}
 
 	// Replace decimal separator if needed
-	decimalSep := nf.DecimalSeparator
+	decimalSep := nf.DecimalSeparator.String()
 	if decimalSep == "" {
 		decimalSep = "."
 	}
@@ -221,12 +221,12 @@ func (nf *NumberFormat) formatDecimal(fractional float64) (string, error) {
 	}
 
 	// Add unit label with appropriate spacing
-	spacing := nf.SuffixSpacing
+	spacing := nf.SuffixSpacing.String()
 	if nf.PrefixLabel {
-		spacing = nf.PrefixSpacing
-		return spacing + nf.Unit + spacing + formatted, nil
+		spacing = nf.PrefixSpacing.String()
+		return spacing + nf.Unit.String() + spacing + formatted, nil
 	} else {
-		return formatted + spacing + nf.Unit, nil
+		return formatted + spacing + nf.Unit.String(), nil
 	}
 }
 
@@ -250,12 +250,12 @@ func (nf *NumberFormat) formatFractionValue(fractional float64) (string, error) 
 	fractionStr := fmt.Sprintf("%d/%d", numerator, denominator)
 
 	// Add unit label with appropriate spacing
-	spacing := nf.SuffixSpacing
+	spacing := nf.SuffixSpacing.String()
 	if nf.PrefixLabel {
-		spacing = nf.PrefixSpacing
-		return spacing + nf.Unit + spacing + fractionStr, nil
+		spacing = nf.PrefixSpacing.String()
+		return spacing + nf.Unit.String() + spacing + fractionStr, nil
 	} else {
-		return fractionStr + spacing + nf.Unit, nil
+		return fractionStr + spacing + nf.Unit.String(), nil
 	}
 }
 
@@ -280,8 +280,8 @@ func (nf *NumberFormat) formatIntegerOnly(value int64) string {
 	numStr := strconv.FormatInt(value, 10)
 
 	// Apply thousands separator if present
-	if nf.ThousandsSeparator != "" {
-		numStr = addThousandsSeparator(numStr, nf.ThousandsSeparator)
+	if !nf.ThousandsSeparator.IsZero() {
+		numStr = addThousandsSeparator(numStr, nf.ThousandsSeparator.String())
 	}
 
 	return numStr
@@ -328,7 +328,7 @@ func (nf *NumberFormat) formatDecimalOnly(fractional float64) (string, error) {
 	}
 
 	// Replace decimal separator if needed
-	decimalSep := nf.DecimalSeparator
+	decimalSep := nf.DecimalSeparator.String()
 	if decimalSep == "" {
 		decimalSep = "."
 	}
@@ -372,16 +372,16 @@ func (nf *NumberFormat) formatDecimalComplete(value float64) string {
 	formatted := fmt.Sprintf("%."+strconv.Itoa(decimalPlaces)+"f", value)
 
 	// Apply thousands separator to integer part if present
-	if nf.ThousandsSeparator != "" {
+	if !nf.ThousandsSeparator.IsZero() {
 		parts := strings.Split(formatted, ".")
 		if len(parts) == 2 {
-			parts[0] = addThousandsSeparator(parts[0], nf.ThousandsSeparator)
+			parts[0] = addThousandsSeparator(parts[0], nf.ThousandsSeparator.String())
 			formatted = parts[0] + "." + parts[1]
 		}
 	}
 
 	// Replace decimal separator if needed
-	decimalSep := nf.DecimalSeparator
+	decimalSep := nf.DecimalSeparator.String()
 	if decimalSep == "" {
 		decimalSep = "."
 	}
@@ -390,12 +390,12 @@ func (nf *NumberFormat) formatDecimalComplete(value float64) string {
 	}
 
 	// Add unit label with appropriate spacing
-	spacing := nf.SuffixSpacing
+	spacing := nf.SuffixSpacing.String()
 	if nf.PrefixLabel {
-		spacing = nf.PrefixSpacing
-		return spacing + nf.Unit + spacing + formatted
+		spacing = nf.PrefixSpacing.String()
+		return spacing + nf.Unit.String() + spacing + formatted
 	} else {
-		return formatted + spacing + nf.Unit
+		return formatted + spacing + nf.Unit.String()
 	}
 }
 

@@ -175,7 +175,7 @@ func (f *FreeText) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		if err := pdf.CheckVersion(rm.Out, "free text annotation DS entry", pdf.V1_5); err != nil {
 			return nil, err
 		}
-		dict["DS"] = pdf.TextString(f.DefaultStyle)
+		dict["DS"] = pdf.Text(f.DefaultStyle)
 	}
 
 	if f.CalloutLine != nil {

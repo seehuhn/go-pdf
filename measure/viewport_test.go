@@ -45,7 +45,7 @@ var viewportTestCases = []struct {
 		version: pdf.V1_6,
 		data: &Viewport{
 			BBox:      pdf.Rectangle{LLx: 50, LLy: 75, URx: 300, URy: 400},
-			Name:      "Main Drawing Area",
+			Name:      pdf.Text("Main Drawing Area"),
 			SingleUse: true,
 		},
 	},
@@ -54,32 +54,32 @@ var viewportTestCases = []struct {
 		version: pdf.V1_7,
 		data: &Viewport{
 			BBox: pdf.Rectangle{LLx: 10, LLy: 20, URx: 200, URy: 300},
-			Name: "Engineering Drawing",
+			Name: pdf.Text("Engineering Drawing"),
 			Measure: &RectilinearMeasure{
-				ScaleRatio: "1:100",
+				ScaleRatio: pdf.Text("1:100"),
 				XAxis: []*NumberFormat{{
-					Unit:             "m",
+					Unit:             pdf.Text("m"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Distance: []*NumberFormat{{
-					Unit:             "m",
+					Unit:             pdf.Text("m"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Area: []*NumberFormat{{
-					Unit:             "m²",
+					Unit:             pdf.Text("m²"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Origin:    [2]float64{0, 0},
 				SingleUse: true,
@@ -92,7 +92,7 @@ var viewportTestCases = []struct {
 		version: pdf.V2_0,
 		data: &Viewport{
 			BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 500, URy: 500},
-			Name: "Geospatial Region",
+			Name: pdf.Text("Geospatial Region"),
 			PtData: &PtData{
 				Subtype: PtDataSubtypeCloud,
 				Names:   []string{PtDataNameLat, PtDataNameLon, PtDataNameAlt},
@@ -111,40 +111,40 @@ var viewportTestCases = []struct {
 		version: pdf.V2_0,
 		data: &Viewport{
 			BBox: pdf.Rectangle{LLx: 100, LLy: 100, URx: 400, URy: 600},
-			Name: "Complete Viewport",
+			Name: pdf.Text("Complete Viewport"),
 			Measure: &RectilinearMeasure{
-				ScaleRatio: "1in = 1ft",
+				ScaleRatio: pdf.Text("1in = 1ft"),
 				XAxis: []*NumberFormat{{
-					Unit:             "ft",
+					Unit:             pdf.Text("ft"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				YAxis: []*NumberFormat{{
-					Unit:             "ft",
+					Unit:             pdf.Text("ft"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Distance: []*NumberFormat{{
-					Unit:             "ft",
+					Unit:             pdf.Text("ft"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Area: []*NumberFormat{{
-					Unit:             "ft²",
+					Unit:             pdf.Text("ft²"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Origin:    [2]float64{100, 100},
 				SingleUse: false,
@@ -163,40 +163,40 @@ var viewportTestCases = []struct {
 		version: pdf.V1_7,
 		data: &Viewport{
 			BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 200},
-			Name: "Different axes",
+			Name: pdf.Text("Different axes"),
 			Measure: &RectilinearMeasure{
-				ScaleRatio: "in X 1cm = 1m, in Y 1cm = 30m",
+				ScaleRatio: pdf.Text("in X 1cm = 1m, in Y 1cm = 30m"),
 				XAxis: []*NumberFormat{{
-					Unit:             "m",
+					Unit:             pdf.Text("m"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				YAxis: []*NumberFormat{{
-					Unit:             "m",
+					Unit:             pdf.Text("m"),
 					ConversionFactor: 30.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Distance: []*NumberFormat{{
-					Unit:             "m",
+					Unit:             pdf.Text("m"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Area: []*NumberFormat{{
-					Unit:             "m²",
+					Unit:             pdf.Text("m²"),
 					ConversionFactor: 1.0,
 					Precision:        100,
 					FractionFormat:   FractionDecimal,
 					SingleUse:        true,
-					DecimalSeparator: ".",
+					DecimalSeparator: pdf.Text("."),
 				}},
 				Origin:    [2]float64{0, 0},
 				CYX:       30.0,
@@ -263,7 +263,7 @@ var viewportArrayTestCases = []struct {
 			Viewports: []*Viewport{
 				{
 					BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-					Name:      "Single",
+					Name:      pdf.Text("Single"),
 					SingleUse: true,
 				},
 			},
@@ -276,17 +276,17 @@ var viewportArrayTestCases = []struct {
 			Viewports: []*Viewport{
 				{
 					BBox:      pdf.Rectangle{LLx: 0, LLy: 0, URx: 50, URy: 50},
-					Name:      "First",
+					Name:      pdf.Text("First"),
 					SingleUse: true,
 				},
 				{
 					BBox:      pdf.Rectangle{LLx: 50, LLy: 50, URx: 100, URy: 100},
-					Name:      "Second",
+					Name:      pdf.Text("Second"),
 					SingleUse: false,
 				},
 				{
 					BBox:      pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 200},
-					Name:      "Third",
+					Name:      pdf.Text("Third"),
 					SingleUse: true,
 				},
 			},
@@ -656,15 +656,15 @@ func TestViewPortArraySelect(t *testing.T) {
 		Viewports: []*Viewport{
 			{
 				BBox: pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 100},
-				Name: "First",
+				Name: pdf.Text("First"),
 			},
 			{
 				BBox: pdf.Rectangle{LLx: 50, LLy: 50, URx: 150, URy: 150},
-				Name: "Second",
+				Name: pdf.Text("Second"),
 			},
 			{
 				BBox: pdf.Rectangle{LLx: 25, LLy: 25, URx: 75, URy: 75},
-				Name: "Third",
+				Name: pdf.Text("Third"),
 			},
 		},
 	}
@@ -707,10 +707,10 @@ func TestViewPortArraySelect(t *testing.T) {
 			if result != tt.expected {
 				var resultName, expectedName string
 				if result != nil {
-					resultName = result.Name
+					resultName = result.Name.String()
 				}
 				if tt.expected != nil {
-					expectedName = tt.expected.Name
+					expectedName = tt.expected.Name.String()
 				}
 				t.Errorf("Select(%v) = %q, want %q", tt.point, resultName, expectedName)
 			}

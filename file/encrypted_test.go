@@ -148,7 +148,7 @@ func TestEncryptedPayloadErrors(t *testing.T) {
 		// Create malformed dictionary (missing required Subtype)
 		dict := pdf.Dict{
 			"Type":    pdf.Name("EncryptedPayload"),
-			"Version": pdf.TextString("1.0"),
+			"Version": pdf.Name("1.0"),
 			// Missing Subtype
 		}
 

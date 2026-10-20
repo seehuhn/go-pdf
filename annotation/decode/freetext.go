@@ -60,7 +60,7 @@ func decodeFreeText(c pdf.Cursor, dict pdf.Dict) (*annotation.FreeText, error) {
 	if ds, err := pdf.Optional(c.TextString(dict["DS"])); err != nil {
 		return nil, err
 	} else {
-		f.DefaultStyle = string(ds)
+		f.DefaultStyle = ds.String()
 	}
 
 	if cl, err := pdf.Optional(c.Array(dict["CL"])); err != nil {

@@ -28,7 +28,7 @@ import (
 // TestSetOCGStateEncodeInvalid checks that malformed state changes are
 // rejected instead of reaching the file.
 func TestSetOCGStateEncodeInvalid(t *testing.T) {
-	group := &oc.Group{Name: "layer"}
+	group := &oc.Group{Name: pdf.Text("layer")}
 
 	cases := []struct {
 		name  string
@@ -176,8 +176,8 @@ func TestSetOCGStateDecodeRepair(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
-			g1 := &oc.Group{Name: "layer 1", Intent: []pdf.Name{"View"}}
-			g2 := &oc.Group{Name: "layer 2", Intent: []pdf.Name{"View"}}
+			g1 := &oc.Group{Name: pdf.Text("layer 1"), Intent: []pdf.Name{"View"}}
+			g2 := &oc.Group{Name: pdf.Text("layer 2"), Intent: []pdf.Name{"View"}}
 			ref1, err := rm.Embed(g1)
 			if err != nil {
 				t.Fatal(err)
@@ -226,7 +226,7 @@ func TestSetOCGStateDecodeIndirectOperation(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	group := &oc.Group{Name: "layer", Intent: []pdf.Name{"View"}}
+	group := &oc.Group{Name: pdf.Text("layer"), Intent: []pdf.Name{"View"}}
 	groupRef, err := rm.Embed(group)
 	if err != nil {
 		t.Fatal(err)
@@ -265,7 +265,7 @@ func TestSetOCGStateSharedGroup(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	group := &oc.Group{Name: "layer", Intent: []pdf.Name{"View"}}
+	group := &oc.Group{Name: pdf.Text("layer"), Intent: []pdf.Name{"View"}}
 	groupRef, err := rm.Embed(group)
 	if err != nil {
 		t.Fatal(err)
@@ -309,9 +309,9 @@ func TestSetOCGStateSharedGroup(t *testing.T) {
 // states in order, and that a group switched on displaces the other members
 // of its radio-button collection.
 func TestSetOCGStateApply(t *testing.T) {
-	g1 := &oc.Group{Name: "Group 1"}
-	g2 := &oc.Group{Name: "Group 2"}
-	g3 := &oc.Group{Name: "Group 3"}
+	g1 := &oc.Group{Name: pdf.Text("Group 1")}
+	g2 := &oc.Group{Name: pdf.Text("Group 2")}
+	g3 := &oc.Group{Name: pdf.Text("Group 3")}
 	allGroups := []*oc.Group{g1, g2, g3}
 
 	config := &oc.Configuration{
@@ -403,7 +403,7 @@ func TestSetOCGStateApply(t *testing.T) {
 // state just set rather than the snapshot.
 func TestSetOCGStateApplyEffective(t *testing.T) {
 	g := &oc.Group{
-		Name:  "Zoomed detail",
+		Name:  pdf.Text("Zoomed detail"),
 		Usage: &oc.Usage{Zoom: &oc.UsageZoom{Min: 4, Max: 100}},
 	}
 	config := &oc.Configuration{

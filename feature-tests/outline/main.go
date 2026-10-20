@@ -68,12 +68,12 @@ func main() {
 
 	ol := &outline.Outline{}
 	for _, s := range styles {
-		item := ol.AddItem(s.name)
+		item := ol.AddItem(pdf.Text(s.name))
 		item.Bold = s.bold
 		item.Italic = s.italic
 		item.Open = true
 		for _, c := range colors {
-			child := item.AddChild(c.name)
+			child := item.AddChild(pdf.Text(c.name))
 			child.Bold = s.bold
 			child.Italic = s.italic
 			child.Color = c.rgb

@@ -85,7 +85,7 @@ func (l *SigFieldLock) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		// Fields is required for Include / Exclude
 		arr := make(pdf.Array, len(l.Fields))
 		for i, s := range l.Fields {
-			arr[i] = pdf.TextString(s)
+			arr[i] = pdf.Text(s)
 		}
 		dict["Fields"] = arr
 	default:

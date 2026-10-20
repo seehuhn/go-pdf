@@ -50,7 +50,7 @@ func decodeText(c pdf.Cursor, dict pdf.Dict) (*annotation.Text, error) {
 	if err != nil {
 		return nil, err
 	}
-	switch stateModel {
+	switch stateModel.String() {
 	case "Marked":
 		text.State = annotation.TextStateUnmarked
 	case "Review":
@@ -61,7 +61,7 @@ func decodeText(c pdf.Cursor, dict pdf.Dict) (*annotation.Text, error) {
 	if err != nil {
 		return nil, err
 	}
-	switch state {
+	switch state.String() {
 	case "Marked":
 		text.State = annotation.TextStateMarked
 	case "Unmarked":
@@ -82,8 +82,8 @@ func decodeText(c pdf.Cursor, dict pdf.Dict) (*annotation.Text, error) {
 	if text.State != annotation.TextStateUnknown {
 		if text.Markup.InReplyTo == 0 {
 			text.State = annotation.TextStateUnknown // can't fix missing reply relationship
-		} else if text.Markup.User == "" {
-			text.Markup.User = "unknown"
+		} else if text.Markup.User.IsZero() {
+			text.Markup.User = pdf.Text("unknown")
 		}
 	}
 

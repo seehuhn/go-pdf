@@ -32,8 +32,8 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*annotation.Movie, error) {
 	// T (optional)
 	if t, err := pdf.Optional(c.TextString(dict["T"])); err != nil {
 		return nil, err
-	} else if t != "" {
-		annot.Title = string(t)
+	} else if !t.IsZero() {
+		annot.Title = t
 	}
 
 	// Movie (required): a movie annotation without a usable Movie cannot be

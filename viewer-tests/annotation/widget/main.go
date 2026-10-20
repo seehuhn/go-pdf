@@ -214,7 +214,7 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 			mk.BorderColor = ink
 		}
 		if d.mkCA != "" {
-			mk.Caption = d.mkCA
+			mk.Caption = pdf.Text(d.mkCA)
 		}
 
 		bs := &annotation.BorderStyle{Width: 1, SingleUse: true}
@@ -290,7 +290,7 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		// for a password field the value feeds the appearance only and is
 		// cleared below, after the widgets are made
 		if d.value != "" {
-			tx.V = &pdf.StringOrStream{Value: d.value}
+			tx.V = &pdf.StringOrStream{Value: pdf.Text(d.value)}
 		}
 		f = tx
 
@@ -301,10 +301,10 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		ch.Align = d.align
 		ch.Selected = d.sel
 		for _, o := range d.opts {
-			ch.Opt = append(ch.Opt, acroform.ChoiceOption{Display: o, Export: o})
+			ch.Opt = append(ch.Opt, acroform.ChoiceOption{Display: pdf.Text(o), Export: pdf.Text(o)})
 		}
 		if d.value != "" {
-			ch.V = []string{d.value}
+			ch.V = []pdf.TextString{pdf.Text(d.value)}
 		}
 		f = ch
 

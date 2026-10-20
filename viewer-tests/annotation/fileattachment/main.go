@@ -104,10 +104,10 @@ func createDocument(filename string) error {
 	}
 	for _, icon := range allIcons {
 		fa := &annotation.FileAttachment{
-			Contents: fmt.Sprintf("Icon: %s", icon),
+			Contents: pdf.Text(fmt.Sprintf("Icon: %s", icon)),
 			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
-			User:     "Test User",
+			User:     pdf.Text("Test User"),
 			Icon:     icon,
 			FS:       sampleFile(fmt.Sprintf("%s-sample.txt", icon)),
 		}
@@ -120,11 +120,11 @@ func createDocument(filename string) error {
 	// red-tinted push pin
 	red := color.DeviceRGB{0.8, 0.15, 0.15}
 	fa := &annotation.FileAttachment{
-		Contents: "Red push pin",
+		Contents: pdf.Text("Red push pin"),
 		Color:    red,
 		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
-		User:     "Test User",
+		User:     pdf.Text("Test User"),
 		Icon:     annotation.FileAttachmentIconPushPin,
 		FS:       sampleFile("red-pin.txt"),
 	}
@@ -135,11 +135,11 @@ func createDocument(filename string) error {
 	// blue-tinted paperclip
 	blue := color.DeviceRGB{0.1, 0.3, 0.75}
 	fa = &annotation.FileAttachment{
-		Contents: "Blue paperclip",
+		Contents: pdf.Text("Blue paperclip"),
 		Color:    blue,
 		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
-		User:     "Test User",
+		User:     pdf.Text("Test User"),
 		Icon:     annotation.FileAttachmentIconPaperclip,
 		FS:       sampleFile("blue-clip.txt"),
 	}
@@ -149,10 +149,10 @@ func createDocument(filename string) error {
 
 	// tag with a thicker border
 	fa = &annotation.FileAttachment{
-		Contents: "Tag with border width 2",
+		Contents: pdf.Text("Tag with border width 2"),
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
 		Flags:    annotation.FlagPrint,
-		User:     "Test User",
+		User:     pdf.Text("Test User"),
 		Icon:     annotation.FileAttachmentIconTag,
 		FS:       sampleFile("tagged.txt"),
 	}
@@ -162,10 +162,10 @@ func createDocument(filename string) error {
 
 	// no-icon default (empty Icon name falls back to PushPin)
 	fa = &annotation.FileAttachment{
-		Contents: "Unset Icon (defaults to PushPin)",
+		Contents: pdf.Text("Unset Icon (defaults to PushPin)"),
 		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
-		User:     "Test User",
+		User:     pdf.Text("Test User"),
 		FS:       sampleFile("default.txt"),
 	}
 	if err = w.addPair(fa, "Icon: (unset)"); err != nil {
@@ -190,8 +190,8 @@ func sampleFile(name string) *file.Specification {
 	}
 	return &file.Specification{
 		FileName:        name,
-		FileNameUnicode: name,
-		Description:     "Sample attachment created by the Quire test generator.",
+		FileNameUnicode: pdf.Text(name),
+		Description:     pdf.Text("Sample attachment created by the Quire test generator."),
 		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
 	}
 }
@@ -225,7 +225,7 @@ func (w *writer) addPair(left *annotation.FileAttachment, label string) error {
 		URx: leftCenter + iconSize/2,
 		URy: w.yPos,
 	}
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightCenter - iconSize/2,
@@ -233,7 +233,7 @@ func (w *writer) addPair(left *annotation.FileAttachment, label string) error {
 		URx: rightCenter + iconSize/2,
 		URy: w.yPos,
 	}
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	if err := w.style.AddAppearance(right); err != nil {
 		return err

@@ -144,17 +144,17 @@ func createDocument(filename string) error {
 	page.TextShow("page content and mark where the layered annotations sit.")
 	page.TextEnd()
 
-	group := &oc.Group{Name: "Notes layer"}
+	group := &oc.Group{Name: pdf.Text("Notes layer")}
 	base := time.Date(2026, 8, 13, 9, 0, 0, 0, time.UTC)
 
 	// comment thread in the layer
 	commentRect := pdf.Rectangle{LLx: 72, LLy: 640, URx: 92, URy: 660}
 	parent := &annotation.Text{
 		Rect:            commentRect,
-		Contents:        "Only while the layer is on.",
+		Contents:        pdf.Text("Only while the layer is on."),
 		OptionalContent: group,
-		User:            "Alice",
-		Subject:         "Layered note",
+		User:            pdf.Text("Alice"),
+		Subject:         pdf.Text("Layered note"),
 		CreationDate:    base,
 		Icon:            annotation.TextIconComment,
 	}
@@ -164,9 +164,9 @@ func createDocument(filename string) error {
 	}
 	reply := &annotation.Text{
 		Rect:            commentRect,
-		Contents:        "A reply inside the same layer.",
+		Contents:        pdf.Text("A reply inside the same layer."),
 		OptionalContent: group,
-		User:            "Bob",
+		User:            pdf.Text("Bob"),
 		InReplyTo:       parentRef,
 		RT:              "R",
 		CreationDate:    base.Add(30 * time.Minute),
@@ -180,7 +180,7 @@ func createDocument(filename string) error {
 	linkRect := pdf.Rectangle{LLx: 72, LLy: 560, URx: 340, URy: 585}
 	link := &annotation.Link{
 		Rect:            linkRect,
-		Contents:        "example.com, in the layer",
+		Contents:        pdf.Text("example.com, in the layer"),
 		OptionalContent: group,
 		Appearance: &appearance.Dict{
 			Normal: linkFrame(linkRect.URx-linkRect.LLx,
@@ -205,8 +205,8 @@ func createDocument(filename string) error {
 	}
 	sound := &annotation.Sound{
 		Rect:         soundRect,
-		Contents:     "A sound outside the layer.",
-		User:         "Carol",
+		Contents:     pdf.Text("A sound outside the layer."),
+		User:         pdf.Text("Carol"),
 		CreationDate: base.Add(time.Hour),
 		Sound: &pdfsound.Sound{
 			SampleRate:    8000,
@@ -230,7 +230,7 @@ func createDocument(filename string) error {
 	toggleRect := pdf.Rectangle{LLx: 72, LLy: 400, URx: 340, URy: 425}
 	toggle := &annotation.Link{
 		Rect:     toggleRect,
-		Contents: "toggle the Notes layer",
+		Contents: pdf.Text("toggle the Notes layer"),
 		Appearance: &appearance.Dict{
 			Normal: linkFrame(toggleRect.URx-toggleRect.LLx,
 				toggleRect.URy-toggleRect.LLy,
@@ -257,7 +257,7 @@ func createDocument(filename string) error {
 	props := &oc.Properties{
 		OCGs: []*oc.Group{group},
 		D: &oc.Configuration{
-			Name:  "Default",
+			Name:  pdf.Text("Default"),
 			Order: []oc.OrderItem{group},
 		},
 	}

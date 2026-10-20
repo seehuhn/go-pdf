@@ -455,7 +455,7 @@ func TestOpacityCheckedBeforeWriting(t *testing.T) {
 		Common: annotation.Common{
 			Rect:                 pdf.Rectangle{LLx: 0, LLy: 0, URx: 100, URy: 50},
 			Appearance:           defaultAppearanceDict,
-			OptionalContent:      &oc.Group{Name: "Layer"},
+			OptionalContent:      &oc.Group{Name: pdf.Text("Layer")},
 			StrokingTransparency: 2, // out of range
 		},
 	}

@@ -66,9 +66,9 @@ func run() error {
 
 	// A and B have Intent=View (the default), matching the configuration.
 	// D has Intent=Design, which does NOT match.
-	groupA := &oc.Group{Name: "A (View, ON)"}
-	groupB := &oc.Group{Name: "B (View, OFF)"}
-	groupD := &oc.Group{Name: "D (Design)", Intent: []pdf.Name{"Design"}}
+	groupA := &oc.Group{Name: pdf.Text("A (View, ON)")}
+	groupB := &oc.Group{Name: pdf.Text("B (View, OFF)")}
+	groupD := &oc.Group{Name: pdf.Text("D (Design)"), Intent: []pdf.Name{"Design"}}
 
 	props := &oc.Properties{
 		OCGs: []*oc.Group{groupA, groupB, groupD},

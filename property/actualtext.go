@@ -33,7 +33,7 @@ type ActualText struct {
 	MCID optional.UInt
 
 	// Text is the replacement text string.
-	Text string
+	Text pdf.TextString
 
 	// SingleUse controls whether the property list is embedded directly
 	// in the content stream (true) or as an indirect object via the
@@ -49,7 +49,7 @@ func (a *ActualText) AsDirectDict() pdf.Dict {
 	if !a.SingleUse {
 		return nil
 	}
-	dict := pdf.Dict{"ActualText": pdf.TextString(a.Text)}
+	dict := pdf.Dict{"ActualText": a.Text}
 	if mcid, ok := a.MCID.Get(); ok {
 		dict["MCID"] = pdf.Integer(mcid)
 	}
@@ -83,7 +83,7 @@ func ExtractActualText(c pdf.Cursor, obj pdf.Object, isDirect bool) (*ActualText
 	}
 
 	if s, ok := atObj.(pdf.String); ok {
-		a.Text = string(s.AsTextString())
+		a.Text = s.AsTextString()
 	}
 
 	if mcid, ok := dict["MCID"].(pdf.Integer); ok && mcid >= 0 {
@@ -111,7 +111,7 @@ func (a *ActualText) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["MCID"] = pdf.Integer(mcid)
 	}
 
-	dict["ActualText"] = pdf.TextString(a.Text)
+	dict["ActualText"] = a.Text
 
 	if a.SingleUse {
 		return dict, nil

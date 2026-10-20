@@ -93,7 +93,7 @@ func createDocument(filename string) error {
 
 	// test 1: default border width
 	a := &annotation.PolyLine{
-		Contents: "default line width",
+		Contents: pdf.Text("default line width"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 	}
@@ -104,7 +104,7 @@ func createDocument(filename string) error {
 
 	// test 2: Border.Width=2
 	a = &annotation.PolyLine{
-		Contents: "Border.Width=2",
+		Contents: pdf.Text("Border.Width=2"),
 		Flags:    annotation.FlagPrint,
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
 		Color:    color.Blue,
@@ -116,7 +116,7 @@ func createDocument(filename string) error {
 
 	// test 3: BorderStyle.Width=2
 	a = &annotation.PolyLine{
-		Contents:    "BorderStyle.Width=2",
+		Contents:    pdf.Text("BorderStyle.Width=2"),
 		Flags:       annotation.FlagPrint,
 		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
@@ -128,7 +128,7 @@ func createDocument(filename string) error {
 
 	// test 4: dashed line
 	a = &annotation.PolyLine{
-		Contents: "dashed line",
+		Contents: pdf.Text("dashed line"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
@@ -145,7 +145,7 @@ func createDocument(filename string) error {
 
 	// test 5: ClosedArrow endings
 	a = &annotation.PolyLine{
-		Contents: "ClosedArrow endings",
+		Contents: pdf.Text("ClosedArrow endings"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		LineEndingStyle: [2]annotation.LineEndingStyle{
@@ -161,7 +161,7 @@ func createDocument(filename string) error {
 
 	// test 6: OpenArrow / Diamond
 	a = &annotation.PolyLine{
-		Contents: "OpenArrow / Diamond",
+		Contents: pdf.Text("OpenArrow / Diamond"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		LineEndingStyle: [2]annotation.LineEndingStyle{
@@ -177,7 +177,7 @@ func createDocument(filename string) error {
 
 	// test 7: Circle endings
 	a = &annotation.PolyLine{
-		Contents: "Circle endings",
+		Contents: pdf.Text("Circle endings"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		LineEndingStyle: [2]annotation.LineEndingStyle{
@@ -193,7 +193,7 @@ func createDocument(filename string) error {
 
 	// test 8: no color (invisible)
 	a = &annotation.PolyLine{
-		Contents: "no color (invisible)",
+		Contents: pdf.Text("no color (invisible)"),
 		Flags:    annotation.FlagPrint,
 	}
 	err = w.addAnnotationPair(a)
@@ -203,7 +203,7 @@ func createDocument(filename string) error {
 
 	// test 9: no line style specified
 	a = &annotation.PolyLine{
-		Contents: "no line style specified",
+		Contents: pdf.Text("no line style specified"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Black,
 	}
@@ -230,7 +230,7 @@ func (w *writer) addAnnotationPair(left *annotation.PolyLine) error {
 	w.page.TextBegin()
 	w.page.TextSetFont(w.font, 10)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-shapeHeight/2-3))
-	w.page.TextShow(left.Contents)
+	w.page.TextShow(left.Contents.String())
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -242,7 +242,7 @@ func (w *writer) addAnnotationPair(left *annotation.PolyLine) error {
 		URy: w.yPos,
 	}
 	left.Vertices = zigzagVertices(leftColStart, leftColEnd, w.yPos-shapeHeight, w.yPos)
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightColStart,
@@ -251,7 +251,7 @@ func (w *writer) addAnnotationPair(left *annotation.PolyLine) error {
 		URy: w.yPos,
 	}
 	right.Vertices = zigzagVertices(rightColStart, rightColEnd, w.yPos-shapeHeight, w.yPos)
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	err := w.style.AddAppearance(right)
 	if err != nil {

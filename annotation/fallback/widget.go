@@ -97,13 +97,13 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	switch x := f.(type) {
 	case *acroform.TextField:
 		if x.V != nil {
-			p.Value = x.V.Value
+			p.Value = x.V.Value.String()
 		}
 		p.MaxLen = x.MaxLen
 	case *acroform.ChoiceField:
 		p.Options = make([]string, len(x.Opt))
 		for i, o := range x.Opt {
-			p.Options[i] = o.Display
+			p.Options[i] = o.Display.String()
 		}
 		p.Selected = x.Selected
 		p.TopIndex = x.TopIndex
@@ -158,12 +158,12 @@ func buttonValue(f acroform.Field) pdf.Name {
 // only when the value is empty.
 func choiceValue(x *acroform.ChoiceField) string {
 	if len(x.V) > 0 {
-		return x.V[0]
+		return x.V[0].String()
 	}
 	if len(x.Selected) > 0 {
 		i := x.Selected[0]
 		if i >= 0 && i < len(x.Opt) {
-			return x.Opt[i].Display
+			return x.Opt[i].Display.String()
 		}
 	}
 	return ""
@@ -382,7 +382,7 @@ func (g *Generator) drawToggle(w *annotation.Widget, fld *widgetField, on bool) 
 	if on {
 		glyph := ""
 		if w.Style != nil {
-			glyph = w.Style.Caption
+			glyph = w.Style.Caption.String()
 		}
 		if glyph == "" {
 			if isRadio {
@@ -455,14 +455,14 @@ func (g *Generator) drawPushButton(w *annotation.Widget) (*form.Form, error) {
 	b, width, height, m := g.fieldContext(w)
 	drawChrome(b, width, height, w)
 
-	if w.Style != nil && w.Style.Caption != "" {
+	if w.Style != nil && !w.Style.Caption.IsZero() {
 		size := captionSize(height)
 		F := g.ContentFont()
 		b.TextBegin()
 		b.TextSetFont(F, size)
 		b.SetFillColor(quireInk)
 		b.TextFirstLine(0, pdf.Round(centredBaseline(F, height, size), 2))
-		b.TextShowAligned(w.Style.Caption, width, 0.5)
+		b.TextShowAligned(w.Style.Caption.String(), width, 0.5)
 		b.TextEnd()
 	}
 

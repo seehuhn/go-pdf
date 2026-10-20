@@ -128,14 +128,14 @@ func createDocument(filename string) error {
 	page.TextEnd()
 
 	group := &oc.Group{
-		Name:  "Zoomed detail",
+		Name:  pdf.Text("Zoomed detail"),
 		Usage: &oc.Usage{Zoom: &oc.UsageZoom{Min: 2, Max: 4}},
 	}
 
 	linkRect := pdf.Rectangle{LLx: 72, LLy: 640, URx: 340, URy: 670}
 	link := &annotation.Link{
 		Rect:            linkRect,
-		Contents:        "example.com, between 200% and 400%",
+		Contents:        pdf.Text("example.com, between 200% and 400%"),
 		OptionalContent: group,
 		Appearance: &appearance.Dict{
 			Normal: linkFrame(linkRect.URx-linkRect.LLx,
@@ -153,7 +153,7 @@ func createDocument(filename string) error {
 	props := &oc.Properties{
 		OCGs: []*oc.Group{group},
 		D: &oc.Configuration{
-			Name: "Default",
+			Name: pdf.Text("Default"),
 			AS: []*oc.UsageApplication{{
 				Event:     oc.EventView,
 				OCGs:      []*oc.Group{group},

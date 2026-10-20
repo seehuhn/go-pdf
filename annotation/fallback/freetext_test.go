@@ -69,7 +69,7 @@ func TestFreeTextTextColor(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			a := &annotation.FreeText{
 				Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
-				Contents:          "hello",
+				Contents:          pdf.Text("hello"),
 				DefaultAppearance: c.da,
 			}
 
@@ -97,7 +97,7 @@ func TestFreeTextCalloutMargin(t *testing.T) {
 	box := pdf.Rectangle{LLx: 50, LLy: 50, URx: 200, URy: 110}
 	a := &annotation.FreeText{
 		Rect:     box,
-		Contents: "hello",
+		Contents: pdf.Text("hello"),
 		Intent:   annotation.FreeTextIntentCallout,
 		// the line starts to the right of and above the box
 		CalloutLine: []vec.Vec2{{X: 320, Y: 220}, {X: 200, Y: 110}},
@@ -131,8 +131,8 @@ func TestFreeTextCalloutMargin(t *testing.T) {
 func TestFreeTextHonoursDAFontSize(t *testing.T) {
 	a := &annotation.FreeText{
 		Rect: pdf.Rectangle{LLx: 0, LLy: 0, URx: 400, URy: 200},
-		Contents: "one two three four five six seven eight nine ten " +
-			"eleven twelve thirteen fourteen",
+		Contents: pdf.Text("one two three four five six seven eight nine ten " +
+			"eleven twelve thirteen fourteen"),
 		DefaultAppearance: "/Helv 18 Tf 0 g",
 		Align:             pdf.TextAlignCenter,
 	}
@@ -175,7 +175,7 @@ func TestFreeTextDefaultFontSize(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			a := &annotation.FreeText{
 				Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
-				Contents:          "hello",
+				Contents:          pdf.Text("hello"),
 				DefaultAppearance: c.da,
 			}
 
@@ -206,7 +206,7 @@ func TestFreeTextTypewriterEncodesAtV2(t *testing.T) {
 
 	a := &annotation.FreeText{
 		Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 60},
-		Contents:          "hello",
+		Contents:          pdf.Text("hello"),
 		Intent:            annotation.FreeTextIntentTypeWriter,
 		DefaultAppearance: "/Cour 12 Tf 0 g",
 	}
@@ -336,7 +336,7 @@ func TestFreeTextCloudyCalloutRect(t *testing.T) {
 	const lw = 4
 	a := &annotation.FreeText{
 		Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
-		Contents: "hello",
+		Contents: pdf.Text("hello"),
 		Border:   &annotation.Border{Width: lw},
 		Intent:   annotation.FreeTextIntentCallout,
 		// a horizontal line out to the left, whose cap reaches to x = 18
@@ -364,7 +364,7 @@ func TestFreeTextCalloutRound(t *testing.T) {
 	const lw = 4
 	a := &annotation.FreeText{
 		Rect:     pdf.Rectangle{LLx: 100, LLy: 100, URx: 200, URy: 160},
-		Contents: "hello",
+		Contents: pdf.Text("hello"),
 		Border:   &annotation.Border{Width: lw},
 		Intent:   annotation.FreeTextIntentCallout,
 		// the line doubles back at its knee, x = 20, by 20 degrees: sharp,

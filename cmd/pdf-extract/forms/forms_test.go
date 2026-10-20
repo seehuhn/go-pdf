@@ -64,7 +64,7 @@ func dump(t *testing.T, form *acroform.InteractiveForm) string {
 func textField(name, value string) *acroform.TextField {
 	f := acroform.NewTextField(name)
 	f.DefaultAppearance = "/Helv 0 Tf 0 g"
-	f.V = &pdf.StringOrStream{Value: value}
+	f.V = &pdf.StringOrStream{Value: pdf.Text(value)}
 	return f
 }
 
@@ -84,7 +84,7 @@ func TestListValues(t *testing.T) {
 	choice := acroform.NewChoiceField("colors")
 	choice.DefaultAppearance = "/Helv 0 Tf 0 g"
 	choice.Flags = acroform.FieldMultiSelect
-	choice.V = []string{"Red", "Green"}
+	choice.V = []pdf.TextString{pdf.Text("Red"), pdf.Text("Green")}
 
 	sig := acroform.NewSignatureField("signature1")
 
@@ -113,11 +113,11 @@ func TestListValues(t *testing.T) {
 
 func TestListNames(t *testing.T) {
 	both := textField("given_name", "Ada")
-	both.AltName = "Given name"
+	both.AltName = pdf.Text("Given name")
 	both.ExportName = "fname"
 
 	altOnly := textField("given_name", "Ada")
-	altOnly.AltName = "Given name"
+	altOnly.AltName = pdf.Text("Given name")
 
 	exportOnly := textField("given_name", "Ada")
 	exportOnly.ExportName = "fname"

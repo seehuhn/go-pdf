@@ -128,7 +128,7 @@ func main() {
 		"Nums": pdf.Array{
 			pdf.Integer(0),
 			pdf.Dict{
-				"P": pdf.TextString("Title"),
+				"P": pdf.Text("Title"),
 			},
 			pdf.Integer(1),
 			pdf.Dict{

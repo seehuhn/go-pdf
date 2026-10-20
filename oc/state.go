@@ -555,7 +555,9 @@ func evaluateUsage(u *Usage, categories []Category, ctx *ViewerContext) (on bool
 		case CategoryUser:
 			if ctx != nil && ctx.UserName != "" && u.User != nil {
 				if ctx.UserType == "" || ctx.UserType == u.User.Type {
-					catOn = slices.Contains(u.User.Name, ctx.UserName)
+					catOn = slices.ContainsFunc(u.User.Name, func(n pdf.TextString) bool {
+						return n.String() == ctx.UserName
+					})
 				}
 				catMatched = true
 			}

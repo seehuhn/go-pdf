@@ -27,7 +27,7 @@ type LangText struct {
 	Lang string
 
 	// Text is the text string in the given language.
-	Text string
+	Text pdf.TextString
 }
 
 // MultiLangText provides text in multiple languages, used to give alternative
@@ -56,7 +56,7 @@ func extractMultiLangText(c pdf.Cursor, obj pdf.Object) (MultiLangText, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, LangText{Lang: string(lang), Text: string(text)})
+		out = append(out, LangText{Lang: lang.String(), Text: text})
 	}
 	return out, nil
 }
@@ -65,7 +65,7 @@ func extractMultiLangText(c pdf.Cursor, obj pdf.Object) (MultiLangText, error) {
 func (m MultiLangText) toArray() pdf.Array {
 	arr := make(pdf.Array, 0, 2*len(m))
 	for _, lt := range m {
-		arr = append(arr, pdf.TextString(lt.Lang), pdf.TextString(lt.Text))
+		arr = append(arr, pdf.Text(lt.Lang), lt.Text)
 	}
 	return arr
 }

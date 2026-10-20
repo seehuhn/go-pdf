@@ -2838,7 +2838,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.0'
-    goType: string
+    goType: pdf.TextString
     purpose: Textual content of the annotation.
   - goName: Page
     pdfKey: P
@@ -3003,7 +3003,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.1'
-    goType: string
+    goType: pdf.TextString
     purpose: User who added the annotation.
   - goName: Popup
     pdfKey: Popup
@@ -3042,7 +3042,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.5'
-    goType: string
+    goType: pdf.TextString
     purpose: Subject displayed in title bar.
   - goName: RT
     pdfKey: RT
@@ -3916,7 +3916,7 @@ types:
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    goType: string
+    goType: pdf.TextString
     purpose: 'Title (optional) is the title of the movie annotation. Movie actions may
 
       use this title to reference the movie annotation.'
@@ -4367,7 +4367,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.7'
-    goType: string
+    goType: pdf.TextString
     purpose: OverlayText (optional) - text to display over redacted region
   - goName: Repeat
     pdfKey: Repeat
@@ -4488,7 +4488,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.5'
-    goType: string
+    goType: pdf.TextString
     purpose: Title is the title of the screen annotation.
   - goName: Style
     pdfKey: MK
@@ -5428,19 +5428,19 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.2'
-    goType: string
+    goType: pdf.TextString
   - goName: RolloverCaption
     pdfKey: RC
     pdfType: text-string
     required: false
     introduced: '1.2'
-    goType: string
+    goType: pdf.TextString
   - goName: DownCaption
     pdfKey: AC
     pdfType: text-string
     required: false
     introduced: '1.2'
-    goType: string
+    goType: pdf.TextString
   - goName: Icon
     pdfKey: I
     pdfType: stream
@@ -5860,7 +5860,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.3'
-    goType: string
+    goType: pdf.TextString
   - goName: ExportName
     pdfKey: TM
     pdfType: text-string
@@ -6017,14 +6017,14 @@ types:
     pdfType: array;text-string
     required: false
     introduced: '1.2'
-    goType: '[]string'
+    goType: '[]pdf.TextString'
     inheritable: true
   - goName: DV
     pdfKey: DV
     pdfType: array;text-string
     required: false
     introduced: '1.2'
-    goType: '[]string'
+    goType: '[]pdf.TextString'
     inheritable: true
 - name: FieldMDPTransformParameters
   purpose: transform parameters for MDP signature fields
@@ -6514,7 +6514,7 @@ types:
     possibleValues:
     - RL
   - goName: ScaleRatio
-    goType: string
+    goType: pdf.TextString
     pdfKey: R
     pdfType: text-string
     required: true
@@ -6646,7 +6646,7 @@ types:
     - NumberFormat
     notes: Table 268
   - goName: Unit
-    goType: string
+    goType: pdf.TextString
     pdfKey: U
     pdfType: text-string
     required: true
@@ -6685,28 +6685,28 @@ types:
     default: false
     introduced: '1.6'
   - goName: ThousandsSeparator
-    goType: string
+    goType: pdf.TextString
     pdfKey: RT
     pdfType: text-string
     required: false
     default: ''','''
     introduced: '1.6'
   - goName: DecimalSeparator
-    goType: string
+    goType: pdf.TextString
     pdfKey: RD
     pdfType: text-string
     required: false
     default: '''.'''
     introduced: '1.6'
   - goName: PrefixSpacing
-    goType: string
+    goType: pdf.TextString
     pdfKey: PS
     pdfType: text-string
     required: false
     default: ''' '''
     introduced: '1.6'
   - goName: SuffixSpacing
-    goType: string
+    goType: pdf.TextString
     pdfKey: SS
     pdfType: text-string
     required: false
@@ -6793,7 +6793,7 @@ types:
     pdfType: text-string
     required: true
     introduced: '1.0'
-    goType: string
+    goType: pdf.TextString
     purpose: Title is the text displayed for this outline item.
     notes: Table 151
     source: OutlineItem
@@ -7232,7 +7232,7 @@ types:
     pdfType: text-string
     required: false
     introduced: '1.6'
-    goType: string
+    goType: pdf.TextString
     purpose: Name is a descriptive title of the viewport (optional).
   - goName: Measure
     pdfKey: Measure
@@ -7330,7 +7330,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.7'
-    goType: '[]map[pdf.Name]string'
+    goType: '[]map[pdf.Name]pdf.TextString'
   - goName: KeyUsage
     pdfKey: KeyUsage
     pdfType: array
@@ -7488,7 +7488,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.5'
-    goType: '[]string'
+    goType: '[]pdf.TextString'
   - goName: MDP
     pdfKey: MDP
     pdfType: dictionary
@@ -7508,7 +7508,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.6'
-    goType: '[]string'
+    goType: '[]pdf.TextString'
   - goName: AddRevInfo
     pdfKey: AddRevInfo
     pdfType: boolean

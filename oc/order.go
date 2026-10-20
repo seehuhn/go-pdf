@@ -16,6 +16,8 @@
 
 package oc
 
+import "seehuhn.de/go/pdf"
+
 // OrderItem represents an item in the Order array of an optional content
 // configuration dictionary. It is either a [*Group] or an [*OrderGroup].
 type OrderItem interface {
@@ -25,7 +27,7 @@ type OrderItem interface {
 // OrderGroup represents a labeled nested array in the Order hierarchy.
 type OrderGroup struct {
 	// Label (optional) is a non-selectable text label for this sub-group.
-	Label string
+	Label pdf.TextString
 
 	// Children contains the nested groups and sub-groups.
 	Children []OrderItem

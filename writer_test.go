@@ -43,12 +43,12 @@ func TestWriter(t *testing.T) {
 	}
 	encInfo1 := AsString(encryptDict)
 
-	author := TextString("Jochen Voß")
+	author := Text("Jochen Voß")
 	w.GetMeta().Info = &Info{
-		Title:        "PDF Test Document",
+		Title:        Text("PDF Test Document"),
 		Author:       author,
-		Subject:      "Testing",
-		Keywords:     "PDF, testing, Go",
+		Subject:      Text("Testing"),
+		Keywords:     Text("PDF, testing, Go"),
 		CreationDate: Date(time.Now()),
 	}
 
@@ -143,7 +143,7 @@ ET
 		t.Fatal("no document information dictionary")
 	}
 	if x := r.meta.Info.Author; x != author {
-		t.Error("wrong author " + x)
+		t.Errorf("wrong author %q", x)
 	}
 }
 

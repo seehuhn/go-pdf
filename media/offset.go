@@ -110,7 +110,7 @@ type MediaOffsetFrame struct {
 // MediaOffsetMarker specifies an offset as a named marker.
 type MediaOffsetMarker struct {
 	// Marker identifies a named offset within a media object.
-	Marker string
+	Marker pdf.TextString
 
 	// SingleUse determines if Embed returns a dictionary (true) or
 	// a reference (false).
@@ -158,7 +158,7 @@ func ExtractMediaOffset(c pdf.Cursor, obj pdf.Object, isDirect bool) (MediaOffse
 		if err != nil {
 			return nil, err
 		}
-		return &MediaOffsetMarker{Marker: string(m), SingleUse: isDirect}, nil
+		return &MediaOffsetMarker{Marker: m, SingleUse: isDirect}, nil
 	default:
 		return nil, pdf.Error("unknown media offset subtype: " + string(s))
 	}
@@ -202,7 +202,7 @@ func (o *MediaOffsetMarker) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 	dict := pdf.Dict{
 		"S": pdf.Name("M"),
-		"M": pdf.TextString(o.Marker),
+		"M": o.Marker,
 	}
 	return offsetResult(e, dict, o.SingleUse)
 }

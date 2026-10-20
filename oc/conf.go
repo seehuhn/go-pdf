@@ -56,11 +56,11 @@ const (
 type Configuration struct {
 	// Name (optional) is a name for the configuration, suitable for
 	// presentation in a user interface.
-	Name string
+	Name pdf.TextString
 
 	// Creator (optional) is the name of the application or feature that
 	// created this configuration dictionary.
-	Creator string
+	Creator pdf.TextString
 
 	// BaseState (optional) controls initial group states when this
 	// configuration is applied.
@@ -139,14 +139,14 @@ func ExtractConfiguration(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Configu
 	if name, err := pdf.Optional(c.TextString(dict["Name"])); err != nil {
 		return nil, err
 	} else {
-		cfg.Name = string(name)
+		cfg.Name = name
 	}
 
 	// Creator (optional)
 	if creator, err := pdf.Optional(c.TextString(dict["Creator"])); err != nil {
 		return nil, err
 	} else {
-		cfg.Creator = string(creator)
+		cfg.Creator = creator
 	}
 
 	// BaseState (optional, default ON)
@@ -303,11 +303,11 @@ func (c *Configuration) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	dict := pdf.Dict{}
 
-	if c.Name != "" {
-		dict["Name"] = pdf.TextString(c.Name)
+	if !c.Name.IsZero() {
+		dict["Name"] = c.Name
 	}
-	if c.Creator != "" {
-		dict["Creator"] = pdf.TextString(c.Creator)
+	if !c.Creator.IsZero() {
+		dict["Creator"] = c.Creator
 	}
 
 	// BaseState (default ON, omit when default)
@@ -548,8 +548,8 @@ func doExtractOrderItems(c pdf.Cursor, arr pdf.Array, remaining *int) ([]OrderIt
 				if err != nil {
 					return nil, err
 				}
-				if label != "" {
-					og.Label = string(label)
+				if !label.IsZero() {
+					og.Label = label
 					start = 1
 				}
 			}
@@ -591,9 +591,9 @@ func embedOrderItems(rm *pdf.EmbedHelper, items []OrderItem) (pdf.Array, error) 
 				return nil, err
 			}
 			inner := children
-			if v.Label != "" {
+			if !v.Label.IsZero() {
 				inner = make(pdf.Array, 0, len(children)+1)
-				inner = append(inner, pdf.TextString(v.Label))
+				inner = append(inner, v.Label)
 				inner = append(inner, children...)
 			}
 			arr = append(arr, inner)

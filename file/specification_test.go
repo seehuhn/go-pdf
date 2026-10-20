@@ -57,7 +57,7 @@ var testCases = []struct {
 		version: pdf.V1_6,
 		spec: &Specification{
 			FileName:       "document.pdf",
-			Description:    "Important document",
+			Description:    pdf.Text("Important document"),
 			Volatile:       true,
 			AFRelationship: RelationshipUnspecified,
 		},
@@ -67,8 +67,8 @@ var testCases = []struct {
 		version: pdf.V1_7,
 		spec: &Specification{
 			FileName:        "example.txt",
-			FileNameUnicode: "example_unicode.txt",
-			Description:     "Unicode filename test",
+			FileNameUnicode: pdf.Text("example_unicode.txt"),
+			Description:     pdf.Text("Unicode filename test"),
 			ID:              []string{"id1", "id2"},
 			AFRelationship:  RelationshipUnspecified,
 		},
@@ -121,13 +121,13 @@ var testCases = []struct {
 			},
 			RelatedFiles: map[string][]RelatedFile{
 				"F": {
-					{Name: "related1.txt", Stream: &Stream{
+					{Name: pdf.Text("related1.txt"), Stream: &Stream{
 						WriteData: func(w io.Writer) error {
 							_, err := w.Write([]byte("Related file 1 content"))
 							return err
 						},
 					}},
-					{Name: "related2.txt", Stream: &Stream{
+					{Name: pdf.Text("related2.txt"), Stream: &Stream{
 						WriteData: func(w io.Writer) error {
 							_, err := w.Write([]byte("Related file 2 content"))
 							return err
@@ -157,7 +157,7 @@ var testCases = []struct {
 			FileName: "collection_item.pdf",
 			CollectionItem: &collection.ItemDict{
 				Data: map[pdf.Name]collection.ItemValue{
-					"Title":   {Val: "Test Collection Item"},
+					"Title":   {Val: pdf.Text("Test Collection Item")},
 					"Created": {Val: time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)},
 				},
 			},
@@ -197,8 +197,8 @@ var testCases = []struct {
 		spec: &Specification{
 			NameSpace:       "URL",
 			FileName:        "https://example.com/document.pdf",
-			FileNameUnicode: "https://example.com/document_unicode.pdf",
-			Description:     "Comprehensive test document",
+			FileNameUnicode: pdf.Text("https://example.com/document_unicode.pdf"),
+			Description:     pdf.Text("Comprehensive test document"),
 			ID:              []string{"comp1", "comp2"},
 			Volatile:        true,
 			EmbeddedFiles: map[string]*Stream{
@@ -223,7 +223,7 @@ var testCases = []struct {
 			},
 			RelatedFiles: map[string][]RelatedFile{
 				"F": {
-					{Name: "metadata.xml", Stream: &Stream{
+					{Name: pdf.Text("metadata.xml"), Stream: &Stream{
 						MimeType: "text/xml",
 						WriteData: func(w io.Writer) error {
 							_, err := w.Write([]byte("<?xml version=\"1.0\"?><metadata></metadata>"))
@@ -235,8 +235,8 @@ var testCases = []struct {
 			AFRelationship: RelationshipSource,
 			CollectionItem: &collection.ItemDict{
 				Data: map[pdf.Name]collection.ItemValue{
-					"Document": {Val: "Comprehensive Test Document"},
-					"Size":     {Val: int64(1024), Prefix: "Size: "},
+					"Document": {Val: pdf.Text("Comprehensive Test Document")},
+					"Size":     {Val: int64(1024), Prefix: pdf.Text("Size: ")},
 					"Rating":   {Val: float64(4.8)},
 				},
 			},
@@ -304,7 +304,7 @@ func TestSpecificationRoundTrip(t *testing.T) {
 func TestSpecificationValidation(t *testing.T) {
 	t.Run("missing all file names", func(t *testing.T) {
 		spec := &Specification{
-			Description: "No filenames",
+			Description: pdf.Text("No filenames"),
 		}
 
 		buf, _ := memfile.NewPDFWriter(t, pdf.V1_0, nil)
@@ -319,7 +319,7 @@ func TestSpecificationValidation(t *testing.T) {
 	t.Run("version requirement - UF", func(t *testing.T) {
 		spec := &Specification{
 			FileName:        "test.txt",
-			FileNameUnicode: "test_unicode.txt",
+			FileNameUnicode: pdf.Text("test_unicode.txt"),
 		}
 
 		buf, _ := memfile.NewPDFWriter(t, pdf.V1_6, nil)
@@ -410,7 +410,7 @@ func TestSpecificationIndirectReference(t *testing.T) {
 		spec := &Specification{
 			FileName: "test.txt",
 			RelatedFiles: map[string][]RelatedFile{
-				"F": {{Name: "related.txt", Stream: &Stream{
+				"F": {{Name: pdf.Text("related.txt"), Stream: &Stream{
 					WriteData: func(w io.Writer) error {
 						_, err := w.Write([]byte("Related file content"))
 						return err
@@ -510,7 +510,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 		// Create malformed dictionary with invalid RF structure
 		dict := pdf.Dict{
 			"Type": pdf.Name("Filespec"),
-			"F":    pdf.TextString("test.txt"),
+			"F":    pdf.Text("test.txt"),
 			"RF": pdf.Dict{
 				"F": pdf.String("not_an_array"), // Should be array
 			},
@@ -529,7 +529,7 @@ func TestSpecificationMalformedInput(t *testing.T) {
 
 		// Create dictionary with malformed ID (only one element)
 		dict := pdf.Dict{
-			"F":  pdf.TextString("test.txt"),
+			"F":  pdf.Text("test.txt"),
 			"ID": pdf.Array{pdf.String("only_one")},
 		}
 

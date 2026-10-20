@@ -511,8 +511,8 @@ func TestFlattenMergedFieldValue(t *testing.T) {
 		"Rect": pdf.Array{pdf.Integer(20), pdf.Integer(20), pdf.Integer(160), pdf.Integer(60)},
 		"F":    pdf.Integer(4), // Print
 		"FT":   pdf.Name("Tx"),
-		"T":    pdf.TextString("merged"),
-		"V":    pdf.TextString("hello"),
+		"T":    pdf.Text("merged"),
+		"V":    pdf.Text("hello"),
 		"DA":   pdf.String("0 0 0 rg /Helv 12 Tf"),
 	})
 
@@ -651,8 +651,8 @@ func TestFlattenSplitFieldValue(t *testing.T) {
 	fieldRef := w.Alloc()
 	widgetRef := w.Alloc()
 	w.Put(fieldRef, pdf.Dict{
-		"FT": pdf.Name("Tx"), "T": pdf.TextString("split"),
-		"V": pdf.TextString("hello"), "DA": pdf.String("0 0 0 rg /Helv 12 Tf"),
+		"FT": pdf.Name("Tx"), "T": pdf.Text("split"),
+		"V": pdf.Text("hello"), "DA": pdf.String("0 0 0 rg /Helv 12 Tf"),
 		"Kids": pdf.Array{widgetRef},
 	})
 	w.Put(widgetRef, pdf.Dict{

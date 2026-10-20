@@ -45,7 +45,7 @@ func TestFreeTextClipMatchesContentWidth(t *testing.T) {
 		}
 		a := &annotation.FreeText{
 			Rect:              pdf.Rectangle{LLx: 0, LLy: 0, URx: 180, URy: 100},
-			Contents:          contents,
+			Contents:          pdf.Text(contents),
 			DefaultAppearance: "/Helv 12 Tf 0 0 0 rg",
 		}
 		if borderWidth > 0 {

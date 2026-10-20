@@ -155,7 +155,7 @@ func ExtractMediaCriteria(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaCr
 			if err != nil {
 				return nil, err
 			}
-			crit.Languages = append(crit.Languages, string(lang))
+			crit.Languages = append(crit.Languages, lang.String())
 		}
 	}
 
@@ -229,7 +229,7 @@ func (c *MediaCriteria) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(c.Languages) > 0 {
 		arr := make(pdf.Array, len(c.Languages))
 		for i, lang := range c.Languages {
-			arr[i] = pdf.TextString(lang)
+			arr[i] = pdf.Text(lang)
 		}
 		dict["L"] = arr
 	}

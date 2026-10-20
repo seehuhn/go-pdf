@@ -23,6 +23,12 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
+// PDF defaults for the separator and spacing entries
+var (
+	textPeriod = pdf.Text(".")
+	textSpace  = pdf.Text(" ")
+)
+
 // FractionalFormat specifies how fractional values are displayed.
 type FractionalFormat byte
 
@@ -38,7 +44,7 @@ const (
 // NumberFormat represents a unit of measurement with formatting information.
 type NumberFormat struct {
 	// Unit specifies the label for displaying this unit.
-	Unit string
+	Unit pdf.TextString
 
 	// ConversionFactor is the multiplier used to convert from the previous unit
 	// or initial measurement value to this unit.
@@ -57,18 +63,18 @@ type NumberFormat struct {
 
 	// ThousandsSeparator (optional) specifies text used between thousands in
 	// numerical display.
-	ThousandsSeparator string
+	ThousandsSeparator pdf.TextString
 
 	// DecimalSeparator (optional) specifies text used as the decimal position.
 	//
 	// When writing, an empty string can be used as a shorthand for a period.
-	DecimalSeparator string
+	DecimalSeparator pdf.TextString
 
 	// PrefixSpacing specifies text concatenated before the unit label.
-	PrefixSpacing string
+	PrefixSpacing pdf.TextString
 
 	// SuffixSpacing specifies text concatenated after the unit label.
-	SuffixSpacing string
+	SuffixSpacing pdf.TextString
 
 	// PrefixLabel determines unit label position. False positions the label
 	// after the value, true positions it before.
@@ -96,10 +102,10 @@ func ExtractNumberFormat(c pdf.Cursor, obj pdf.Object, isDirect bool) (*NumberFo
 	if err != nil {
 		return nil, err
 	}
-	if unit == "" {
+	if unit.IsZero() {
 		return nil, pdf.Error("missing required Unit")
 	}
-	nf.Unit = string(unit)
+	nf.Unit = unit
 
 	conversion, err := pdf.Optional(c.Number(dict["C"]))
 	if err != nil {
@@ -164,29 +170,29 @@ func ExtractNumberFormat(c pdf.Cursor, obj pdf.Object, isDirect bool) (*NumberFo
 		return nil, err
 	} else {
 		// RT present: use the value (even if empty string)
-		nf.ThousandsSeparator = string(rt)
+		nf.ThousandsSeparator = rt
 	} // If RT not present, PDF uses comma default, but we leave empty in Go
 
 	if rd, err := pdf.Optional(c.TextString(dict["RD"])); err != nil {
 		return nil, err
-	} else if rd != "" {
-		nf.DecimalSeparator = string(rd)
+	} else if !rd.IsZero() {
+		nf.DecimalSeparator = rd
 	} else {
-		nf.DecimalSeparator = "."
+		nf.DecimalSeparator = pdf.Text(".")
 	}
 
 	if ps, err := pdf.Optional(c.TextString(dict["PS"])); err != nil {
 		return nil, err
 	} else {
 		// PS: store the value (empty if not present)
-		nf.PrefixSpacing = string(ps)
+		nf.PrefixSpacing = ps
 	}
 
 	if ss, err := pdf.Optional(c.TextString(dict["SS"])); err != nil {
 		return nil, err
 	} else {
 		// SS: store the value (empty if not present)
-		nf.SuffixSpacing = string(ss)
+		nf.SuffixSpacing = ss
 	}
 
 	if o, err := pdf.Optional(c.Name(dict["O"])); err != nil {
@@ -203,7 +209,7 @@ func ExtractNumberFormat(c pdf.Cursor, obj pdf.Object, isDirect bool) (*NumberFo
 // Embed converts the NumberFormat into a PDF dictionary.
 func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// Validate required fields
-	if nf.Unit == "" {
+	if nf.Unit.IsZero() {
 		return nil, errors.New("missing required Unit")
 	}
 	if nf.ConversionFactor == 0 {
@@ -226,7 +232,7 @@ func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	dict := pdf.Dict{
-		"U": pdf.TextString(nf.Unit),
+		"U": nf.Unit,
 		"C": pdf.Number(nf.ConversionFactor),
 	}
 
@@ -267,21 +273,21 @@ func (nf *NumberFormat) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// Separators and spacing - optimize by using PDF defaults
 	// RT: default is comma, so always write it (even if empty string)
-	dict["RT"] = pdf.TextString(nf.ThousandsSeparator)
+	dict["RT"] = nf.ThousandsSeparator
 
 	// RD: empty string is shorthand for period, only write if different from period
-	if nf.DecimalSeparator != "" && nf.DecimalSeparator != "." {
-		dict["RD"] = pdf.TextString(nf.DecimalSeparator)
+	if !nf.DecimalSeparator.IsZero() && nf.DecimalSeparator != textPeriod {
+		dict["RD"] = nf.DecimalSeparator
 	}
 
 	// PS: default is single space, only write if different from default
-	if nf.PrefixSpacing != " " {
-		dict["PS"] = pdf.TextString(nf.PrefixSpacing)
+	if nf.PrefixSpacing != textSpace {
+		dict["PS"] = nf.PrefixSpacing
 	}
 
 	// SS: default is single space, only write if different from default
-	if nf.SuffixSpacing != " " {
-		dict["SS"] = pdf.TextString(nf.SuffixSpacing)
+	if nf.SuffixSpacing != textSpace {
+		dict["SS"] = nf.SuffixSpacing
 	}
 
 	// Label position

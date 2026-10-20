@@ -93,7 +93,7 @@ func createDocument(filename string) error {
 	w.yPos -= 24.0
 
 	a := &annotation.Square{
-		Contents: "default border width",
+		Contents: pdf.Text("default border width"),
 		Flags:    annotation.FlagPrint,
 		Border:   &annotation.Border{Width: 1, SingleUse: true},
 		Color:    color.Blue,
@@ -104,7 +104,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents: "Border.Width=2",
+		Contents: pdf.Text("Border.Width=2"),
 		Flags:    annotation.FlagPrint,
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
 		Color:    color.Blue,
@@ -115,7 +115,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents:    "BorderStyle.Width=2",
+		Contents:    pdf.Text("BorderStyle.Width=2"),
 		Flags:       annotation.FlagPrint,
 		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
@@ -126,7 +126,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents: "dashed border",
+		Contents: pdf.Text("dashed border"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
@@ -142,7 +142,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents: "border style B",
+		Contents: pdf.Text("border style B"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
@@ -157,7 +157,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents: "border style U",
+		Contents: pdf.Text("border style U"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
@@ -172,7 +172,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents: "default border color",
+		Contents: pdf.Text("default border color"),
 		Flags:    annotation.FlagPrint,
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
 	}
@@ -182,7 +182,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents:  "filled",
+		Contents:  pdf.Text("filled"),
 		Flags:     annotation.FlagPrint,
 		Border:    &annotation.Border{Width: 1, SingleUse: true},
 		Color:     color.Black,
@@ -194,7 +194,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents:  "cloudy border, intensity=0",
+		Contents:  pdf.Text("cloudy border, intensity=0"),
 		Flags:     annotation.FlagPrint,
 		Color:     color.Black,
 		FillColor: color.White,
@@ -215,7 +215,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents:  "cloudy border, intensity=1",
+		Contents:  pdf.Text("cloudy border, intensity=1"),
 		Flags:     annotation.FlagPrint,
 		Color:     color.Black,
 		FillColor: color.White,
@@ -236,7 +236,7 @@ func createDocument(filename string) error {
 	}
 
 	a = &annotation.Square{
-		Contents:  "cloudy border, intensity=2",
+		Contents:  pdf.Text("cloudy border, intensity=2"),
 		Flags:     annotation.FlagPrint,
 		Color:     color.Black,
 		FillColor: color.White,
@@ -278,7 +278,7 @@ func (w *writer) addAnnotationPair(left *annotation.Square) error {
 	w.page.TextBegin()
 	w.page.TextSetFont(w.font, 10)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-squareSize/2-3))
-	w.page.TextShow(left.Contents)
+	w.page.TextShow(left.Contents.String())
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -289,7 +289,7 @@ func (w *writer) addAnnotationPair(left *annotation.Square) error {
 		URx: leftColEnd,
 		URy: w.yPos,
 	}
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightColStart,
@@ -297,7 +297,7 @@ func (w *writer) addAnnotationPair(left *annotation.Square) error {
 		URx: rightColEnd,
 		URy: w.yPos,
 	}
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	err := w.style.AddAppearance(right)
 	if err != nil {

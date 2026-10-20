@@ -26,8 +26,8 @@ import (
 )
 
 var (
-	usageAppGroup1 = &Group{Name: "Group 1", Intent: []pdf.Name{"View"}}
-	usageAppGroup2 = &Group{Name: "Group 2", Intent: []pdf.Name{"Design"}}
+	usageAppGroup1 = &Group{Name: pdf.Text("Group 1"), Intent: []pdf.Name{"View"}}
+	usageAppGroup2 = &Group{Name: pdf.Text("Group 2"), Intent: []pdf.Name{"Design"}}
 
 	usageAppTestCases = []struct {
 		name    string

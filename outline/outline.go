@@ -41,7 +41,7 @@ type Outline struct {
 // Items form a tree structure via the Children field.
 type Item struct {
 	// Title is the text displayed for this outline item.
-	Title string
+	Title pdf.TextString
 
 	// Color specifies the color for the outline entry's text.
 	// Components must be in the range 0.0 to 1.0.
@@ -79,7 +79,7 @@ type Item struct {
 }
 
 // AddItem appends a new top-level item with the given title and returns it.
-func (o *Outline) AddItem(title string) *Item {
+func (o *Outline) AddItem(title pdf.TextString) *Item {
 	item := &Item{
 		Title: title,
 	}
@@ -88,7 +88,7 @@ func (o *Outline) AddItem(title string) *Item {
 }
 
 // AddChild appends a new child item with the given title and returns it.
-func (item *Item) AddChild(title string) *Item {
+func (item *Item) AddChild(title pdf.TextString) *Item {
 	child := &Item{
 		Title: title,
 	}
@@ -140,7 +140,7 @@ func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, d
 	if err != nil {
 		return nil, nil, pdf.Wrap(err, "/Title in outline")
 	}
-	item.Title = string(title)
+	item.Title = title
 
 	count, _ := c.Integer(dict["Count"])
 	item.Open = count > 0
@@ -311,7 +311,7 @@ func (ww *writer) writeItem(ref pdf.Reference, dict pdf.Dict, item *Item) error 
 		return errors.New("outline item has both Dest and Action")
 	}
 
-	dict["Title"] = pdf.TextString(item.Title)
+	dict["Title"] = item.Title
 
 	if item.Color != (color.DeviceRGB{}) {
 		if err := pdf.CheckVersion(ww.rm.Out, "outline item color", pdf.V1_4); err != nil {

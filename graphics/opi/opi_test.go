@@ -50,7 +50,7 @@ var testCases = []struct {
 		dict: &V13{
 			F:            spec("photo.tif"),
 			ID:           pdf.String("image-id-42"),
-			Comments:     "handle with care",
+			Comments:     pdf.Text("handle with care"),
 			Size:         [2]int{1024, 768},
 			CropRect:     [4]int{10, 10, 1000, 700},
 			CropFixed:    &[4]float64{10.5, 10.5, 1000.5, 700.5},
@@ -64,8 +64,8 @@ var testCases = []struct {
 			GrayMap:      []int{0, 21845, 43690, 65535},
 			Transparency: new(false),
 			Tags: []Tag13{
-				{Num: 270, Text: "description"},
-				{Num: 271, Text: "make"},
+				{Num: 270, Text: pdf.Text("description")},
+				{Num: 271, Text: pdf.Text("make")},
 			},
 		},
 	},
@@ -81,8 +81,8 @@ var testCases = []struct {
 			F:         spec("proxy.tif"),
 			MainImage: pdf.String("/vol/images/full.tif"),
 			Tags: []Tag20{
-				{Num: 270, Text: []string{"a description"}},
-				{Num: 333, Text: []string{"first", "second"}},
+				{Num: 270, Text: []pdf.TextString{pdf.Text("a description")}},
+				{Num: 333, Text: []pdf.TextString{pdf.Text("first"), pdf.Text("second")}},
 			},
 			Size:                    &[2]float64{800, 600},
 			CropRect:                &[4]float64{0, 0, 800, 600},
@@ -341,7 +341,7 @@ func TestV13ReadMalformed(t *testing.T) {
 		Size:      [2]int{640, 480},
 		CropRect:  [4]int{0, 0, 640, 480},
 		Position:  [8]float64{0, 0, 0, 480, 640, 480, 640, 0},
-		Tags:      []Tag13{{Num: 270, Text: "kept"}},
+		Tags:      []Tag13{{Num: 270, Text: pdf.Text("kept")}},
 		SingleUse: true,
 	}
 	if diff := cmp.Diff(want, v); diff != "" {
@@ -487,7 +487,7 @@ func TestV20ReadMalformed(t *testing.T) {
 	}
 	want := &V20{
 		F:         v.F,
-		Tags:      []Tag20{{Num: 271, Text: []string{"b", "c"}}},
+		Tags:      []Tag20{{Num: 271, Text: []pdf.TextString{pdf.Text("b"), pdf.Text("c")}}},
 		SingleUse: true,
 	}
 	if diff := cmp.Diff(want, v); diff != "" {

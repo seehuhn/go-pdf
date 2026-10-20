@@ -64,22 +64,22 @@ func showInfo(obj pdf.Object, info *pdf.Info) {
 	fmt.Println(strings.Repeat("-", len(title)))
 	fmt.Println()
 
-	if info.Title != "" {
+	if !info.Title.IsZero() {
 		fmt.Println("Title:", info.Title)
 	}
-	if info.Author != "" {
+	if !info.Author.IsZero() {
 		fmt.Println("Author:", info.Author)
 	}
-	if info.Subject != "" {
+	if !info.Subject.IsZero() {
 		fmt.Println("Subject:", info.Subject)
 	}
-	if info.Keywords != "" {
+	if !info.Keywords.IsZero() {
 		fmt.Println("Keywords:", info.Keywords)
 	}
-	if info.Creator != "" {
+	if !info.Creator.IsZero() {
 		fmt.Println("Creator:", info.Creator)
 	}
-	if info.Producer != "" {
+	if !info.Producer.IsZero() {
 		fmt.Println("Producer:", info.Producer)
 	}
 	if !info.CreationDate.IsZero() {

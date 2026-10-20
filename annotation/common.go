@@ -100,7 +100,7 @@ type Common struct {
 
 	// Contents (optional) is the textual content of the annotation.
 	// The exact meaning of this field depends on the type of the annotation.
-	Contents string
+	Contents pdf.TextString
 
 	// Lang (optional) is a language identifier specifying the natural language
 	// for all text in the annotation.
@@ -209,8 +209,8 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 
 	dict["Rect"] = &c.Rect
 
-	if c.Contents != "" {
-		dict["Contents"] = pdf.TextString(c.Contents)
+	if !c.Contents.IsZero() {
+		dict["Contents"] = c.Contents
 	}
 
 	if c.Page != 0 {
@@ -224,14 +224,14 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 		if err := pdf.CheckVersion(w, "annotation NM entry", pdf.V1_4); err != nil {
 			return err
 		}
-		dict["NM"] = pdf.TextString(c.Name)
+		dict["NM"] = pdf.Text(c.Name)
 	}
 
 	if c.LastModified != "" {
 		if err := pdf.CheckVersion(w, "annotation M entry", pdf.V1_1); err != nil {
 			return err
 		}
-		dict["M"] = pdf.TextString(c.LastModified)
+		dict["M"] = pdf.Text(c.LastModified)
 	}
 
 	if c.Flags != 0 {
@@ -365,7 +365,7 @@ func (c *Common) fillDict(rm *pdf.ResourceManager, dict pdf.Dict, isMarkup bool,
 		if err := pdf.CheckVersion(w, "annotation Lang entry", pdf.V2_0); err != nil {
 			return err
 		}
-		dict["Lang"] = pdf.TextString(c.Lang.String())
+		dict["Lang"] = pdf.Text(c.Lang.String())
 	}
 
 	return nil

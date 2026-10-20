@@ -39,9 +39,9 @@ func makeSource(t *testing.T, n int) *pdf.Reader {
 		t.Fatal(err)
 	}
 	doc.Out.GetMeta().Info = &pdf.Info{
-		Title:    "secret title",
-		Author:   "somebody",
-		Producer: "test",
+		Title:    pdf.Text("secret title"),
+		Author:   pdf.Text("somebody"),
+		Producer: pdf.Text("test"),
 	}
 	for i := range n {
 		p := doc.AddPage()
@@ -85,7 +85,7 @@ func TestWriteBasic(t *testing.T) {
 	}
 
 	// metadata must be stripped
-	if info := rr.GetMeta().Info; info != nil && info.Title != "" {
+	if info := rr.GetMeta().Info; info != nil && info.Title != pdf.Text("") {
 		t.Errorf("Info.Title survived: %q", info.Title)
 	}
 	// output must be unencrypted

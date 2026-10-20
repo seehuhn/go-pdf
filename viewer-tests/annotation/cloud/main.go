@@ -194,10 +194,10 @@ func (w *writer) addRow(num int, p probe) error {
 	w.drawRuler(rightCenterX, cy)
 
 	left := newSquare(leftCenterX, cy, p)
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right := newSquare(rightCenterX, cy, p)
-	right.Contents += " (Quire)"
+	right.Contents = pdf.Text(right.Contents, " (Quire)")
 	err := w.style.AddAppearance(right)
 	if err != nil {
 		return err
@@ -247,7 +247,7 @@ func newSquare(cx, cy float64, p probe) *annotation.Square {
 			URx: cx + annotSize/2,
 			URy: cy + annotSize/2,
 		},
-		Contents: p.dict,
+		Contents: pdf.Text(p.dict),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{

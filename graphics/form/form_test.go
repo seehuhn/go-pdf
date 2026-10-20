@@ -594,8 +594,8 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 	// create test associated files
 	testSpec := &file.Specification{
 		FileName:        "source.xml",
-		FileNameUnicode: "source.xml",
-		Description:     "Source XML data",
+		FileNameUnicode: pdf.Text("source.xml"),
+		Description:     pdf.Text("Source XML data"),
 		AFRelationship:  file.RelationshipSource,
 		EmbeddedFiles: map[string]*file.Stream{
 			"UF": {
@@ -643,7 +643,7 @@ func TestFormWithAssociatedFiles(t *testing.T) {
 
 	// check AssociatedFiles content
 	extractedSpec := form1.AssociatedFiles[0]
-	if extractedSpec.FileNameUnicode != "source.xml" {
+	if extractedSpec.FileNameUnicode != pdf.Text("source.xml") {
 		t.Errorf("AssociatedFiles FileNameUnicode mismatch: got %s, want source.xml", extractedSpec.FileNameUnicode)
 	}
 	if extractedSpec.AFRelationship != file.RelationshipSource {
@@ -721,7 +721,7 @@ func writeFormDict(t *testing.T, version pdf.Version, extra pdf.Dict) (*pdf.Writ
 // referenced from, which is not known here.
 func TestExtractKeepsBothVariants(t *testing.T) {
 	writer, ref := writeFormDict(t, pdf.V1_7, pdf.Dict{
-		"MarkStyle": pdf.TextString("Colour bar"),
+		"MarkStyle": pdf.Text("Colour bar"),
 		"PCM":       pdf.Name("DeviceCMYK"),
 	})
 
@@ -747,7 +747,7 @@ func TestExtractKeepsBothVariants(t *testing.T) {
 // stripping, so that both sets were lost here.
 func TestExtractKeepsTrapNetAt13(t *testing.T) {
 	writer, ref := writeFormDict(t, pdf.V1_3, pdf.Dict{
-		"MarkStyle": pdf.TextString("Colour bar"),
+		"MarkStyle": pdf.Text("Colour bar"),
 		"PCM":       pdf.Name("DeviceCMYK"),
 	})
 
@@ -790,7 +790,7 @@ func TestExtractStripsFutureEntries(t *testing.T) {
 			name:    "PrinterMark before 1.4",
 			tooOld:  pdf.V1_3,
 			ok:      pdf.V1_4,
-			extra:   pdf.Dict{"MarkStyle": pdf.TextString("Colour bar")},
+			extra:   pdf.Dict{"MarkStyle": pdf.Text("Colour bar")},
 			present: func(f *form.Form) bool { return f.PrinterMark != nil },
 		},
 		{
@@ -823,7 +823,7 @@ func TestExtractStripsFutureEntries(t *testing.T) {
 				"Measure": pdf.Dict{
 					"Type":    pdf.Name("Measure"),
 					"Subtype": pdf.Name("RL"),
-					"R":       pdf.TextString("1in = 1in"),
+					"R":       pdf.Text("1in = 1in"),
 				},
 			},
 			present: func(f *form.Form) bool { return f.Measure != nil },

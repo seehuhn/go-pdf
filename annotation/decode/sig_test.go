@@ -46,7 +46,7 @@ var sigSeedValueTestCases = []struct {
 			Filter:    "Adobe.PPKLite",
 			SubFilter: []pdf.Name{"adbe.pkcs7.detached", "ETSI.CAdES.detached"},
 			V:         2,
-			Reasons:   []string{"I approve this document", "I am the author"},
+			Reasons:   []pdf.TextString{pdf.Text("I approve this document"), pdf.Text("I am the author")},
 		},
 	},
 	{
@@ -66,7 +66,7 @@ var sigSeedValueTestCases = []struct {
 				URL:      "https://timestamp.example.com/tsa",
 				Required: true,
 			},
-			LegalAttestation: []string{"no changes allowed"},
+			LegalAttestation: []pdf.TextString{pdf.Text("no changes allowed")},
 			MDP:              optional.NewUInt(2),
 		},
 	},
@@ -81,7 +81,7 @@ var sigSeedValueTestCases = []struct {
 				Subject:   [][]byte{{0x30, 0x82, 0x01, 0x0a}},
 				Issuer:    [][]byte{{0x30, 0x82, 0x02, 0x0b}},
 				OID:       [][]byte{[]byte("2.16.840.1.113733.1.7.1.1")},
-				SubjectDN: []map[pdf.Name]string{{"CN": "Test Signer", "O": "Example Ltd"}},
+				SubjectDN: []map[pdf.Name]pdf.TextString{{"CN": pdf.Text("Test Signer"), "O": pdf.Text("Example Ltd")}},
 				KeyUsage:  []string{"1XXXXXXXX"},
 				URL:       "https://ca.example.com/enroll",
 				URLType:   "Browser",
@@ -97,10 +97,10 @@ var sigSeedValueTestCases = []struct {
 			SubFilter:        []pdf.Name{"ETSI.CAdES.detached"},
 			DigestMethod:     []pdf.Name{"SHA384"},
 			V:                3,
-			Reasons:          []string{"I approve this document"},
+			Reasons:          []pdf.TextString{pdf.Text("I approve this document")},
 			MDP:              optional.NewUInt(3),
 			TimeStamp:        &acroform.SigSeedValueTimeStamp{URL: "https://timestamp.example.com/tsa", Required: true},
-			LegalAttestation: []string{"attestation one", "attestation two"},
+			LegalAttestation: []pdf.TextString{pdf.Text("attestation one"), pdf.Text("attestation two")},
 			AddRevInfo:       true,
 			LockDocument:     "auto",
 			AppearanceFilter: "Formal Signature",
@@ -220,7 +220,7 @@ func TestSigArraysSkipMalformed(t *testing.T) {
 	c := pdf.NewCursor(mock.Getter)
 
 	sv, err := sigSeedValue(c, pdf.Dict{
-		"Reasons":   pdf.Array{pdf.TextString("a"), pdf.Integer(1), pdf.TextString(".")},
+		"Reasons":   pdf.Array{pdf.Text("a"), pdf.Integer(1), pdf.Text(".")},
 		"SubFilter": pdf.Array{pdf.Integer(1), pdf.Integer(2)},
 		"Cert": pdf.Dict{
 			"Subject":   pdf.Array{pdf.Integer(1), pdf.String("s")},
@@ -231,7 +231,7 @@ func TestSigArraysSkipMalformed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if diff := cmp.Diff([]string{"a", "."}, sv.Reasons); diff != "" {
+	if diff := cmp.Diff([]pdf.TextString{pdf.Text("a"), pdf.Text(".")}, sv.Reasons); diff != "" {
 		t.Errorf("Reasons (-want +got):\n%s", diff)
 	}
 	if sv.SubFilter != nil {

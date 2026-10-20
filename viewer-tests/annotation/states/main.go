@@ -143,7 +143,7 @@ func run() error {
 		// Locked so that a viewer does not offer to edit the annotation:
 		// editing regenerates the normal appearance and discards the
 		// other two.
-		Contents:          "Appearance states",
+		Contents:          pdf.Text("Appearance states"),
 		Appearance:        states(rect, F),
 		DefaultAppearance: fmt.Sprintf("/Helv %g Tf 0 g", fontSize),
 	}

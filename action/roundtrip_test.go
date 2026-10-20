@@ -56,9 +56,9 @@ var testSound = &sound.Sound{
 // because reading a group materialises the default, so leaving it unset
 // would make the round-trip comparison fail on the default alone.
 var (
-	testOCG1 = &oc.Group{Name: "layer 1", Intent: []pdf.Name{"View"}}
-	testOCG2 = &oc.Group{Name: "layer 2", Intent: []pdf.Name{"View"}}
-	testOCG3 = &oc.Group{Name: "layer 3", Intent: []pdf.Name{"Design"}}
+	testOCG1 = &oc.Group{Name: pdf.Text("layer 1"), Intent: []pdf.Name{"View"}}
+	testOCG2 = &oc.Group{Name: pdf.Text("layer 2"), Intent: []pdf.Name{"View"}}
+	testOCG3 = &oc.Group{Name: pdf.Text("layer 3"), Intent: []pdf.Name{"Design"}}
 )
 
 var actionTestCases = []pdf.Action{
@@ -272,7 +272,7 @@ var actionTestCases = []pdf.Action{
 	&GoTo3DView{TA: pdf.Reference(1), V: pdf.Name("Default")},
 
 	// JavaScript
-	&JavaScript{JS: &pdf.StringOrStream{Value: "app.alert('Hello');"}},
+	&JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("app.alert('Hello');")}},
 
 	// RichMediaExecute (PDF 2.0)
 	&RichMediaExecute{TA: pdf.Reference(1)},
@@ -290,7 +290,7 @@ var actionTestCases = []pdf.Action{
 		},
 	},
 	&JavaScript{
-		JS:   &pdf.StringOrStream{Value: "app.alert('test');"},
+		JS:   &pdf.StringOrStream{Value: pdf.Text("app.alert('test');")},
 		Next: ActionList{&Named{N: "LastPage"}},
 	},
 	&Hide{

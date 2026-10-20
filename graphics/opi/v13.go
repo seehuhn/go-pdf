@@ -36,7 +36,7 @@ type V13 struct {
 
 	// Comments (optional) is a human-readable comment for the OPI server
 	// operator.
-	Comments string
+	Comments pdf.TextString
 
 	// Size is the image dimensions in pixels, as [pixelsWide pixelsHigh].
 	Size [2]int
@@ -103,7 +103,7 @@ type Color13 struct {
 // Tag13 is a TIFF tag number paired with its ASCII value.
 type Tag13 struct {
 	Num  int
-	Text string
+	Text pdf.TextString
 }
 
 var _ Dict = (*V13)(nil)
@@ -170,8 +170,8 @@ func (v *V13) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(v.ID) > 0 {
 		inner["ID"] = v.ID
 	}
-	if v.Comments != "" {
-		inner["Comments"] = pdf.TextString(v.Comments)
+	if !v.Comments.IsZero() {
+		inner["Comments"] = v.Comments
 	}
 	inner["Size"] = intsToArray(v.Size[:])
 	inner["CropRect"] = intsToArray(v.CropRect[:])
@@ -210,7 +210,7 @@ func (v *V13) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if len(v.Tags) > 0 {
 		arr := make(pdf.Array, 0, 2*len(v.Tags))
 		for _, t := range v.Tags {
-			arr = append(arr, pdf.Integer(t.Num), pdf.TextString(t.Text))
+			arr = append(arr, pdf.Integer(t.Num), t.Text)
 		}
 		inner["Tags"] = arr
 	}
@@ -241,10 +241,10 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 	} else if len(id) > 0 {
 		v.ID = id
 	}
-	if cm, err := pdf.Optional(c.String(dict["Comments"])); err != nil {
+	if cm, err := pdf.Optional(c.TextString(dict["Comments"])); err != nil {
 		return nil, err
-	} else if len(cm) > 0 {
-		v.Comments = string(cm.AsTextString())
+	} else if !cm.IsZero() {
+		v.Comments = cm
 	}
 
 	// Size, CropRect and Position are required.  CropFixed has the same
@@ -346,13 +346,13 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 			} else if err != nil {
 				return nil, err
 			}
-			text, err := c.String(tags[i+1])
+			text, err := c.TextString(tags[i+1])
 			if pdf.IsMalformed(err) {
 				continue
 			} else if err != nil {
 				return nil, err
 			}
-			v.Tags = append(v.Tags, Tag13{Num: int(num), Text: string(text.AsTextString())})
+			v.Tags = append(v.Tags, Tag13{Num: int(num), Text: text})
 		}
 	}
 

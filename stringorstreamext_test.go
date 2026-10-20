@@ -70,12 +70,12 @@ func TestStringOrStreamRoundTrip(t *testing.T) {
 		name string
 		in   pdf.StringOrStream
 	}{
-		{"inline ascii", pdf.StringOrStream{Value: "Hello, world"}},
-		{"inline empty", pdf.StringOrStream{Value: ""}},
-		{"inline unicode", pdf.StringOrStream{Value: "café — résumé — 日本語"}},
-		{"stream ascii", pdf.StringOrStream{Value: "var x = 1;\n", IsStream: true}},
-		{"stream empty", pdf.StringOrStream{Value: "", IsStream: true}},
-		{"stream unicode", pdf.StringOrStream{Value: "<body>café 日本語</body>", IsStream: true}},
+		{"inline ascii", pdf.StringOrStream{Value: pdf.Text("Hello, world")}},
+		{"inline empty", pdf.StringOrStream{Value: pdf.Text("")}},
+		{"inline unicode", pdf.StringOrStream{Value: pdf.Text("café — résumé — 日本語")}},
+		{"stream ascii", pdf.StringOrStream{Value: pdf.Text("var x = 1;\n"), IsStream: true}},
+		{"stream empty", pdf.StringOrStream{Value: pdf.Text(""), IsStream: true}},
+		{"stream unicode", pdf.StringOrStream{Value: pdf.Text("<body>café 日本語</body>"), IsStream: true}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -112,14 +112,14 @@ func streamBytes(t *testing.T, r pdf.Getter, ref pdf.Reference) []byte {
 // written as a text stream: a value that cannot be PDFDocEncoded is stored with
 // a UTF-16BE byte order marker, not as raw UTF-8.
 func TestStringOrStreamEmbedStreamIsTextStream(t *testing.T) {
-	in := pdf.StringOrStream{Value: "日本語", IsStream: true}
+	in := pdf.StringOrStream{Value: pdf.Text("日本語"), IsStream: true}
 	w, ref := writeSOS(t, in)
 
 	data := streamBytes(t, w, ref)
 	if !bytes.HasPrefix(data, []byte{0xFE, 0xFF}) {
 		t.Errorf("stream form lacks UTF-16BE BOM: got % x", data)
 	}
-	if bytes.Equal(data, []byte(in.Value)) {
+	if bytes.Equal(data, []byte(in.Value.String())) {
 		t.Errorf("stream form wrote raw UTF-8 bytes instead of a text stream")
 	}
 
@@ -131,7 +131,7 @@ func TestStringOrStreamEmbedStreamIsTextStream(t *testing.T) {
 // TestStringOrStreamEmbedStreamPDFDocEncoded checks that a value within
 // PDFDocEncoding is stored compactly, without a spurious byte order marker.
 func TestStringOrStreamEmbedStreamPDFDocEncoded(t *testing.T) {
-	in := pdf.StringOrStream{Value: "café", IsStream: true}
+	in := pdf.StringOrStream{Value: pdf.Text("café"), IsStream: true}
 	w, ref := writeSOS(t, in)
 
 	data := streamBytes(t, w, ref)
@@ -170,7 +170,7 @@ func TestStringOrStreamReadForeignTextStream(t *testing.T) {
 	}
 
 	got := readSOS(t, w, ref)
-	want := pdf.StringOrStream{Value: "é", IsStream: true}
+	want := pdf.StringOrStream{Value: pdf.Text("é"), IsStream: true}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected value (-want +got):\n%s", diff)
 	}
@@ -181,8 +181,8 @@ func TestStringOrStreamReadForeignTextStream(t *testing.T) {
 func TestStringOrStreamFormsInterchangeable(t *testing.T) {
 	const text = "café — 日本語"
 
-	wInline, refInline := writeSOS(t, pdf.StringOrStream{Value: text})
-	wStream, refStream := writeSOS(t, pdf.StringOrStream{Value: text, IsStream: true})
+	wInline, refInline := writeSOS(t, pdf.StringOrStream{Value: pdf.Text(text)})
+	wStream, refStream := writeSOS(t, pdf.StringOrStream{Value: pdf.Text(text), IsStream: true})
 
 	inline := readSOS(t, wInline, refInline)
 	stream := readSOS(t, wStream, refStream)
@@ -200,7 +200,7 @@ func TestStringOrStreamFormsInterchangeable(t *testing.T) {
 func TestStringOrStreamEmbedInlineStaysDirect(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
-	obj, err := rm.Embed(pdf.StringOrStream{Value: "inline"})
+	obj, err := rm.Embed(pdf.StringOrStream{Value: pdf.Text("inline")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,10 +225,10 @@ func TestStringOrStreamEmbedStreamRequiresV15(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	rm := pdf.NewResourceManager(w)
 
-	if _, err := rm.Embed(pdf.StringOrStream{Value: "x", IsStream: true}); err == nil {
+	if _, err := rm.Embed(pdf.StringOrStream{Value: pdf.Text("x"), IsStream: true}); err == nil {
 		t.Error("stream form accepted in PDF 1.4")
 	}
-	if _, err := rm.Embed(pdf.StringOrStream{Value: "x"}); err != nil {
+	if _, err := rm.Embed(pdf.StringOrStream{Value: pdf.Text("x")}); err != nil {
 		t.Errorf("inline form rejected in PDF 1.4: %v", err)
 	}
 }
@@ -240,7 +240,7 @@ func TestStringOrStreamEmbedDeduplicatesStreams(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	s := pdf.StringOrStream{Value: "shared script", IsStream: true}
+	s := pdf.StringOrStream{Value: pdf.Text("shared script"), IsStream: true}
 	a, err := rm.Embed(s)
 	if err != nil {
 		t.Fatal(err)
@@ -258,7 +258,7 @@ func TestStringOrStreamEmbedDeduplicatesStreams(t *testing.T) {
 		t.Errorf("identical streams not deduplicated: %v vs %v", refA, refB)
 	}
 
-	other, err := rm.Embed(pdf.StringOrStream{Value: "different script", IsStream: true})
+	other, err := rm.Embed(pdf.StringOrStream{Value: pdf.Text("different script"), IsStream: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestStringOrStreamReadBareString(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := readSOS(t, w, ref)
-	want := pdf.StringOrStream{Value: "plain text"}
+	want := pdf.StringOrStream{Value: pdf.Text("plain text")}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected value (-want +got):\n%s", diff)
 	}
@@ -296,7 +296,7 @@ func TestStringOrStreamReadBareString(t *testing.T) {
 func TestStringOrStreamReadReference(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	strRef := w.Alloc()
-	if err := w.Put(strRef, pdf.TextString("via reference")); err != nil {
+	if err := w.Put(strRef, pdf.Text("via reference")); err != nil {
 		t.Fatal(err)
 	}
 	ref := w.Alloc()
@@ -307,7 +307,7 @@ func TestStringOrStreamReadReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := readSOS(t, w, ref)
-	want := pdf.StringOrStream{Value: "via reference"}
+	want := pdf.StringOrStream{Value: pdf.Text("via reference")}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("unexpected value (-want +got):\n%s", diff)
 	}

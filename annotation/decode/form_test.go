@@ -74,7 +74,8 @@ func fieldCmpOptions() []cmp.Option {
 type nodeSnap struct {
 	Kind     string
 	Name     string
-	TU, TM   string
+	TU       pdf.TextString
+	TM       string
 	Flags    acroform.FieldFlags
 	AA       *triggers.Form
 	VT       acroform.VariableText
@@ -85,8 +86,8 @@ type nodeSnap struct {
 	BtnV     pdf.Name
 	BtnDV    pdf.Name
 	BtnOpt   []string
-	ChV      []string
-	ChDV     []string
+	ChV      []pdf.TextString
+	ChDV     []pdf.TextString
 	ChOpt    []acroform.ChoiceOption
 	TopIndex int
 	Selected []int
@@ -307,7 +308,7 @@ func TestDecodeValues(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	ref := w.Alloc()
-	if err := w.Put(ref, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.TextString("f0")}); err != nil {
+	if err := w.Put(ref, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.Text("f0")}); err != nil {
 		t.Fatal(err)
 	}
 	dict := pdf.Dict{
@@ -551,7 +552,7 @@ func TestDecodeDuplicateNames(t *testing.T) {
 		if !ok {
 			t.Fatalf("field %d is %T, want *acroform.TextField", i, node)
 		}
-		if f.V == nil || f.V.Value != "first" {
+		if f.V == nil || f.V.Value.String() != "first" {
 			t.Errorf("field %d: V = %v, want \"first\"", i, f.V)
 		}
 	}

@@ -108,7 +108,7 @@ var rtCases = []rtCase{
 	},
 	{
 		name:   "offset-marker",
-		obj:    &MediaOffsetMarker{Marker: "Chapter One"},
+		obj:    &MediaOffsetMarker{Marker: pdf.Text("Chapter One")},
 		decode: adapt(ExtractMediaOffset),
 	},
 	{
@@ -197,7 +197,7 @@ var rtCases = []rtCase{
 			TitleBar:     optional.NewBool(true),
 			UserCanClose: optional.NewBool(false),
 			Resizable:    ResizeKeepAspect,
-			Title:        MultiLangText{{Lang: "en-US", Text: "Player"}},
+			Title:        MultiLangText{{Lang: "en-US", Text: pdf.Text("Player")}},
 		},
 		decode: adapt(ExtractFloatingWindowParameters),
 	},
@@ -219,11 +219,11 @@ var rtCases = []rtCase{
 	{
 		name: "clip-data-file",
 		obj: &MediaClipData{
-			Name:              "clip",
+			Name:              pdf.Text("clip"),
 			DataFile:          spec(),
 			ContentType:       "video/mp4",
 			Permissions:       &MediaPermissions{TempFile: TempExtract, SingleUse: true},
-			Alt:               MultiLangText{{Lang: "en", Text: "a movie"}},
+			Alt:               MultiLangText{{Lang: "en", Text: pdf.Text("a movie")}},
 			Players:           &MediaPlayers{MustUse: []*MediaPlayerInfo{{PID: swid(), SingleUse: true}}, SingleUse: true},
 			MustHonourBaseURL: "https://example.com/",
 			BestEffortBaseURL: "https://example.org/",
@@ -233,18 +233,18 @@ var rtCases = []rtCase{
 	{
 		name: "clip-data-form",
 		obj: &MediaClipData{
-			Name:     "form-clip",
+			Name:     pdf.Text("form-clip"),
 			DataForm: clipForm(),
-			Alt:      MultiLangText{{Lang: "en", Text: "a form"}},
+			Alt:      MultiLangText{{Lang: "en", Text: pdf.Text("a form")}},
 		},
 		decode: adapt(ExtractMediaClip),
 	},
 	{
 		name: "clip-section",
 		obj: &MediaClipSection{
-			Name:            "section",
+			Name:            pdf.Text("section"),
 			Next:            &MediaClipData{DataFile: spec(), SingleUse: true},
-			Alt:             MultiLangText{{Lang: "en", Text: "part"}},
+			Alt:             MultiLangText{{Lang: "en", Text: pdf.Text("part")}},
 			MustHonourBegin: &MediaOffsetTime{Time: &Timespan{Seconds: 5, SingleUse: true}, SingleUse: true},
 			BestEffortEnd:   &MediaOffsetFrame{Frame: 100, SingleUse: true},
 		},
@@ -253,7 +253,7 @@ var rtCases = []rtCase{
 	{
 		name: "media-rendition",
 		obj: &MediaRendition{
-			Name:               "video",
+			Name:               pdf.Text("video"),
 			MustHonourCriteria: &MediaCriteria{Bandwidth: optional.NewUInt(1000000), SingleUse: true},
 			Clip:               &MediaClipData{DataFile: spec(), SingleUse: true},
 			Play: &MediaPlayParameters{
@@ -270,7 +270,7 @@ var rtCases = []rtCase{
 	{
 		name: "selector-rendition",
 		obj: &SelectorRendition{
-			Name: "choices",
+			Name: pdf.Text("choices"),
 			Renditions: []Rendition{
 				&MediaRendition{Clip: &MediaClipData{DataFile: spec(), SingleUse: true}, SingleUse: true},
 				&SelectorRendition{SingleUse: true},

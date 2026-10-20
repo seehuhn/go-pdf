@@ -231,8 +231,8 @@ func createFileStream(data []byte) *file.Stream {
 func embedFile(doc *document.MultiPage, name string, data []byte) error {
 	spec := &file.Specification{
 		FileName:        name + ".pdf",
-		FileNameUnicode: name + ".pdf",
-		Description:     name + " Document",
+		FileNameUnicode: pdf.Text(name + ".pdf"),
+		Description:     pdf.Text(name + " Document"),
 		EmbeddedFiles:   map[string]*file.Stream{"F": createFileStream(data)},
 	}
 
@@ -260,13 +260,13 @@ func embedFile(doc *document.MultiPage, name string, data []byte) error {
 func addFileAttachment(page *document.Page, name string, data []byte) {
 	spec := &file.Specification{
 		FileName:        name,
-		FileNameUnicode: name,
+		FileNameUnicode: pdf.Text(name),
 		EmbeddedFiles:   map[string]*file.Stream{"F": createFileStream(data)},
 	}
 
 	annot := &annotation.FileAttachment{
 		Rect:     pdf.Rectangle{LLx: 10, LLy: paper.URy - 30, URx: 20, URy: paper.URy - 20},
-		Contents: name,
+		Contents: pdf.Text(name),
 		FS:       spec,
 	}
 

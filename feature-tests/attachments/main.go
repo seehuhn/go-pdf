@@ -140,8 +140,8 @@ func newSpec(name, mime, desc string, data []byte, modTime time.Time) *file.Spec
 	}
 	return &file.Specification{
 		FileName:        name,
-		FileNameUnicode: name,
-		Description:     desc,
+		FileNameUnicode: pdf.Text(name),
+		Description:     pdf.Text(desc),
 		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
 	}
 }
@@ -192,10 +192,10 @@ func addFileAttachment(page *document.Page, style *fallback.Generator,
 	spec *file.Specification, rect pdf.Rectangle, contents string) error {
 	fa := &annotation.FileAttachment{
 		Rect:     rect,
-		Contents: contents,
+		Contents: pdf.Text(contents),
 		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
-		User:     "Attachments test",
+		User:     pdf.Text("Attachments test"),
 		Icon:     annotation.FileAttachmentIconPushPin,
 		FS:       spec,
 	}

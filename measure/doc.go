@@ -49,7 +49,7 @@
 // and separators.
 //
 //	format := &measure.NumberFormat{
-//		Unit:             "ft",
+//		Unit:             pdf.Text("ft"),
 //		ConversionFactor: 12,
 //		Precision:        8,
 //		FractionFormat:   measure.FractionFraction,
@@ -89,13 +89,13 @@
 //
 //	// Create number formats for different units
 //	feetFormat := &measure.NumberFormat{
-//		Unit:             "ft",
+//		Unit:             pdf.Text("ft"),
 //		ConversionFactor: 1.0,
 //		Precision:        100,
 //	}
 //
 //	inchFormat := &measure.NumberFormat{
-//		Unit:             "in",
+//		Unit:             pdf.Text("in"),
 //		ConversionFactor: 12,
 //		Precision:        8,
 //		FractionFormat:   measure.FractionFraction,

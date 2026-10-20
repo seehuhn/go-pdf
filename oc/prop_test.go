@@ -26,9 +26,9 @@ import (
 )
 
 var (
-	propGroup1 = &Group{Name: "Layer 1", Intent: []pdf.Name{"View"}}
-	propGroup2 = &Group{Name: "Layer 2", Intent: []pdf.Name{"View"}}
-	propGroup3 = &Group{Name: "Layer 3", Intent: []pdf.Name{"Design"}}
+	propGroup1 = &Group{Name: pdf.Text("Layer 1"), Intent: []pdf.Name{"View"}}
+	propGroup2 = &Group{Name: pdf.Text("Layer 2"), Intent: []pdf.Name{"View"}}
+	propGroup3 = &Group{Name: pdf.Text("Layer 3"), Intent: []pdf.Name{"Design"}}
 
 	propTestCases = []struct {
 		name    string
@@ -81,7 +81,7 @@ var (
 					Order: []OrderItem{
 						propGroup1,
 						&OrderGroup{
-							Label:    "Background",
+							Label:    pdf.Text("Background"),
 							Children: []OrderItem{propGroup2, propGroup3},
 						},
 					},
@@ -99,13 +99,13 @@ var (
 				},
 				Configs: []*Configuration{
 					{
-						Name:      "Print",
+						Name:      pdf.Text("Print"),
 						BaseState: BaseStateOFF,
 						Intent:    []pdf.Name{"View"},
 						ON:        []*Group{propGroup1},
 					},
 					{
-						Name:      "Export",
+						Name:      pdf.Text("Export"),
 						BaseState: BaseStateON,
 						Intent:    []pdf.Name{"View"},
 						OFF:       []*Group{propGroup2},
@@ -159,7 +159,7 @@ var (
 					Order: []OrderItem{
 						propGroup1,
 						&OrderGroup{
-							Label:    "Background",
+							Label:    pdf.Text("Background"),
 							Children: []OrderItem{propGroup2, propGroup3},
 						},
 					},
@@ -168,14 +168,14 @@ var (
 				},
 				Configs: []*Configuration{
 					{
-						Name:      "Print",
+						Name:      pdf.Text("Print"),
 						BaseState: BaseStateOFF,
 						Intent:    []pdf.Name{"View"},
 						ON:        []*Group{propGroup1},
 						Order: []OrderItem{
 							propGroup1,
 							&OrderGroup{
-								Label:    "Background",
+								Label:    pdf.Text("Background"),
 								Children: []OrderItem{propGroup2, propGroup3},
 							},
 						},
@@ -355,7 +355,7 @@ func TestPropertiesOrderInheritance(t *testing.T) {
 	groupRef := w.Alloc()
 	err := w.Put(groupRef, pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString("Layer 1"),
+		"Name": pdf.Text("Layer 1"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -369,9 +369,9 @@ func TestPropertiesOrderInheritance(t *testing.T) {
 			"RBGroups": pdf.Array{pdf.Array{groupRef}},
 		},
 		"Configs": pdf.Array{
-			pdf.Dict{"Name": pdf.TextString("absent")},
+			pdf.Dict{"Name": pdf.Text("absent")},
 			pdf.Dict{
-				"Name":     pdf.TextString("empty"),
+				"Name":     pdf.Text("empty"),
 				"Order":    pdf.Array{},
 				"RBGroups": pdf.Array{},
 			},

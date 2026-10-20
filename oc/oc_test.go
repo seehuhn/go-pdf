@@ -36,13 +36,13 @@ func TestExtractConditionalInferType(t *testing.T) {
 	cases := []testCase{
 		{
 			name:    "named group",
-			dict:    pdf.Dict{"Name": pdf.TextString("Layer")},
+			dict:    pdf.Dict{"Name": pdf.Text("Layer")},
 			wantOCG: true,
 		},
 		{
 			name: "group with usage and intent",
 			dict: pdf.Dict{
-				"Name":   pdf.TextString("Layer"),
+				"Name":   pdf.Text("Layer"),
 				"Intent": pdf.Name("Design"),
 			},
 			wantOCG: true,
@@ -69,7 +69,7 @@ func TestExtractConditionalInferType(t *testing.T) {
 			// a /Type that is not a name carries no type information, so it is
 			// treated like a missing one rather than dropping the whole entry
 			name:    "Type is a string",
-			dict:    pdf.Dict{"Type": pdf.String("OCG"), "Name": pdf.TextString("Layer")},
+			dict:    pdf.Dict{"Type": pdf.String("OCG"), "Name": pdf.Text("Layer")},
 			wantOCG: true,
 		},
 		{
@@ -112,7 +112,7 @@ func TestExtractConditionalInferType(t *testing.T) {
 func TestExtractConditionalInferTypeIdentity(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	ref := w.Alloc()
-	err := w.Put(ref, pdf.Dict{"Name": pdf.TextString("Layer")})
+	err := w.Put(ref, pdf.Dict{"Name": pdf.Text("Layer")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestExtractConditionalBadType(t *testing.T) {
 	ref := w.Alloc()
 	err := w.Put(ref, pdf.Dict{
 		"Type": pdf.Name("Annot"),
-		"Name": pdf.TextString("Layer"),
+		"Name": pdf.Text("Layer"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestExtractConditionalInferTypeRoundTrip(t *testing.T) {
 	ocgRef := w.Alloc()
 	err := w.Put(ocgRef, pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString("Layer"),
+		"Name": pdf.Text("Layer"),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -118,7 +118,7 @@ func TestTextExtractorActualTextIndirect(t *testing.T) {
 	b.MarkedContentStart(&graphics.MarkedContent{
 		Tag: "Span",
 		Properties: &property.ActualText{
-			Text:      "replaced",
+			Text:      pdf.Text("replaced"),
 			SingleUse: false,
 		},
 		Inline: false,
@@ -214,7 +214,7 @@ func TestTextExtractorActualText(t *testing.T) {
 
 	// text with ActualText
 	actualText := &property.ActualText{
-		Text:      "replaced",
+		Text:      pdf.Text("replaced"),
 		SingleUse: true,
 	}
 	mc := &graphics.MarkedContent{

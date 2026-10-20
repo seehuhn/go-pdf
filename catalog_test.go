@@ -34,7 +34,7 @@ func TestDecodeCatalogLang(t *testing.T) {
 		dict := Dict{
 			"Type":  Name("Catalog"),
 			"Pages": NewReference(1, 0),
-			"Lang":  TextString(tc.in),
+			"Lang":  Text(tc.in),
 		}
 		cat, err := DecodeCatalog(NewCursor(mockGetter), dict, false)
 		if err != nil {

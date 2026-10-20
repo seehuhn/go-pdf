@@ -130,7 +130,7 @@ func TestRoundTrip(t *testing.T) {
 			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
-						Text:      "Test",
+						Text:      pdf.Text("Test"),
 						SingleUse: true,
 					},
 				},
@@ -263,7 +263,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
-						Text:      "Test",
+						Text:      pdf.Text("Test"),
 						SingleUse: true,
 					},
 				},
@@ -277,7 +277,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
-						Text:      "Test",
+						Text:      pdf.Text("Test"),
 						SingleUse: true,
 					},
 				},
@@ -291,7 +291,7 @@ func TestVersionValidation(t *testing.T) {
 			resource: &content.Resources{
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
-						Text:      "Test",
+						Text:      pdf.Text("Test"),
 						SingleUse: true,
 					},
 				},
@@ -360,7 +360,7 @@ func TestVersionValidation(t *testing.T) {
 				},
 				Properties: map[pdf.Name]property.List{
 					"P1": &property.ActualText{
-						Text:      "Test",
+						Text:      pdf.Text("Test"),
 						SingleUse: true,
 					},
 				},

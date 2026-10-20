@@ -93,7 +93,7 @@ func createDocument(filename string) error {
 
 	// test 1: default border width
 	a := &annotation.Ink{
-		Contents: "default line width",
+		Contents: pdf.Text("default line width"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 	}
@@ -104,7 +104,7 @@ func createDocument(filename string) error {
 
 	// test 2: Border.Width=2
 	a = &annotation.Ink{
-		Contents: "Border.Width=2",
+		Contents: pdf.Text("Border.Width=2"),
 		Flags:    annotation.FlagPrint,
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
 		Color:    color.Blue,
@@ -116,7 +116,7 @@ func createDocument(filename string) error {
 
 	// test 3: BorderStyle.Width=2
 	a = &annotation.Ink{
-		Contents:    "BorderStyle.Width=2",
+		Contents:    pdf.Text("BorderStyle.Width=2"),
 		Flags:       annotation.FlagPrint,
 		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
@@ -128,7 +128,7 @@ func createDocument(filename string) error {
 
 	// test 4: dashed line
 	a = &annotation.Ink{
-		Contents: "dashed line",
+		Contents: pdf.Text("dashed line"),
 		Flags:    annotation.FlagPrint,
 		Color:    color.Blue,
 		BorderStyle: &annotation.BorderStyle{
@@ -145,7 +145,7 @@ func createDocument(filename string) error {
 
 	// test 5: thick stroke
 	a = &annotation.Ink{
-		Contents:    "thick stroke (width 5)",
+		Contents:    pdf.Text("thick stroke (width 5)"),
 		Flags:       annotation.FlagPrint,
 		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 5, Style: "S", SingleUse: true},
@@ -157,7 +157,7 @@ func createDocument(filename string) error {
 
 	// test 6: multi-stroke (plus sign — two disjoint paths)
 	a = &annotation.Ink{
-		Contents:    "multi-stroke (plus sign)",
+		Contents:    pdf.Text("multi-stroke (plus sign)"),
 		Flags:       annotation.FlagPrint,
 		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
@@ -169,7 +169,7 @@ func createDocument(filename string) error {
 
 	// test 7: short stroke (two points only)
 	a = &annotation.Ink{
-		Contents:    "short stroke (two points)",
+		Contents:    pdf.Text("short stroke (two points)"),
 		Flags:       annotation.FlagPrint,
 		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 2, Style: "S", SingleUse: true},
@@ -181,7 +181,7 @@ func createDocument(filename string) error {
 
 	// test 8: single-point dot
 	a = &annotation.Ink{
-		Contents:    "single-point dot",
+		Contents:    pdf.Text("single-point dot"),
 		Flags:       annotation.FlagPrint,
 		Color:       color.Blue,
 		BorderStyle: &annotation.BorderStyle{Width: 6, Style: "S", SingleUse: true},
@@ -193,7 +193,7 @@ func createDocument(filename string) error {
 
 	// test 9: no color (invisible)
 	a = &annotation.Ink{
-		Contents: "no color (invisible)",
+		Contents: pdf.Text("no color (invisible)"),
 		Flags:    annotation.FlagPrint,
 	}
 	err = w.addAnnotationPair(a, scribble)
@@ -203,7 +203,7 @@ func createDocument(filename string) error {
 
 	// test 10: stroking transparency
 	a = &annotation.Ink{
-		Contents:                "50% transparency",
+		Contents:                pdf.Text("50% transparency"),
 		Flags:                   annotation.FlagPrint,
 		Color:                   color.Blue,
 		StrokingTransparency:    0.5,
@@ -236,7 +236,7 @@ func (w *writer) addAnnotationPair(left *annotation.Ink, shape inkShape) error {
 	w.page.TextBegin()
 	w.page.TextSetFont(w.font, 10)
 	w.page.TextSetMatrix(matrix.Translate(commentStart, w.yPos-shapeHeight/2-3))
-	w.page.TextShow(left.Contents)
+	w.page.TextShow(left.Contents.String())
 	w.page.TextEnd()
 
 	right := clone(left)
@@ -248,7 +248,7 @@ func (w *writer) addAnnotationPair(left *annotation.Ink, shape inkShape) error {
 		URy: w.yPos,
 	}
 	left.InkList = shape(leftColStart, leftColEnd, w.yPos-shapeHeight, w.yPos)
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightColStart,
@@ -257,7 +257,7 @@ func (w *writer) addAnnotationPair(left *annotation.Ink, shape inkShape) error {
 		URy: w.yPos,
 	}
 	right.InkList = shape(rightColStart, rightColEnd, w.yPos-shapeHeight, w.yPos)
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	err := w.style.AddAppearance(right)
 	if err != nil {

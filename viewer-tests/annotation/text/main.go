@@ -107,10 +107,10 @@ func createDocument(filename string) error {
 
 	for _, icon := range allIcons {
 		text := &annotation.Text{
-			Contents: fmt.Sprintf("Icon: %s", icon),
+			Contents: pdf.Text(fmt.Sprintf("Icon: %s", icon)),
 			Border:   &annotation.Border{Width: 1},
 			Flags:    annotation.FlagPrint,
-			User:     "Test User",
+			User:     pdf.Text("Test User"),
 			Icon:     icon,
 		}
 		err = w.addAnnotationPair(text, string(icon))
@@ -122,11 +122,11 @@ func createDocument(filename string) error {
 	// test with pink color
 	pink := color.DeviceRGB{0.96, 0.87, 0.90}
 	text := &annotation.Text{
-		Contents: "Pink background",
+		Contents: pdf.Text("Pink background"),
 		Color:    pink,
 		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
-		User:     "Test User",
+		User:     pdf.Text("Test User"),
 		Icon:     annotation.TextIconNote,
 	}
 	err = w.addAnnotationPair(text, "Common.Color = pink")
@@ -136,11 +136,11 @@ func createDocument(filename string) error {
 
 	// test with an empty /C array, the spec's "no colour; transparent"
 	text = &annotation.Text{
-		Contents: "Transparent background",
+		Contents: pdf.Text("Transparent background"),
 		Color:    colorenc.Transparent,
 		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
-		User:     "Test User",
+		User:     pdf.Text("Test User"),
 		Icon:     annotation.TextIconNote,
 	}
 	err = w.addAnnotationPair(text, "Common.Color = Transparent")
@@ -150,10 +150,10 @@ func createDocument(filename string) error {
 
 	// test with border width
 	text = &annotation.Text{
-		Contents: "Border width 2",
+		Contents: pdf.Text("Border width 2"),
 		Border:   &annotation.Border{Width: 2, SingleUse: true},
 		Flags:    annotation.FlagPrint,
-		User:     "Test User",
+		User:     pdf.Text("Test User"),
 		Icon:     annotation.TextIconNote,
 	}
 	err = w.addAnnotationPair(text, "Common.Border.Width = 2")
@@ -195,7 +195,7 @@ func (w *writer) addAnnotationPair(left *annotation.Text, label string) error {
 		URx: leftCenter + iconSize/2,
 		URy: w.yPos,
 	}
-	left.Contents += " (viewer)"
+	left.Contents = pdf.Text(left.Contents, " (viewer)")
 
 	right.Rect = pdf.Rectangle{
 		LLx: rightCenter - iconSize/2,
@@ -203,7 +203,7 @@ func (w *writer) addAnnotationPair(left *annotation.Text, label string) error {
 		URx: rightCenter + iconSize/2,
 		URy: w.yPos,
 	}
-	right.Contents += " (quire)"
+	right.Contents = pdf.Text(right.Contents, " (quire)")
 
 	err := w.style.AddAppearance(right)
 	if err != nil {

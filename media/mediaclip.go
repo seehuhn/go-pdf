@@ -62,7 +62,7 @@ func ExtractMediaClip(c pdf.Cursor, obj pdf.Object, isDirect bool) (MediaClip, e
 type MediaClipData struct {
 	// Name (optional) is the name of the media clip, for use in the user
 	// interface.
-	Name string
+	Name pdf.TextString
 
 	// DataFile holds the media data as a file specification.  Exactly one of
 	// DataFile and DataForm must be set.
@@ -107,7 +107,7 @@ func extractMediaClipData(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*MediaCli
 	if n, err := pdf.Optional(c.TextString(dict["N"])); err != nil {
 		return nil, err
 	} else {
-		clip.Name = string(n)
+		clip.Name = n
 	}
 
 	resolved, err := c.Resolve(dict["D"])
@@ -189,8 +189,8 @@ func (c *MediaClipData) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("MediaClip")
 	}
-	if c.Name != "" {
-		dict["N"] = pdf.TextString(c.Name)
+	if !c.Name.IsZero() {
+		dict["N"] = c.Name
 	}
 
 	var data pdf.Native
@@ -246,7 +246,7 @@ func (c *MediaClipData) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 type MediaClipSection struct {
 	// Name (optional) is the name of the media clip, for use in the user
 	// interface.
-	Name string
+	Name pdf.TextString
 
 	// Next is the next-level media clip of which this section defines a
 	// continuous part.
@@ -277,7 +277,7 @@ func extractMediaClipSection(c pdf.Cursor, dict pdf.Dict, isDirect bool) (*Media
 	if n, err := pdf.Optional(c.TextString(dict["N"])); err != nil {
 		return nil, err
 	} else {
-		sec.Name = string(n)
+		sec.Name = n
 	}
 
 	next, err := c.Decode(dict["D"], ExtractMediaClip)
@@ -333,8 +333,8 @@ func (c *MediaClipSection) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if e.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("MediaClip")
 	}
-	if c.Name != "" {
-		dict["N"] = pdf.TextString(c.Name)
+	if !c.Name.IsZero() {
+		dict["N"] = c.Name
 	}
 
 	next, err := e.Embed(c.Next)

@@ -215,8 +215,8 @@ func EmbeddedSpec() *file.Specification {
 	}
 	return &file.Specification{
 		FileName:        FileName,
-		FileNameUnicode: FileName,
-		Description:     Description,
+		FileNameUnicode: pdf.Text(FileName),
+		Description:     pdf.Text(Description),
 		EmbeddedFiles:   map[string]*file.Stream{"F": stream, "UF": stream},
 	}
 }
@@ -227,7 +227,7 @@ func EmbeddedSpec() *file.Specification {
 func ExternalSpec() *file.Specification {
 	return &file.Specification{
 		FileName:        FileName,
-		FileNameUnicode: FileName,
-		Description:     Description,
+		FileNameUnicode: pdf.Text(FileName),
+		Description:     pdf.Text(Description),
 	}
 }

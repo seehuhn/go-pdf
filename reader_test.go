@@ -529,7 +529,7 @@ func FuzzReader(f *testing.F) {
 			case 0:
 				// pass
 			case 1:
-				w.meta.Info.Title = "test"
+				w.meta.Info.Title = Text("test")
 			case 2:
 				w.meta.Info.ModDate = Date(time.Now())
 			case 3:

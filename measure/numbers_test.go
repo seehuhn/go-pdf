@@ -32,7 +32,7 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 		{
 			name: "basic format",
 			nf: NumberFormat{
-				Unit:             "ft",
+				Unit:             pdf.Text("ft"),
 				ConversionFactor: 12.0,
 				Precision:        1,
 				FractionFormat:   FractionDecimal,
@@ -43,12 +43,12 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 		{
 			name: "fraction format with custom separators",
 			nf: NumberFormat{
-				Unit:               "in",
+				Unit:               pdf.Text("in"),
 				ConversionFactor:   1.0,
 				Precision:          8,
 				FractionFormat:     FractionFraction,
 				ForceExactFraction: true,
-				ThousandsSeparator: ",",
+				ThousandsSeparator: pdf.Text(","),
 				// DecimalSeparator, PrefixSpacing, SuffixSpacing left as zero values
 				// since they match PDF defaults and would be optimized out
 				PrefixLabel: false,
@@ -57,7 +57,7 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 		{
 			name: "prefix label format",
 			nf: NumberFormat{
-				Unit:             "m",
+				Unit:             pdf.Text("m"),
 				ConversionFactor: 1000.0,
 				Precision:        100,
 				FractionFormat:   FractionDecimal,
@@ -68,21 +68,18 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 		{
 			name: "no thousands separator",
 			nf: NumberFormat{
-				Unit:               "mm",
-				ConversionFactor:   10.0,
-				Precision:          0,
-				FractionFormat:     FractionRound,
-				ThousandsSeparator: "",
+				Unit:             pdf.Text("mm"),
+				ConversionFactor: 10.0,
+				Precision:        0,
+				FractionFormat:   FractionRound,
 			},
 		},
 		{
 			name: "custom spacing",
 			nf: NumberFormat{
-				Unit:             "km",
+				Unit:             pdf.Text("km"),
 				ConversionFactor: 0.001,
 				Precision:        1000,
-				PrefixSpacing:    "",
-				SuffixSpacing:    "",
 			},
 		},
 	}
@@ -108,8 +105,8 @@ func TestNumberFormatExtractEmbed(t *testing.T) {
 
 			// Normalize expected result for comparison
 			expected := tt.nf
-			if expected.DecimalSeparator == "" {
-				expected.DecimalSeparator = "." // empty string becomes period after round-trip
+			if expected.DecimalSeparator.IsZero() {
+				expected.DecimalSeparator = pdf.Text(".") // empty string becomes period after round-trip
 			}
 
 			// Compare
@@ -137,15 +134,12 @@ func TestNumberFormatExtractDefaults(t *testing.T) {
 	}
 
 	expected := NumberFormat{
-		Unit:               "mi",
+		Unit:               pdf.Text("mi"),
 		ConversionFactor:   1.0,
 		Precision:          100,
 		FractionFormat:     FractionDecimal,
 		ForceExactFraction: false,
-		ThousandsSeparator: "",
-		DecimalSeparator:   ".", // Always filled in when reading
-		PrefixSpacing:      "",
-		SuffixSpacing:      "",
+		DecimalSeparator:   pdf.Text("."), // Always filled in when reading
 		PrefixLabel:        false,
 		SingleUse:          true, // direct dict, not a reference
 	}

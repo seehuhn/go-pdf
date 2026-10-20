@@ -73,10 +73,10 @@ func createDocument(filename string) error {
 
 	screen := &annotation.Screen{
 		Rect:     moviepage.Screen,
-		Contents: moviepage.Description + ", embedded in the PDF file.",
+		Contents: pdf.Text(moviepage.Description + ", embedded in the PDF file."),
 		Border:   &annotation.Border{Width: 1},
 		Flags:    annotation.FlagPrint,
-		Title:    "Tick movie",
+		Title:    pdf.Text("Tick movie"),
 	}
 	// reserve the reference up front, so the actions can target it via AN
 	screenRef := page.Doc.RM.GetReference(screen)
@@ -100,7 +100,7 @@ func createDocument(filename string) error {
 		// does not have)
 		page.Add(&annotation.Link{
 			Rect:     rects[i],
-			Contents: b.label,
+			Contents: pdf.Text(b.label),
 			Flags:    annotation.FlagPrint,
 			Action:   renditionAction(actionRend, screenRef, b.op),
 		})
@@ -124,9 +124,9 @@ func renditionAction(r media.Rendition, an pdf.Reference, op uint) *action.Rendi
 // PDF file, with the player's controller UI shown.
 func newRendition() *media.MediaRendition {
 	return &media.MediaRendition{
-		Name: "Tick movie",
+		Name: pdf.Text("Tick movie"),
 		Clip: &media.MediaClipData{
-			Name:        "Tick movie",
+			Name:        pdf.Text("Tick movie"),
 			DataFile:    moviepage.EmbeddedSpec(),
 			ContentType: "video/mp4",
 		},

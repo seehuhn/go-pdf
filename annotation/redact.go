@@ -48,7 +48,7 @@ type Redact struct {
 	RO pdf.Reference
 
 	// OverlayText (optional) - text to display over redacted region
-	OverlayText string
+	OverlayText pdf.TextString
 
 	// Repeat (optional) - whether overlay text should repeat to fill region
 	Repeat bool
@@ -116,8 +116,8 @@ func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	// OverlayText (optional)
-	if r.OverlayText != "" {
-		dict["OverlayText"] = pdf.TextString(r.OverlayText)
+	if !r.OverlayText.IsZero() {
+		dict["OverlayText"] = r.OverlayText
 
 		// DA (required if OverlayText present)
 		if r.DefaultAppearance == "" {

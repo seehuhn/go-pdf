@@ -249,7 +249,7 @@ type lineCaption struct {
 // The caption offset moves the text along the line, in its direction, and
 // across it, towards the side a caption above the line stands on.
 func (g *Generator) layoutCaption(a *annotation.Line, main []vec.Vec2, lw float64) *lineCaption {
-	if !a.Caption || a.Contents == "" {
+	if !a.Caption || a.Contents.IsZero() {
 		return nil
 	}
 	F := g.ContentFont()
@@ -275,7 +275,7 @@ func (g *Generator) layoutCaption(a *annotation.Line, main []vec.Vec2, lw float6
 
 	capt := &lineCaption{}
 	width := 0.0
-	for _, text := range captionLines(a.Contents) {
+	for _, text := range captionLines(a.Contents.String()) {
 		seq := F.Layout(nil, captionFontSize, text)
 		capt.lines = append(capt.lines, seq)
 		width = max(width, seq.TotalWidth())

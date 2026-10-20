@@ -92,7 +92,7 @@ func withoutAP(filename string) error {
 			Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
 			NonStrokingTransparency: 1 - CA,
 			StrokingTransparency:    1 - CA,
-			Contents:                text,
+			Contents:                pdf.Text(text),
 			Flags:                   annotation.FlagPrint,
 			FillColor:               color.DeviceRGB{0.5056, 0.9555, 0.9956},
 		}
@@ -149,7 +149,7 @@ func withAP(filename string) error {
 				Color:                   color.DeviceRGB{0.4975, 0.9333, 0.2483},
 				NonStrokingTransparency: 1 - ca,
 				StrokingTransparency:    1 - CA,
-				Contents:                text,
+				Contents:                pdf.Text(text),
 				Flags:                   annotation.FlagPrint,
 				FillColor:               color.DeviceRGB{0.5056, 0.9555, 0.9956},
 			}

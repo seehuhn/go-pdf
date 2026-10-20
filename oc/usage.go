@@ -83,8 +83,8 @@ func ExtractUsage(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usage, error) {
 
 		if creator, err := pdf.Optional(c.TextString(creatorDict["Creator"])); err != nil {
 			return nil, err
-		} else if creator != "" {
-			info.Creator = string(creator)
+		} else if !creator.IsZero() {
+			info.Creator = creator
 		}
 
 		if subtype, err := pdf.Optional(c.Name(creatorDict["Subtype"])); err != nil {
@@ -104,7 +104,7 @@ func ExtractUsage(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usage, error) {
 		}
 
 		// only keep CreatorInfo if it has both required fields
-		if info.Creator != "" && info.Subtype != "" {
+		if !info.Creator.IsZero() && info.Subtype != "" {
 			usage.Creator = info
 		}
 	}
@@ -119,7 +119,7 @@ func ExtractUsage(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usage, error) {
 			return nil, err
 		}
 		if err == nil {
-			info := &UsageLanguage{Lang: langtag.Parse(string(langStr))}
+			info := &UsageLanguage{Lang: langtag.Parse(langStr.String())}
 
 			if preferred, err := pdf.Optional(c.Name(langDict["Preferred"])); err != nil {
 				return nil, err
@@ -238,18 +238,18 @@ func ExtractUsage(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usage, error) {
 		// Name can be either a text string or an array of text strings
 		nameObj := userDict["Name"]
 		if arr, err := c.Array(nameObj); err == nil && arr != nil {
-			info.Name = make([]string, 0, len(arr))
+			info.Name = make([]pdf.TextString, 0, len(arr))
 			for _, item := range arr {
 				if str, err := pdf.Optional(c.TextString(item)); err != nil {
 					return nil, err
-				} else if str != "" {
-					info.Name = append(info.Name, string(str))
+				} else if !str.IsZero() {
+					info.Name = append(info.Name, str)
 				}
 			}
 		} else if str, err := pdf.Optional(c.TextString(nameObj)); err != nil {
 			return nil, err
-		} else if str != "" {
-			info.Name = []string{string(str)}
+		} else if !str.IsZero() {
+			info.Name = []pdf.TextString{str}
 		}
 
 		// the writer requires both a valid Type and at least one Name
@@ -287,10 +287,10 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if u.Creator != nil {
 		creatorDict := pdf.Dict{}
 
-		if u.Creator.Creator == "" {
+		if u.Creator.Creator.IsZero() {
 			return nil, errors.New("CreatorInfo.Creator is required")
 		}
-		creatorDict["Creator"] = pdf.TextString(u.Creator.Creator)
+		creatorDict["Creator"] = u.Creator.Creator
 
 		if u.Creator.Subtype == "" {
 			return nil, errors.New("CreatorInfo.Subtype is required")
@@ -316,7 +316,7 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if !u.Language.Lang.IsRoot() {
 			langStr = u.Language.Lang.String()
 		}
-		langDict["Lang"] = pdf.TextString(langStr)
+		langDict["Lang"] = pdf.Text(langStr)
 
 		if u.Language.Preferred {
 			langDict["Preferred"] = pdf.Name("ON")
@@ -426,11 +426,11 @@ func (u *Usage) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		if len(u.User.Name) == 0 {
 			return nil, errors.New("User.Name is required")
 		} else if len(u.User.Name) == 1 {
-			userDict["Name"] = pdf.TextString(u.User.Name[0])
+			userDict["Name"] = u.User.Name[0]
 		} else {
 			nameArray := make(pdf.Array, len(u.User.Name))
 			for i, name := range u.User.Name {
-				nameArray[i] = pdf.TextString(name)
+				nameArray[i] = name
 			}
 			userDict["Name"] = nameArray
 		}
@@ -499,7 +499,7 @@ const (
 // UsageCreator contains information about the application that created an optional content group.
 type UsageCreator struct {
 	// Creator specifies the application that created the group.
-	Creator string
+	Creator pdf.TextString
 
 	// Subtype defines the type of content controlled by the group.
 	// Suggested values include "Artwork" for graphic-design or publishing applications,
@@ -592,7 +592,7 @@ type UsageUser struct {
 	Type UserType
 
 	// Name represents the name(s) of the individual, position or organisation.
-	Name []string
+	Name []pdf.TextString
 }
 
 // UsagePageElement declares that a group contains a pagination artifact.

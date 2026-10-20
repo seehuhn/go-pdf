@@ -40,10 +40,10 @@ var usageTestCases = []struct {
 		name: "creator_info",
 		usage: &Usage{
 			Creator: &UsageCreator{
-				Creator: "Test Application",
+				Creator: pdf.Text("Test Application"),
 				Subtype: "Artwork",
 				AdditionalInfo: pdf.Dict{
-					"Version": pdf.TextString("1.0"),
+					"Version": pdf.Text("1.0"),
 				},
 			},
 		},
@@ -114,7 +114,7 @@ var usageTestCases = []struct {
 		usage: &Usage{
 			User: &UsageUser{
 				Type: UserTypeIndividual,
-				Name: []string{"John Doe"},
+				Name: []pdf.TextString{pdf.Text("John Doe")},
 			},
 		},
 	},
@@ -123,7 +123,7 @@ var usageTestCases = []struct {
 		usage: &Usage{
 			User: &UsageUser{
 				Type: UserTypeOrganisation,
-				Name: []string{"Company A", "Company B"},
+				Name: []pdf.TextString{pdf.Text("Company A"), pdf.Text("Company B")},
 			},
 		},
 	},
@@ -139,7 +139,7 @@ var usageTestCases = []struct {
 		name: "complex",
 		usage: &Usage{
 			Creator: &UsageCreator{
-				Creator: "PDF Editor Pro",
+				Creator: pdf.Text("PDF Editor Pro"),
 				Subtype: "Technical",
 			},
 			Language: &UsageLanguage{
@@ -162,7 +162,7 @@ var usageTestCases = []struct {
 			},
 			User: &UsageUser{
 				Type: UserTypeTitle,
-				Name: []string{"Manager", "Director"},
+				Name: []pdf.TextString{pdf.Text("Manager"), pdf.Text("Director")},
 			},
 			PageElement: &UsagePageElement{
 				Subtype: PageElementBackground,
@@ -257,7 +257,7 @@ func normalizeUsage(u *Usage) {
 	if u.Creator != nil && u.Creator.AdditionalInfo != nil {
 		for key, val := range u.Creator.AdditionalInfo {
 			if ts, ok := val.(pdf.TextString); ok {
-				u.Creator.AdditionalInfo[key] = pdf.String(ts)
+				u.Creator.AdditionalInfo[key] = ts.AsPDF(0)
 			}
 		}
 	}
@@ -287,10 +287,10 @@ func TestExtractUsageLanguage(t *testing.T) {
 		dict pdf.Dict
 		want *UsageLanguage
 	}{
-		{"tag", pdf.Dict{"Lang": pdf.TextString("es-MX")}, &UsageLanguage{Lang: language.MustParse("es-MX")}},
-		{"empty", pdf.Dict{"Lang": pdf.TextString("")}, &UsageLanguage{Lang: language.Und}},
-		{"und", pdf.Dict{"Lang": pdf.TextString("und")}, &UsageLanguage{Lang: language.Und}},
-		{"malformed", pdf.Dict{"Lang": pdf.TextString("en--US")}, &UsageLanguage{Lang: language.Und}},
+		{"tag", pdf.Dict{"Lang": pdf.Text("es-MX")}, &UsageLanguage{Lang: language.MustParse("es-MX")}},
+		{"empty", pdf.Dict{"Lang": pdf.Text("")}, &UsageLanguage{Lang: language.Und}},
+		{"und", pdf.Dict{"Lang": pdf.Text("und")}, &UsageLanguage{Lang: language.Und}},
+		{"malformed", pdf.Dict{"Lang": pdf.Text("en--US")}, &UsageLanguage{Lang: language.Und}},
 		{"missing", pdf.Dict{"Preferred": pdf.Name("ON")}, nil},
 		{"not a string", pdf.Dict{"Lang": pdf.Integer(1)}, nil},
 	}

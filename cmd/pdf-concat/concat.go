@@ -54,7 +54,7 @@ type Concat struct {
 
 // Child represents a child document in the concatenated file.
 type Child struct {
-	Title     string
+	Title     pdf.TextString
 	FirstPage pdf.Reference
 	Outline   []*outline.Item
 }
@@ -89,7 +89,7 @@ func (c *Concat) Close() error {
 	meta := c.w.GetMeta()
 	now := time.Now()
 	meta.Info = &pdf.Info{
-		Producer:     "seehuhn.de/go/pdf/cmd/pdf-concat",
+		Producer:     pdf.Text("seehuhn.de/go/pdf/cmd/pdf-concat"),
 		CreationDate: pdf.Date(now),
 		ModDate:      pdf.Date(now),
 	}
@@ -166,11 +166,11 @@ func (c *Concat) Append(fname string) error {
 	meta := r.GetMeta()
 	outlineTree, _ := pdf.NewCursor(r).DecodeOptional(r.GetMeta().Catalog.Outlines, outline.Decode)
 
-	var title string
-	if meta.Info != nil && meta.Info.Title != "" {
-		title = string(meta.Info.Title)
+	var title pdf.TextString
+	if meta.Info != nil && !meta.Info.Title.IsZero() {
+		title = meta.Info.Title
 	} else {
-		title = fname
+		title = pdf.Text(fname)
 	}
 
 	child := &Child{
@@ -325,7 +325,7 @@ func (c *Concat) prepareForm(r *pdf.Reader, cp *pdf.Copier) ([]preparedField, ma
 		prepared = append(prepared, preparedField{
 			newRef:  newRef,
 			srcDict: fieldDict,
-			rename:  c.uniqueName(string(name)),
+			rename:  c.uniqueName(name.String()),
 		})
 	}
 	return prepared, fontRename, nil
@@ -344,7 +344,7 @@ func (c *Concat) finishForm(cp *pdf.Copier, prepared []preparedField, fontRename
 			return err
 		}
 		if p.rename != "" {
-			dict["T"] = pdf.TextString(p.rename)
+			dict["T"] = pdf.Text(p.rename)
 		}
 		if da, ok := dict["DA"].(pdf.String); ok {
 			dict["DA"] = rewriteDA(da, fontRename)

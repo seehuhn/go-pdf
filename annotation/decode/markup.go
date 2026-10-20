@@ -29,7 +29,7 @@ func decodeMarkup(c pdf.Cursor, dict pdf.Dict, markup *annotation.Markup) error 
 	if t, err := pdf.Optional(c.TextString(dict["T"])); err != nil {
 		return err
 	} else {
-		markup.User = string(t)
+		markup.User = t
 	}
 
 	// Popup (optional)
@@ -60,7 +60,7 @@ func decodeMarkup(c pdf.Cursor, dict pdf.Dict, markup *annotation.Markup) error 
 	if subj, err := pdf.Optional(c.TextString(dict["Subj"])); err != nil {
 		return err
 	} else {
-		markup.Subject = string(subj)
+		markup.Subject = subj
 	}
 
 	// RT (optional); only "R" and "Group" are valid, and RT is meaningless

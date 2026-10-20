@@ -35,7 +35,7 @@ var membershipTestCases = []struct {
 		version: pdf.V1_7,
 		membership: &Membership{
 			OCGs: []*Group{
-				{Name: "Layer1"},
+				{Name: pdf.Text("Layer1")},
 			},
 			Policy: PolicyAnyOn,
 		},
@@ -45,9 +45,9 @@ var membershipTestCases = []struct {
 		version: pdf.V1_7,
 		membership: &Membership{
 			OCGs: []*Group{
-				{Name: "Layer1"},
-				{Name: "Layer2"},
-				{Name: "Layer3"},
+				{Name: pdf.Text("Layer1")},
+				{Name: pdf.Text("Layer2")},
+				{Name: pdf.Text("Layer3")},
 			},
 			Policy: PolicyAllOn,
 		},
@@ -57,7 +57,7 @@ var membershipTestCases = []struct {
 		version: pdf.V1_7,
 		membership: &Membership{
 			OCGs: []*Group{
-				{Name: "HiddenLayer"},
+				{Name: pdf.Text("HiddenLayer")},
 			},
 			Policy: PolicyAllOff,
 		},
@@ -67,8 +67,8 @@ var membershipTestCases = []struct {
 		version: pdf.V1_7,
 		membership: &Membership{
 			OCGs: []*Group{
-				{Name: "Layer1"},
-				{Name: "Layer2"},
+				{Name: pdf.Text("Layer1")},
+				{Name: pdf.Text("Layer2")},
 			},
 			Policy: PolicyAnyOff,
 		},
@@ -79,8 +79,8 @@ var membershipTestCases = []struct {
 		membership: &Membership{
 			VE: &VisibilityExpressionAnd{
 				Args: []VisibilityExpression{
-					&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-					&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+					&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
+					&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer2")}},
 				},
 			},
 		},
@@ -91,14 +91,14 @@ var membershipTestCases = []struct {
 		membership: &Membership{
 			VE: &VisibilityExpressionOr{
 				Args: []VisibilityExpression{
-					&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
+					&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
 					&VisibilityExpressionNot{
-						Arg: &VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+						Arg: &VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer2")}},
 					},
 					&VisibilityExpressionAnd{
 						Args: []VisibilityExpression{
-							&VisibilityExpressionGroup{Group: &Group{Name: "Layer3"}},
-							&VisibilityExpressionGroup{Group: &Group{Name: "Layer4"}},
+							&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer3")}},
+							&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer4")}},
 						},
 					},
 				},
@@ -110,14 +110,14 @@ var membershipTestCases = []struct {
 		version: pdf.V2_0,
 		membership: &Membership{
 			OCGs: []*Group{
-				{Name: "Layer1"},
-				{Name: "Layer2"},
+				{Name: pdf.Text("Layer1")},
+				{Name: pdf.Text("Layer2")},
 			},
 			Policy: PolicyAllOn,
 			VE: &VisibilityExpressionAnd{
 				Args: []VisibilityExpression{
-					&VisibilityExpressionGroup{Group: &Group{Name: "Layer1"}},
-					&VisibilityExpressionGroup{Group: &Group{Name: "Layer2"}},
+					&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer1")}},
+					&VisibilityExpressionGroup{Group: &Group{Name: pdf.Text("Layer2")}},
 				},
 			},
 		},
@@ -233,7 +233,7 @@ func TestMembershipValidation(t *testing.T) {
 	// test invalid policy (should fail)
 	invalidPolicy := &Membership{
 		OCGs: []*Group{
-			{Name: "Test"},
+			{Name: pdf.Text("Test")},
 		},
 		Policy: MembershipPolicy("Invalid"),
 	}
@@ -253,7 +253,7 @@ func TestMembershipExtractPermissive(t *testing.T) {
 	// create a minimal OCG
 	ocgDict := pdf.Dict{
 		"Type": pdf.Name("OCG"),
-		"Name": pdf.TextString("Test"),
+		"Name": pdf.Text("Test"),
 	}
 	ocgRef := rm.Out.Alloc()
 	err := rm.Out.Put(ocgRef, ocgDict)
@@ -309,7 +309,7 @@ func TestMembershipSingleOCG(t *testing.T) {
 	// create membership with single OCG
 	membership := &Membership{
 		OCGs: []*Group{
-			{Name: "SingleLayer"},
+			{Name: pdf.Text("SingleLayer")},
 		},
 		Policy:    PolicyAnyOn,
 		SingleUse: false,
@@ -332,7 +332,7 @@ func TestMembershipSingleOCG(t *testing.T) {
 	if len(extracted.OCGs) != 1 {
 		t.Errorf("expected 1 OCG, got %d", len(extracted.OCGs))
 	}
-	if extracted.OCGs[0].Name != "SingleLayer" {
+	if extracted.OCGs[0].Name.String() != "SingleLayer" {
 		t.Errorf("expected OCG name 'SingleLayer', got %s", extracted.OCGs[0].Name)
 	}
 }
@@ -343,7 +343,7 @@ func TestMembershipWithNullOCGs(t *testing.T) {
 	rm := pdf.NewResourceManager(buf)
 
 	// create a valid group first
-	group := &Group{Name: "ValidGroup"}
+	group := &Group{Name: pdf.Text("ValidGroup")}
 	groupRef, err := rm.Embed(group)
 	if err != nil {
 		t.Fatalf("embed group: %v", err)
@@ -380,7 +380,7 @@ func TestMembershipWithNullOCGs(t *testing.T) {
 	if len(membership.OCGs) != 1 {
 		t.Errorf("expected 1 OCG after filtering nulls, got %d", len(membership.OCGs))
 	}
-	if membership.OCGs[0].Name != "ValidGroup" {
+	if membership.OCGs[0].Name.String() != "ValidGroup" {
 		t.Errorf("expected OCG name 'ValidGroup', got %s", membership.OCGs[0].Name)
 	}
 }

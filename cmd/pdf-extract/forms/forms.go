@@ -67,7 +67,7 @@ func render(name string, field acroform.Field) string {
 	var b strings.Builder
 	b.WriteString(name)
 	if c := field.GetCommon(); c != nil {
-		if c.AltName != "" {
+		if !c.AltName.IsZero() {
 			fmt.Fprintf(&b, " %q", c.AltName)
 		}
 		if c.ExportName != "" {
@@ -84,11 +84,15 @@ func fieldValue(field acroform.Field) string {
 	switch f := field.(type) {
 	case *acroform.TextField:
 		if f.V != nil {
-			return f.V.Value
+			return f.V.Value.String()
 		}
 		return ""
 	case *acroform.ChoiceField:
-		return strings.Join(f.V, ", ")
+		vals := make([]string, len(f.V))
+		for i, v := range f.V {
+			vals[i] = v.String()
+		}
+		return strings.Join(vals, ", ")
 	case *acroform.ButtonField:
 		if f.Variant() == acroform.ButtonPush {
 			return ""

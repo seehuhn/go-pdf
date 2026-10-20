@@ -2622,7 +2622,7 @@ types:
   specTable: Table 399
   fields:
   - goName: MarkStyle
-    goType: string
+    goType: pdf.TextString
     pdfKey: MarkStyle
     pdfType: text-string
     required: false
@@ -2695,7 +2695,7 @@ types:
 
       trapping parameters.  The library does not interpret these objects.'
   - goName: TrapStyles
-    goType: string
+    goType: pdf.TextString
     pdfKey: TrapStyles
     pdfType: text-string
     required: false
@@ -3745,7 +3745,7 @@ types:
     pdfType: text-string
     required: true
     introduced: '1.5'
-    goType: string
+    goType: pdf.TextString
     purpose: 'Name (optional) specifies the name of the optional content group,
 
       suitable for presentation in an interactive PDF processor''s user interface.'
@@ -3972,14 +3972,14 @@ types:
   specTable: Table 99
   fields:
   - goName: Name
-    goType: string
+    goType: pdf.TextString
     pdfKey: Name
     pdfType: text-string
     required: false
     introduced: '1.5'
     notes: Table 99
   - goName: Creator
-    goType: string
+    goType: pdf.TextString
     pdfKey: Creator
     pdfType: text-string
     required: false

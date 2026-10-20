@@ -32,13 +32,13 @@ func writeNameArray(dict pdf.Dict, key pdf.Name, vals []pdf.Name) {
 	dict[key] = arr
 }
 
-func writeTextStringArray(dict pdf.Dict, key pdf.Name, vals []string) {
+func writeTextStringArray(dict pdf.Dict, key pdf.Name, vals []pdf.TextString) {
 	if len(vals) == 0 {
 		return
 	}
 	arr := make(pdf.Array, len(vals))
 	for i, s := range vals {
-		arr[i] = pdf.TextString(s)
+		arr[i] = s
 	}
 	dict[key] = arr
 }

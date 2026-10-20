@@ -48,15 +48,15 @@ type Characteristics struct {
 
 	// Caption is the annotation's normal caption, displayed when it is not
 	// interacting with the user.
-	Caption string
+	Caption pdf.TextString
 
 	// RolloverCaption is the caption displayed when the user rolls the cursor
 	// into the annotation's active area without pressing the pointer button.
-	RolloverCaption string
+	RolloverCaption pdf.TextString
 
 	// DownCaption is the caption displayed when the pointer button is pressed
 	// within the annotation's active area.
-	DownCaption string
+	DownCaption pdf.TextString
 
 	// Icon (optional) is the annotation's normal icon, displayed when it is not
 	// interacting with the user.
@@ -121,19 +121,19 @@ func ExtractCharacteristics(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Chara
 	if ca, err := pdf.Optional(c.TextString(dict["CA"])); err != nil {
 		return nil, err
 	} else {
-		res.Caption = string(ca)
+		res.Caption = ca
 	}
 
 	if rc, err := pdf.Optional(c.TextString(dict["RC"])); err != nil {
 		return nil, err
 	} else {
-		res.RolloverCaption = string(rc)
+		res.RolloverCaption = rc
 	}
 
 	if ac, err := pdf.Optional(c.TextString(dict["AC"])); err != nil {
 		return nil, err
 	} else {
-		res.DownCaption = string(ac)
+		res.DownCaption = ac
 	}
 
 	if f, err := c.DecodeOptional(dict["I"], extract.Form); err != nil {
@@ -195,14 +195,14 @@ func (c *Characteristics) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["BG"] = bg
 	}
 
-	if c.Caption != "" {
-		dict["CA"] = pdf.TextString(c.Caption)
+	if !c.Caption.IsZero() {
+		dict["CA"] = c.Caption
 	}
-	if c.RolloverCaption != "" {
-		dict["RC"] = pdf.TextString(c.RolloverCaption)
+	if !c.RolloverCaption.IsZero() {
+		dict["RC"] = c.RolloverCaption
 	}
-	if c.DownCaption != "" {
-		dict["AC"] = pdf.TextString(c.DownCaption)
+	if !c.DownCaption.IsZero() {
+		dict["AC"] = c.DownCaption
 	}
 
 	if c.Icon != nil {

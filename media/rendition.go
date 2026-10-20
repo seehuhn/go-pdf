@@ -34,7 +34,7 @@ func (*SelectorRendition) isRendition() {}
 type RenditionCommon struct {
 	// Name (optional) is the name of the rendition, for use in a user
 	// interface and for name tree lookup by ECMAScript actions.
-	Name string
+	Name pdf.TextString
 
 	// MustHonourCriteria (optional) are the criteria that must be met for the
 	// rendition to be viable.
@@ -49,7 +49,7 @@ func extractRenditionCommon(c pdf.Cursor, dict pdf.Dict, out *RenditionCommon) e
 	if n, err := pdf.Optional(c.TextString(dict["N"])); err != nil {
 		return err
 	} else {
-		out.Name = string(n)
+		out.Name = n
 	}
 
 	var err error
@@ -71,8 +71,8 @@ func extractCriteria(c pdf.Cursor, obj pdf.Object) (*MediaCriteria, error) {
 }
 
 func (c *RenditionCommon) fillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
-	if c.Name != "" {
-		dict["N"] = pdf.TextString(c.Name)
+	if !c.Name.IsZero() {
+		dict["N"] = c.Name
 	}
 	if c.MustHonourCriteria != nil {
 		crit, err := e.Embed(c.MustHonourCriteria)

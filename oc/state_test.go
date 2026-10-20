@@ -24,9 +24,9 @@ import (
 )
 
 func TestDefaultState(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
-	g3 := &Group{Name: "Group 3"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
+	g2 := &Group{Name: pdf.Text("Group 2")}
+	g3 := &Group{Name: pdf.Text("Group 3")}
 	allGroups := []*Group{g1, g2, g3}
 
 	t.Run("base_state_on", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("with_as_view_state", func(t *testing.T) {
 		g := &Group{
-			Name: "Viewable",
+			Name: pdf.Text("Viewable"),
 			Usage: &Usage{
 				View: &UsageView{ViewState: StateOFF},
 			},
@@ -118,7 +118,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("with_as_print_state", func(t *testing.T) {
 		g := &Group{
-			Name: "Printable",
+			Name: pdf.Text("Printable"),
 			Usage: &Usage{
 				Print: &UsagePrint{PrintState: StateON},
 			},
@@ -141,7 +141,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("as_wrong_event_ignored", func(t *testing.T) {
 		g := &Group{
-			Name: "Printable",
+			Name: pdf.Text("Printable"),
 			Usage: &Usage{
 				Print: &UsagePrint{PrintState: StateON},
 			},
@@ -165,7 +165,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("as_no_usage", func(t *testing.T) {
 		// group without usage should not be affected by AS
-		g := &Group{Name: "NoUsage"}
+		g := &Group{Name: pdf.Text("NoUsage")}
 		c := &Configuration{
 			BaseState: BaseStateON,
 			AS: []*UsageApplication{
@@ -184,7 +184,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("as_multiple_categories_all_on", func(t *testing.T) {
 		g := &Group{
-			Name: "Both",
+			Name: pdf.Text("Both"),
 			Usage: &Usage{
 				View:   &UsageView{ViewState: StateON},
 				Export: &UsageExport{ExportState: StateON},
@@ -208,7 +208,7 @@ func TestDefaultState(t *testing.T) {
 
 	t.Run("as_multiple_categories_one_off", func(t *testing.T) {
 		g := &Group{
-			Name: "Mixed",
+			Name: pdf.Text("Mixed"),
 			Usage: &Usage{
 				View:   &UsageView{ViewState: StateON},
 				Export: &UsageExport{ExportState: StateOFF},
@@ -312,8 +312,8 @@ func TestIntentOverlaps(t *testing.T) {
 }
 
 func TestIntentFiltering(t *testing.T) {
-	viewGroup := &Group{Name: "ViewLayer", Intent: []pdf.Name{"View"}}
-	designGroup := &Group{Name: "DesignLayer", Intent: []pdf.Name{"Design"}}
+	viewGroup := &Group{Name: pdf.Text("ViewLayer"), Intent: []pdf.Name{"View"}}
+	designGroup := &Group{Name: pdf.Text("DesignLayer"), Intent: []pdf.Name{"Design"}}
 	allGroups := []*Group{viewGroup, designGroup}
 
 	t.Run("view_config_includes_view_group", func(t *testing.T) {
@@ -360,7 +360,7 @@ func TestIntentFiltering(t *testing.T) {
 	})
 
 	t.Run("mixed_intent_groups", func(t *testing.T) {
-		mixedGroup := &Group{Name: "Mixed", Intent: []pdf.Name{"View", "Design"}}
+		mixedGroup := &Group{Name: pdf.Text("Mixed"), Intent: []pdf.Name{"View", "Design"}}
 		c := &Configuration{Intent: []pdf.Name{"Design"}}
 		state := c.DefaultState([]*Group{viewGroup, designGroup, mixedGroup}, nil)
 		if state.Participates(viewGroup) {
@@ -407,7 +407,7 @@ func TestDefaultStateASAndSemantics(t *testing.T) {
 	// than one OCGs array, its state shall be ON only if all categories in
 	// all the usage application dictionaries it appears in have a state of ON."
 	g := &Group{
-		Name: "Multi-AS",
+		Name: pdf.Text("Multi-AS"),
 		Usage: &Usage{
 			View:   &UsageView{ViewState: StateON},
 			Export: &UsageExport{ExportState: StateOFF},
@@ -439,7 +439,7 @@ func TestDefaultStateASAndSemantics(t *testing.T) {
 
 	t.Run("and_semantics_all_on", func(t *testing.T) {
 		gBoth := &Group{
-			Name: "BothOn",
+			Name: pdf.Text("BothOn"),
 			Usage: &Usage{
 				View:   &UsageView{ViewState: StateON},
 				Export: &UsageExport{ExportState: StateON},
@@ -471,7 +471,7 @@ func TestDefaultStateASAndSemantics(t *testing.T) {
 func TestVEIntentNotVisible(t *testing.T) {
 	// A Design group under a View config should not participate.
 	// VE = Not(Design group) should have no opinion, so content is visible.
-	designGroup := &Group{Name: "DesignLayer", Intent: []pdf.Name{"Design"}}
+	designGroup := &Group{Name: pdf.Text("DesignLayer"), Intent: []pdf.Name{"Design"}}
 	allGroups := []*Group{designGroup}
 
 	c := &Configuration{Intent: []pdf.Name{"View"}}
@@ -489,8 +489,8 @@ func TestVEIntentNotVisible(t *testing.T) {
 }
 
 func TestDefaultStateBaseStateUnchanged(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
+	g2 := &Group{Name: pdf.Text("Group 2")}
 	allGroups := []*Group{g1, g2}
 
 	t.Run("unchanged_groups_participate", func(t *testing.T) {
@@ -514,7 +514,7 @@ func TestDefaultStateBaseStateUnchanged(t *testing.T) {
 }
 
 func TestManualOverride(t *testing.T) {
-	g := &Group{Name: "Manual"}
+	g := &Group{Name: pdf.Text("Manual")}
 	state := &ViewState{base: map[*Group]bool{g: true}}
 
 	if state.IsManual(g) {
@@ -542,7 +542,7 @@ func TestManualOverride(t *testing.T) {
 func TestEffectiveZoom(t *testing.T) {
 	t.Run("on_when_in_range", func(t *testing.T) {
 		g := &Group{
-			Name:  "ZoomLayer",
+			Name:  pdf.Text("ZoomLayer"),
 			Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
 		}
 		c := &Configuration{
@@ -562,7 +562,7 @@ func TestEffectiveZoom(t *testing.T) {
 
 	t.Run("off_below_min", func(t *testing.T) {
 		g := &Group{
-			Name:  "ZoomLayer",
+			Name:  pdf.Text("ZoomLayer"),
 			Usage: &Usage{Zoom: &UsageZoom{Min: 2.0, Max: 4.0}},
 		}
 		c := &Configuration{
@@ -582,7 +582,7 @@ func TestEffectiveZoom(t *testing.T) {
 
 	t.Run("off_at_max_strict_less_than", func(t *testing.T) {
 		g := &Group{
-			Name:  "ZoomLayer",
+			Name:  pdf.Text("ZoomLayer"),
 			Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 2.0}},
 		}
 		c := &Configuration{
@@ -602,7 +602,7 @@ func TestEffectiveZoom(t *testing.T) {
 
 	t.Run("skip_when_zoom_zero", func(t *testing.T) {
 		g := &Group{
-			Name:  "ZoomLayer",
+			Name:  pdf.Text("ZoomLayer"),
 			Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
 		}
 		c := &Configuration{
@@ -624,11 +624,11 @@ func TestEffectiveZoom(t *testing.T) {
 func TestEffectiveLanguage(t *testing.T) {
 	t.Run("exact_match", func(t *testing.T) {
 		en := &Group{
-			Name:  "English",
+			Name:  pdf.Text("English"),
 			Usage: &Usage{Language: &UsageLanguage{Lang: language.English}},
 		}
 		de := &Group{
-			Name:  "German",
+			Name:  pdf.Text("German"),
 			Usage: &Usage{Language: &UsageLanguage{Lang: language.German}},
 		}
 		c := &Configuration{
@@ -651,14 +651,14 @@ func TestEffectiveLanguage(t *testing.T) {
 
 	t.Run("partial_match_preferred", func(t *testing.T) {
 		enGB := &Group{
-			Name: "en-GB",
+			Name: pdf.Text("en-GB"),
 			Usage: &Usage{Language: &UsageLanguage{
 				Lang:      language.MustParse("en-GB"),
 				Preferred: true,
 			}},
 		}
 		enUS := &Group{
-			Name: "en-US",
+			Name: pdf.Text("en-US"),
 			Usage: &Usage{Language: &UsageLanguage{
 				Lang: language.MustParse("en-US"),
 			}},
@@ -684,7 +684,7 @@ func TestEffectiveLanguage(t *testing.T) {
 
 	t.Run("no_match", func(t *testing.T) {
 		en := &Group{
-			Name: "English",
+			Name: pdf.Text("English"),
 			Usage: &Usage{Language: &UsageLanguage{
 				Lang:      language.English,
 				Preferred: true,
@@ -707,7 +707,7 @@ func TestEffectiveLanguage(t *testing.T) {
 
 	t.Run("unknown_language", func(t *testing.T) {
 		unknown := &Group{
-			Name: "Unknown",
+			Name: pdf.Text("Unknown"),
 			Usage: &Usage{Language: &UsageLanguage{
 				Lang:      language.Und,
 				Preferred: true,
@@ -730,7 +730,7 @@ func TestEffectiveLanguage(t *testing.T) {
 
 	t.Run("skip_when_und", func(t *testing.T) {
 		en := &Group{
-			Name:  "English",
+			Name:  pdf.Text("English"),
 			Usage: &Usage{Language: &UsageLanguage{Lang: language.English}},
 		}
 		c := &Configuration{
@@ -752,10 +752,10 @@ func TestEffectiveLanguage(t *testing.T) {
 func TestEffectiveUser(t *testing.T) {
 	t.Run("name_match", func(t *testing.T) {
 		g := &Group{
-			Name: "ForAlice",
+			Name: pdf.Text("ForAlice"),
 			Usage: &Usage{User: &UsageUser{
 				Type: UserTypeIndividual,
-				Name: []string{"Alice", "Bob"},
+				Name: []pdf.TextString{pdf.Text("Alice"), pdf.Text("Bob")},
 			}},
 		}
 		c := &Configuration{
@@ -775,10 +775,10 @@ func TestEffectiveUser(t *testing.T) {
 
 	t.Run("name_mismatch", func(t *testing.T) {
 		g := &Group{
-			Name: "ForAlice",
+			Name: pdf.Text("ForAlice"),
 			Usage: &Usage{User: &UsageUser{
 				Type: UserTypeIndividual,
-				Name: []string{"Alice"},
+				Name: []pdf.TextString{pdf.Text("Alice")},
 			}},
 		}
 		c := &Configuration{
@@ -798,10 +798,10 @@ func TestEffectiveUser(t *testing.T) {
 
 	t.Run("type_filter", func(t *testing.T) {
 		g := &Group{
-			Name: "OrgLayer",
+			Name: pdf.Text("OrgLayer"),
 			Usage: &Usage{User: &UsageUser{
 				Type: UserTypeOrganisation,
-				Name: []string{"Acme"},
+				Name: []pdf.TextString{pdf.Text("Acme")},
 			}},
 		}
 		c := &Configuration{
@@ -825,10 +825,10 @@ func TestEffectiveUser(t *testing.T) {
 
 	t.Run("skip_when_empty", func(t *testing.T) {
 		g := &Group{
-			Name: "ForAlice",
+			Name: pdf.Text("ForAlice"),
 			Usage: &Usage{User: &UsageUser{
 				Type: UserTypeIndividual,
-				Name: []string{"Alice"},
+				Name: []pdf.TextString{pdf.Text("Alice")},
 			}},
 		}
 		c := &Configuration{
@@ -850,7 +850,7 @@ func TestEffectiveUser(t *testing.T) {
 func TestEffectiveANDSemantics(t *testing.T) {
 	// zoom ON + language OFF = OFF
 	g := &Group{
-		Name: "Combo",
+		Name: pdf.Text("Combo"),
 		Usage: &Usage{
 			Zoom:     &UsageZoom{Min: 1.0, Max: 4.0},
 			Language: &UsageLanguage{Lang: language.German},
@@ -876,7 +876,7 @@ func TestEffectiveANDSemantics(t *testing.T) {
 
 func TestEffectiveManualOverride(t *testing.T) {
 	g := &Group{
-		Name:  "ManualLayer",
+		Name:  pdf.Text("ManualLayer"),
 		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
 	}
 	c := &Configuration{
@@ -899,7 +899,7 @@ func TestEffectiveManualOverride(t *testing.T) {
 
 func TestEffectiveNilContext(t *testing.T) {
 	g := &Group{
-		Name:  "Layer",
+		Name:  pdf.Text("Layer"),
 		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
 	}
 	c := &Configuration{
@@ -920,7 +920,7 @@ func TestEffectiveNilContext(t *testing.T) {
 
 func TestEffectiveNoAS(t *testing.T) {
 	g := &Group{
-		Name:  "Layer",
+		Name:  pdf.Text("Layer"),
 		Usage: &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
 	}
 	c := &Configuration{BaseState: BaseStateON}
@@ -933,7 +933,7 @@ func TestEffectiveNoAS(t *testing.T) {
 
 // The zero value of GroupStates is a usable, modifiable, empty snapshot.
 func TestGroupStatesZeroValue(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
 
 	var s GroupStates
 	if s.Participates(g1) {
@@ -956,8 +956,8 @@ func TestGroupStatesZeroValue(t *testing.T) {
 // The zero value of ViewState is a usable, modifiable, empty state without a
 // configuration.
 func TestViewStateZeroValue(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
+	g2 := &Group{Name: pdf.Text("Group 2")}
 
 	var s ViewState
 	if s.Participates(g1) {
@@ -985,7 +985,7 @@ func TestViewStateZeroValue(t *testing.T) {
 // A nil *ViewState derives a nil snapshot instead of panicking, and a nil
 // snapshot answers like an empty one.
 func TestEffectiveNilState(t *testing.T) {
-	g := &Group{Name: "Layer"}
+	g := &Group{Name: pdf.Text("Layer")}
 
 	var s *ViewState
 	if snap := s.Effective(&ViewerContext{Zoom: 0.5}); snap != nil {
@@ -1008,7 +1008,7 @@ func TestEffectiveNilState(t *testing.T) {
 // a usage application must not put them back.
 func TestEffectiveIntentMismatch(t *testing.T) {
 	g := &Group{
-		Name:   "Design Layer",
+		Name:   pdf.Text("Design Layer"),
 		Intent: []pdf.Name{"Design"},
 		Usage:  &Usage{Zoom: &UsageZoom{Min: 1.0, Max: 4.0}},
 	}
@@ -1039,12 +1039,12 @@ func TestEffectiveIntentMismatch(t *testing.T) {
 // not take part in choosing the best language match either.
 func TestEffectiveIntentMismatchLanguage(t *testing.T) {
 	excluded := &Group{
-		Name:   "English (design only)",
+		Name:   pdf.Text("English (design only)"),
 		Intent: []pdf.Name{"Design"},
 		Usage:  &Usage{Language: &UsageLanguage{Lang: language.English}},
 	}
 	included := &Group{
-		Name:  "German",
+		Name:  pdf.Text("German"),
 		Usage: &Usage{Language: &UsageLanguage{Lang: language.German}},
 	}
 	c := &Configuration{
@@ -1072,11 +1072,11 @@ func TestEffectiveIntentMismatchLanguage(t *testing.T) {
 // other groups are switched OFF rather than treated as the best match.
 func TestEffectiveManualLanguageCandidate(t *testing.T) {
 	manual := &Group{
-		Name:  "American English",
+		Name:  pdf.Text("American English"),
 		Usage: &Usage{Language: &UsageLanguage{Lang: language.AmericanEnglish}},
 	}
 	other := &Group{
-		Name:  "British English",
+		Name:  pdf.Text("British English"),
 		Usage: &Usage{Language: &UsageLanguage{Lang: language.BritishEnglish, Preferred: true}},
 	}
 	c := &Configuration{
@@ -1104,9 +1104,9 @@ func TestEffectiveManualLanguageCandidate(t *testing.T) {
 // collections end up with at most one visible member, whichever way the
 // configuration switches several of them on.
 func TestDefaultStateRBGroups(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
-	g3 := &Group{Name: "Group 3"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
+	g2 := &Group{Name: pdf.Text("Group 2")}
+	g3 := &Group{Name: pdf.Text("Group 3")}
 	allGroups := []*Group{g1, g2, g3}
 
 	t.Run("first_visible_member_wins", func(t *testing.T) {
@@ -1183,9 +1183,9 @@ func TestDefaultStateRBGroups(t *testing.T) {
 }
 
 func TestSwitch(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
-	g3 := &Group{Name: "Group 3"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
+	g2 := &Group{Name: pdf.Text("Group 2")}
+	g3 := &Group{Name: pdf.Text("Group 3")}
 	allGroups := []*Group{g1, g2, g3}
 
 	t.Run("named_group_wins", func(t *testing.T) {
@@ -1280,11 +1280,11 @@ func TestSwitch(t *testing.T) {
 // most one visible (8.11.4.3).
 func TestEffectiveRBGroups(t *testing.T) {
 	g1 := &Group{
-		Name:  "Overview",
+		Name:  pdf.Text("Overview"),
 		Usage: &Usage{Zoom: &UsageZoom{Min: 0, Max: 4}},
 	}
 	g2 := &Group{
-		Name:  "Detail",
+		Name:  pdf.Text("Detail"),
 		Usage: &Usage{Zoom: &UsageZoom{Min: 2, Max: 100}},
 	}
 	c := &Configuration{
@@ -1317,10 +1317,10 @@ func TestEffectiveRBGroups(t *testing.T) {
 // array order says.
 func TestEffectiveRBGroupsPinnedWins(t *testing.T) {
 	g1 := &Group{
-		Name:  "Overview",
+		Name:  pdf.Text("Overview"),
 		Usage: &Usage{Zoom: &UsageZoom{Min: 0, Max: 4}},
 	}
-	g2 := &Group{Name: "Detail"}
+	g2 := &Group{Name: pdf.Text("Detail")}
 	c := &Configuration{
 		RBGroups: [][]*Group{{g1, g2}},
 		AS: []*UsageApplication{{
@@ -1347,8 +1347,8 @@ func TestEffectiveRBGroupsPinnedWins(t *testing.T) {
 // that asked for radio-button relationships to be ignored, and the reduction
 // must not take back what the action asked for.
 func TestEffectiveRBGroupsIgnoreRBPair(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
+	g2 := &Group{Name: pdf.Text("Group 2")}
 	c := &Configuration{
 		OFF:      []*Group{g2},
 		RBGroups: [][]*Group{{g1, g2}},
@@ -1367,9 +1367,9 @@ func TestEffectiveRBGroupsIgnoreRBPair(t *testing.T) {
 // asks for radio-button relationships to be ignored — survive the reduction:
 // the reduction never rewrites a pin.
 func TestEffectiveRBGroupsPinnedPair(t *testing.T) {
-	g1 := &Group{Name: "Group 1"}
-	g2 := &Group{Name: "Group 2"}
-	g3 := &Group{Name: "Group 3"}
+	g1 := &Group{Name: pdf.Text("Group 1")}
+	g2 := &Group{Name: pdf.Text("Group 2")}
+	g3 := &Group{Name: pdf.Text("Group 3")}
 	c := &Configuration{
 		OFF:      []*Group{g2, g3},
 		RBGroups: [][]*Group{{g1, g2, g3}},
@@ -1390,7 +1390,7 @@ func TestEffectiveRBGroupsPinnedPair(t *testing.T) {
 
 // A derived snapshot is independent of the state it came from.
 func TestEffectiveIsASnapshot(t *testing.T) {
-	g := &Group{Name: "Layer"}
+	g := &Group{Name: pdf.Text("Layer")}
 	c := &Configuration{}
 	state := c.DefaultState([]*Group{g}, nil)
 
@@ -1404,7 +1404,7 @@ func TestEffectiveIsASnapshot(t *testing.T) {
 func TestEffectiveForPrint(t *testing.T) {
 	t.Run("print_state_applied", func(t *testing.T) {
 		g := &Group{
-			Name:  "Watermark",
+			Name:  pdf.Text("Watermark"),
 			Usage: &Usage{Print: &UsagePrint{PrintState: StateON}},
 		}
 		c := &Configuration{
@@ -1427,7 +1427,7 @@ func TestEffectiveForPrint(t *testing.T) {
 
 	t.Run("print_overrides_pins", func(t *testing.T) {
 		g := &Group{
-			Name:  "Watermark",
+			Name:  pdf.Text("Watermark"),
 			Usage: &Usage{Print: &UsagePrint{PrintState: StateON}},
 		}
 		c := &Configuration{
@@ -1449,9 +1449,9 @@ func TestEffectiveForPrint(t *testing.T) {
 	})
 
 	t.Run("print_recommendation_wins_collections", func(t *testing.T) {
-		g1 := &Group{Name: "Screen variant"}
+		g1 := &Group{Name: pdf.Text("Screen variant")}
 		g2 := &Group{
-			Name:  "Print variant",
+			Name:  pdf.Text("Print variant"),
 			Usage: &Usage{Print: &UsagePrint{PrintState: StateON}},
 		}
 		c := &Configuration{
@@ -1473,7 +1473,7 @@ func TestEffectiveForPrint(t *testing.T) {
 	})
 
 	t.Run("no_print_dicts", func(t *testing.T) {
-		g := &Group{Name: "Layer"}
+		g := &Group{Name: pdf.Text("Layer")}
 		c := &Configuration{}
 		state := c.DefaultState([]*Group{g}, nil)
 		state.Switch(g, false)

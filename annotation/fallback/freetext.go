@@ -154,7 +154,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	}
 
 	// render text content if present
-	if a.Contents != "" {
+	if !a.Contents.IsZero() {
 		F := g.freeTextFont(a)
 
 		clipLeft := inner.LLx + lw + freeTextPadding
@@ -178,7 +178,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		b.SetFillColor(textCol)
 		b.TextSetHorizontalScaling(1)
 		b.TextSetRise(0)
-		wrapper := text.WrapWith(g.breaker(), clipWidth, a.Contents)
+		wrapper := text.WrapWith(g.breaker(), clipWidth, a.Contents.String())
 		// The first baseline sits one ascent below the top of the content
 		// area.  This leaves the rest of the leading below the last line,
 		// where the descenders need it, instead of above the first line.

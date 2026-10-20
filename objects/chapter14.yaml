@@ -16,7 +16,7 @@ types:
     introduced: '1.4'
     notes: Marked-content identifier for structure
   - goName: Text
-    goType: string
+    goType: pdf.TextString
     pdfKey: ActualText
     pdfType: text-string
     required: true
@@ -1720,7 +1720,7 @@ types:
     required: false
     introduced: '1.2'
     deprecated: '2.0'
-    goType: string
+    goType: pdf.TextString
   - goName: Size
     pdfKey: Size
     pdfType: array

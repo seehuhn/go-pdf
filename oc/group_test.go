@@ -34,7 +34,7 @@ var groupTestCases = []struct {
 	{
 		name: "minimal",
 		group: &Group{
-			Name: "Test Group",
+			Name: pdf.Text("Test Group"),
 		},
 	},
 	{
@@ -46,21 +46,21 @@ var groupTestCases = []struct {
 	{
 		name: "with_single_intent",
 		group: &Group{
-			Name:   "Design Layer",
+			Name:   pdf.Text("Design Layer"),
 			Intent: []pdf.Name{"Design"},
 		},
 	},
 	{
 		name: "with_multiple_intents",
 		group: &Group{
-			Name:   "Multi Purpose Layer",
+			Name:   pdf.Text("Multi Purpose Layer"),
 			Intent: []pdf.Name{"View", "Design"},
 		},
 	},
 	{
 		name: "with_usage",
 		group: &Group{
-			Name: "Language Layer",
+			Name: pdf.Text("Language Layer"),
 			Usage: &Usage{
 				Language: &UsageLanguage{
 					Lang:      language.English,
@@ -72,11 +72,11 @@ var groupTestCases = []struct {
 	{
 		name: "complex",
 		group: &Group{
-			Name:   "Complex Layer",
+			Name:   pdf.Text("Complex Layer"),
 			Intent: []pdf.Name{"View", "Print"},
 			Usage: &Usage{
 				Creator: &UsageCreator{
-					Creator: "Test App",
+					Creator: pdf.Text("Test App"),
 					Subtype: "Artwork",
 				},
 				Language: &UsageLanguage{
@@ -181,7 +181,7 @@ func TestUnnamedGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if group.Name != "" {
+	if !group.Name.IsZero() {
 		t.Errorf("got name %q, want an empty name", group.Name)
 	}
 }
@@ -212,7 +212,7 @@ func TestGroupIntentHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			group := &Group{
-				Name:   "Test Group",
+				Name:   pdf.Text("Test Group"),
 				Intent: tt.inputIntent,
 			}
 
