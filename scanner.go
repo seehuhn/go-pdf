@@ -938,38 +938,6 @@ func endstreamAt(r io.ReaderAt, pos int64) bool {
 	return n == len(kw) && string(kw[:]) == "endstream"
 }
 
-func (s *scanner) ReadHeaderVersion() (Version, error) {
-	err := s.SkipString("%PDF-")
-	if err != nil {
-		if e, ok := errors.AsType[*MalformedFileError](err); ok {
-			e.Err = errNoPDF
-		}
-		return 0, err
-	}
-
-	var buf []byte
-	err = s.ScanBytes(func(b byte) bool {
-		if b >= '0' && b <= '9' || b == '.' {
-			buf = append(buf, b)
-			return true
-		}
-		return false
-	})
-	if err != nil {
-		return 0, err
-	}
-
-	ver, err := ParseVersion(string(buf))
-	if err != nil {
-		return 0, &MalformedFileError{
-			Err: err,
-			Loc: []string{"PDF header"},
-		}
-	}
-
-	return ver, nil
-}
-
 // PeekN returns a view of the next n bytes of input from the scanner's buffer.
 // If n is larger than scannerBufSize, the function panics.
 // If an EOF is encountered before n bytes can be read, the function returns

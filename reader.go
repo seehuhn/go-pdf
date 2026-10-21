@@ -141,34 +141,11 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		unencrypted: make(map[Reference]bool),
 	}
 
-	// search the first 1024 bytes for the %PDF- signature
-	headerOffset, err := findHeaderOffset(data, size)
+	headerOffset, version, err := ReadHeader(data, size)
 	if err != nil {
 		return nil, err
 	}
 	r.headerOffset = headerOffset
-
-	s, err := r.scannerFrom(headerOffset, false)
-	if err != nil {
-		return nil, err
-	}
-	version, err := s.ReadHeaderVersion()
-	if err != nil {
-		if e, ok := errors.AsType[*MalformedFileError](err); ok && e.Err == errNoPDF {
-			return nil, err // no PDF header at all
-		}
-		// A PDF processor shall attempt to read any PDF file, even if the
-		// header announces a version more recent than the one for which
-		// the processor was written: continue with the newest known
-		// version.
-		version = V2_0
-		if opt.ErrorHandling == ErrorHandlingReport {
-			r.Errors = append(r.Errors, &MalformedFileError{
-				Err: fmt.Errorf("unsupported PDF header version: %w", err),
-				Loc: []string{"PDF header"},
-			})
-		}
-	}
 	r.meta.Version = version
 
 	// Install a dummy xref table first, so that we don't crash if an invalid
@@ -599,22 +576,6 @@ func safeGetInteger(r Getter, canObjStm bool) getIntFn {
 		}
 		return getIntegerNoObjStm(r, obj)
 	}
-}
-
-// findHeaderOffset searches the first 1024 bytes of the file for the
-// %PDF- signature and returns its byte offset.
-func findHeaderOffset(data io.ReaderAt, size int64) (int64, error) {
-	n := min(size, 1024)
-	buf := make([]byte, n)
-	_, err := data.ReadAt(buf, 0)
-	if err != nil && err != io.EOF {
-		return 0, err
-	}
-	idx := bytes.Index(buf, []byte("%PDF-"))
-	if idx < 0 {
-		return 0, &MalformedFileError{Err: errNoPDF}
-	}
-	return int64(idx), nil
 }
 
 func (r *Reader) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {

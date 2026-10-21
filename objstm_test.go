@@ -344,8 +344,7 @@ func BenchmarkGetFromObjStm(b *testing.B) {
 	}
 	defer r.Close()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		for num := uint32(1); num <= uint32(n); num++ {
 			if _, err := r.Get(NewReference(num, 0), true); err != nil {
 				b.Fatal(err)

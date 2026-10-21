@@ -32,7 +32,7 @@ type FileInfo struct {
 	FileSize      int64
 	PDFStart      int64
 	PDFEnd        int64
-	HeaderVersion string
+	HeaderVersion Version
 	Sections      []*FileSection
 
 	// objIndex maps each indirect reference to its FileObject.  It is built
@@ -132,11 +132,8 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 		unencrypted: make(map[Reference]bool),
 	}
 
-	version, err := ParseVersion(fi.HeaderVersion)
-	if err != nil {
-		return nil, err
-	}
-	r.meta.Version = version
+	r.headerOffset = fi.PDFStart
+	r.meta.Version = fi.HeaderVersion
 
 	r.xref = fi.makeXRef()
 	r.objstms = newObjstmCache()
@@ -154,17 +151,16 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 }
 
 func (fi *FileInfo) locateObjects() error {
-	sr := io.NewSectionReader(fi.R, 0, fi.FileSize)
-	s := newScanner(sr, nil, nil)
-
-	pos, m, err := s.Find(startRegexp)
-	if err == io.EOF {
-		return errNoPDF
-	} else if err != nil {
+	pos, version, err := ReadHeader(fi.R, fi.FileSize)
+	if err != nil {
 		return err
 	}
 	fi.PDFStart = pos
-	fi.HeaderVersion = m[1]
+	fi.HeaderVersion = version
+
+	sr := io.NewSectionReader(fi.R, pos, fi.FileSize-pos)
+	s := newScanner(sr, nil, nil)
+	s.filePos = pos
 
 	section := &FileSection{}
 
@@ -194,7 +190,7 @@ func (fi *FileInfo) locateObjects() error {
 
 scanLoop:
 	for {
-		pos, m, err = s.Find(markerRegexp)
+		pos, m, err := s.Find(markerRegexp)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -443,11 +439,7 @@ func (fi *FileInfo) decodeObjStmIndex(objInfo *FileObject) ([]stmObj, error) {
 		return nil, &MalformedFileError{Err: errors.New("no valid /First")}
 	}
 
-	ver, err := ParseVersion(fi.HeaderVersion)
-	if err != nil {
-		return nil, err
-	}
-	getter := &sequentialGetter{fi: fi, ver: ver, seen: make(map[Reference]bool)}
+	getter := &sequentialGetter{fi: fi, ver: fi.HeaderVersion, seen: make(map[Reference]bool)}
 
 	in, err := DecodeStream(getter, nil, stm)
 	if err != nil {
@@ -495,7 +487,7 @@ func (fi *FileInfo) makeXRef() map[uint32]*xRefEntry {
 			}
 
 			xref[obj.Reference.Number()] = &xRefEntry{
-				Pos:        obj.ObjStart,
+				Pos:        obj.ObjStart - fi.PDFStart,
 				Generation: obj.Reference.Generation(),
 			}
 		}
@@ -609,8 +601,6 @@ func countLeadingSpaces(s string) int64 {
 }
 
 var (
-	startRegexp = regexp.MustCompile(`%PDF-([1-9]\.[0-9])[^0-9]`)
-
 	whiteSpacePat = `[\000\011\012\014\015 ]+`
 	eolPat        = `(?:\r\n|\r|\n|^)`
 	objectPat     = `([0-9]+)` + whiteSpacePat + `([0-9]+)` + whiteSpacePat + `obj`
