@@ -66,6 +66,7 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"unsafe"
 )
 
 const (
@@ -121,6 +122,11 @@ type Reader struct {
 
 	earlyChange uint16 // the off-by-one error allowed by the PDF spec
 }
+
+// ReaderBytes is the memory footprint of one [Reader], including the
+// 4096 byte [bufio.Reader] buffer allocated when the source is not an
+// [io.ByteReader].
+const ReaderBytes = int(unsafe.Sizeof(Reader{})+unsafe.Sizeof(bufio.Reader{})) + 4096
 
 // NewReader creates a new [Reader].
 // The reader reads from reads and decompress data from src. If src does not

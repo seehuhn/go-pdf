@@ -57,12 +57,6 @@ func Resolve(r Getter, obj Object) (Native, error) {
 	return resolve(r, obj, true)
 }
 
-// maxFilterChainLength bounds the number of entries in a stream's
-// /Filter array.  Legitimate PDFs rarely exceed two or three; the cap
-// blocks malformed inputs that stack hundreds of decoders to amplify
-// per-wrapper overhead.
-const maxFilterChainLength = 8
-
 // resolve follows indirect references until it reaches a non-reference object.
 // See [resolvePath] for the cycle and depth bounds.  Pass canObjStm=false to
 // forbid reading from an object stream (used while resolving stream lengths).
@@ -316,6 +310,38 @@ func (s *sourceAwareReader) Read(p []byte) (int, error) {
 
 func (s *sourceAwareReader) Close() error { return s.inner.Close() }
 
+// alignDecodeParms returns the /DecodeParms entries which belong to the
+// filters named by filter, one per filter, with nil where the file gives
+// none.  The /DecodeParms entry is optional, so a wrongly shaped value is
+// dropped rather than failing the read.  A one-element array next to a
+// single filter name, or a single dict next to a one-element filter array,
+// is used as if it had the correct shape.  Array elements are returned
+// unresolved.  The result is empty when filter is neither a name nor an
+// array.
+func alignDecodeParms(filter, parms Object) Array {
+	var n int
+	f, filterIsArray := filter.(Array)
+	_, filterIsName := filter.(Name)
+	switch {
+	case filterIsArray:
+		n = len(f)
+	case filterIsName:
+		n = 1
+	}
+	res := make(Array, n)
+	switch p := parms.(type) {
+	case Dict:
+		if n == 1 {
+			res[0] = p
+		}
+	case Array:
+		if filterIsArray || len(p) == 1 {
+			copy(res, p)
+		}
+	}
+	return res
+}
+
 // GetFilters extracts the information contained in the /Filter and
 // /DecodeParms entries of a stream dictionary.
 func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
@@ -333,29 +359,19 @@ func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
 	case nil:
 		// pass
 	case Name:
-		var pDict Dict
-		if decodeParams != nil {
-			var ok bool
-			pDict, ok = decodeParams.(Dict)
-			if !ok {
-				return nil, fmt.Errorf("wrong type, expected Dict but got %T", decodeParams)
-			}
+		pa := alignDecodeParms(filter, decodeParams)
+		p0, err := resolve(r, pa[0], false)
+		if err != nil {
+			return nil, err
 		}
+		pDict, _ := p0.(Dict)
 		filter, err := MakeFilter(f, pDict)
 		if err != nil {
 			return nil, err
 		}
 		res = append(res, filter)
 	case Array:
-		if len(f) > maxFilterChainLength {
-			return nil, &MalformedFileError{
-				Err: fmt.Errorf("filter chain length %d exceeds limit", len(f)),
-			}
-		}
-		pa, ok := decodeParams.(Array)
-		if !ok && decodeParams != nil {
-			return nil, errors.New("invalid /DecodeParms field")
-		}
+		pa := alignDecodeParms(filter, decodeParams)
 		for i, fi := range f {
 			fi, err := resolve(r, fi, false)
 			if err != nil {
@@ -365,20 +381,11 @@ func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
 			if !ok {
 				return nil, fmt.Errorf("wrong type, expected Name but got %T", fi)
 			}
-			var pDict Dict
-			if len(pa) > i {
-				pai, err := resolve(r, pa[i], false)
-				if err != nil {
-					return nil, err
-				}
-				if pai != nil {
-					var ok bool
-					pDict, ok = pai.(Dict)
-					if !ok {
-						return nil, fmt.Errorf("wrong type, expected Dict but got %T", pai)
-					}
-				}
+			pai, err := resolve(r, pa[i], false)
+			if err != nil {
+				return nil, err
 			}
+			pDict, _ := pai.(Dict)
 			filter, err := MakeFilter(name, pDict)
 			if err != nil {
 				return nil, err

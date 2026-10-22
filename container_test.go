@@ -23,6 +23,9 @@ import (
 	"io"
 	"os"
 	"testing"
+
+	"seehuhn.de/go/pdf/internal/filter/asciihex"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 func TestGetDictTyped_NilObject(t *testing.T) {
@@ -226,5 +229,83 @@ func TestCheckDictType(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+// TestGetFiltersDecodeParmsShape verifies that a wrongly typed
+// /DecodeParms is dropped, or used where its intended filter is plain,
+// instead of making the stream unreadable.
+func TestGetFiltersDecodeParmsShape(t *testing.T) {
+	withPred := Dict{"Predictor": Integer(12), "Columns": Integer(4)}
+	cases := []struct {
+		name      string
+		filter    Object
+		parms     Object
+		predictor FlatePredictor
+	}{
+		{"name+dict", Name("FlateDecode"), withPred, FlatePredictorPNGUp},
+		{"name+array1", Name("FlateDecode"), Array{withPred}, FlatePredictorPNGUp},
+		{"name+array2", Name("FlateDecode"), Array{withPred, withPred}, FlatePredictorNone},
+		{"name+int", Name("FlateDecode"), Integer(3), FlatePredictorNone},
+		{"array1+dict", Array{Name("FlateDecode")}, withPred, FlatePredictorPNGUp},
+		{"array2+dict", Array{Name("ASCIIHexDecode"), Name("FlateDecode")}, withPred, FlatePredictorNone},
+		{"array+array", Array{Name("FlateDecode")}, Array{withPred}, FlatePredictorPNGUp},
+		{"array+badelem", Array{Name("FlateDecode")}, Array{Integer(3)}, FlatePredictorNone},
+		{"array+int", Array{Name("FlateDecode")}, Integer(3), FlatePredictorNone},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			filters, err := GetFilters(nil, nil, Dict{"Filter": c.filter, "DecodeParms": c.parms})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(filters) == 0 {
+				t.Fatal("no filters")
+			}
+			ff, ok := filters[len(filters)-1].(FilterFlate)
+			if !ok {
+				t.Fatalf("last filter is %T, want FilterFlate", filters[len(filters)-1])
+			}
+			if ff.Predictor != c.predictor {
+				t.Errorf("predictor = %v, want %v", ff.Predictor, c.predictor)
+			}
+		})
+	}
+}
+
+// TestAlignDecodeParmsBadFilter verifies that a /Filter value which is
+// neither a name nor an array yields no parms entries, so that a chain
+// built on top of it stays aligned.
+func TestAlignDecodeParmsBadFilter(t *testing.T) {
+	for _, filter := range []Object{nil, Integer(3), Dict{}} {
+		if got := alignDecodeParms(filter, Dict{"Predictor": Integer(12)}); len(got) != 0 {
+			t.Errorf("filter %v: got %d parms entries, want 0", filter, len(got))
+		}
+	}
+}
+
+func TestDecodeStreamChainExhaustsBudget(t *testing.T) {
+	// a tiny stream gets the base budget; this many readers exceed it
+	n := limits.StreamBudgetBase/asciihex.ReaderBytes + 2
+	chain := make(Array, n)
+	for i := range chain {
+		chain[i] = Name("ASCIIHexDecode")
+	}
+	stm := NewStream(Dict{"Filter": chain}, []byte("4142>"))
+
+	filters, err := GetFilters(mockGetter, nil, stm.Dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(filters) != n {
+		t.Fatalf("got %d filters, want %d", len(filters), n)
+	}
+
+	r, err := DecodeStream(mockGetter, nil, stm)
+	if err == nil {
+		_, err = io.ReadAll(r)
+	}
+	if !IsMalformed(err) {
+		t.Errorf("expected malformed error, got %v", err)
 	}
 }

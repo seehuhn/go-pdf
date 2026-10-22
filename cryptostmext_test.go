@@ -57,7 +57,7 @@ func addContentsPage(w *pdf.Writer, streamRef pdf.Reference) error {
 // TestIndirectFilterWriteInlines verifies that Writer.OpenStream
 // resolves an indirect /Filter entry into the destination's stream
 // dict so that subsequent operations (the cheap /Crypt probe,
-// appendFilter for additional encoders, and the on-disk wire form)
+// insertFilters for additional encoders, and the on-disk wire form)
 // see direct values rather than a Reference.
 func TestIndirectFilterWriteInlines(t *testing.T) {
 	testData := []byte("Indirect-/Filter Identity-Crypt payload.")

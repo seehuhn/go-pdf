@@ -19,7 +19,12 @@ package runlength
 import (
 	"bufio"
 	"io"
+	"unsafe"
 )
+
+// ReaderBytes is the memory footprint of one reader returned by [Decode],
+// including the 4096 byte [bufio.Reader] buffer.
+const ReaderBytes = int(unsafe.Sizeof(rlReader{})+unsafe.Sizeof(bufio.Reader{})) + 4096
 
 // Decode returns a new ReadCloser which decodes data in run-length format.
 func Decode(r io.Reader) io.ReadCloser {

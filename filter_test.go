@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -747,3 +748,95 @@ func TestFilterCCITTFaxNotTruncated(t *testing.T) {
 		t.Errorf("decoded output %d bytes, want %d", n, wantBytes)
 	}
 }
+
+func TestDecodeZeroBudget(t *testing.T) {
+	filters := []Filter{
+		FilterASCII85{},
+		FilterASCIIHex{},
+		FilterRunLength{},
+		FilterFlate{},
+		FilterLZW{},
+	}
+	for _, f := range filters {
+		name, _, _ := f.Info(V2_0)
+		t.Run(string(name), func(t *testing.T) {
+			_, err := f.Decode(V2_0, bytes.NewReader([]byte("x")), membudget.New(0))
+			if !IsMalformed(err) {
+				t.Errorf("expected malformed error, got %v", err)
+			}
+		})
+	}
+}
+
+// TestPooledByteReader verifies that a source with ReadByte is used as
+// it is, and that any other source is wrapped in a buffered reader.
+func TestPooledByteReader(t *testing.T) {
+	data := []byte("hello")
+
+	src := bytes.NewReader(data)
+	br, release := pooledByteReader(src)
+	if br != io.Reader(src) {
+		t.Errorf("ByteReader source was wrapped in %T", br)
+	}
+	release()
+
+	var plain io.Reader = struct{ io.Reader }{bytes.NewReader(data)}
+	br, release = pooledByteReader(plain)
+	if _, ok := br.(*bufio.Reader); !ok {
+		t.Fatalf("plain source yielded %T, want *bufio.Reader", br)
+	}
+	got, err := io.ReadAll(br)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Errorf("got %q, want %q", got, data)
+	}
+	release()
+}
+
+// TestDecodeFlateLZWReleasesBuffer verifies that closing a Flate or LZW
+// reader releases the pooled buffer exactly once.
+func TestDecodeFlateLZWReleasesBuffer(t *testing.T) {
+	for _, f := range []Filter{FilterFlate{}, FilterLZW{}} {
+		name, _, _ := f.Info(V2_0)
+		t.Run(string(name), func(t *testing.T) {
+			var buf bytes.Buffer
+			enc, err := f.Encode(V2_0, nopWriteCloser{&buf})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := enc.Write([]byte("some data")); err != nil {
+				t.Fatal(err)
+			}
+			if err := enc.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			var plain io.Reader = struct{ io.Reader }{bytes.NewReader(buf.Bytes())}
+			r, err := f.Decode(V2_0, plain, membudget.New(1<<20))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := io.ReadAll(r); err != nil {
+				t.Fatal(err)
+			}
+			rc, ok := r.(*filterContentReader).ReadCloser.(*releaseOnClose)
+			if !ok {
+				t.Fatalf("decoder is %T, want *releaseOnClose", r.(*filterContentReader).ReadCloser)
+			}
+			calls := 0
+			rc.release = func() { calls++ }
+			if err := r.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 1 {
+				t.Errorf("release called %d times, want 1", calls)
+			}
+		})
+	}
+}
+
+type nopWriteCloser struct{ io.Writer }
+
+func (nopWriteCloser) Close() error { return nil }

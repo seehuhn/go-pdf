@@ -20,7 +20,12 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"unsafe"
 )
+
+// ReaderBytes is the memory footprint of one reader returned by [Decode],
+// including the 4096 byte [bufio.Reader] buffer.
+const ReaderBytes = int(unsafe.Sizeof(reader{})+unsafe.Sizeof(bufio.Reader{})) + 4096
 
 // Decode decodes data that has been encoded in ASCII hexadecimal form.
 func Decode(r io.Reader) io.ReadCloser {

@@ -17,11 +17,13 @@
 package pdf
 
 import (
+	"bufio"
 	"bytes"
 	"compress/zlib"
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sync"
 
 	"seehuhn.de/go/membudget"
@@ -181,7 +183,10 @@ func (f FilterASCII85) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, erro
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterASCII85) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
+func (f FilterASCII85) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
+	if err := budget.Charge(ascii85.ReaderBytes); err != nil {
+		return asMalformedFilter(nil, err)
+	}
 	return asMalformedFilter(ascii85.Decode(r), nil)
 }
 
@@ -200,7 +205,10 @@ func (f FilterASCIIHex) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, err
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterASCIIHex) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
+func (f FilterASCIIHex) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
+	if err := budget.Charge(asciihex.ReaderBytes); err != nil {
+		return asMalformedFilter(nil, err)
+	}
 	return asMalformedFilter(asciihex.Decode(r), nil)
 }
 
@@ -219,7 +227,10 @@ func (f FilterRunLength) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, er
 }
 
 // Decode implements the [Filter] interface.
-func (f FilterRunLength) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
+func (f FilterRunLength) Decode(_ Version, r io.Reader, budget *membudget.Budget) (io.ReadCloser, error) {
+	if err := budget.Charge(runlength.ReaderBytes); err != nil {
+		return asMalformedFilter(nil, err)
+	}
 	return asMalformedFilter(runlength.Decode(r), nil)
 }
 
@@ -1155,15 +1166,79 @@ func decodeFlateLZW(r io.Reader, p FlatePredictor, colors, bpc, columns int, isL
 	var inner io.ReadCloser
 	var err error
 	if isLZW {
-		inner = lzw.NewReader(r, lzwOffByOne)
+		if err := budget.Charge(lzw.ReaderBytes); err != nil {
+			return asMalformedFilter(nil, err)
+		}
 	} else {
-		inner, err = zlibNewReader(r)
+		if err := budget.Charge(zlibReaderBytes); err != nil {
+			return asMalformedFilter(nil, err)
+		}
+	}
+
+	src, release := pooledByteReader(r)
+	if isLZW {
+		inner = lzw.NewReader(src, lzwOffByOne)
+	} else {
+		inner, err = zlibNewReader(src)
 		if err != nil {
+			release()
 			return nil, err
 		}
 	}
-	return predict.NewReader(inner, predictParams(p, colors, bpc, columns), budget)
+	inner = &releaseOnClose{inner, release}
+	res, err := predict.NewReader(inner, predictParams(p, colors, bpc, columns), budget)
+	if err != nil {
+		inner.Close()
+		return nil, err
+	}
+	return res, nil
 }
+
+// byteReader is the source type the Flate and LZW decompressors read
+// without allocating a buffer of their own.
+type byteReader interface {
+	io.Reader
+	io.ByteReader
+}
+
+// bufioReaderPool holds buffers for sources which lack ReadByte.
+var bufioReaderPool = sync.Pool{
+	New: func() any { return bufio.NewReaderSize(nil, 4096) },
+}
+
+// pooledByteReader returns r as a [byteReader], wrapping it in a pooled
+// [bufio.Reader] where needed.  The returned function must be called
+// once the reader is no longer used, to return the buffer to the pool.
+func pooledByteReader(r io.Reader) (byteReader, func()) {
+	if br, ok := r.(byteReader); ok {
+		return br, func() {}
+	}
+	br := bufioReaderPool.Get().(*bufio.Reader)
+	br.Reset(r)
+	release := func() {
+		br.Reset(nil)
+		bufioReaderPool.Put(br)
+	}
+	return br, release
+}
+
+// releaseOnClose calls release after the wrapped reader has been closed.
+type releaseOnClose struct {
+	io.ReadCloser
+	release func()
+}
+
+func (r *releaseOnClose) Close() error {
+	err := r.ReadCloser.Close()
+	r.release()
+	return err
+}
+
+// zlibReaderBytes is the memory charged for one zlib reader: the 32 KiB
+// window plus decompressor state.  Pooled readers are charged like fresh
+// ones, since the budget accounts for the stream's footprint, not the
+// allocator's.
+const zlibReaderBytes = 64 << 10
 
 func predictParams(p FlatePredictor, colors, bpc, columns int) *predict.Params {
 	if colors == 0 {
@@ -1207,37 +1282,72 @@ func (w *withClose) Close() error {
 	return w.close()
 }
 
-func appendFilter(streamDict Dict, name Name, parms Dict) {
-	switch filter := streamDict["Filter"].(type) {
+// insertFilters adds encoder filters to streamDict.  The new filters are
+// placed as one block in front of the existing /Filter chain, so that the
+// chain keeps decoding order.  A leading /Crypt entry of the existing chain
+// stays in first position.  Existing /Filter and /DecodeParms values must
+// be direct.
+func insertFilters(streamDict Dict, names []Name, parms []Dict) {
+	if len(names) == 0 {
+		return
+	}
+
+	var oldNames []Object
+	switch f := streamDict["Filter"].(type) {
 	case Name:
-		streamDict["Filter"] = Array{filter, name}
-		p0, _ := streamDict["DecodeParms"].(Dict)
-		if len(p0)+len(parms) > 0 {
-			streamDict["DecodeParms"] = Array{p0, parms}
-		}
-
+		oldNames = []Object{f}
 	case Array:
-		streamDict["Filter"] = append(filter, name)
-		pp, _ := streamDict["DecodeParms"].(Array)
-		needsParms := len(parms) > 0
-		for i := 0; i < len(pp) && !needsParms; i++ {
-			pi, _ := pp[i].(Dict)
-			needsParms = len(pi) > 0
-		}
-		if needsParms {
-			for len(pp) < len(filter) {
-				pp = append(pp, nil)
-			}
-			pp := pp[:len(filter)]
-			streamDict["DecodeParms"] = append(pp, parms)
-		}
+		oldNames = f
+	}
 
-	default:
-		streamDict["Filter"] = name
-		if len(parms) > 0 {
-			streamDict["DecodeParms"] = parms
+	var oldParms []Dict
+	for _, x := range alignDecodeParms(streamDict["Filter"], streamDict["DecodeParms"]) {
+		d, _ := x.(Dict)
+		oldParms = append(oldParms, d)
+	}
+
+	// split off a leading /Crypt, which must remain first
+	k := 0
+	if len(oldNames) > 0 && oldNames[0] == Name("Crypt") {
+		k = 1
+	}
+
+	newNames := make([]Object, len(names))
+	for i, n := range names {
+		newNames[i] = n
+	}
+	allNames := slices.Concat(oldNames[:k], newNames, oldNames[k:])
+	allParms := slices.Concat(oldParms[:k], parms, oldParms[k:])
+
+	needsParms := false
+	for _, d := range allParms {
+		if len(d) > 0 {
+			needsParms = true
+			break
 		}
 	}
+
+	if len(allNames) == 1 {
+		streamDict["Filter"] = allNames[0]
+	} else {
+		streamDict["Filter"] = Array(allNames)
+	}
+
+	delete(streamDict, "DecodeParms")
+	if !needsParms {
+		return
+	}
+	if len(allParms) == 1 {
+		streamDict["DecodeParms"] = allParms[0]
+		return
+	}
+	arr := make(Array, len(allParms))
+	for i, d := range allParms {
+		if len(d) > 0 {
+			arr[i] = d
+		}
+	}
+	streamDict["DecodeParms"] = arr
 }
 
 // asMalformedFilter reclassifies the result of a Filter.Decode call.
@@ -1277,6 +1387,8 @@ func zlibNewReader(r io.Reader) (io.ReadCloser, error) {
 	if obj != nil {
 		zr := obj.(zlib.Resetter)
 		if err := zr.Reset(r, nil); err != nil {
+			// the reader is reusable after a failed Reset
+			zlibReaderPool.Put(obj)
 			return nil, err
 		}
 		return pooledZlibReader{obj.(io.ReadCloser)}, nil

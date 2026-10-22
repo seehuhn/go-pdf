@@ -19,7 +19,11 @@ package ascii85
 import (
 	"errors"
 	"io"
+	"unsafe"
 )
+
+// ReaderBytes is the memory footprint of one reader returned by [Decode].
+const ReaderBytes = int(unsafe.Sizeof(ascii85Reader{}))
 
 // Encode returns a new WriteCloser which encodes data in ASCII85 format.
 // The returned WriteCloser must be closed to flush all data.

@@ -17,7 +17,9 @@
 package pdf_test
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -121,30 +123,63 @@ func TestGetFiltersJBIG2GlobalsValid(t *testing.T) {
 	}
 }
 
-// TestGetFiltersChainTooLong verifies that GetFilters rejects a /Filter
-// array longer than the per-stream cap, preventing attackers from
-// stacking many decoder wrappers on a single read.
-func TestGetFiltersChainTooLong(t *testing.T) {
+// TestDecodeStreamLongChain verifies that a long chain of cheap filters
+// decodes correctly within the stream budget.
+func TestDecodeStreamLongChain(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	ref := w.Alloc()
 
-	chain := make(pdf.Array, 17)
+	// OpenStream refuses to repeat a filter, so the chain is built by hand
+	const n = 12
+	want := []byte("hello, chain")
+	data := want
+	chain := make(pdf.Array, n)
 	for i := range chain {
-		chain[i] = pdf.Name("FlateDecode")
+		chain[i] = pdf.Name("ASCIIHexDecode")
+		var buf bytes.Buffer
+		enc, err := pdf.FilterASCIIHex{}.Encode(pdf.V2_0, nopCloser{&buf})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := enc.Write(data); err != nil {
+			t.Fatal(err)
+		}
+		if err := enc.Close(); err != nil {
+			t.Fatal(err)
+		}
+		data = buf.Bytes()
 	}
-	stm := pdf.NewStream(pdf.Dict{"Filter": chain}, nil)
-	if err := w.Put(ref, stm); err != nil {
+	stmW, err := w.OpenStream(ref, pdf.Dict{"Filter": chain})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stmW.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := stmW.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	stream, err := pdf.NewCursor(w).Stream(ref)
+	obj, err := pdf.Resolve(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pdf.GetFilters(w, nil, stream.Dict); err == nil {
-		t.Fatal("expected error for oversized filter chain, got nil")
+	stm, ok := obj.(*pdf.Stream)
+	if !ok {
+		t.Fatalf("expected *pdf.Stream, got %T", obj)
+	}
+	r, err := pdf.DecodeStream(w, nil, stm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

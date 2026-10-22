@@ -747,6 +747,9 @@ func checkCompressed(refs []Reference, objects []Object) error {
 // Filters are specified in order from outermost to innermost.
 // When reading, filters are applied in the given order.
 // When writing, filters are applied in reverse order.
+// Filters already named in dict are innermost: the caller supplies data
+// encoded with them, and the new filters are placed in front of them in
+// /Filter.  A new filter must not repeat a filter already in the chain.
 //
 // If dict contains a /Length entry, it must be a direct [Integer] giving the
 // number of bytes of stream data as they appear in the file.  Supplying the
@@ -791,10 +794,9 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 
 	// Copy dict so that we don't modify the caller's dict, and inline any
 	// indirect /Filter or /DecodeParms entries.  Inlining serves two
-	// purposes: it gives appendFilter direct Name/Array values to extend
-	// (otherwise a Reference would fall through its default branch and
-	// silently overwrite the caller's chain), and it lets the cheap
-	// /Crypt probe below decide on resolved data.
+	// purposes: it gives insertFilters direct Name/Array values to extend
+	// (otherwise a Reference would be mistaken for an empty chain), and it
+	// lets the cheap /Crypt probe below decide on resolved data.
 	streamDict := maps.Clone(dict)
 	if streamDict == nil {
 		streamDict = Dict{}
@@ -838,14 +840,19 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 	//     dict["Filter"] (e.g. for a copied stream being written through
 	//     Writer.Put).  Per PDF spec §7.4.10 the explicit Crypt filter
 	//     overrides the default StmF.
-	skipDefaultEncrypt := w.refIsPlaintext[ref] || leadingCrypt != nil
-	if !skipDefaultEncrypt {
-		startsWithCrypt, err := filterChainStartsWithCrypt(w, streamDict["Filter"])
-		if err != nil {
-			return nil, err
-		}
-		skipDefaultEncrypt = startsWithCrypt
+	startsWithCrypt, err := filterChainStartsWithCrypt(w, streamDict["Filter"])
+	if err != nil {
+		return nil, err
 	}
+	if startsWithCrypt && len(filters) > 0 {
+		if leadingCrypt != nil {
+			return nil, errors.New("OpenStream: duplicate Crypt filter")
+		}
+		if !leadingCryptIsIdentity(streamDict) {
+			return nil, errors.New("OpenStream: cannot add filters to non-Identity Crypt stream")
+		}
+	}
+	skipDefaultEncrypt := w.refIsPlaintext[ref] || leadingCrypt != nil || startsWithCrypt
 	if w.w.enc != nil && !skipDefaultEncrypt {
 		enc, err := w.w.enc.EncryptStream(ref, streamBody)
 		if err != nil {
@@ -854,18 +861,42 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 		streamBody = enc
 	}
 
-	for _, filter := range filters {
-		streamBody, err = filter.Encode(w.meta.Version, streamBody)
-		if err != nil {
-			return nil, err
+	// Some viewers show a blank for a stream whose chain repeats a
+	// decompression filter, so the chain composed here must not repeat
+	// any filter.  A chain already present in dict is kept as it is, so
+	// that a stream read from a file can be written back unchanged.
+	seen := make(map[Name]bool)
+	switch f := streamDict["Filter"].(type) {
+	case Name:
+		seen[f] = true
+	case Array:
+		for _, x := range f {
+			if n, ok := x.(Name); ok {
+				seen[n] = true
+			}
 		}
+	}
 
+	var names []Name
+	var allParms []Dict
+	for _, filter := range filters {
 		name, parms, err := filter.Info(w.meta.Version)
 		if err != nil {
 			return nil, err
 		}
-		appendFilter(streamDict, name, parms)
+		if seen[name] {
+			return nil, fmt.Errorf("OpenStream: filter %s used twice", name)
+		}
+		seen[name] = true
+
+		streamBody, err = filter.Encode(w.meta.Version, streamBody)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+		allParms = append(allParms, parms)
 	}
+	insertFilters(streamDict, names, allParms)
 
 	w.inStream = true
 	return streamBody, nil
@@ -1067,4 +1098,20 @@ func (w *Writer) sameAsStored(ref Reference, native Native) bool {
 		return false
 	}
 	return Equal(native, old)
+}
+
+// leadingCryptIsIdentity reports whether the /Crypt entry at the start of
+// the direct /Filter chain in streamDict selects the Identity crypt filter.
+func leadingCryptIsIdentity(streamDict Dict) bool {
+	var parms Dict
+	switch p := streamDict["DecodeParms"].(type) {
+	case Dict:
+		parms = p
+	case Array:
+		if len(p) > 0 {
+			parms, _ = p[0].(Dict)
+		}
+	}
+	name, ok := parms["Name"].(Name)
+	return !ok || name == "Identity"
 }
