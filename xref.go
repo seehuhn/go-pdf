@@ -132,6 +132,10 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 					trailer[key] = val
 				}
 			}
+			// The spec treats objects numbered above Size as missing.
+			// The reader deliberately deviates and keeps them, to be
+			// permissive; Size only seeds the next object number for
+			// incremental updates.
 			if size, ok := dict["Size"].(Integer); ok && size > 0 {
 				r.trailerSize = int64(size)
 			}

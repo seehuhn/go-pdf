@@ -18,6 +18,7 @@ package pdf_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -1517,5 +1518,265 @@ func TestUpdateFreeList(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestUpdateVersionZeroKeepsVersion verifies that a replacement catalog with
+// a zero Version inherits the document version instead of lowering it.
+func TestUpdateVersionZeroKeepsVersion(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_4, nil)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{MinimumVersion: pdf.V1_7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	w, err = pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat := *w.GetMeta().Catalog
+	cat.Version = 0
+	cat.PageMode = "UseOutlines"
+	w.GetMeta().Catalog = &cat
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	m := reopen(t, f.Data).GetMeta()
+	if m.Version != pdf.V1_7 || m.Catalog.Version != pdf.V1_7 {
+		t.Errorf("version %s, catalog version %s, want 1.7", m.Version, m.Catalog.Version)
+	}
+	if m.Catalog.PageMode != "UseOutlines" {
+		t.Errorf("PageMode = %q after update", m.Catalog.PageMode)
+	}
+}
+
+// TestUpdateVersionZeroHeaderOnly verifies that a zero Version writes no
+// /Version entry when the document version comes from the header alone.
+func TestUpdateVersionZeroHeaderOnly(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_4, nil)
+	n := len(f.Data)
+	w, err := pdf.NewUpdater(f, int64(n), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat := *w.GetMeta().Catalog
+	cat.PageMode = "UseOutlines"
+	w.GetMeta().Catalog = &cat
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	m := reopen(t, f.Data).GetMeta()
+	if m.Version != pdf.V1_4 || m.Catalog.Version != 0 {
+		t.Errorf("version %s, catalog version %s, want 1.4 and 0", m.Version, m.Catalog.Version)
+	}
+	if bytes.Contains(f.Data[n:], []byte("/Version")) {
+		t.Error("update wrote a /Version entry")
+	}
+}
+
+// TestUpdateVersionLoweredRejected verifies that Close rejects a catalog
+// whose Version is below the document version.
+func TestUpdateVersionLoweredRejected(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_4, nil)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{MinimumVersion: pdf.V1_7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	before := bytes.Clone(f.Data)
+
+	w, err = pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat := *w.GetMeta().Catalog
+	cat.Version = pdf.V1_5
+	w.GetMeta().Catalog = &cat
+	err = w.Close()
+	if _, ok := errors.AsType[*pdf.VersionError](err); !ok {
+		t.Fatalf("Close returned %v, want a VersionError", err)
+	}
+
+	if m := reopen(t, before).GetMeta(); m.Version != pdf.V1_7 {
+		t.Errorf("base version %s, want 1.7", m.Version)
+	}
+}
+
+// TestUpdateUnsupportedVersionKept verifies that a catalog Version the
+// library cannot write itself survives an update that rewrites the catalog.
+func TestUpdateUnsupportedVersionKept(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_4, nil)
+	data := bytes.Clone(base.Data)
+	pagesRef := reopen(t, data).GetMeta().Catalog.Pages
+	prev := lastStartXRef(t, data)
+	size := trailerSize(t, data)
+
+	buf := bytes.NewBuffer(data)
+	pos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root << /Type /Catalog /Pages %d 0 R /Version /1.8 >> /Prev %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size, pagesRef.Number(), prev, pos)
+	f := &memfile.MemFile{Data: buf.Bytes()}
+
+	v18, err := pdf.ParseVersion("1.8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := reopen(t, f.Data).GetMeta(); m.Version != v18 {
+		t.Fatalf("base version %s, want 1.8", m.Version)
+	}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat := *w.GetMeta().Catalog
+	cat.PageMode = "UseOutlines"
+	w.GetMeta().Catalog = &cat
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	m := reopen(t, f.Data).GetMeta()
+	if m.Version != v18 || m.Catalog.Version != v18 {
+		t.Errorf("version %s, catalog version %s, want 1.8", m.Version, m.Catalog.Version)
+	}
+	if m.Catalog.PageMode != "UseOutlines" {
+		t.Errorf("PageMode = %q after update", m.Catalog.PageMode)
+	}
+}
+
+// TestUpdateShortIDRejects20 verifies that a document whose file identifier
+// is shorter than 16 bytes cannot be raised to PDF 2.0.
+func TestUpdateShortIDRejects20(t *testing.T) {
+	id := [][]byte{{1, 2, 3}, {4, 5, 6}}
+	f, _ := newBaseFile(t, pdf.V1_4, &pdf.WriterOptions{ID: id})
+	n := int64(len(f.Data))
+
+	if _, err := pdf.NewUpdater(f, n, &pdf.UpdateOptions{MinimumVersion: pdf.V2_0}); err == nil {
+		t.Error("raising to 2.0 with a short ID succeeded")
+	}
+
+	w, err := pdf.NewUpdater(f, n, &pdf.UpdateOptions{MinimumVersion: pdf.V1_7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := reopen(t, f.Data).GetMeta().ID; len(got) != 2 || !bytes.Equal(got[0], id[0]) {
+		t.Errorf("ID = %x, want ID[0] = %x", got, id[0])
+	}
+}
+
+// TestUpdateShortID1Allows20 verifies that a short ID[1] does not prevent
+// raising a document to PDF 2.0, since the update regenerates it.
+func TestUpdateShortID1Allows20(t *testing.T) {
+	id := [][]byte{bytes.Repeat([]byte{7}, 16), {4, 5, 6}}
+	f, _ := newBaseFile(t, pdf.V1_4, &pdf.WriterOptions{ID: id})
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{MinimumVersion: pdf.V2_0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	m := reopen(t, f.Data).GetMeta()
+	if m.Version != pdf.V2_0 {
+		t.Errorf("version %s, want 2.0", m.Version)
+	}
+	if len(m.ID) != 2 || !bytes.Equal(m.ID[0], id[0]) || len(m.ID[1]) < 16 {
+		t.Errorf("ID = %x, want ID[0] = %x and a 16-byte ID[1]", m.ID, id[0])
+	}
+}
+
+// TestUpdateRaiseBelow14Rejected verifies that NewUpdater rejects raising a
+// document to a version below 1.4, where no /Version entry exists.
+func TestUpdateRaiseBelow14Rejected(t *testing.T) {
+	f, _ := newBaseFile(t, pdf.V1_2, nil)
+	n := len(f.Data)
+	_, err := pdf.NewUpdater(f, int64(n), &pdf.UpdateOptions{MinimumVersion: pdf.V1_3})
+	if _, ok := errors.AsType[*pdf.VersionError](err); !ok {
+		t.Fatalf("NewUpdater returned %v, want a VersionError", err)
+	}
+	if len(f.Data) != n {
+		t.Error("rejected update wrote data")
+	}
+}
+
+// TestUpdateVersionBelow14Dropped verifies that a catalog Version below 1.4
+// is dropped on read, so that an update can rewrite the catalog.
+func TestUpdateVersionBelow14Dropped(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_2, nil)
+	data := bytes.Clone(base.Data)
+	pagesRef := reopen(t, data).GetMeta().Catalog.Pages
+	prev := lastStartXRef(t, data)
+	size := trailerSize(t, data)
+
+	buf := bytes.NewBuffer(data)
+	pos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root << /Type /Catalog /Pages %d 0 R /Version /1.3 >> /Prev %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size, pagesRef.Number(), prev, pos)
+	f := &memfile.MemFile{Data: buf.Bytes()}
+
+	if m := reopen(t, f.Data).GetMeta(); m.Version != pdf.V1_2 || m.Catalog.Version != 0 {
+		t.Fatalf("version %s, catalog version %s, want 1.2 and 0", m.Version, m.Catalog.Version)
+	}
+
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat := *w.GetMeta().Catalog
+	cat.PageMode = "UseOutlines"
+	w.GetMeta().Catalog = &cat
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if m := reopen(t, f.Data).GetMeta(); m.Version != pdf.V1_2 || m.Catalog.PageMode != "UseOutlines" {
+		t.Errorf("version %s, PageMode %q after update", m.Version, m.Catalog.PageMode)
+	}
+}
+
+// TestUpdateVersionBelowHeaderDropped verifies that a catalog Version below
+// the header version is dropped on read, so that an update which leaves the
+// catalog untouched succeeds and writes no /Version entry.
+func TestUpdateVersionBelowHeaderDropped(t *testing.T) {
+	base, _ := newBaseFile(t, pdf.V1_4, nil)
+	data := bytes.Clone(base.Data)
+	pagesRef := reopen(t, data).GetMeta().Catalog.Pages
+	prev := lastStartXRef(t, data)
+	size := trailerSize(t, data)
+
+	buf := bytes.NewBuffer(data)
+	pos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root << /Type /Catalog /Pages %d 0 R /Version /1.2 >> /Prev %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size, pagesRef.Number(), prev, pos)
+	f := &memfile.MemFile{Data: buf.Bytes()}
+
+	if m := reopen(t, f.Data).GetMeta(); m.Version != pdf.V1_4 || m.Catalog.Version != 0 {
+		t.Fatalf("version %s, catalog version %s, want 1.4 and 0", m.Version, m.Catalog.Version)
+	}
+
+	n := len(f.Data)
+	w, err := pdf.NewUpdater(f, int64(n), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(f.Data[n:], []byte("/Version")) {
+		t.Error("update wrote a /Version entry")
+	}
+	if m := reopen(t, f.Data).GetMeta(); m.Version != pdf.V1_4 || m.Catalog.Version != 0 {
+		t.Errorf("version %s, catalog version %s, want 1.4 and 0", m.Version, m.Catalog.Version)
 	}
 }

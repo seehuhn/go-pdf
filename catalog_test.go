@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"bytes"
 	"testing"
 
 	"golang.org/x/text/language"
@@ -43,5 +44,27 @@ func TestDecodeCatalogLang(t *testing.T) {
 		if cat.Lang != tc.want {
 			t.Errorf("%q: got Lang %v, want %v", tc.in, cat.Lang, tc.want)
 		}
+	}
+}
+
+// TestCatalogEncodeUnsupportedVersion verifies that a Version the library
+// cannot write itself is written through unchanged.
+func TestCatalogEncodeUnsupportedVersion(t *testing.T) {
+	w, err := NewWriter(&bytes.Buffer{}, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm := NewResourceManager(w)
+	v18, err := ParseVersion("1.8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Catalog{Pages: w.Alloc(), Version: v18}
+	obj, err := c.Encode(rm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := obj.(Dict)["Version"]; got != Name("1.8") {
+		t.Errorf("Version = %v, want /1.8", got)
 	}
 }

@@ -34,6 +34,9 @@ import (
 type Catalog struct {
 	// Version (optional, PDF 1.4) specifies the PDF version this document
 	// conforms to if later than the version in the file header.
+	//
+	// In an incremental update a zero Version leaves the document version
+	// unchanged, and Close rejects a Version below the document version.
 	Version Version
 
 	// Extensions (optional, PDF 1.7) contains developer extensions information
@@ -291,9 +294,9 @@ func (c *Catalog) Encode(rm *ResourceManager) (Native, error) {
 		if err := CheckVersion(out, "Catalog Version entry", V1_4); err != nil {
 			return nil, err
 		}
-		if c.Version.IsSupported() {
-			dict["Version"] = Name(c.Version.String())
-		}
+		// versions the library cannot write itself, such as 1.8 read
+		// from an existing file, are written through unchanged
+		dict["Version"] = Name(c.Version.String())
 	}
 
 	if c.Extensions != nil {

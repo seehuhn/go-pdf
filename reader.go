@@ -279,8 +279,17 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 			return err
 		}
 	}
-	if r.meta.Catalog.Version > r.meta.Version {
+	// A catalog Version takes effect only if later than the header
+	// version; a lower one is ineffective and is dropped.  The entry
+	// exists only from PDF 1.4 on, so an earlier value cannot be written
+	// back and is dropped as well.
+	switch {
+	case r.meta.Catalog.Version < V1_4:
+		r.meta.Catalog.Version = 0
+	case r.meta.Catalog.Version > r.meta.Version:
 		r.meta.Version = r.meta.Catalog.Version
+	case r.meta.Catalog.Version < r.meta.Version:
+		r.meta.Catalog.Version = 0
 	}
 
 	// /EncryptMetadata=false exempts only the catalog metadata stream;

@@ -41,6 +41,11 @@ type UpdateOptions struct {
 	// version by writing the catalog /Version entry; otherwise the option
 	// has no effect.
 	//
+	// Raising a document below PDF 1.4 fails, since the /Version entry
+	// exists only from PDF 1.4 on.  Raising a document to PDF 2.0 fails
+	// when the original's permanent file identifier is shorter than the
+	// 16 bytes PDF 2.0 requires.
+	//
 	// It is the caller's responsibility to ensure that the original document
 	// is compatible with the resulting version.
 	MinimumVersion Version
@@ -115,6 +120,20 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	}
 
 	v := max(base.meta.Version, opt.MinimumVersion)
+
+	// raising the version needs the catalog /Version entry, which exists
+	// only from PDF 1.4 on
+	if opt.MinimumVersion > base.meta.Version && opt.MinimumVersion < V1_4 {
+		return nil, &VersionError{Operation: "Catalog Version entry", Earliest: V1_4}
+	}
+
+	// PDF 2.0 requires file identifiers of at least 16 bytes.  ID[0] is
+	// permanent and feeds the encryption key, so a short one cannot be
+	// replaced; the document cannot be raised to 2.0.  ID[1] is
+	// regenerated on every update.
+	if v >= V2_0 && len(base.meta.ID) == 2 && len(base.meta.ID[0]) < 16 {
+		return nil, errInvalidID
+	}
 
 	// the highest object number in use, whether listed by /Size or not
 	next := base.trailerSize
@@ -290,19 +309,39 @@ func (w *Writer) closeUpdate() (Dict, error) {
 
 	trailer := w.meta.Trailer.Clone()
 
+	// The catalog of an update must not lower the document version.  A
+	// zero Version means "unchanged" and inherits the entry the document
+	// already has: the base catalog's Version, or MinimumVersion where
+	// that raised the document.
+	cat := w.meta.Catalog
+	switch {
+	case cat.Version == 0:
+		inherited := w.baseCatalog.Version
+		if w.meta.Version > w.base.meta.Version {
+			inherited = w.meta.Version
+		}
+		if inherited != 0 {
+			c := *cat // decoded values are immutable
+			c.Version = inherited
+			cat = &c
+		}
+	case cat.Version < w.meta.Version:
+		return nil, &VersionError{Operation: "Catalog Version entry", Earliest: w.meta.Version}
+	}
+
 	var rootRef Reference
 	switch {
 	case w.meta.Catalog == w.baseCatalog && w.Origin(w.baseCatalog) != 0:
 		rootRef = w.Origin(w.baseCatalog)
 	case w.Origin(w.baseCatalog) != 0:
 		var err error
-		rootRef, err = w.rm.Replace(w.baseCatalog, w.meta.Catalog)
+		rootRef, err = w.rm.Replace(w.baseCatalog, cat)
 		if err != nil {
 			return nil, fmt.Errorf("failed to write document catalog: %w", err)
 		}
 	default:
 		var err error
-		rootRef, err = w.rm.Store(w.meta.Catalog)
+		rootRef, err = w.rm.Store(cat)
 		if err != nil {
 			return nil, fmt.Errorf("failed to write document catalog: %w", err)
 		}
