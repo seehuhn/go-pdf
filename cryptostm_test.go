@@ -21,8 +21,6 @@ import (
 	"compress/zlib"
 	"io"
 	"testing"
-
-	"seehuhn.de/go/membudget"
 )
 
 // TestEncryptedStreamMultipleReads verifies that encrypted streams can be
@@ -648,12 +646,10 @@ func TestCopyEncryptedStreamWithIdentityCrypt(t *testing.T) {
 	}
 }
 
-// TestRawStreamReaderRejectsNonIdentityCrypt verifies that RawStreamReader
-// refuses to emit ciphertext for streams whose /Filter chain begins with a
-// non-Identity Crypt entry: until the library can decrypt /StdCF and named
-// CFs, returning the raw encrypted bytes would silently corrupt any caller
-// that copies them into a destination with different keys.
-func TestRawStreamReaderRejectsNonIdentityCrypt(t *testing.T) {
+// TestRawStreamReaderLeadingCrypt verifies that RawStreamReader decrypts
+// streams whose /Filter chain begins with a /Crypt entry naming a crypt
+// filter of the document, and fails for an unknown name.
+func TestRawStreamReaderLeadingCrypt(t *testing.T) {
 	// Build an encrypted PDF containing a normal Flate-compressed stream.
 	buf := &bytes.Buffer{}
 	w, err := NewWriter(buf, V1_6, &WriterOptions{
@@ -691,94 +687,82 @@ func TestRawStreamReaderRejectsNonIdentityCrypt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Mutate the dict to claim /Crypt /StdCF at filter position 0.  The
-	// on-disk bytes are not actually /StdCF-encrypted, but RawStreamReader
-	// must refuse without inspecting them.
-	for _, tc := range []struct {
-		name        string
-		decodeParms Object
-	}{
-		{"StdCF", Array{Dict{"Name": Name("StdCF")}, nil}},
-		{"NamedCF", Array{Dict{"Name": Name("MyCF")}, nil}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			stream.Dict["Filter"] = Array{Name("Crypt"), Name("FlateDecode")}
-			stream.Dict["DecodeParms"] = tc.decodeParms
-			if _, err := RawStreamReader(r, stream); err == nil {
-				t.Errorf("RawStreamReader: expected error for non-Identity Crypt, got nil")
-			}
-		})
+	readRaw := func() ([]byte, error) {
+		rc, err := RawStreamReader(r, stream)
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		return io.ReadAll(rc)
+	}
+	want, err := readRaw()
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// Sanity check: the unmutated /Crypt /Identity case must still succeed.
+	// The default StmF of the file is /StdCF, and both use the same key,
+	// so a leading /Crypt /StdCF selects the same decryption.
 	stream.Dict["Filter"] = Array{Name("Crypt"), Name("FlateDecode")}
-	stream.Dict["DecodeParms"] = nil // /Identity is the default
+	stream.Dict["DecodeParms"] = Array{Dict{"Name": Name("StdCF")}, nil}
+	got, err := readRaw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("/Crypt /StdCF: got %x, want %x", got, want)
+	}
+
+	stream.Dict["DecodeParms"] = Array{Dict{"Name": Name("MyCF")}, nil}
+	if _, err := RawStreamReader(r, stream); err == nil {
+		t.Error("expected error for unknown crypt filter")
+	}
+
+	// /Identity is the default, and the on-disk bytes are returned as is
+	stream.Dict["DecodeParms"] = nil
 	if _, err := RawStreamReader(r, stream); err != nil {
-		t.Errorf("RawStreamReader: unexpected error for /Crypt /Identity: %v", err)
+		t.Errorf("unexpected error for /Crypt /Identity: %v", err)
 	}
 }
 
-// TestFilterCryptRoundTrip tests the Encode method of filterCrypt for symmetry.
+// TestFilterCryptRoundTrip tests that filterCrypt.decrypt reverses
+// encryptStream.
 func TestFilterCryptRoundTrip(t *testing.T) {
 	testData := []byte("Test data for filter crypt encode/decode round trip.")
 
-	// Create encryption info
 	id := []byte("0123456789ABCDEF")
 	sec, err := createStdSecHandler(id, "test", "test", PermAll, 128, 4, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	enc := &encryptInfo{
-		stmF: &cryptFilter{Cipher: cipherAES, Length: 128},
-		sec:  sec,
-	}
+	cf := &cryptFilter{Cipher: cipherAES, Length: 128}
+	enc := &encryptInfo{stmF: cf, sec: sec}
 
 	ref := NewReference(1, 0)
 	filter := &filterCrypt{enc: enc, ref: ref}
 
-	// Encode (encrypt) the data
 	var encryptedBuf bytes.Buffer
-	encoder, err := filter.Encode(V1_6, &withDummyClose{&encryptedBuf})
+	encoder, err := enc.encryptStream(cf, ref, &withDummyClose{&encryptedBuf})
 	if err != nil {
-		t.Fatalf("Encode failed: %v", err)
+		t.Fatal(err)
 	}
-	_, err = encoder.Write(testData)
-	if err != nil {
-		t.Fatalf("Write failed: %v", err)
+	if _, err := encoder.Write(testData); err != nil {
+		t.Fatal(err)
 	}
-	err = encoder.Close()
-	if err != nil {
-		t.Fatalf("Close failed: %v", err)
+	if err := encoder.Close(); err != nil {
+		t.Fatal(err)
 	}
 
-	// Decode (decrypt) the data
-	decoder, err := filter.Decode(V1_6, bytes.NewReader(encryptedBuf.Bytes()), membudget.New(1<<20))
+	decoder, err := filter.decrypt(cf, bytes.NewReader(encryptedBuf.Bytes()))
 	if err != nil {
-		t.Fatalf("Decode failed: %v", err)
+		t.Fatal(err)
 	}
 	decrypted, err := io.ReadAll(decoder)
 	if err != nil {
-		t.Fatalf("ReadAll failed: %v", err)
+		t.Fatal(err)
 	}
 	decoder.Close()
 
 	if !bytes.Equal(decrypted, testData) {
-		t.Errorf("Round trip failed: got %q, want %q", decrypted, testData)
-	}
-}
-
-// TestFilterCryptInfo verifies that filterCrypt.Info returns empty values
-// since the crypt filter should not appear in the stream dictionary.
-func TestFilterCryptInfo(t *testing.T) {
-	filter := &filterCrypt{}
-	name, dict, err := filter.Info(V1_6)
-	if err != nil {
-		t.Errorf("Info returned error: %v", err)
-	}
-	if name != "" {
-		t.Errorf("Info returned non-empty name: %q", name)
-	}
-	if dict != nil {
-		t.Errorf("Info returned non-nil dict: %v", dict)
+		t.Errorf("round trip failed: got %q, want %q", decrypted, testData)
 	}
 }

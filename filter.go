@@ -68,9 +68,10 @@ import (
 //
 // The Crypt filter is represented by three variants implementing
 // [CryptFilter]: [FilterCryptIdentity], [FilterCryptStandard], and
-// [FilterCryptNamed].  Of these, only [FilterCryptIdentity] is
-// implemented end-to-end; the other two round-trip the wire form but
-// do not yet support encoding or decoding.
+// [FilterCryptNamed].  Decryption and encryption for these is applied
+// by [DecodeStream] and [Writer.OpenStream], which have access to the
+// document's encryption keys; the Encode and Decode methods of
+// [FilterCryptStandard] and [FilterCryptNamed] return an error.
 type Filter interface {
 	// Info returns the name and parameters of the filter,
 	// as they should be written to the PDF file.
@@ -136,7 +137,7 @@ func parseCrypt(param Dict) (CryptFilter, error) {
 		n, ok := val.(Name)
 		if !ok {
 			return nil, &MalformedFileError{
-				Err: fmt.Errorf("Crypt filter: /Name has wrong type %T", val),
+				Err: fmt.Errorf("crypt filter: /Name has wrong type %T", val),
 			}
 		}
 		name = n
@@ -893,12 +894,11 @@ func (FilterCryptIdentity) Decode(_ Version, r io.Reader, _ *membudget.Budget) (
 }
 
 // FilterCryptStandard declares that a stream is encrypted using the
-// document's /StdCF crypt filter, with the file key used as-is (no
-// per-object Algorithm 1 key derivation, per PDF spec §7.4.10).
+// document's /StdCF crypt filter.
 //
-// Encoding and decoding via the filter interface are not yet supported;
-// the type exists so PDF files using /Crypt with /Name /StdCF survive a
-// read/write cycle.
+// The encryption is applied by [Writer.OpenStream] and removed by
+// [DecodeStream] and [RawStreamReader]; the Encode and Decode methods
+// return an error.
 type FilterCryptStandard struct{}
 
 func (FilterCryptStandard) isCryptFilter() {}
@@ -912,26 +912,27 @@ func (FilterCryptStandard) Info(v Version) (Name, Dict, error) {
 }
 
 // Encode implements the [Filter] interface.
+// It always fails; use [Writer.OpenStream] to encrypt a stream.
 func (FilterCryptStandard) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
-	return nil, errors.New("FilterCryptStandard encoding not yet supported")
+	return nil, errCryptEncode
 }
 
 // Decode implements the [Filter] interface.
+// It always fails; use [DecodeStream] to decrypt a stream.
 func (FilterCryptStandard) Decode(_ Version, _ io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
-	return asMalformedFilter(nil, errors.New("FilterCryptStandard decoding not yet supported"))
+	return nil, errCryptDecode
 }
 
 // FilterCryptNamed declares that a stream is encrypted using a named
-// crypt filter from the document's /CF dictionary, with the file key
-// used as-is (no per-object Algorithm 1 key derivation, per PDF spec
-// §7.4.10).
+// crypt filter from the document's /CF dictionary.
 //
 // Name must not be empty, "Identity" (use [FilterCryptIdentity]
-// instead), or "StdCF" (use [FilterCryptStandard] instead).
+// instead), or "StdCF" (use [FilterCryptStandard] instead).  When
+// writing, the name must be present in the /CF dictionary of the file.
 //
-// Encoding and decoding via the filter interface are not yet supported;
-// the type exists so PDF files using a named /Crypt filter survive a
-// read/write cycle.
+// The encryption is applied by [Writer.OpenStream] and removed by
+// [DecodeStream] and [RawStreamReader]; the Encode and Decode methods
+// return an error.
 type FilterCryptNamed struct {
 	Name Name
 }
@@ -955,13 +956,32 @@ func (f FilterCryptNamed) Info(v Version) (Name, Dict, error) {
 }
 
 // Encode implements the [Filter] interface.
+// It always fails; use [Writer.OpenStream] to encrypt a stream.
 func (FilterCryptNamed) Encode(_ Version, _ io.WriteCloser) (io.WriteCloser, error) {
-	return nil, errors.New("FilterCryptNamed encoding not yet supported")
+	return nil, errCryptEncode
 }
 
 // Decode implements the [Filter] interface.
+// It always fails; use [DecodeStream] to decrypt a stream.
 func (FilterCryptNamed) Decode(_ Version, _ io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
-	return asMalformedFilter(nil, errors.New("FilterCryptNamed decoding not yet supported"))
+	return nil, errCryptDecode
+}
+
+var (
+	errCryptEncode = errors.New("crypt filter is applied by Writer.OpenStream")
+	errCryptDecode = errors.New("crypt filter is applied by DecodeStream")
+)
+
+// cryptFilterName returns the /CF name selected by cf.
+func cryptFilterName(cf CryptFilter) Name {
+	switch cf := cf.(type) {
+	case FilterCryptStandard:
+		return "StdCF"
+	case FilterCryptNamed:
+		return cf.Name
+	default:
+		return "Identity"
+	}
 }
 
 // checkVersionV is the equivalent of [CheckVersion] for use
@@ -1292,19 +1312,7 @@ func insertFilters(streamDict Dict, names []Name, parms []Dict) {
 		return
 	}
 
-	var oldNames []Object
-	switch f := streamDict["Filter"].(type) {
-	case Name:
-		oldNames = []Object{f}
-	case Array:
-		oldNames = f
-	}
-
-	var oldParms []Dict
-	for _, x := range alignDecodeParms(streamDict["Filter"], streamDict["DecodeParms"]) {
-		d, _ := x.(Dict)
-		oldParms = append(oldParms, d)
-	}
+	oldNames, oldParms := filterChain(streamDict)
 
 	// split off a leading /Crypt, which must remain first
 	k := 0
@@ -1318,6 +1326,52 @@ func insertFilters(streamDict Dict, names []Name, parms []Dict) {
 	}
 	allNames := slices.Concat(oldNames[:k], newNames, oldNames[k:])
 	allParms := slices.Concat(oldParms[:k], parms, oldParms[k:])
+	setFilterChain(streamDict, allNames, allParms)
+}
+
+// stripLeadingCrypt removes a /Crypt entry at the start of the /Filter
+// chain in streamDict, together with its /DecodeParms entry.  Existing
+// /Filter and /DecodeParms values must be direct.
+func stripLeadingCrypt(streamDict Dict) {
+	names, parms := filterChain(streamDict)
+	if len(names) == 0 || names[0] != Name("Crypt") {
+		return
+	}
+	setFilterChain(streamDict, names[1:], parms[1:])
+}
+
+// filterChain returns the entries of the direct /Filter chain in
+// streamDict, together with one /DecodeParms dict per entry (nil where
+// none is given).
+func filterChain(streamDict Dict) ([]Object, []Dict) {
+	var names []Object
+	switch f := streamDict["Filter"].(type) {
+	case Name:
+		names = []Object{f}
+	case Array:
+		names = f
+	}
+
+	var parms []Dict
+	for _, x := range alignDecodeParms(streamDict["Filter"], streamDict["DecodeParms"]) {
+		d, _ := x.(Dict)
+		parms = append(parms, d)
+	}
+	return names, parms
+}
+
+// setFilterChain sets the /Filter and /DecodeParms entries of streamDict,
+// in the most compact form.  The slices allNames and allParms must have
+// equal length.
+func setFilterChain(streamDict Dict, allNames []Object, allParms []Dict) {
+	switch len(allNames) {
+	case 0:
+		delete(streamDict, "Filter")
+	case 1:
+		streamDict["Filter"] = allNames[0]
+	default:
+		streamDict["Filter"] = Array(allNames)
+	}
 
 	needsParms := false
 	for _, d := range allParms {
@@ -1325,12 +1379,6 @@ func insertFilters(streamDict Dict, names []Name, parms []Dict) {
 			needsParms = true
 			break
 		}
-	}
-
-	if len(allNames) == 1 {
-		streamDict["Filter"] = allNames[0]
-	} else {
-		streamDict["Filter"] = Array(allNames)
 	}
 
 	delete(streamDict, "DecodeParms")

@@ -26,6 +26,7 @@ import (
 	"maps"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 )
 
@@ -36,6 +37,24 @@ type WriterOptions struct {
 	UserPassword    string
 	OwnerPassword   string
 	UserPermissions Perm
+
+	// EncryptStreams, EncryptStrings and EncryptEmbeddedFiles select the
+	// encryption method for streams, for strings, and for embedded file
+	// streams.  The zero value, CryptDefault, encrypts the data with the
+	// strongest cipher the PDF version allows.  Any other value requires a
+	// password and PDF 1.6 or later, and at least one of the three fields
+	// must differ from CryptIdentity.  CryptRC4 is not available in
+	// PDF 2.0.
+	//
+	// If streams and strings use different methods, object streams are not
+	// used, since strings inside an object stream are encrypted only as part
+	// of the stream.
+	//
+	// Some readers cannot open files in which streams and strings use
+	// different methods.
+	EncryptStreams       CryptMethod
+	EncryptStrings       CryptMethod
+	EncryptEmbeddedFiles CryptMethod
 
 	// DocumentMetadata (optional) is the document-level XMP metadata stream
 	// embedded in the document catalog.  If DocumentMetadata.Plaintext is
@@ -193,6 +212,21 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 			return nil, &VersionError{Operation: "plaintext document metadata", Earliest: V1_6}
 		}
 	}
+	methods := []CryptMethod{opt.EncryptStreams, opt.EncryptStrings, opt.EncryptEmbeddedFiles}
+	if slices.ContainsFunc(methods, func(m CryptMethod) bool { return m != CryptDefault }) {
+		if !useEncryption {
+			return nil, errors.New("encryption method set without a password")
+		}
+		if v < V1_6 {
+			return nil, &VersionError{Operation: "per-class encryption methods", Earliest: V1_6}
+		}
+		if !slices.ContainsFunc(methods, func(m CryptMethod) bool { return m != CryptIdentity }) {
+			return nil, errors.New("encryption enabled but all data stored as plaintext")
+		}
+		if v >= V2_0 && slices.Contains(methods, CryptRC4) {
+			return nil, errors.New("RC4 encryption not available in PDF 2.0")
+		}
+	}
 	needID := opt.ID != nil || useEncryption || v >= V2_0
 	if needID && v == V1_0 {
 		return nil, &VersionError{Operation: "PDF file identifiers", Earliest: V1_1}
@@ -232,44 +266,69 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 
 	var enc *encryptInfo
 	if useEncryption {
-		var cf *cryptFilter
-		var V int
-		if v >= V2_0 {
-			cf = &cryptFilter{
-				Cipher: cipherAES,
-				Length: 256,
-			}
-			V = 5
-		} else if v >= V1_6 {
-			cf = &cryptFilter{
-				Cipher: cipherAES,
-				Length: 128,
-			}
-			V = 4
-		} else if v >= V1_4 {
-			cf = &cryptFilter{
-				Cipher: cipherRC4,
-				Length: 128,
-			}
-			V = 2
-		} else {
-			cf = &cryptFilter{
-				Cipher: cipherRC4,
-				Length: 40,
-			}
-			V = 1
+		var V, length int
+		switch {
+		case v >= V2_0:
+			V, length = 5, 256
+		case v >= V1_6:
+			V, length = 4, 128
+		case v >= V1_4:
+			V, length = 2, 128
+		default:
+			V, length = 1, 40
 		}
 		sec, err := createStdSecHandler(ID[0], opt.UserPassword,
-			opt.OwnerPassword, opt.UserPermissions, cf.Length, V,
+			opt.OwnerPassword, opt.UserPermissions, length, V,
 			unencryptedMetadata)
 		if err != nil {
 			return nil, err
 		}
-		enc = &encryptInfo{
-			sec:  sec,
-			stmF: cf,
-			strF: cf,
-			efF:  cf,
+		enc = &encryptInfo{sec: sec}
+		if V >= 4 {
+			// one /CF entry per cipher, named in the order streams,
+			// strings, embedded files
+			enc.cf = make(map[Name]*cryptFilter)
+			byCipher := make(map[cipherType]*cryptFilter)
+			resolve := func(m CryptMethod) *cryptFilter {
+				var cipher cipherType
+				switch m {
+				case CryptIdentity:
+					return nil
+				case CryptRC4:
+					cipher = cipherRC4
+				default:
+					cipher = cipherAES
+				}
+				if cf, ok := byCipher[cipher]; ok {
+					return cf
+				}
+				name := Name("StdCF")
+				if len(enc.cf) > 0 {
+					name = "StdCF2"
+				}
+				cf := &cryptFilter{
+					Name:      name,
+					Cipher:    cipher,
+					Length:    length,
+					AuthEvent: "DocOpen",
+				}
+				byCipher[cipher] = cf
+				enc.cf[name] = cf
+				return cf
+			}
+			enc.stmF = resolve(opt.EncryptStreams)
+			enc.strF = resolve(opt.EncryptStrings)
+			enc.efF = resolve(opt.EncryptEmbeddedFiles)
+			if enc.efF != nil && enc.efF != enc.stmF && enc.efF != enc.strF {
+				// a filter used only for embedded files needs the
+				// password only when an embedded file is opened
+				enc.efF.AuthEvent = "EFOpen"
+			}
+		} else {
+			cf := &cryptFilter{Cipher: cipherRC4, Length: length}
+			enc.stmF = cf
+			enc.strF = cf
+			enc.efF = cf
 		}
 
 		encryptDict, err := enc.AsDict(v)
@@ -291,6 +350,9 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	}
 
 	outOpt := outputOptionsFor(v, opt.HumanReadable)
+	if !enc.objStmSafe() {
+		outOpt &= ^optObjStm
+	}
 
 	pdf := &Writer{
 		meta: MetaInfo{
@@ -420,8 +482,12 @@ func (w *Writer) closeNew() (Dict, error) {
 // end-of-file marker, then flushes and, for files opened by Create or
 // Update, closes the underlying file.
 func (w *Writer) writeXRefSection(trailer Dict) error {
-	// don't encrypt the encryption dictionary and the xref dict
+	// the encryption dictionary and the xref dict are not encrypted; the
+	// encryptor is restored afterwards, since the Writer still serves as a
+	// Getter once closed
+	enc := w.w.enc
 	w.w.enc = nil
+	defer func() { w.w.enc = enc }()
 
 	xRefPos := w.w.pos
 	trailer["Size"] = Integer(w.nextRef)
@@ -579,6 +645,10 @@ func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
 }
 
 // Put writes an indirect object to the PDF file, using the given reference.
+//
+// A [*Stream] read from an encrypted file can be written only to the same
+// file, for example in an incremental update.  Use a [Copier] to transfer
+// streams between files.
 func (w *Writer) Put(ref Reference, obj Object) error {
 	if w.inStream {
 		w.afterStream = append(w.afterStream, allocatedObject{ref, obj})
@@ -586,11 +656,29 @@ func (w *Writer) Put(ref Reference, obj Object) error {
 	}
 
 	if stm, isStream := obj.(*Stream); isStream {
-		ws, err := w.OpenStream(ref, stm.Dict)
+		// The body of a stream read from an encrypted file is ciphertext.
+		// If the stream comes from this file (read through w, or from the
+		// base file of an update), it is decrypted here and encrypted again
+		// for ref; a leading /Crypt entry stays in the dictionary and
+		// selects the same filter on both sides.
+		var body io.Reader = stm.NewReader()
+		if stm.crypt != nil {
+			if stm.crypt.enc != w.w.enc {
+				return errors.New("Writer.Put: stream from another encrypted file, use a Copier")
+			}
+			rc, err := RawStreamReader(w, stm)
+			if err != nil {
+				return err
+			}
+			defer rc.Close()
+			body = rc
+		}
+
+		ws, err := w.openStream(ref, stm.Dict, stm.embeddedFile, nil)
 		if err != nil {
 			return err
 		}
-		_, err = io.Copy(ws, stm.NewReader())
+		_, err = io.Copy(ws, body)
 		if err != nil {
 			return err
 		}
@@ -760,43 +848,46 @@ func checkCompressed(refs []Reference, objects []Object) error {
 // by then, so the output must be discarded if this happens.
 //
 // If /Length is absent, the writer determines the value itself.
+//
+// A stream with /Type /EmbeddedFile in dict is treated as an embedded file
+// stream, see [Writer.OpenEmbeddedFileStream].
 func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
+	return w.openStream(ref, dict, false, filters)
+}
+
+// OpenEmbeddedFileStream is like [Writer.OpenStream], but marks the stream as
+// an embedded file stream.  In an encrypted file, such streams are encrypted
+// using the crypt filter for embedded files rather than the one for other
+// streams.  Use this method for streams referenced from the /EF or /RF entry
+// of a file specification dictionary.
+func (w *Writer) OpenEmbeddedFileStream(ref Reference, dict Dict, filters ...Filter) (io.WriteCloser, error) {
+	return w.openStream(ref, dict, true, filters)
+}
+
+func (w *Writer) openStream(ref Reference, dict Dict, embeddedFile bool, filters []Filter) (io.WriteCloser, error) {
 	if w.inStream {
 		return nil, errors.New("OpenStream() while stream is open")
 	}
 
 	// Per PDF spec §7.4.10, a Crypt filter must be the first entry in
-	// the /Filter array.  Reject API misuse and detect a leading Crypt
-	// filter so the document-level encryption wrap can be skipped (the
-	// CryptFilter is responsible for that stream's encryption recipe).
-	// Bail before setXRef so a not-yet-supported CryptFilter does not
-	// leave a dirty xref entry pointing at an uncreated stream.
-	var leadingCrypt CryptFilter
+	// the /Filter array.
+	var cryptName Name
 	for i, f := range filters {
 		cf, isCrypt := f.(CryptFilter)
 		if !isCrypt {
 			continue
 		}
 		if i != 0 {
-			return nil, errors.New("Crypt filter must be the first filter in OpenStream")
+			return nil, errors.New("crypt filter must be the first filter in OpenStream")
 		}
-		if _, ok := cf.(FilterCryptIdentity); !ok {
-			return nil, fmt.Errorf("OpenStream: %T encoding is not yet supported", cf)
-		}
-		leadingCrypt = cf
+		cryptName = cryptFilterName(cf)
 	}
-
-	err := w.setXRef(ref, &xRefEntry{Pos: w.w.pos, Generation: ref.Generation()})
-	if err != nil {
-		return nil, fmt.Errorf("Writer.OpenStream: %w", err)
-	}
-	w.w.ref = ref
 
 	// Copy dict so that we don't modify the caller's dict, and inline any
 	// indirect /Filter or /DecodeParms entries.  Inlining serves two
 	// purposes: it gives insertFilters direct Name/Array values to extend
 	// (otherwise a Reference would be mistaken for an empty chain), and it
-	// lets the cheap /Crypt probe below decide on resolved data.
+	// lets leadingCryptName below decide on resolved data.
 	streamDict := maps.Clone(dict)
 	if streamDict == nil {
 		streamDict = Dict{}
@@ -813,52 +904,48 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 		streamDict[key] = inlined
 	}
 
-	// A caller-supplied /Length must be a value we can check against the data
-	// once it has been written.  A [Placeholder] is rejected along with every
-	// other type: the writer installs its own below, and one supplied here
-	// could do no better.
-	var length *Placeholder
-	if lengthObj, exists := streamDict["Length"]; !exists {
-		length = NewPlaceholder(w, 12)
-		streamDict["Length"] = length
-	} else if _, isInteger := lengthObj.(Integer); !isInteger {
-		return nil, fmt.Errorf("Writer.OpenStream: /Length is %T, want Integer", lengthObj)
-	}
-
-	var streamBody io.WriteCloser = &streamWriter{
-		parent:     w,
-		streamDict: streamDict,
-		ref:        ref,
-		length:     length,
-	}
-
-	// Skip the document-level encryption wrap when:
-	//   - the writer has explicitly marked this ref as plaintext (catalog
-	//     metadata stream when /EncryptMetadata false), or
-	//   - the stream's wire form declares a Crypt filter at position 0 of
-	//     /Filter — either passed in via filters... or already present in
-	//     dict["Filter"] (e.g. for a copied stream being written through
-	//     Writer.Put).  Per PDF spec §7.4.10 the explicit Crypt filter
-	//     overrides the default StmF.
-	startsWithCrypt, err := filterChainStartsWithCrypt(w, streamDict["Filter"])
+	// A Crypt filter may also be present in dict already, e.g. for a
+	// copied stream being written through Writer.Put.
+	dictCrypt, err := leadingCryptName(streamDict)
 	if err != nil {
 		return nil, err
 	}
-	if startsWithCrypt && len(filters) > 0 {
-		if leadingCrypt != nil {
+	enc := w.w.enc
+	if dictCrypt != "" {
+		if cryptName != "" {
 			return nil, errors.New("OpenStream: duplicate Crypt filter")
 		}
-		if !leadingCryptIsIdentity(streamDict) {
-			return nil, errors.New("OpenStream: cannot add filters to non-Identity Crypt stream")
+		if enc == nil && dictCrypt != "Identity" {
+			// An unencrypted file has no named crypt filters.  The reader
+			// drops such an entry from a direct filter chain; an indirect
+			// chain is only resolved here, so the entry is dropped now.
+			stripLeadingCrypt(streamDict)
+		} else {
+			cryptName = dictCrypt
 		}
 	}
-	skipDefaultEncrypt := w.refIsPlaintext[ref] || leadingCrypt != nil || startsWithCrypt
-	if w.w.enc != nil && !skipDefaultEncrypt {
-		enc, err := w.w.enc.EncryptStream(ref, streamBody)
-		if err != nil {
-			return nil, err
+
+	// The crypt filter for this stream: an explicit Crypt filter overrides
+	// the document default.  Errors are reported before setXRef, so that
+	// no xref entry is left pointing at an uncreated stream.
+	var cf *cryptFilter
+	switch {
+	case enc == nil:
+		if cryptName != "" && cryptName != "Identity" {
+			return nil, fmt.Errorf("OpenStream: crypt filter %s in unencrypted file", cryptName)
 		}
-		streamBody = enc
+	case w.refIsPlaintext[ref]:
+		// catalog metadata stream with /EncryptMetadata false
+	case cryptName == "Identity":
+		// stored as plaintext
+	case cryptName != "":
+		cf = enc.cf[cryptName]
+		if cf == nil {
+			return nil, fmt.Errorf("OpenStream: unknown crypt filter %s", cryptName)
+		}
+	default:
+		embeddedFile = embeddedFile || streamDict["Type"] == Name("EmbeddedFile")
+		cf = enc.streamCF(embeddedFile)
 	}
 
 	// Some viewers show a blank for a stream whose chain repeats a
@@ -888,13 +975,55 @@ func (w *Writer) OpenStream(ref Reference, dict Dict, filters ...Filter) (io.Wri
 			return nil, fmt.Errorf("OpenStream: filter %s used twice", name)
 		}
 		seen[name] = true
+		names = append(names, name)
+		allParms = append(allParms, parms)
+	}
 
+	// A caller-supplied /Length must be a value we can check against the data
+	// once it has been written.  A [Placeholder] is rejected along with every
+	// other type: the writer installs its own below, and one supplied here
+	// could do no better.
+	var length *Placeholder
+	if lengthObj, exists := streamDict["Length"]; !exists {
+		length = NewPlaceholder(w, 12)
+		streamDict["Length"] = length
+	} else if _, isInteger := lengthObj.(Integer); !isInteger {
+		return nil, fmt.Errorf("Writer.OpenStream: /Length is %T, want Integer", lengthObj)
+	}
+
+	err = w.setXRef(ref, &xRefEntry{Pos: w.w.pos, Generation: ref.Generation()})
+	if err != nil {
+		return nil, fmt.Errorf("Writer.OpenStream: %w", err)
+	}
+	w.w.ref = ref
+
+	var streamBody io.WriteCloser = &streamWriter{
+		parent:     w,
+		streamDict: streamDict,
+		ref:        ref,
+		length:     length,
+	}
+	if cf != nil {
+		// For V 4, PDF spec §7.4.10 asks for the file key as is when a
+		// stream has its own Crypt filter.  Files in practice are encrypted
+		// with the per-object key of Algorithm 1, and readers expect that,
+		// so the per-object key is used here too.  For V 5 the two agree.
+		streamBody, err = enc.encryptStream(cf, ref, streamBody)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Crypt filters are applied by the encryption wrap above; their
+	// Encode methods refuse to run.
+	for _, filter := range filters {
+		if _, isCrypt := filter.(CryptFilter); isCrypt {
+			continue
+		}
 		streamBody, err = filter.Encode(w.meta.Version, streamBody)
 		if err != nil {
 			return nil, err
 		}
-		names = append(names, name)
-		allParms = append(allParms, parms)
 	}
 	insertFilters(streamDict, names, allParms)
 
@@ -1100,18 +1229,25 @@ func (w *Writer) sameAsStored(ref Reference, native Native) bool {
 	return Equal(native, old)
 }
 
-// leadingCryptIsIdentity reports whether the /Crypt entry at the start of
-// the direct /Filter chain in streamDict selects the Identity crypt filter.
-func leadingCryptIsIdentity(streamDict Dict) bool {
-	var parms Dict
-	switch p := streamDict["DecodeParms"].(type) {
-	case Dict:
-		parms = p
-	case Array:
-		if len(p) > 0 {
-			parms, _ = p[0].(Dict)
-		}
+// leadingCryptName returns the name of the crypt filter selected by a /Crypt
+// entry at the start of the direct /Filter chain in streamDict.  The result
+// is Identity if the entry has no /Name, and empty if the chain does not
+// start with /Crypt.  A /Name which is not a name is an error.
+func leadingCryptName(streamDict Dict) (Name, error) {
+	names, parms := filterChain(streamDict)
+	if len(names) == 0 || names[0] != Name("Crypt") {
+		return "", nil
 	}
-	name, ok := parms["Name"].(Name)
-	return !ok || name == "Identity"
+	val := parms[0]["Name"]
+	if val == nil {
+		return "Identity", nil
+	}
+	name, ok := val.(Name)
+	if !ok {
+		return "", fmt.Errorf("crypt filter: /Name is %T, want Name", val)
+	}
+	if name == "" {
+		return "Identity", nil
+	}
+	return name, nil
 }

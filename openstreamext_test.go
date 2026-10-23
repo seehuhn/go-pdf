@@ -222,7 +222,9 @@ func TestOpenStreamExistingFilters(t *testing.T) {
 }
 
 func TestOpenStreamCryptErrors(t *testing.T) {
-	t.Run("non-identity crypt", func(t *testing.T) {
+	t.Run("named crypt in unencrypted file", func(t *testing.T) {
+		// a named crypt filter has no meaning without encryption: a
+		// dict entry is dropped, an explicit filter is refused
 		w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 		dict := pdf.Dict{
 			"Filter": pdf.Array{pdf.Name("Crypt"), pdf.Name("FlateDecode")},
@@ -230,9 +232,41 @@ func TestOpenStreamCryptErrors(t *testing.T) {
 				pdf.Dict{"Name": pdf.Name("StdCF")}, nil,
 			},
 		}
-		_, err := w.OpenStream(w.Alloc(), dict, pdf.FilterASCII85{})
+		ref := w.Alloc()
+		s, err := w.OpenStream(ref, dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Close(); err != nil {
+			t.Fatal(err)
+		}
+		stm, err := pdf.NewCursor(w).Stream(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(pdf.Name("FlateDecode"), stm.Dict["Filter"]); diff != "" {
+			t.Errorf("wrong /Filter (-want +got):\n%s", diff)
+		}
+		if _, ok := stm.Dict["DecodeParms"]; ok {
+			t.Errorf("unexpected /DecodeParms %v", stm.Dict["DecodeParms"])
+		}
+
+		_, err = w.OpenStream(w.Alloc(), nil, pdf.FilterCryptStandard{})
 		if err == nil {
 			t.Error("expected error")
+		}
+	})
+	t.Run("crypt name not a name", func(t *testing.T) {
+		for _, opt := range []*pdf.WriterOptions{nil, {UserPassword: "u"}} {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, opt)
+			dict := pdf.Dict{
+				"Filter":      pdf.Name("Crypt"),
+				"DecodeParms": pdf.Dict{"Name": pdf.Integer(1)},
+			}
+			_, err := w.OpenStream(w.Alloc(), dict)
+			if err == nil {
+				t.Error("expected error")
+			}
 		}
 	})
 	t.Run("duplicate crypt", func(t *testing.T) {
@@ -280,4 +314,52 @@ func TestOpenStreamDuplicateFilter(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
+
+// TestOpenStreamDictCryptAddFilter checks that a filter can be added to a
+// stream whose dict already selects a named crypt filter.
+func TestOpenStreamDictCryptAddFilter(t *testing.T) {
+	data := []byte("some stream data, some stream data, some stream data")
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, &pdf.WriterOptions{UserPassword: "u"})
+	dict := pdf.Dict{
+		"Filter":      pdf.Name("Crypt"),
+		"DecodeParms": pdf.Dict{"Name": pdf.Name("StdCF")},
+	}
+	ref := w.Alloc()
+	body, err := w.OpenStream(ref, dict, pdf.FilterFlate{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := body.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	obj, err := pdf.Resolve(w, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stm := obj.(*pdf.Stream)
+	wantFilter := pdf.Array{pdf.Name("Crypt"), pdf.Name("FlateDecode")}
+	if diff := cmp.Diff(wantFilter, stm.Dict["Filter"]); diff != "" {
+		t.Errorf("wrong /Filter (-want +got):\n%s", diff)
+	}
+	wantParms := pdf.Array{pdf.Dict{"Name": pdf.Name("StdCF")}, nil}
+	if diff := cmp.Diff(wantParms, stm.Dict["DecodeParms"]); diff != "" {
+		t.Errorf("wrong /DecodeParms (-want +got):\n%s", diff)
+	}
+
+	r, err := pdf.DecodeStream(w, nil, stm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, data) {
+		t.Errorf("round trip failed: got %q, want %q", got, data)
+	}
 }

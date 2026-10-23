@@ -24,9 +24,14 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
+// uniform returns an Encryption which uses method m for all data.
+func uniform(m pdf.CryptMethod, keyLength int) *pdf.Encryption {
+	return &pdf.Encryption{Streams: m, Strings: m, EmbeddedFiles: m, KeyLength: keyLength}
+}
+
 // TestEncryptionString covers the documented String() formats:
-// "None" for nil, "RC4 (N-bit)" for RC4, "<cipher>-N" for non-RC4
-// ciphers, and "Unknown" when the cipher is unset.
+// "None" for nil, the cipher label when all data uses the same method,
+// and the per-class form otherwise.
 func TestEncryptionString(t *testing.T) {
 	cases := []struct {
 		name string
@@ -34,11 +39,24 @@ func TestEncryptionString(t *testing.T) {
 		want string
 	}{
 		{"Nil", nil, "None"},
-		{"RC4_40", &pdf.Encryption{Cipher: "RC4", KeyLength: 40}, "RC4 (40-bit)"},
-		{"RC4_128", &pdf.Encryption{Cipher: "RC4", KeyLength: 128}, "RC4 (128-bit)"},
-		{"AES_128", &pdf.Encryption{Cipher: "AES", KeyLength: 128}, "AES-128"},
-		{"AES_256", &pdf.Encryption{Cipher: "AES", KeyLength: 256}, "AES-256"},
+		{"RC4_40", uniform(pdf.CryptRC4, 40), "RC4 (40-bit)"},
+		{"RC4_128", uniform(pdf.CryptRC4, 128), "RC4 (128-bit)"},
+		{"AES_128", uniform(pdf.CryptAES, 128), "AES-128"},
+		{"AES_256", uniform(pdf.CryptAES, 256), "AES-256"},
+		{"Identity", uniform(pdf.CryptIdentity, 0), "plaintext"},
 		{"Unknown", &pdf.Encryption{}, "Unknown"},
+		{"Mixed", &pdf.Encryption{
+			Streams:       pdf.CryptAES,
+			Strings:       pdf.CryptRC4,
+			EmbeddedFiles: pdf.CryptIdentity,
+			KeyLength:     128,
+		}, "AES-128 streams, RC4 (128-bit) strings, plaintext embedded files"},
+		{"AttachmentsOnly", &pdf.Encryption{
+			Streams:       pdf.CryptIdentity,
+			Strings:       pdf.CryptIdentity,
+			EmbeddedFiles: pdf.CryptAES,
+			KeyLength:     256,
+		}, "plaintext streams, plaintext strings, AES-256 embedded files"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -60,10 +78,10 @@ func TestEncryptionMetaInfo(t *testing.T) {
 		version pdf.Version
 		want    pdf.Encryption
 	}{
-		{"V1_3_RC4_40", pdf.V1_3, pdf.Encryption{Cipher: "RC4", KeyLength: 40}},
-		{"V1_5_RC4_128", pdf.V1_5, pdf.Encryption{Cipher: "RC4", KeyLength: 128}},
-		{"V1_7_AES_128", pdf.V1_7, pdf.Encryption{Cipher: "AES", KeyLength: 128}},
-		{"V2_0_AES_256", pdf.V2_0, pdf.Encryption{Cipher: "AES", KeyLength: 256}},
+		{"V1_3_RC4_40", pdf.V1_3, *uniform(pdf.CryptRC4, 40)},
+		{"V1_5_RC4_128", pdf.V1_5, *uniform(pdf.CryptRC4, 128)},
+		{"V1_7_AES_128", pdf.V1_7, *uniform(pdf.CryptAES, 128)},
+		{"V2_0_AES_256", pdf.V2_0, *uniform(pdf.CryptAES, 256)},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

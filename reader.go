@@ -195,33 +195,43 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 
 	IDObj := trailer["ID"]
 	r.meta.ID = getIDDirect(IDObj)
+	r.meta.Permissions = PermAll
 	if encObj, ok := trailer["Encrypt"]; ok {
-		// If the file is encrypted, ID is guaranteed to be a direct object.
-		if r.meta.ID == nil {
-			return errors.New("file is encrypted, but no ID found")
-		}
 		if ref, ok := encObj.(Reference); ok {
 			r.unencrypted[ref] = true
 		}
-		var perm Perm
-		var err error
-		r.enc, perm, err = r.parseEncryptDict(encObj, opt.Password)
+		// A null, dangling or non-dictionary /Encrypt means the file is
+		// not encrypted.
+		encDict, err := Optional(NewCursor(r).Dict(encObj))
 		if err != nil {
-			// An /Encrypt entry we cannot parse means we cannot decrypt
-			// the file's streams, so the rest of the document would be
-			// unreadable.  Surface the error regardless of
-			// ErrorHandling — the file is unsalvageable in any mode.
-			// AuthenticationError is returned unwrapped so callers can
-			// detect it cleanly via errors.As.
-			if _, ok := errors.AsType[*AuthenticationError](err); ok {
-				return err
-			}
 			return Wrap(err, "encryption dictionary")
 		}
-		r.meta.Permissions = perm
-		r.meta.Encryption = r.enc.publicInfo()
-	} else {
-		r.meta.Permissions = PermAll
+		if encDict == nil {
+			// drop the entry, so that an update cannot reuse a dangling
+			// object number for an unrelated object
+			delete(trailer, "Encrypt")
+		} else {
+			// If the file is encrypted, ID is guaranteed to be a direct object.
+			if r.meta.ID == nil {
+				return errors.New("file is encrypted, but no ID found")
+			}
+			var perm Perm
+			r.enc, perm, err = r.parseEncryptDict(encDict, opt.Password)
+			if err != nil {
+				// An /Encrypt entry we cannot parse means we cannot decrypt
+				// the file's streams, so the rest of the document would be
+				// unreadable.  Surface the error regardless of
+				// ErrorHandling — the file is unsalvageable in any mode.
+				// AuthenticationError is returned unwrapped so callers can
+				// detect it cleanly via errors.As.
+				if _, ok := errors.AsType[*AuthenticationError](err); ok {
+					return err
+				}
+				return Wrap(err, "encryption dictionary")
+			}
+			r.meta.Permissions = perm
+			r.meta.Encryption = r.enc.publicInfo()
+		}
 	}
 	if r.meta.ID == nil && IDObj != nil {
 		// If the file is not encrypted, ID may be an indirect object.

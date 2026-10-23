@@ -88,34 +88,32 @@ func getIntegerNoObjStm(r Getter, obj Object) (Integer, error) {
 //
 // Each call creates a fresh reader, so streams can be read multiple times.
 //
-// Streams whose filter chain begins with an explicit /Crypt entry naming a
-// CF other than /Identity (e.g. /StdCF, or a custom /CF entry) cannot be
-// decrypted yet: the function returns an error rather than silently
-// emitting ciphertext.  Encoding/decoding such streams is Phase 2 work.
+// A leading /Crypt entry of the filter chain is not removed from the stream
+// dictionary, but its decryption is applied.
 func RawStreamReader(r Getter, x *Stream) (io.ReadCloser, error) {
-	recipe, err := streamCryptRecipe(r, x)
+	recipe, cfName, err := streamCryptRecipe(r, x)
 	if err != nil {
 		return nil, err
 	}
-	out := io.NopCloser(x.NewReader())
+	raw := x.NewReader()
 	switch recipe {
 	case cryptNone, cryptIdentity:
-		return out, nil
+		return io.NopCloser(raw), nil
 	case cryptDefault:
-		v := GetVersion(r)
-		budget := membudget.New(limits.StreamBudget(x.length))
-		return x.crypt.Decode(v, out, budget)
-	case cryptUnsupportedCF:
-		return nil, errors.New(
-			"RawStreamReader: stream uses non-Identity /Crypt filter; not yet supported")
+		return x.crypt.decrypt(x.crypt.enc.streamCF(x.embeddedFile), raw)
+	case cryptNamed:
+		cf, err := x.crypt.enc.namedCF(cfName)
+		if err != nil {
+			return nil, err
+		}
+		return x.crypt.decrypt(cf, raw)
 	}
 	panic("unreachable")
 }
 
 // cryptRecipe describes how a stream's on-disk bytes relate to its
 // post-decryption form, controlling whether [RawStreamReader] needs to
-// apply [filterCrypt] decryption and whether [Copier] can install the
-// source bytes verbatim.
+// decrypt and whether [Copier] can install the source bytes verbatim.
 type cryptRecipe int
 
 const (
@@ -124,8 +122,7 @@ const (
 	cryptNone cryptRecipe = iota
 
 	// cryptDefault: the document is encrypted and the stream uses the
-	// default StmF crypt filter with per-object Algorithm 1 key
-	// derivation.  Post-decryption bytes require [filterCrypt.Decode].
+	// document's default crypt filter.
 	cryptDefault
 
 	// cryptIdentity: the document is encrypted but the stream's filter
@@ -133,40 +130,55 @@ const (
 	// default StmF.  On-disk bytes are already plaintext.
 	cryptIdentity
 
-	// cryptUnsupportedCF: the stream's filter chain declares /Crypt
-	// /StdCF or a named CF at position 0.  The bytes are encrypted
-	// with that CF's recipe (no per-object Algorithm 1), which the
-	// library does not yet implement.
-	cryptUnsupportedCF
+	// cryptNamed: the document is encrypted and the stream's filter
+	// chain declares /Crypt at position 0, naming a crypt filter other
+	// than Identity.
+	cryptNamed
 )
 
 // streamCryptRecipe classifies how the encryption layer applies to x.
 // It is shared between [RawStreamReader] and [Copier] so that both
-// paths agree on which streams require decryption and which the
-// library cannot yet handle.
-func streamCryptRecipe(r Getter, x *Stream) (cryptRecipe, error) {
+// paths agree on which streams require decryption.
+//
+// The returned name is that of the crypt filter selected by a leading
+// /Crypt entry, if this is not Identity.  It is reported for unencrypted
+// documents too, where the /Crypt entry has no effect.
+func streamCryptRecipe(r Getter, x *Stream) (cryptRecipe, Name, error) {
+	recipe := cryptDefault
 	if x.crypt == nil {
-		return cryptNone, nil
+		recipe = cryptNone
 	}
+
 	// cheap probe: most streams have no /Crypt at filter position 0
 	startsWithCrypt, err := filterChainStartsWithCrypt(r, x.Dict["Filter"])
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	if !startsWithCrypt {
-		return cryptDefault, nil
+		return recipe, "", nil
 	}
 	filters, err := GetFilters(r, nil, x.Dict)
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
-	switch filters[0].(type) {
-	case FilterCryptIdentity:
-		return cryptIdentity, nil
-	case CryptFilter:
-		return cryptUnsupportedCF, nil
+	if len(filters) == 0 {
+		return recipe, "", nil
 	}
-	return cryptDefault, nil
+	cf, ok := filters[0].(CryptFilter)
+	if !ok {
+		return recipe, "", nil
+	}
+	name := cryptFilterName(cf)
+	if name == "Identity" {
+		if recipe == cryptDefault {
+			recipe = cryptIdentity
+		}
+		return recipe, "", nil
+	}
+	if recipe == cryptDefault {
+		recipe = cryptNamed
+	}
+	return recipe, name, nil
 }
 
 // filterChainStartsWithCrypt reports whether the resolved /Filter entry
@@ -227,20 +239,27 @@ func DecodeStream(r Getter, path *CycleCheck, x *Stream) (io.ReadCloser, error) 
 	// per-decode working-memory budget, sized to the raw stream length
 	budget := membudget.New(limits.StreamBudget(x.length))
 
-	// Skip the document-level decryption when the stream's filter chain
-	// declares its own per-stream Crypt filter at position 0.  Per PDF
-	// spec §7.4.10, an explicit /Crypt entry overrides the document's
-	// default StmF and skips the per-object Algorithm 1 key derivation;
-	// the [CryptFilter] variant at position 0 is responsible for
-	// decryption (a pass-through for [FilterCryptIdentity]).
-	applyCrypt := x.crypt != nil
-	if applyCrypt && len(filters) > 0 {
-		if _, ok := filters[0].(CryptFilter); ok {
-			applyCrypt = false
+	// A /Crypt entry at position 0 of the filter chain selects the crypt
+	// filter, overriding the document default.  In an unencrypted
+	// document, or for a stream exempt from encryption, it has no effect.
+	var leadingCrypt CryptFilter
+	if len(filters) > 0 {
+		if cf, ok := filters[0].(CryptFilter); ok {
+			leadingCrypt = cf
+			filters = filters[1:]
 		}
 	}
-	if applyCrypt {
-		out, err = x.crypt.Decode(v, out, budget)
+	if x.crypt != nil {
+		// The per-object key is used for streams with their own Crypt
+		// filter as well, see Writer.openStream.
+		cf := x.crypt.enc.streamCF(x.embeddedFile)
+		if leadingCrypt != nil {
+			cf, err = x.crypt.enc.namedCF(cryptFilterName(leadingCrypt))
+			if err != nil {
+				return nil, err
+			}
+		}
+		out, err = x.crypt.decrypt(cf, out)
 		if err != nil {
 			return nil, src.promote(err)
 		}
@@ -403,7 +422,7 @@ func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
 	for i, f := range res {
 		if _, ok := f.(CryptFilter); ok && i != 0 {
 			return nil, &MalformedFileError{
-				Err: errors.New("Crypt filter must be at position 0 in /Filter"),
+				Err: errors.New("crypt filter must be at position 0 in /Filter"),
 			}
 		}
 	}

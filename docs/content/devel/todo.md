@@ -77,7 +77,10 @@ weight = 100
 ## Missing Features
 
 - implement JPXDecode filters
-- implement Crypt filters
+- crypt filters: support `/CFM /None` (data decrypted by the security
+  handler rather than the reader)
+- report custom (e.g. DRM) security handlers with a distinct error,
+  instead of a generic malformed-file error
 - add a way to repair broken xref tables?
 - implement public-key encryption (PDF spec §7.6.5).
   Currently the only supported `/Encrypt /Filter` is `Standard`; files

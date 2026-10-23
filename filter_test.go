@@ -548,9 +548,9 @@ func TestCryptFilterPositionValidationOnWrite(t *testing.T) {
 	}
 }
 
-// TestFilterCryptStandardUnimplemented verifies that Encode/Decode return
-// clear errors for the not-yet-implemented variants.
-func TestFilterCryptStandardUnimplemented(t *testing.T) {
+// TestFilterCryptStandardMethodsFail verifies that Encode/Decode of
+// FilterCryptStandard fail, since encryption needs the document keys.
+func TestFilterCryptStandardMethodsFail(t *testing.T) {
 	f := FilterCryptStandard{}
 	if _, err := f.Encode(V2_0, nil); err == nil {
 		t.Error("FilterCryptStandard.Encode: expected error, got nil")
@@ -560,9 +560,9 @@ func TestFilterCryptStandardUnimplemented(t *testing.T) {
 	}
 }
 
-// TestFilterCryptNamedUnimplemented verifies that Encode/Decode return
-// clear errors for FilterCryptNamed.
-func TestFilterCryptNamedUnimplemented(t *testing.T) {
+// TestFilterCryptNamedMethodsFail verifies that Encode/Decode of
+// FilterCryptNamed fail, since encryption needs the document keys.
+func TestFilterCryptNamedMethodsFail(t *testing.T) {
 	f := FilterCryptNamed{Name: "MyCF"}
 	if _, err := f.Encode(V2_0, nil); err == nil {
 		t.Error("FilterCryptNamed.Encode: expected error, got nil")
@@ -677,10 +677,8 @@ func TestFilterCCITTFaxRowsVsEndOfBlock(t *testing.T) {
 	image := []byte{0xF0, 0xFF, 0x0F, 0xF0, 0xAA, 0x55, 0xFF, 0x00, 0x00, 0x01}
 	for _, k := range []int{-1, 0, 2} {
 		for _, ignoreEOB := range []bool{false, true} {
-			f := FilterCCITTFax{K: k, Columns: 16, Rows: 3, EndOfLine: true, IgnoreEndOfBlock: ignoreEOB}
-
 			// the writer enforces Rows, so encode without the bound
-			f.Rows = 0
+			f := FilterCCITTFax{K: k, Columns: 16, EndOfLine: true, IgnoreEndOfBlock: ignoreEOB}
 			var encoded bytes.Buffer
 			w, err := f.Encode(V2_0, withDummyClose{&encoded})
 			if err != nil {

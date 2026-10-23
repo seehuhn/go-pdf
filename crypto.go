@@ -17,6 +17,7 @@
 package pdf
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
@@ -32,7 +33,6 @@ import (
 	"io"
 
 	"github.com/xdg-go/stringprep"
-	"seehuhn.de/go/membudget"
 )
 
 type encryptInfo struct {
@@ -41,6 +41,79 @@ type encryptInfo struct {
 	strF *cryptFilter // strings
 	stmF *cryptFilter // streams
 	efF  *cryptFilter // embedded files
+
+	// cf holds the entries of the /CF dictionary, keyed by name.
+	// It is nil for V 1 and 2, where crypt filters do not exist.
+	cf map[Name]*cryptFilter
+}
+
+// CryptMethod selects how one class of data (streams, strings or embedded
+// files) is encrypted under the standard security handler.
+type CryptMethod int
+
+const (
+	// CryptDefault selects the strongest cipher the PDF version allows.
+	CryptDefault CryptMethod = iota
+
+	// CryptIdentity stores the data as plaintext.
+	CryptIdentity
+
+	// CryptRC4 selects RC4 with a 128-bit key.  This is available in PDF 1.6
+	// and 1.7 only.
+	CryptRC4
+
+	// CryptAES selects AES with a 128-bit key in PDF 1.6 and 1.7, and with a
+	// 256-bit key in PDF 2.0.
+	CryptAES
+)
+
+// String returns "plaintext", "RC4" or "AES" for the corresponding methods,
+// and "default" for CryptDefault.
+func (m CryptMethod) String() string {
+	switch m {
+	case CryptDefault:
+		return "default"
+	case CryptIdentity:
+		return "plaintext"
+	case CryptRC4:
+		return "RC4"
+	case CryptAES:
+		return "AES"
+	default:
+		return fmt.Sprintf("CryptMethod(%d)", int(m))
+	}
+}
+
+// streamCF returns the crypt filter for streams without a leading /Crypt
+// entry in their filter chain, or nil if such streams are not encrypted.
+func (enc *encryptInfo) streamCF(embeddedFile bool) *cryptFilter {
+	if embeddedFile {
+		return enc.efF
+	}
+	return enc.stmF
+}
+
+// objStmSafe reports whether objects can be stored in object streams.
+// Strings inside an object stream are encrypted only as part of the stream
+// (PDF spec 7.5.7), so this requires streams and strings to share one crypt
+// filter.  A nil enc is safe.
+func (enc *encryptInfo) objStmSafe() bool {
+	return enc == nil || enc.stmF == enc.strF
+}
+
+// namedCF returns the crypt filter with the given name from the /CF
+// dictionary.  The name Identity selects no encryption and gives nil.
+func (enc *encryptInfo) namedCF(name Name) (*cryptFilter, error) {
+	if name == "Identity" {
+		return nil, nil
+	}
+	cf, ok := enc.cf[name]
+	if !ok {
+		return nil, &MalformedFileError{
+			Err: fmt.Errorf("unknown crypt filter %s", name),
+		}
+	}
+	return cf, nil
 }
 
 // publicInfo returns the user-facing description of this encryption
@@ -49,84 +122,43 @@ func (enc *encryptInfo) publicInfo() *Encryption {
 	if enc == nil {
 		return nil
 	}
-	// Pick the first non-nil slot as the canonical cipher.  Per spec
-	// (ISO 32000-2 Table 21), StmF/StrF/EFF may individually reference
-	// different crypt filters or default to /Identity, so any slot may
-	// legitimately be nil.  In files we produce all three point to the
-	// same *cryptFilter, and in files we accept every non-nil slot is
-	// built from the single /StdCF entry (the parser rejects other
-	// named filters), so cipher and length agree across non-nil slots.
-	cf := enc.stmF
-	if cf == nil {
-		cf = enc.strF
+	pub := &Encryption{
+		Streams:       enc.stmF.method(),
+		Strings:       enc.strF.method(),
+		EmbeddedFiles: enc.efF.method(),
 	}
-	if cf == nil {
-		cf = enc.efF
-	}
-	pub := &Encryption{}
-	if cf != nil {
-		switch cf.Cipher {
-		case cipherRC4:
-			pub.Cipher = "RC4"
-		case cipherAES:
-			pub.Cipher = "AES"
-		}
-		pub.KeyLength = cf.Length
+	if enc.stmF != nil || enc.strF != nil || enc.efF != nil {
+		pub.KeyLength = 8 * enc.sec.keyBytes
 	}
 	return pub
 }
 
-// filterCrypt is the internal default-StmF stream encryption layer.
-// Unlike regular filters which are stored in the PDF file's stream dictionary,
-// this filter is applied transparently based on the document's encryption
-// settings, using the document's StmF crypt filter and Algorithm 1
-// (per-object key derivation, PDF spec §7.6.3).
-//
-// It is unrelated to the public [CryptFilter] interface (and its variants
-// FilterCryptIdentity, FilterCryptStandard, FilterCryptNamed), which
-// represent the explicit /Crypt entries in a stream's /Filter array
-// described by PDF spec §7.4.10.  When such an entry is present at
-// position 0, the filterCrypt layer is skipped because the CryptFilter
-// variant is responsible for the stream's encryption recipe.
+// filterCrypt records the encryption context of a stream read from an
+// encrypted file: the document's encryption and the stream's object
+// reference, which feeds the per-object key derivation (Algorithm 1).
 //
 // The raw (possibly encrypted) stream data stays in the Stream object.
-// Decryption happens on-the-fly when the stream is read through DecodeStream,
-// so each call to NewReader yields independently decryptable data.
+// Decryption happens on-the-fly when the stream is read through
+// [DecodeStream] or [RawStreamReader], which pick the crypt filter: the one
+// named by a leading /Crypt entry in the filter chain, or the document's
+// default for streams otherwise.
 type filterCrypt struct {
 	enc *encryptInfo
 	ref Reference
 }
 
-// Info implements the [Filter] interface.
-// The crypt filter is transparent and does not appear in the stream dictionary.
-func (f *filterCrypt) Info(Version) (Name, Dict, error) {
-	return "", nil, nil
-}
-
-// Encode implements the [Filter] interface.
-func (f *filterCrypt) Encode(_ Version, w io.WriteCloser) (io.WriteCloser, error) {
-	return f.enc.EncryptStream(f.ref, w)
-}
-
-// Decode implements the [Filter] interface.
-func (f *filterCrypt) Decode(_ Version, r io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
-	decrypted, err := f.enc.DecryptStream(f.ref, r)
+// decrypt returns a reader for the decrypted form of the on-disk stream
+// bytes r, using crypt filter cf.
+func (f *filterCrypt) decrypt(cf *cryptFilter, r io.Reader) (io.ReadCloser, error) {
+	decrypted, err := f.enc.decryptStream(cf, f.ref, r)
 	if err != nil {
 		return nil, err
-	}
-	// wrap in ReadCloser since DecryptStream returns io.Reader
-	if rc, ok := decrypted.(io.ReadCloser); ok {
-		return rc, nil
 	}
 	return io.NopCloser(decrypted), nil
 }
 
-func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo, Perm, error) {
+func (r *Reader) parseEncryptDict(enc Dict, password string) (*encryptInfo, Perm, error) {
 	c := NewCursor(r)
-	enc, err := c.Dict(encObj)
-	if err != nil {
-		return nil, 0, err
-	}
 	if len(r.meta.ID) != 2 {
 		return nil, 0, &MalformedFileError{Err: errors.New("found Encrypt but no ID")}
 	}
@@ -178,55 +210,74 @@ func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo,
 		res.efF = cf
 		keyBytes = cf.Length / 8
 	case 4, 5:
-		// /CF crypt-filter dictionary; a malformed one is ignored (a needed
-		// but missing entry is caught later in getCryptFilter), but a genuine
-		// read error is propagated
+		// /CF crypt-filter dictionary; a malformed dictionary or entry is
+		// ignored (a needed but missing entry is caught by namedCF below),
+		// but a genuine read error is propagated
 		CF, err := Optional(c.Dict(enc["CF"]))
 		if err != nil {
 			return nil, 0, err
 		}
+		res.cf = make(map[Name]*cryptFilter, len(CF))
+		for _, name := range CF.SortedKeys() {
+			if name == "Identity" {
+				// reserved name, always selects no encryption
+				continue
+			}
+			cfDict, err := Optional(c.Dict(CF[name]))
+			if err != nil {
+				return nil, 0, err
+			}
+			if cfDict == nil {
+				continue
+			}
+			cf, err := Optional(getCryptFilter(c, name, cfDict))
+			if err != nil {
+				return nil, 0, err
+			}
+			if cf != nil {
+				res.cf[name] = cf
+			}
+		}
+
 		// StmF/StrF/EFF name the stream, string and embedded-file crypt
 		// filters.  As with /CF above, a malformed selector is ignored and a
 		// genuine read error propagated; an absent selector then leaves the
 		// default (Identity for StmF/StrF, StmF for EFF).
-		stmFName, err := Optional(c.Name(enc["StmF"]))
-		if err != nil {
+		slot := func(key Name, dflt *cryptFilter) (*cryptFilter, error) {
+			name, err := Optional(c.Name(enc[key]))
+			if err != nil {
+				return nil, err
+			}
+			if name == "" {
+				return dflt, nil
+			}
+			cf, err := res.namedCF(name)
+			if err != nil {
+				return nil, Wrap(err, string(key))
+			}
+			return cf, nil
+		}
+		if res.stmF, err = slot("StmF", nil); err != nil {
 			return nil, 0, err
 		}
-		if stmFName != "" {
-			cf, err := getCryptFilter(stmFName, CF)
-			if err != nil {
-				return nil, 0, Wrap(err, "StmF")
-			}
-			res.stmF = cf
-		}
-		strFName, err := Optional(c.Name(enc["StrF"]))
-		if err != nil {
+		if res.strF, err = slot("StrF", nil); err != nil {
 			return nil, 0, err
 		}
-		if strFName != "" {
-			cf, err := getCryptFilter(strFName, CF)
-			if err != nil {
-				return nil, 0, Wrap(err, "StrF")
-			}
-			res.strF = cf
-		}
-		res.efF = res.stmF // default
-		effName, err := Optional(c.Name(enc["EFF"]))
-		if err != nil {
+		if res.efF, err = slot("EFF", res.stmF); err != nil {
 			return nil, 0, err
 		}
-		if effName != "" {
-			cf, err := getCryptFilter(effName, CF)
-			if err != nil {
-				return nil, 0, Wrap(err, "EFF")
-			}
-			res.efF = cf
-		}
-		if V == 4 {
-			keyBytes = 16
-		} else {
+		switch {
+		case V == 5:
 			keyBytes = 32
+		case res.stmF != nil && res.stmF.Cipher == cipherRC4:
+			// the file key of an RC4 file has the length of the crypt filter
+			keyBytes = res.stmF.Length / 8
+		case res.stmF == nil && res.strF != nil && res.strF.Cipher == cipherRC4:
+			keyBytes = res.strF.Length / 8
+		case res.stmF == nil && res.strF == nil && res.efF != nil && res.efF.Cipher == cipherRC4:
+			keyBytes = res.efF.Length / 8
+		default:
+			keyBytes = 16
 		}
 
 	default:
@@ -251,73 +302,90 @@ func (r *Reader) parseEncryptDict(encObj Object, password string) (*encryptInfo,
 	// eager authentication
 	perm, err := res.sec.unlock(password)
 	if err != nil {
-		return nil, 0, err
+		if _, ok := errors.AsType[*AuthenticationError](err); !ok || res.stmF != nil || res.strF != nil {
+			return nil, 0, err
+		}
+		// only embedded files are encrypted: defer authentication until
+		// an embedded file is accessed
+		perm = stdSecPToPerm(res.sec.R, res.sec.P)
 	}
 
 	return res, perm, nil
 }
 
+// AsDict returns the encryption dictionary for a file of the given version.
 func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 	dict := Dict{
 		"Filter": Name("Standard"),
 	}
 
-	length := -1
-	var cipher cipherType
-	for _, cf := range []*cryptFilter{enc.stmF, enc.strF, enc.efF} {
-		if length < 0 {
-			length = cf.Length
-			cipher = cf.Cipher
-		} else {
-			if length > 0 && length != cf.Length {
-				length = 0
-			}
-			if cipher != cf.Cipher {
-				cipher = cipherUnknown
-			}
+	if enc.cf == nil {
+		// V 1 and 2 have a single RC4 filter for all data
+		cf := enc.stmF
+		if cf == nil || cf.Cipher != cipherRC4 || enc.strF != cf || enc.efF != cf {
+			return nil, errors.New("V 1 and 2 need one RC4 filter for all data")
 		}
-
-		if cf.Length%8 != 0 {
-			return nil, errors.New("invalid key length")
+		switch {
+		case cf.Length == 40 && version >= V1_1:
+			dict["V"] = Integer(1)
+		case cf.Length >= 40 && cf.Length <= 128 && cf.Length%8 == 0 && version >= V1_4:
+			// The top-level /Length is only defined for V 2 and 3, in bits.
+			dict["V"] = Integer(2)
+			dict["Length"] = Integer(cf.Length)
+		default:
+			return nil, errors.New("no supported encryption scheme found")
 		}
-	}
-	if length == 0 {
-		return nil, errors.New("not implemented: mixed key length")
-	}
-	if cipher == cipherUnknown {
-		return nil, errors.New("not implemented: mixed key ciphers")
-	}
-
-	// /Length values throughout the encrypt dict (top level and inside
-	// /CF/StdCF) are written in bits — 256 for AES-256, 128 for AES-128.
-	// ISO 32000-2 Table 21 says the top-level /Length is in bits, but
-	// Table 27 says /Length inside a crypt-filter dict is in bytes (range
-	// 5–16).  The two specs disagree, and Acrobat Reader empirically
-	// rejects V=5 files when /CF/StdCF/Length is in bytes (32) rather than
-	// bits (256).  Sticking with bits for both keeps Acrobat happy and
-	// matches the convention used by Adobe's own writers.
-	if cipher == cipherAES && length == 256 && version >= V2_0 {
-		dict["V"] = Integer(5)
-		dict["StmF"] = Name("StdCF")
-		dict["StrF"] = Name("StdCF")
-		dict["Length"] = Integer(256)
-		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(256), "CFM": Name("AESV3")},
-		}
-	} else if cipher == cipherAES && length == 128 && version >= V1_6 {
-		dict["V"] = Integer(4)
-		dict["StmF"] = Name("StdCF")
-		dict["StrF"] = Name("StdCF")
-		dict["CF"] = Dict{
-			"StdCF": Dict{"Length": Integer(128), "CFM": Name("AESV2")},
-		}
-	} else if cipher == cipherRC4 && length == 40 && version >= V1_1 {
-		dict["V"] = Integer(1)
-	} else if cipher == cipherRC4 && version >= V1_4 {
-		dict["V"] = Integer(2)
-		dict["Length"] = Integer(length)
 	} else {
-		return nil, errors.New("no supported encryption scheme found")
+		V := 4
+		if enc.sec.R >= 5 {
+			V = 5
+		}
+		if V == 4 && version < V1_6 {
+			return nil, &VersionError{Operation: "crypt filters", Earliest: V1_6}
+		} else if V == 5 && version < V2_0 {
+			return nil, &VersionError{Operation: "AES-256 encryption", Earliest: V2_0}
+		}
+		dict["V"] = Integer(V)
+
+		// The spec lists the top-level /Length for V 2 and 3 only, but
+		// files in practice carry it for V 4 and 5 as well, and readers
+		// take the V 4 key length from it.
+		dict["Length"] = Integer(8 * enc.sec.keyBytes)
+
+		// /CF/<name>/Length (Table 25) nominally holds bytes for the
+		// standard handler, but files in practice give bits, and some
+		// readers reject V 5 files with 32 there, so bits are written
+		// (256 for AES-256, 128 for AES-128 and RC4).
+		CF := Dict{}
+		for name, cf := range enc.cf {
+			var cfm Name
+			switch {
+			case V == 4 && cf.Cipher == cipherRC4 && cf.Length == 128:
+				cfm = "V2"
+			case V == 4 && cf.Cipher == cipherAES && cf.Length == 128:
+				cfm = "AESV2"
+			case V == 5 && cf.Cipher == cipherAES && cf.Length == 256:
+				cfm = "AESV3"
+			default:
+				return nil, fmt.Errorf("crypt filter %s: %s not supported with V %d", name, cf, V)
+			}
+			cfDict := Dict{"CFM": cfm, "Length": Integer(cf.Length)}
+			if cf.AuthEvent == "EFOpen" {
+				// DocOpen is the default
+				cfDict["AuthEvent"] = Name("EFOpen")
+			}
+			CF[name] = cfDict
+		}
+		dict["CF"] = CF
+
+		// /StmF and /StrF default to Identity, but some readers mishandle
+		// the absent entries, so both are always written.  /EFF defaults
+		// to /StmF.
+		dict["StmF"] = enc.stmF.filterName()
+		dict["StrF"] = enc.strF.filterName()
+		if eff := enc.efF.filterName(); eff != enc.stmF.filterName() {
+			dict["EFF"] = eff
+		}
 	}
 
 	sec := enc.sec
@@ -338,7 +406,8 @@ func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 }
 
 // EncryptBytes encrypts the bytes in buf using Algorithm 1 in the PDF spec.
-// This function modfies the contents of buf and may return buf.
+// The input buf is left unchanged.  The result is a newly allocated slice,
+// except that buf itself is returned when no encryption applies.
 func (enc *encryptInfo) EncryptBytes(ref Reference, buf []byte) ([]byte, error) {
 	cf := enc.strF
 	if cf == nil {
@@ -379,15 +448,17 @@ func (enc *encryptInfo) EncryptBytes(ref Reference, buf []byte) ([]byte, error) 
 		if err != nil {
 			return nil, err
 		}
-		c.XORKeyStream(buf, buf)
-		return buf, nil
+		out := make([]byte, len(buf))
+		c.XORKeyStream(out, buf)
+		return out, nil
 	default:
 		panic("unknown cipher")
 	}
 }
 
 // DecryptBytes decrypts the bytes in buf using Algorithm 1 in the PDF spec.
-// This function modfies the contents of buf and may return buf.
+// The input buf is left unchanged.  The result is a newly allocated slice,
+// except that buf itself is returned when no decryption applies.
 func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) {
 	cf := enc.strF
 	if cf == nil {
@@ -410,14 +481,16 @@ func (enc *encryptInfo) DecryptBytes(ref Reference, buf []byte) ([]byte, error) 
 			return nil, err
 		}
 
+		out := make([]byte, len(buf)-16)
 		cbc := cipher.NewCBCDecrypter(c, iv)
-		cbc.CryptBlocks(buf[16:], buf[16:])
+		cbc.CryptBlocks(out, buf[16:])
 
-		return unpadPKCS7(buf[16:])
+		return unpadPKCS7(out)
 	case cipherRC4:
 		c, _ := rc4.NewCipher(key)
-		c.XORKeyStream(buf, buf)
-		return buf, nil
+		out := make([]byte, len(buf))
+		c.XORKeyStream(out, buf)
+		return out, nil
 	default:
 		panic("unknown cipher")
 	}
@@ -455,8 +528,10 @@ func unpadPKCS7(buf []byte) ([]byte, error) {
 	return buf[:n-int(padByte)], nil
 }
 
-func (enc *encryptInfo) EncryptStream(ref Reference, w io.WriteCloser) (io.WriteCloser, error) {
-	cf := enc.stmF
+// encryptStream returns a writer which encrypts the data of the stream
+// with reference ref using crypt filter cf, and writes the result to w.
+// If cf is nil, w is returned unchanged.
+func (enc *encryptInfo) encryptStream(cf *cryptFilter, ref Reference, w io.WriteCloser) (io.WriteCloser, error) {
 	if cf == nil {
 		return w, nil
 	}
@@ -497,8 +572,10 @@ func (enc *encryptInfo) EncryptStream(ref Reference, w io.WriteCloser) (io.Write
 	}
 }
 
-func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, error) {
-	cf := enc.stmF
+// decryptStream returns a reader for the decrypted data of the stream with
+// reference ref, whose encrypted bytes are read from r, using crypt filter
+// cf.  If cf is nil, r is returned unchanged.
+func (enc *encryptInfo) decryptStream(cf *cryptFilter, ref Reference, r io.Reader) (io.Reader, error) {
 	if cf == nil {
 		return r, nil
 	}
@@ -516,7 +593,12 @@ func (enc *encryptInfo) DecryptStream(ref Reference, r io.Reader) (io.Reader, er
 		buf := make([]byte, 32)
 		iv := buf[:16]
 		_, err := io.ReadFull(r, iv)
-		if err != nil {
+		if err == io.EOF {
+			// an empty body decrypts to empty data
+			return bytes.NewReader(nil), nil
+		} else if err == io.ErrUnexpectedEOF {
+			return nil, &MalformedFileError{Err: errCorrupted}
+		} else if err != nil {
 			return nil, err
 		}
 
@@ -798,6 +880,13 @@ func (sec *stdSecHandler) KeyForRef(cf *cryptFilter, ref Reference) ([]byte, err
 			h.Write([]byte("sAlT"))
 		}
 		l := min(sec.keyBytes+5, 16)
+		if cf.Cipher == cipherAES && l != 16 {
+			// AES with a file key shorter than 11 bytes, only possible
+			// alongside a short RC4 filter in V 4
+			return nil, &MalformedFileError{
+				Err: fmt.Errorf("crypt filter %s: AES with %d-bit file key", cf.Name, 8*sec.keyBytes),
+			}
+		}
 		return h.Sum(nil)[:l], nil
 	case 5, 6:
 		return sec.key, nil
@@ -1421,7 +1510,7 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 			if err == io.EOF {
 				r.r = nil
 				if k%16 != 0 {
-					return 0, errCorrupted
+					return 0, &MalformedFileError{Err: errCorrupted}
 				}
 			} else if err != nil {
 				return 0, err
@@ -1450,7 +1539,7 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 			// whole buffer; r.reserved is empty
 			unpadded, err := unpadPKCS7(r.ready)
 			if err != nil {
-				return 0, err
+				return 0, &MalformedFileError{Err: err}
 			}
 			r.ready = unpadded
 		}
@@ -1462,46 +1551,94 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 }
 
 type cryptFilter struct {
+	// Name is the key of the filter in the /CF dictionary, or empty for
+	// the implicit filter of V 1 and 2.
+	Name Name
+
 	Cipher cipherType
 
 	// Length is the key length in bits.
 	Length int
+
+	// AuthEvent is the event which triggers authorization for this
+	// filter, DocOpen or EFOpen.  The value is recorded but not acted on.
+	AuthEvent Name
 }
 
 func (cf *cryptFilter) String() string {
 	return fmt.Sprintf("%s-%d", cf.Cipher, cf.Length)
 }
 
-func getCryptFilter(cryptFilterName Name, CF Dict) (*cryptFilter, error) {
-	if cryptFilterName == "Identity" {
-		return nil, nil
+// filterName returns the name under which cf appears in the encryption
+// dictionary.  A nil filter is the Identity filter.
+func (cf *cryptFilter) filterName() Name {
+	if cf == nil {
+		return "Identity"
 	}
-	if cryptFilterName != "StdCF" {
-		return nil, errors.New("unknown crypt filter " + string(cryptFilterName))
+	return cf.Name
+}
+
+// method returns the CryptMethod corresponding to cf.  A nil filter
+// corresponds to CryptIdentity.
+func (cf *cryptFilter) method() CryptMethod {
+	if cf == nil {
+		return CryptIdentity
 	}
-	if CF == nil {
-		return nil, errors.New("missing CF dictionary")
+	switch cf.Cipher {
+	case cipherRC4:
+		return CryptRC4
+	case cipherAES:
+		return CryptAES
+	default:
+		panic("crypt filter without cipher")
+	}
+}
+
+// getCryptFilter parses the /CF entry cfDict with the given name.
+func getCryptFilter(c Cursor, name Name, cfDict Dict) (*cryptFilter, error) {
+	cfm, err := Optional(c.Name(cfDict["CFM"]))
+	if err != nil {
+		return nil, err
 	}
 
-	cfDict, ok := CF[cryptFilterName].(Dict)
-	if !ok {
-		return nil, errors.New("missing " + string(cryptFilterName) + " entry in CF dict")
-	}
-
-	res := &cryptFilter{}
-	switch cfDict["CFM"] {
-	case Name("V2"):
+	res := &cryptFilter{Name: name}
+	switch cfm {
+	case "V2":
 		res.Cipher = cipherRC4
-		res.Length = 128
-	case Name("AESV2"):
+		length, err := Optional(c.Integer(cfDict["Length"]))
+		if err != nil {
+			return nil, err
+		}
+		// Table 25 gives the length in bytes for the standard security
+		// handler, but files also use bits.
+		switch {
+		case length >= 5 && length <= 16:
+			res.Length = int(length) * 8
+		case length >= 40 && length <= 128 && length%8 == 0:
+			res.Length = int(length)
+		default:
+			res.Length = 128
+		}
+	case "AESV2":
 		res.Cipher = cipherAES
 		res.Length = 128
-	case Name("AESV3"):
+	case "AESV3":
 		res.Cipher = cipherAES
 		res.Length = 256
 	default:
-		return nil, errors.New("unknown cipher")
+		return nil, &MalformedFileError{
+			Err: fmt.Errorf("crypt filter %s: unsupported CFM %q", name, cfm),
+		}
 	}
+
+	res.AuthEvent, err = Optional(c.Name(cfDict["AuthEvent"]))
+	if err != nil {
+		return nil, err
+	}
+	if res.AuthEvent == "" {
+		res.AuthEvent = "DocOpen"
+	}
+
 	return res, nil
 }
 

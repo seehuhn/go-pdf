@@ -143,7 +143,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		} else {
 			// Some writers put only changed entries into an update trailer.
 			// Take the document entry points from the newest trailer that
-			// has them, as pdf.js and MuPDF do.
+			// has them.
 			for _, key := range []Name{"Root", "Encrypt", "ID"} {
 				if _, ok := trailer[key]; ok {
 					continue

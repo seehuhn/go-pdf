@@ -140,6 +140,15 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	for n := range base.xref {
 		next = max(next, int64(n)+1)
 	}
+	// Older trailers keep naming a dangling /Encrypt object, and a reader
+	// merges that entry into the update's trailer; reusing the number would
+	// make the new object the encryption dictionary.  Numbers which cannot
+	// be allocated anyway are ignored.
+	for ref := range base.unencrypted {
+		if n := int64(ref.Number()); n < maxXRefSize {
+			next = max(next, n+1)
+		}
+	}
 	if next >= maxXRefSize {
 		return nil, errors.New("object numbers exhausted")
 	}
@@ -150,6 +159,9 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	}
 
 	outOpt := outputOptionsFor(v, opt.HumanReadable)
+	if !base.enc.objStmSafe() {
+		outOpt &= ^optObjStm
+	}
 
 	meta := base.meta
 	meta.Version = v
@@ -192,10 +204,15 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	if catalogObj, path, err := resolvePath(base, nil, base.meta.Trailer["Root"], true); err == nil && path != nil {
 		ref := path.Ref
 		w.recordOrigin(w.baseCatalog, ref)
-		if m := w.baseCatalog.Metadata; m != nil {
-			if dict, ok := catalogObj.(Dict); ok {
-				if mref, ok := dict["Metadata"].(Reference); ok {
+		if dict, ok := catalogObj.(Dict); ok {
+			if mref, ok := dict["Metadata"].(Reference); ok {
+				if m := w.baseCatalog.Metadata; m != nil {
 					w.recordOrigin(m, mref)
+				}
+				// the base Reader reads this stream as plaintext, so a
+				// replacement written at the same reference must be too
+				if base.enc != nil && base.enc.sec.unencryptedMetadata {
+					w.refIsPlaintext[mref] = true
 				}
 			}
 		}

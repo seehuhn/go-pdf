@@ -398,11 +398,9 @@ func (s *scanner) ReadString() (_ String, err error) {
 		case ')':
 			bracketLevel--
 			if bracketLevel == 0 {
-				if s.enc != nil && s.encRef != 0 {
-					res, err = s.enc.DecryptBytes(s.encRef, res)
-					if err != nil {
-						return nil, err
-					}
+				res, err = s.decryptString(res)
+				if err != nil {
+					return nil, err
 				}
 				return String(res), nil
 			}
@@ -457,12 +455,24 @@ func (s *scanner) ReadString() (_ String, err error) {
 
 // ReadHexString reads a <>-delimited string, starting after the opening
 // angled bracket.
-func (s *scanner) ReadHexString() (_ String, err error) {
+func (s *scanner) ReadHexString() (String, error) {
+	raw, err := s.readHexBytes()
+	if err != nil {
+		return nil, err
+	}
+	res, err := s.decryptString(raw)
+	if err != nil {
+		return nil, err
+	}
+	return String(res), nil
+}
+
+// readHexBytes reads the bytes of a hex string, without decryption.
+func (s *scanner) readHexBytes() (res []byte, err error) {
 	defer func() {
 		err = eofToMalformed(err, "hex String")
 	}()
 
-	var res []byte
 	var hexVal byte
 	first := true
 	tooLong := false
@@ -508,14 +518,28 @@ func (s *scanner) ReadHexString() (_ String, err error) {
 		return nil, err
 	}
 
-	if s.enc != nil && s.encRef != 0 {
-		res, err = s.enc.DecryptBytes(s.encRef, res)
-		if err != nil {
-			return nil, err
-		}
-	}
+	return res, nil
+}
 
-	return String(res), nil
+// decryptString decrypts the raw bytes of a string, if the file is encrypted.
+//
+// A string which cannot be decrypted is returned unchanged.  The key is
+// already authenticated, so a length which rules out AES ciphertext (fewer
+// than 32 bytes, or not a multiple of 16) or invalid padding means the
+// writer stored the string as plaintext; its bytes are the best reading
+// available.
+func (s *scanner) decryptString(raw []byte) ([]byte, error) {
+	if s.enc == nil || s.encRef == 0 {
+		return raw, nil
+	}
+	res, err := s.enc.DecryptBytes(s.encRef, raw)
+	if errors.Is(err, errCorrupted) || IsMalformed(err) {
+		return raw, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // ReadName reads a PDF name object.
@@ -694,6 +718,7 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 	}
 
 	dict = make(map[Name]Object)
+	var rawContents []byte // undecrypted hex /Contents, for signature dicts
 	for {
 		var key Name
 		key, err = s.ReadName()
@@ -709,9 +734,30 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 		}
 
 		var val Object
-		val, err = s.ReadObject()
-		if err != nil {
-			return nil, err
+		if key == "Contents" {
+			rawContents = nil // a duplicate key replaces an earlier value
+		}
+		if key == "Contents" && s.enc != nil && s.encRef != 0 {
+			buf, _ := s.PeekN(2) // errors resurface in ReadObject
+			if len(buf) == 2 && buf[0] == '<' && buf[1] != '<' {
+				s.pos++
+				rawContents, err = s.readHexBytes()
+				if err != nil {
+					return nil, err
+				}
+				var dec []byte
+				dec, err = s.decryptString(rawContents)
+				if err != nil {
+					return nil, err
+				}
+				val = String(dec)
+			}
+		}
+		if val == nil {
+			val, err = s.ReadObject()
+			if err != nil {
+				return nil, err
+			}
 		}
 		err = s.SkipWhiteSpace()
 		if err != nil {
@@ -778,6 +824,11 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 		return nil, err
 	}
 
+	// the hex /Contents of a signature dictionary is not encrypted (7.6.2)
+	if _, ok := dict["Contents"].(String); ok && rawContents != nil && isSignatureDict(dict) {
+		dict["Contents"] = String(rawContents)
+	}
+
 	return dict, nil
 }
 
@@ -834,6 +885,10 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	var crypt *filterCrypt
 	if s.enc != nil {
 		crypt = &filterCrypt{enc: s.enc, ref: s.encRef}
+	} else if name, err := leadingCryptName(dict); err != nil || (name != "" && name != "Identity") {
+		// an unencrypted file has no named crypt filters, so the entry
+		// is dropped; Identity is kept, since it changes nothing
+		stripLeadingCrypt(dict)
 	}
 
 	var l int64
@@ -872,11 +927,12 @@ func (s *scanner) ReadStreamData(dict Dict) (stm *Stream, err error) {
 	delete(dict, "Length")
 
 	return &Stream{
-		Dict:   dict,
-		data:   origReader,
-		start:  start,
-		length: l,
-		crypt:  crypt,
+		Dict:         dict,
+		data:         origReader,
+		start:        start,
+		length:       l,
+		crypt:        crypt,
+		embeddedFile: dict["Type"] == Name("EmbeddedFile"),
 	}, nil
 }
 

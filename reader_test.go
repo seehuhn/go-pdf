@@ -556,6 +556,17 @@ func FuzzReader(f *testing.F) {
 		}
 	}
 
+	// encryption fixtures
+	namedCF, _ := buildNamedCFFile(f)
+	f.Add(namedCF)
+	f.Add(buildAttachmentsOnlyFile(f).data)
+	f.Add(buildDanglingEncryptFile(f, []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+	}, "9 0 R"))
+	f.Add(buildSigContentsFile(f, V1_7))
+	f.Add(buildSigContentsFile(f, V2_0))
+
 	f.Fuzz(func(t *testing.T, in []byte) {
 		buf := bytes.NewReader(in)
 		r, err := NewReader(buf, int64(len(in)), nil)
@@ -763,4 +774,32 @@ func TestGetFromObjStmTruncated(t *testing.T) {
 			}
 		})
 	}
+}
+
+// buildSigContentsFile returns an encrypted file containing a signature
+// dictionary, whose /Contents is stored without encryption.  The file opens
+// without a password.
+func buildSigContentsFile(tb testing.TB, v Version) []byte {
+	tb.Helper()
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, v, &WriterOptions{OwnerPassword: "owner"})
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if err := addPage(w); err != nil {
+		tb.Fatal(err)
+	}
+	sig := Dict{
+		"Type":      Name("Sig"),
+		"ByteRange": Array{Integer(0), Integer(1), Integer(2), Integer(3)},
+		"Contents":  String("signature bytes!"),
+		"Reason":    String("encrypted reason"),
+	}
+	if err := w.Put(w.Alloc(), sig); err != nil {
+		tb.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		tb.Fatal(err)
+	}
+	return buf.Bytes()
 }

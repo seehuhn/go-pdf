@@ -55,16 +55,22 @@ type MetaInfo struct {
 
 // Encryption describes the encryption configuration of a PDF file.
 type Encryption struct {
-	// Cipher names the bulk-encryption algorithm: "RC4" or "AES".
-	Cipher string
+	// Streams, Strings and EmbeddedFiles give the encryption method used
+	// for streams, for strings, and for embedded file streams.  These
+	// fields are never CryptDefault.
+	Streams, Strings, EmbeddedFiles CryptMethod
 
-	// KeyLength is the encryption key length in bits.  For RC4 it is a
-	// multiple of 8 between 40 and 128; for AES it is 128 or 256.
+	// KeyLength is the length of the file encryption key in bits.  For RC4
+	// it is a multiple of 8 between 40 and 128; for AES it is 128 or 256.
+	// It is 0 if all three classes of data are stored as plaintext.
 	KeyLength int
 }
 
 // String returns a short, human-readable label for the encryption
-// configuration, e.g. "RC4 (40-bit)", "AES-128", or "AES-256".
+// configuration, for example "RC4 (40-bit)", "AES-256" or "plaintext".  If
+// the three classes of data use different methods, the label lists them per
+// class, for example "AES-128 streams, RC4 (128-bit) strings, plaintext
+// embedded files".
 // A nil receiver returns "None" so callers can format the unencrypted case
 // without an explicit nil check.
 func (e *Encryption) String() string {
@@ -72,13 +78,24 @@ func (e *Encryption) String() string {
 		return "None"
 	}
 
-	switch e.Cipher {
-	case "":
-		return "Unknown"
-	case "RC4":
-		return fmt.Sprintf("RC4 (%d-bit)", e.KeyLength)
+	label := func(m CryptMethod) string {
+		switch m {
+		case CryptIdentity:
+			return "plaintext"
+		case CryptRC4:
+			return fmt.Sprintf("RC4 (%d-bit)", e.KeyLength)
+		case CryptAES:
+			return fmt.Sprintf("AES-%d", e.KeyLength)
+		default:
+			return "Unknown"
+		}
 	}
-	return fmt.Sprintf("%s-%d", e.Cipher, e.KeyLength)
+	if e.Streams == e.Strings && e.Streams == e.EmbeddedFiles {
+		return label(e.Streams)
+	}
+	return label(e.Streams) + " streams, " +
+		label(e.Strings) + " strings, " +
+		label(e.EmbeddedFiles) + " embedded files"
 }
 
 // Version represents a version of the PDF standard.

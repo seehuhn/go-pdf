@@ -61,6 +61,9 @@ func ExtractStream(c pdf.Cursor, obj pdf.Object, _ bool) (*Stream, error) {
 	} else if stream == nil {
 		return nil, pdf.Error("missing embedded file stream")
 	}
+	// /Type is optional, so the stream may not be recognised as an
+	// embedded file without this
+	stream = stream.AsEmbeddedFile()
 
 	// Check Type field - optional for embedded file streams
 	if err := c.CheckDictType(stream.Dict, "EmbeddedFile"); err != nil {
@@ -172,7 +175,7 @@ func (s *Stream) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 	ref := e.Alloc()
 
-	w, err := e.Out().OpenStream(ref, dict)
+	w, err := e.Out().OpenEmbeddedFileStream(ref, dict)
 	if err != nil {
 		return nil, err
 	}

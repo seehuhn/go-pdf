@@ -712,3 +712,209 @@ func TestStreamConcurrentReaders(t *testing.T) {
 		t.Errorf("expected ABCDEF, got %q", data4)
 	}
 }
+
+func aesStringScanner(t *testing.T, contents string, authenticated bool) *scanner {
+	t.Helper()
+	id := []byte("0123456789ABCDEF")
+	sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !authenticated {
+		sec.key = nil
+	}
+	s := testScanner(contents)
+	s.enc = &encryptInfo{
+		strF: &cryptFilter{Cipher: cipherAES, Length: 128},
+		sec:  sec,
+	}
+	s.encRef = NewReference(1, 0)
+	return s
+}
+
+func TestDictStringCorruptKeepsRaw(t *testing.T) {
+	// 5 bytes is not a valid AES ciphertext length
+	for _, in := range []string{"(abcde)", "<6162636465>"} {
+		s := aesStringScanner(t, in, true)
+		obj, err := s.ReadObject()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := obj.(String); !ok || string(got) != "abcde" {
+			t.Errorf("%s: got %v, want raw bytes", in, obj)
+		}
+	}
+}
+
+func TestDictStringAuthErrorPropagates(t *testing.T) {
+	for _, in := range []string{"(abcde)", "<6162636465>"} {
+		s := aesStringScanner(t, in, false)
+		_, err := s.ReadObject()
+		if _, ok := errors.AsType[*AuthenticationError](err); !ok {
+			t.Errorf("%s: got %v, want authentication error", in, err)
+		}
+	}
+}
+
+// TestReadStreamDataEmbeddedFile checks that streams with /Type /EmbeddedFile
+// are marked as embedded files.
+func TestReadStreamDataEmbeddedFile(t *testing.T) {
+	for _, tc := range []struct {
+		dict string
+		want bool
+	}{
+		{"<< /Type /EmbeddedFile /Length 3 >>", true},
+		{"<< /Length 3 >>", false},
+		{"<< /Type /XObject /Length 3 >>", false},
+	} {
+		s := testScanner(tc.dict + "stream\nabc\nendstream\n")
+		obj, err := s.ReadObject()
+		if err != nil {
+			t.Fatal(err)
+		}
+		stm, ok := obj.(*Stream)
+		if !ok {
+			t.Fatalf("got %T, want *Stream", obj)
+		}
+		if stm.embeddedFile != tc.want {
+			t.Errorf("%s: embeddedFile = %t, want %t", tc.dict, stm.embeddedFile, tc.want)
+		}
+	}
+}
+
+func TestSigContentsNotDecrypted(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
+		testSigContentsNotDecrypted(t, sec, cipher)
+	}
+}
+
+func testSigContentsNotDecrypted(t *testing.T, sec *stdSecHandler, cipher cipherType) {
+	ref := NewReference(5, 0)
+	cf := &cryptFilter{Cipher: cipher, Length: 128}
+	enc := &encryptInfo{sec: sec, strF: cf, stmF: cf, efF: cf}
+
+	plain := []byte("signature bytes!")
+	cipherText, err := enc.EncryptBytes(ref, plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plainHex := fmt.Sprintf("<%x>", plain)
+	cipherHex := fmt.Sprintf("<%x>", cipherText)
+	esc := strings.NewReplacer("\\", "\\\\", "(", "\\(", ")", "\\)", "\r", "\\r")
+	literal := "(" + esc.Replace(string(cipherText)) + ")"
+
+	cases := []struct {
+		name string
+		src  string
+		want Object // expected /Contents in the outer dictionary
+	}{
+		{"before type", "<</Contents " + plainHex + "/Type/Sig>>", String(plain)},
+		{"after type", "<</Type/Sig/Contents " + plainHex + ">>", String(plain)},
+		{"timestamp", "<</Type/DocTimeStamp/Contents " + plainHex + ">>", String(plain)},
+		{"byte range only", "<</ByteRange[0 1 2 3]/Contents " + plainHex + ">>", String(plain)},
+		{"other type", "<</Type/Other/Contents " + cipherHex + ">>", String(plain)},
+		{"no type", "<</Contents " + cipherHex + ">>", String(plain)},
+		{"literal string", "<</Type/Sig/Contents " + literal + ">>", String(plain)},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newScanner(bytes.NewReader([]byte(c.src)), nil, enc)
+			s.encRef = ref
+			dict, err := s.ReadDict()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(c.want, dict["Contents"]); diff != "" {
+				t.Errorf("wrong /Contents (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("nested", func(t *testing.T) {
+		src := "<</V<</Type/Sig/Contents " + plainHex + "/Reason " + cipherHex + ">>/Contents " + cipherHex + ">>"
+		s := newScanner(bytes.NewReader([]byte(src)), nil, enc)
+		s.encRef = ref
+		dict, err := s.ReadDict()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(String(plain), dict["Contents"]); diff != "" {
+			t.Errorf("outer /Contents (-want +got):\n%s", diff)
+		}
+		v, ok := dict["V"].(Dict)
+		if !ok {
+			t.Fatalf("missing /V")
+		}
+		if diff := cmp.Diff(String(plain), v["Contents"]); diff != "" {
+			t.Errorf("inner /Contents (-want +got):\n%s", diff)
+		}
+		if diff := cmp.Diff(String(plain), v["Reason"]); diff != "" {
+			t.Errorf("inner /Reason (-want +got):\n%s", diff)
+		}
+	})
+}
+
+func TestSigContentsDuplicateKey(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	ref := NewReference(5, 0)
+	sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cf := &cryptFilter{Cipher: cipherRC4, Length: 128}
+	enc := &encryptInfo{sec: sec, strF: cf, stmF: cf, efF: cf}
+	plain := []byte("abc")
+	cipherText, err := enc.EncryptBytes(ref, plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := fmt.Sprintf("<</Type/Sig/Contents <6161> /Contents <%x>>>", cipherText)
+	s := newScanner(bytes.NewReader([]byte(src)), nil, enc)
+	s.encRef = ref
+	dict, err := s.ReadDict()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(String(cipherText), dict["Contents"]); diff != "" {
+		t.Errorf("wrong /Contents (-want +got):\n%s", diff)
+	}
+}
+
+// TestReadStreamDataUnencryptedCrypt checks that a named /Crypt filter in an
+// unencrypted file is dropped on read, while Identity is kept.
+func TestReadStreamDataUnencryptedCrypt(t *testing.T) {
+	for _, tc := range []struct {
+		dict      string
+		wantF     Object
+		wantParms Object
+	}{
+		{"<< /Length 3 /Filter /Crypt /DecodeParms << /Name /StdCF >> >>", nil, nil},
+		{"<< /Length 3 /Filter /Crypt /DecodeParms << /Name 1 >> >>", nil, nil},
+		{"<< /Length 3 /Filter /Crypt /DecodeParms << /Name /Identity >> >>",
+			Name("Crypt"), Dict{"Name": Name("Identity")}},
+		{"<< /Length 3 /Filter /Crypt >>", Name("Crypt"), nil},
+		{"<< /Length 3 /Filter [/Crypt /ASCIIHexDecode] /DecodeParms [<< /Name /StdCF >> null] >>",
+			Name("ASCIIHexDecode"), nil},
+	} {
+		s := testScanner(tc.dict + "stream\nabc\nendstream\n")
+		obj, err := s.ReadObject()
+		if err != nil {
+			t.Fatal(err)
+		}
+		stm, ok := obj.(*Stream)
+		if !ok {
+			t.Fatalf("got %T, want *Stream", obj)
+		}
+		if diff := cmp.Diff(tc.wantF, stm.Dict["Filter"]); diff != "" {
+			t.Errorf("%s: wrong /Filter (-want +got):\n%s", tc.dict, diff)
+		}
+		if diff := cmp.Diff(tc.wantParms, stm.Dict["DecodeParms"]); diff != "" {
+			t.Errorf("%s: wrong /DecodeParms (-want +got):\n%s", tc.dict, diff)
+		}
+	}
+}

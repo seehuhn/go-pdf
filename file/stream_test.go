@@ -216,6 +216,75 @@ func TestStreamRoundTrip(t *testing.T) {
 	}
 }
 
+// TestStreamEncryptionScope checks that embedded file streams written and
+// read through Stream use the crypt filter for embedded files.  The streams
+// lack /Type /EmbeddedFile, so ExtractStream must identify them itself.
+func TestStreamEncryptionScope(t *testing.T) {
+	const payload = "embedded file contents"
+	cases := []struct {
+		name    string
+		version pdf.Version
+		stm, ef pdf.CryptMethod
+	}{
+		{"default", pdf.V1_7, pdf.CryptDefault, pdf.CryptDefault},
+		{"attachments-only", pdf.V1_7, pdf.CryptIdentity, pdf.CryptAES},
+		{"plaintext-embedded-files", pdf.V1_7, pdf.CryptAES, pdf.CryptIdentity},
+		{"RC4-embedded-files", pdf.V1_7, pdf.CryptAES, pdf.CryptRC4},
+		{"AES-256-attachments-only", pdf.V2_0, pdf.CryptIdentity, pdf.CryptAES},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			opt := &pdf.WriterOptions{
+				UserPassword:         "secret",
+				EncryptStreams:       c.stm,
+				EncryptEmbeddedFiles: c.ef,
+			}
+			w, mf := memfile.NewPDFWriter(t, c.version, opt)
+			rm := pdf.NewResourceManager(w)
+			obj, err := rm.Embed(&Stream{
+				WriteData: func(w io.Writer) error {
+					_, err := w.Write([]byte(payload))
+					return err
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			r, err := pdf.NewReader(bytes.NewReader(mf.Data), int64(len(mf.Data)),
+				&pdf.ReaderOptions{Password: "secret"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			stm, err := pdf.NewCursor(r).Stream(obj)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := stm.Dict["Type"]; ok {
+				t.Fatal("unexpected /Type in embedded file stream")
+			}
+
+			decoded, err := ExtractStream(pdf.CursorAt(pdf.NewExtractor(r), nil), obj, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			buf := &bytes.Buffer{}
+			if err := decoded.WriteData(buf); err != nil {
+				t.Fatal(err)
+			}
+			if buf.String() != payload {
+				t.Errorf("got %q, want %q", buf.String(), payload)
+			}
+		})
+	}
+}
+
 func TestStreamValidation(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_3, nil)
 	rm := pdf.NewResourceManager(w)

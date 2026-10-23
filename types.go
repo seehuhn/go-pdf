@@ -636,7 +636,40 @@ func formatString(w io.Writer, s String, opt OutputOptions) error {
 	return finalErr
 }
 
+// isSignatureDict reports whether d is a signature dictionary or a document
+// timestamp dictionary.  A dictionary without /Type but with a /ByteRange
+// entry is also accepted.
+func isSignatureDict(d Dict) bool {
+	switch d["Type"] {
+	case Name("Sig"), Name("DocTimeStamp"):
+		return true
+	case nil:
+		_, ok := d["ByteRange"]
+		return ok
+	}
+	return false
+}
+
+// formatSignatureContents writes the /Contents string of a signature
+// dictionary as a hex string.  This string is not encrypted (PDF 7.6.2).
+func formatSignatureContents(w io.Writer, s String) error {
+	_, err := fmt.Fprintf(w, "<%x>", []byte(s))
+	return err
+}
+
+// formatDictValue writes a dictionary value.  If sigContents is set, a
+// String value is written as an unencrypted hex string.
+func formatDictValue(w io.Writer, opt OutputOptions, sigContents bool, val Object, needSep bool) error {
+	if str, ok := val.(String); ok && sigContents {
+		return formatSignatureContents(w, str)
+	}
+	_, err := doFormat(w, val, opt, needSep)
+	return err
+}
+
 func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
+	sig := isSignatureDict(dict)
+
 	_, err := io.WriteString(w, "<<")
 	if err != nil {
 		return err
@@ -662,7 +695,7 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 			if err != nil {
 				return err
 			}
-			_, err = doFormat(w, val, opt, false)
+			err = formatDictValue(w, opt, sig && name == "Contents", val, false)
 			if err != nil {
 				return err
 			}
@@ -683,7 +716,7 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 			if err != nil {
 				return err
 			}
-			_, err = doFormat(w, val, opt, true)
+			err = formatDictValue(w, opt, sig && name == "Contents", val, true)
 			if err != nil {
 				return err
 			}
@@ -923,6 +956,28 @@ type Stream struct {
 	// crypt is the decryption filter for this stream, or nil if the stream
 	// is not encrypted. Decryption is applied lazily in DecodeStream.
 	crypt *filterCrypt
+
+	// embeddedFile marks an embedded file stream, which is encrypted with
+	// the /EFF crypt filter instead of /StmF.
+	embeddedFile bool
+}
+
+// AsEmbeddedFile returns a stream with the same contents as x, marked as an
+// embedded file stream.  In an encrypted file, embedded file streams use the
+// crypt filter given by /EFF in the encryption dictionary, rather than the one
+// for other streams.  Streams with /Type /EmbeddedFile are recognised
+// automatically; this method is needed for streams which are referenced from
+// a file specification's /EF or /RF entry but lack the /Type entry.
+//
+// The result is x itself if x is already marked, and a shallow copy otherwise.
+// The stream x is not modified.
+func (x *Stream) AsEmbeddedFile() *Stream {
+	if x.embeddedFile {
+		return x
+	}
+	res := *x
+	res.embeddedFile = true
+	return &res
 }
 
 // NewStream creates a Stream from in-memory data.

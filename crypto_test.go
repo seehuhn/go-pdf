@@ -26,6 +26,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestComputeOU(t *testing.T) {
@@ -454,7 +456,7 @@ func TestEncryptStream(t *testing.T) {
 				}
 
 				buf := &bytes.Buffer{}
-				w, err := enc.EncryptStream(ref, withDummyClose{buf})
+				w, err := enc.encryptStream(enc.stmF, ref, withDummyClose{buf})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -467,7 +469,7 @@ func TestEncryptStream(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				restored, err := enc.DecryptStream(ref, buf)
+				restored, err := enc.decryptStream(enc.stmF, ref, buf)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -679,7 +681,8 @@ func TestMalformedVR(t *testing.T) {
 }
 
 // buildRawPDF assembles a minimal PDF whose object i+1 has body objs[i], with a
-// trailer that references the encryption dictionary as /Encrypt <encRef> 0 R.
+// trailer that references the encryption dictionary as /Encrypt <encRef> 0 R,
+// or has no /Encrypt if encRef is 0.
 func buildRawPDF(objs []string, encRef int) []byte {
 	id := "<" + strings.Repeat("00", 16) + ">"
 	var b bytes.Buffer
@@ -694,8 +697,12 @@ func buildRawPDF(objs []string, encRef int) []byte {
 	for i := 1; i <= len(objs); i++ {
 		fmt.Fprintf(&b, "%010d 00000 n \n", offs[i])
 	}
-	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R /Encrypt %d 0 R "+
-		"/ID [%s %s] >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, encRef, id, id, x)
+	encrypt := ""
+	if encRef != 0 {
+		encrypt = fmt.Sprintf("/Encrypt %d 0 R ", encRef)
+	}
+	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R %s"+
+		"/ID [%s %s] >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, encrypt, id, id, x)
 	return b.Bytes()
 }
 
@@ -728,11 +735,11 @@ func TestEncryptVTypeCoercion(t *testing.T) {
 		objs []string
 	}{
 		{"real V", []string{cat, pages,
-			"<< /Filter /Standard /V 4.0 /R 4 /O " + h32 + " /U " + h32 + " /P -4 >>"}},
+			"<< /Filter /Standard /V 4.0 /R 4 /CF << /StdCF << /CFM /AESV2 /Length 16 >> >> /StmF /StdCF /StrF /StdCF /O " + h32 + " /U " + h32 + " /P -4 >>"}},
 		{"indirect V", []string{cat, pages,
-			"<< /Filter /Standard /V 4 0 R /R 4 /O " + h32 + " /U " + h32 + " /P -4 >>", "4"}},
+			"<< /Filter /Standard /V 4 0 R /R 4 /CF << /StdCF << /CFM /AESV2 /Length 16 >> >> /StmF /StdCF /StrF /StdCF /O " + h32 + " /U " + h32 + " /P -4 >>", "4"}},
 		{"indirect R", []string{cat, pages,
-			"<< /Filter /Standard /V 4 /R 4 0 R /O " + h32 + " /U " + h32 + " /P -4 >>", "4"}},
+			"<< /Filter /Standard /V 4 /R 4 0 R /CF << /StdCF << /CFM /AESV2 /Length 16 >> >> /StmF /StdCF /StrF /StdCF /O " + h32 + " /U " + h32 + " /P -4 >>", "4"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			data := buildRawPDF(tc.objs, 3)
@@ -946,5 +953,1082 @@ func TestCheckPerms(t *testing.T) {
 				t.Errorf("got err=%v, want ok=%v", err, c.ok)
 			}
 		})
+	}
+}
+
+// buildDanglingEncryptFile returns a file with the given objects whose
+// trailer has /Encrypt set to enc.
+func buildDanglingEncryptFile(tb testing.TB, objs []string, enc string) []byte {
+	tb.Helper()
+	data := buildRawPDF(objs, 0)
+	data = bytes.Replace(data, []byte("/Root 1 0 R "), []byte("/Root 1 0 R /Encrypt "+enc+" "), 1)
+	if !bytes.Contains(data, []byte("/Encrypt "+enc)) {
+		tb.Fatal("fixture lacks /Encrypt")
+	}
+	return data
+}
+
+// TestEncryptDanglingRef checks that an /Encrypt entry which does not
+// resolve to a dictionary is treated like an absent entry.
+func TestEncryptDanglingRef(t *testing.T) {
+	cat := "<< /Type /Catalog /Pages 2 0 R >>"
+	pages := "<< /Type /Pages /Kids [] /Count 0 >>"
+	for _, tc := range []struct {
+		name string
+		objs []string
+		enc  string
+	}{
+		{"missing object", []string{cat, pages}, "9 0 R"},
+		{"wrong generation", []string{cat, pages, "<< >>"}, "3 5 R"},
+		{"null", []string{cat, pages}, "null"},
+		{"not a dictionary", []string{cat, pages, "42"}, "3 0 R"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := buildDanglingEncryptFile(t, tc.objs, tc.enc)
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.GetMeta().Permissions != PermAll {
+				t.Errorf("permissions %v, want all", r.GetMeta().Permissions)
+			}
+			if r.GetMeta().Encryption != nil {
+				t.Error("unexpected encryption info")
+			}
+			if _, ok := r.GetMeta().Trailer["Encrypt"]; ok {
+				t.Error("trailer keeps the /Encrypt entry")
+			}
+		})
+	}
+}
+
+func TestCryptFilterDictLength(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	cases := []struct {
+		version Version
+		V       int
+		length  int
+	}{
+		{V1_7, 4, 128},
+		{V2_0, 5, 256},
+	}
+	for _, c := range cases {
+		sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, c.length, c.V, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cf := &cryptFilter{Name: "StdCF", Cipher: cipherAES, Length: c.length}
+		enc := &encryptInfo{sec: sec, strF: cf, stmF: cf, efF: cf,
+			cf: map[Name]*cryptFilter{"StdCF": cf}}
+		dict, err := enc.AsDict(c.version)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dict["Length"] != Integer(c.length) {
+			t.Errorf("V %d: wrong Length: %v", c.V, dict["Length"])
+		}
+		cfDict, _ := dict["CF"].(Dict)
+		stdCF, _ := cfDict["StdCF"].(Dict)
+		if stdCF["Length"] != Integer(c.length) {
+			t.Errorf("V %d: wrong CF/StdCF/Length: %v", c.V, stdCF["Length"])
+		}
+	}
+}
+
+func TestDecryptBytesKeepsInputOnBadPadding(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	ref := NewReference(1, 0)
+	sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc := encryptInfo{
+		strF: &cryptFilter{Cipher: cipherAES, Length: 128},
+		sec:  sec,
+	}
+	cipherText, err := enc.EncryptBytes(ref, []byte("0123456789ABCDEF"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cipherText[len(cipherText)-18] ^= 1
+	orig := bytes.Clone(cipherText)
+	if _, err := enc.DecryptBytes(ref, cipherText); err == nil {
+		t.Fatal("expected a padding error")
+	}
+	if !bytes.Equal(cipherText, orig) {
+		t.Error("input was modified")
+	}
+}
+
+func TestEncryptBytesKeepsInput(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	ref := NewReference(1, 0)
+	sec, err := createStdSecHandler(id, "secret", "supersecret", PermPrint, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cipher := range []cipherType{cipherRC4, cipherAES} {
+		enc := encryptInfo{
+			strF: &cryptFilter{Cipher: cipher, Length: 128},
+			sec:  sec,
+		}
+		plain := []byte("some plain text")
+		orig := bytes.Clone(plain)
+		if _, err := enc.EncryptBytes(ref, plain); err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(plain, orig) {
+			t.Errorf("cipher %d: EncryptBytes modified its input", cipher)
+		}
+	}
+}
+
+// object numbers of the streams in the file built by buildNamedCFFile
+const (
+	namedCFStdRef = 4 // /Crypt /StdCF
+	namedCFMyRef  = 5 // /Crypt /MyCF
+	namedCFDefRef = 6 // no /Crypt
+)
+
+// buildNamedCFFile returns a V 4 file whose /CF dictionary has the entries
+// StdCF (AESV2) and MyCF (RC4), together with the payloads of its streams.
+func buildNamedCFFile(tb testing.TB) ([]byte, map[uint32]string) {
+	tb.Helper()
+	id := make([]byte, 16) // matches the /ID written by buildRawPDF
+	sec, err := createStdSecHandler(id, "", "owner", PermAll, 128, 4, false)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	stdCF := &cryptFilter{Name: "StdCF", Cipher: cipherAES, Length: 128}
+	myCF := &cryptFilter{Name: "MyCF", Cipher: cipherRC4, Length: 128}
+	enc := &encryptInfo{
+		sec:  sec,
+		stmF: stdCF,
+		strF: stdCF,
+		efF:  stdCF,
+		cf:   map[Name]*cryptFilter{"StdCF": stdCF, "MyCF": myCF},
+	}
+
+	const (
+		stdRef = namedCFStdRef
+		myRef  = namedCFMyRef
+		defRef = namedCFDefRef
+	)
+	payload := map[uint32]string{
+		stdRef: "stream encrypted with StdCF",
+		myRef:  "stream encrypted with MyCF",
+		defRef: "stream encrypted with the default filter",
+	}
+	streamObj := func(num uint32, cf *cryptFilter, filter string) string {
+		buf := &bytes.Buffer{}
+		w, err := enc.encryptStream(cf, NewReference(num, 0), withDummyClose{buf})
+		if err != nil {
+			tb.Fatal(err)
+		}
+		if _, err := w.Write([]byte(payload[num])); err != nil {
+			tb.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			tb.Fatal(err)
+		}
+		return fmt.Sprintf("<< /Length %d %s >>\nstream\n%s\nendstream",
+			buf.Len(), filter, buf.String())
+	}
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		fmt.Sprintf("<< /Filter /Standard /V 4 /R 4 /Length 128"+
+			" /CF << /StdCF << /CFM /AESV2 /Length 16 >> /MyCF << /CFM /V2 /Length 16 >> >>"+
+			" /StmF /StdCF /StrF /StdCF /O <%x> /U <%x> /P %d >>",
+			sec.O, sec.U, int32(sec.P)),
+		streamObj(stdRef, stdCF, "/Filter /Crypt /DecodeParms << /Name /StdCF >>"),
+		streamObj(myRef, myCF, "/Filter [/Crypt] /DecodeParms [<< /Name /MyCF >>]"),
+		streamObj(defRef, stdCF, ""),
+	}
+	return buildRawPDF(objs, 3), payload
+}
+
+// TestNamedCryptFilter checks streams which select a crypt filter of the
+// /CF dictionary through a leading /Crypt entry.
+func TestNamedCryptFilter(t *testing.T) {
+	const (
+		stdRef = namedCFStdRef
+		myRef  = namedCFMyRef
+		defRef = namedCFDefRef
+	)
+	data, payload := buildNamedCFFile(t)
+
+	// checkStreams verifies that the streams in r decode to the payloads
+	checkStreams := func(t *testing.T, r Getter, refs map[uint32]Reference) {
+		t.Helper()
+		for num, ref := range refs {
+			stm, err := NewCursor(r).Stream(ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rc, err := DecodeStream(r, nil, stm)
+			if err != nil {
+				t.Fatalf("object %d: %v", num, err)
+			}
+			got, err := io.ReadAll(rc)
+			if err != nil {
+				t.Fatalf("object %d: %v", num, err)
+			}
+			if string(got) != payload[num] {
+				t.Errorf("object %d: got %q, want %q", num, got, payload[num])
+			}
+		}
+	}
+	srcRefs := map[uint32]Reference{}
+	for num := range payload {
+		srcRefs[num] = NewReference(num, 0)
+	}
+
+	src, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("DecodeStream", func(t *testing.T) {
+		checkStreams(t, src, srcRefs)
+	})
+
+	t.Run("RawStreamReader", func(t *testing.T) {
+		for num, ref := range srcRefs {
+			stm, err := NewCursor(src).Stream(ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rc, err := RawStreamReader(src, stm)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := io.ReadAll(rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != payload[num] {
+				t.Errorf("object %d: got %q, want %q", num, got, payload[num])
+			}
+		}
+	})
+
+	for _, encrypted := range []bool{true, false} {
+		t.Run(fmt.Sprintf("Copier/encrypted=%t", encrypted), func(t *testing.T) {
+			opt := &WriterOptions{}
+			if encrypted {
+				opt.UserPassword = "dst"
+			}
+			buf := &bytes.Buffer{}
+			w, err := NewWriter(buf, V1_6, opt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			copier := NewCopier(w, src)
+			dstRefs := map[uint32]Reference{}
+			for num, ref := range srcRefs {
+				dstRefs[num], err = copier.CopyReference(ref)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := addPage(w); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			dst, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()),
+				&ReaderOptions{Password: "dst"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			checkStreams(t, dst, dstRefs)
+
+			// the destination defines StdCF only if it is encrypted
+			wantFilter := map[uint32]Object{stdRef: nil, myRef: nil, defRef: nil}
+			if encrypted {
+				wantFilter[stdRef] = Name("Crypt")
+			}
+			for num, ref := range dstRefs {
+				stm, err := NewCursor(dst).Stream(ref)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := stm.Dict["Filter"]; got != wantFilter[num] {
+					t.Errorf("object %d: /Filter %v, want %v", num, got, wantFilter[num])
+				}
+				if num != stdRef || !encrypted {
+					if _, ok := stm.Dict["DecodeParms"]; ok {
+						t.Errorf("object %d: unexpected /DecodeParms", num)
+					}
+				}
+			}
+		})
+	}
+
+	t.Run("Update", func(t *testing.T) {
+		dst := &bytes.Buffer{}
+		w, err := NewUpdaterTo(bytes.NewReader(data), int64(len(data)), dst, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		newRefs := map[uint32]Reference{}
+		for num, f := range map[uint32]Filter{
+			stdRef: FilterCryptStandard{},
+			myRef:  FilterCryptNamed{Name: "MyCF"},
+		} {
+			ref := w.Alloc()
+			s, err := w.OpenStream(ref, nil, f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.Write([]byte(payload[num])); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Close(); err != nil {
+				t.Fatal(err)
+			}
+			newRefs[num] = ref
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		r, err := NewReader(bytes.NewReader(dst.Bytes()), int64(dst.Len()), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkStreams(t, r, newRefs)
+		checkStreams(t, r, srcRefs)
+	})
+
+	t.Run("Writer", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		w, err := NewWriter(buf, V1_6, &WriterOptions{UserPassword: "u"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.OpenStream(w.Alloc(), nil, FilterCryptNamed{Name: "MyCF"}); err == nil {
+			t.Error("expected error for undefined crypt filter")
+		}
+
+		ref := w.Alloc()
+		s, err := w.OpenStream(ref, nil, FilterCryptStandard{}, FilterFlate{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Write([]byte(payload[stdRef])); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := addPage(w); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()),
+			&ReaderOptions{Password: "u"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkStreams(t, r, map[uint32]Reference{stdRef: ref})
+	})
+
+	t.Run("UnencryptedWriter", func(t *testing.T) {
+		w, err := NewWriter(&bytes.Buffer{}, V1_6, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.OpenStream(w.Alloc(), nil, FilterCryptStandard{}); err == nil {
+			t.Error("expected error for crypt filter in unencrypted file")
+		}
+	})
+}
+
+// TestCFLengthPermissive checks the interpretation of /Length in crypt
+// filter dictionaries.
+func TestCFLengthPermissive(t *testing.T) {
+	c := NewCursor(mockGetter)
+	for _, tc := range []struct {
+		cfm    Name
+		length Object
+		want   int
+	}{
+		{"V2", nil, 128},
+		{"V2", Integer(5), 40},
+		{"V2", Integer(16), 128},
+		{"V2", Integer(40), 40},
+		{"V2", Integer(96), 96},
+		{"V2", Integer(128), 128},
+		{"V2", Integer(4), 128},
+		{"V2", Integer(17), 128},
+		{"V2", Integer(44), 128},
+		{"V2", Integer(256), 128},
+		{"V2", Name("x"), 128},
+		{"AESV2", Integer(5), 128},
+		{"AESV2", nil, 128},
+		{"AESV3", Integer(16), 256},
+		{"AESV3", nil, 256},
+	} {
+		cfDict := Dict{"CFM": tc.cfm, "Length": tc.length}
+		cf, err := getCryptFilter(c, "MyCF", cfDict)
+		if err != nil {
+			t.Errorf("%s/%v: %v", tc.cfm, tc.length, err)
+			continue
+		}
+		if cf.Length != tc.want {
+			t.Errorf("%s/%v: length %d, want %d", tc.cfm, tc.length, cf.Length, tc.want)
+		}
+		if cf.AuthEvent != "DocOpen" {
+			t.Errorf("%s/%v: AuthEvent %q", tc.cfm, tc.length, cf.AuthEvent)
+		}
+	}
+
+	for _, cfm := range []Object{nil, Name("None"), Name("AESV4"), Integer(2)} {
+		_, err := getCryptFilter(c, "MyCF", Dict{"CFM": cfm})
+		if !IsMalformed(err) {
+			t.Errorf("CFM %v: expected malformed-file error, got %v", cfm, err)
+		}
+	}
+}
+
+// effTestFile is a hand-built V 4 file whose /EFF differs from /StmF.
+type effTestFile struct {
+	data []byte
+	enc  *encryptInfo
+
+	payload map[Reference]string // stream contents, by object
+	specRef Reference            // file specification with /EF and /RF
+	efRef   Reference            // untyped stream referenced from /EF
+	rfRef   Reference            // untyped stream referenced from /RF
+	stmRef  Reference            // ordinary stream
+	stdRef  Reference            // /EF stream with its own /Crypt /StdCF
+	idRef   Reference            // /EF stream with its own /Crypt /Identity
+}
+
+// buildEFFTestFile returns a file with /StmF /StdCF (AESV2) and the given
+// /EFF, which is either Identity or MyCF (RC4).  The embedded file streams
+// lack /Type /EmbeddedFile, so that only their use in /EF and /RF identifies
+// them.
+func buildEFFTestFile(t *testing.T, eff Name) *effTestFile {
+	t.Helper()
+	id := make([]byte, 16) // matches the /ID written by buildRawPDF
+	sec, err := createStdSecHandler(id, "", "owner", PermAll, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdCF := &cryptFilter{Name: "StdCF", Cipher: cipherAES, Length: 128}
+	myCF := &cryptFilter{Name: "MyCF", Cipher: cipherRC4, Length: 128}
+	enc := &encryptInfo{
+		sec:  sec,
+		stmF: stdCF,
+		strF: stdCF,
+		cf:   map[Name]*cryptFilter{"StdCF": stdCF, "MyCF": myCF},
+	}
+	switch eff {
+	case "Identity":
+	case "MyCF":
+		enc.efF = myCF
+	default:
+		t.Fatalf("unsupported EFF %s", eff)
+	}
+
+	f := &effTestFile{
+		enc:     enc,
+		specRef: NewReference(4, 0),
+		efRef:   NewReference(5, 0),
+		rfRef:   NewReference(6, 0),
+		stmRef:  NewReference(7, 0),
+		stdRef:  NewReference(8, 0),
+		idRef:   NewReference(9, 0),
+	}
+	f.payload = map[Reference]string{
+		f.stdRef: "own StdCF contents",
+		f.idRef:  "own Identity contents",
+		f.efRef:  "embedded file contents",
+		f.rfRef:  "related file contents",
+		f.stmRef: "ordinary stream contents",
+	}
+	streamObj := func(ref Reference, cf *cryptFilter, extra string) string {
+		buf := &bytes.Buffer{}
+		w, err := enc.encryptStream(cf, ref, withDummyClose{buf})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(f.payload[ref])); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return fmt.Sprintf("<< %s/Length %d >>\nstream\n%s\nendstream", extra, buf.Len(), buf.String())
+	}
+	fileName, err := enc.EncryptBytes(f.specRef, []byte("a.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		fmt.Sprintf("<< /Filter /Standard /V 4 /R 4 /Length 128"+
+			" /CF << /StdCF << /CFM /AESV2 /Length 16 >> /MyCF << /CFM /V2 /Length 16 >> >>"+
+			" /StmF /StdCF /StrF /StdCF /EFF /%s /O <%x> /U <%x> /P %d >>",
+			eff, sec.O, sec.U, int32(sec.P)),
+		fmt.Sprintf("<< /Type /Filespec /EF << /F 5 0 R /UF 8 0 R /DOS 9 0 R >> /RF << /F [<%x> 6 0 R] >> >>",
+			fileName),
+		streamObj(f.efRef, enc.efF, ""),
+		streamObj(f.rfRef, enc.efF, ""),
+		streamObj(f.stmRef, enc.stmF, ""),
+		streamObj(f.stdRef, stdCF, "/Filter /Crypt /DecodeParms << /Name /StdCF >> "),
+		streamObj(f.idRef, nil, "/Filter /Crypt "),
+	}
+	f.data = buildRawPDF(objs, 3)
+	return f
+}
+
+// decodeAll returns the decoded contents of stm.
+func decodeAll(t *testing.T, r Getter, stm *Stream) string {
+	t.Helper()
+	rc, err := DecodeStream(r, nil, stm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(got)
+}
+
+// TestEmbeddedFileEFF checks that embedded file streams read from a file
+// whose /EFF differs from /StmF are decrypted with /EFF.
+func TestEmbeddedFileEFF(t *testing.T) {
+	for _, eff := range []Name{"Identity", "MyCF"} {
+		t.Run(string(eff), func(t *testing.T) {
+			f := buildEFFTestFile(t, eff)
+			r, err := NewReader(bytes.NewReader(f.data), int64(len(f.data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, ref := range []Reference{f.efRef, f.rfRef} {
+				stm, err := NewCursor(r).Stream(ref)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := decodeAll(t, r, stm.AsEmbeddedFile()); got != f.payload[ref] {
+					t.Errorf("DecodeStream: got %q, want %q", got, f.payload[ref])
+				}
+
+				rc, err := RawStreamReader(r, stm.AsEmbeddedFile())
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := io.ReadAll(rc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != f.payload[ref] {
+					t.Errorf("RawStreamReader: got %q, want %q", got, f.payload[ref])
+				}
+			}
+			stm, err := NewCursor(r).Stream(f.stmRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := decodeAll(t, r, stm); got != f.payload[f.stmRef] {
+				t.Errorf("got %q, want %q", got, f.payload[f.stmRef])
+			}
+		})
+	}
+}
+
+// TestEmbeddedFileOwnCrypt checks that an embedded file stream with its own
+// leading /Crypt filter is decrypted with that filter rather than /EFF.
+func TestEmbeddedFileOwnCrypt(t *testing.T) {
+	for _, eff := range []Name{"Identity", "MyCF"} {
+		t.Run(string(eff), func(t *testing.T) {
+			f := buildEFFTestFile(t, eff)
+			r, err := NewReader(bytes.NewReader(f.data), int64(len(f.data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, ref := range []Reference{f.stdRef, f.idRef} {
+				stm, err := NewCursor(r).Stream(ref)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := decodeAll(t, r, stm.AsEmbeddedFile()); got != f.payload[ref] {
+					t.Errorf("object %d: got %q, want %q", ref.Number(), got, f.payload[ref])
+				}
+			}
+		})
+	}
+}
+
+// attachmentsOnlyFile is a hand-built V 4 file in which only embedded files
+// are encrypted: /StmF and /StrF are absent and /EFF /StdCF has
+// /AuthEvent /EFOpen.  The user password is "secret".
+type attachmentsOnlyFile struct {
+	data    []byte
+	payload string
+	efRef   Reference
+	pageRef Reference
+	perm    Perm // user permissions given by /R and /P
+}
+
+func buildAttachmentsOnlyFile(tb testing.TB) *attachmentsOnlyFile {
+	tb.Helper()
+	id := make([]byte, 16) // matches the /ID written by buildRawPDF
+	sec, err := createStdSecHandler(id, "secret", "owner", PermAll&^PermPrint, 128, 4, false)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	stdCF := &cryptFilter{Name: "StdCF", Cipher: cipherAES, Length: 128}
+	enc := &encryptInfo{sec: sec, efF: stdCF, cf: map[Name]*cryptFilter{"StdCF": stdCF}}
+	f := &attachmentsOnlyFile{
+		payload: "attachment contents",
+		efRef:   NewReference(5, 0),
+		pageRef: NewReference(6, 0),
+		perm:    stdSecPToPerm(sec.R, sec.P),
+	}
+	buf := &bytes.Buffer{}
+	w, err := enc.encryptStream(stdCF, f.efRef, withDummyClose{buf})
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if _, err := w.Write([]byte(f.payload)); err != nil {
+		tb.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		tb.Fatal(err)
+	}
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		fmt.Sprintf("<< /Filter /Standard /V 4 /R 4 /Length 128"+
+			" /CF << /StdCF << /CFM /AESV2 /Length 16 /AuthEvent /EFOpen >> >>"+
+			" /EFF /StdCF /O <%x> /U <%x> /P %d >>",
+			sec.O, sec.U, int32(sec.P)),
+		"<< /Type /Filespec /EF << /F 5 0 R >> >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", buf.Len(), buf.String()),
+		"<< /Length 12 >>\nstream\nplain stream\nendstream",
+	}
+	f.data = buildRawPDF(objs, 3)
+	return f
+}
+
+// TestAttachmentsOnlyDeferredAuth checks that a file with only its embedded
+// files encrypted opens without a password, and that the password is needed
+// only to access the embedded files.
+func TestAttachmentsOnlyDeferredAuth(t *testing.T) {
+	f := buildAttachmentsOnlyFile(t)
+
+	r, err := NewReader(bytes.NewReader(f.data), int64(len(f.data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.GetMeta().Permissions; got != f.perm {
+		t.Errorf("permissions: got %v, want %v", got, f.perm)
+	}
+	stm, err := NewCursor(r).Stream(f.pageRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := decodeAll(t, r, stm); got != "plain stream" {
+		t.Errorf("plain stream: got %q", got)
+	}
+
+	stm, err = NewCursor(r).Stream(f.efRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rc, err := DecodeStream(r, nil, stm.AsEmbeddedFile())
+	if err == nil {
+		_, err = io.ReadAll(rc)
+	}
+	if _, ok := errors.AsType[*AuthenticationError](err); !ok {
+		t.Errorf("embedded file without password: got error %v", err)
+	}
+
+	// with the password, the embedded file can be read
+	r, err = NewReader(bytes.NewReader(f.data), int64(len(f.data)),
+		&ReaderOptions{Password: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stm, err = NewCursor(r).Stream(f.efRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := decodeAll(t, r, stm.AsEmbeddedFile()); got != f.payload {
+		t.Errorf("embedded file: got %q, want %q", got, f.payload)
+	}
+}
+
+// TestAttachmentsOnlyDeferredAuthUpdate checks that in update mode, adding
+// an embedded file to an attachments-only file needs the password, while
+// other changes do not.
+func TestAttachmentsOnlyDeferredAuthUpdate(t *testing.T) {
+	f := buildAttachmentsOnlyFile(t)
+
+	w, err := NewUpdaterTo(bytes.NewReader(f.data), int64(len(f.data)), io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.OpenEmbeddedFileStream(w.Alloc(), nil)
+	if _, ok := errors.AsType[*AuthenticationError](err); !ok {
+		t.Errorf("embedded file without password: got error %v", err)
+	}
+	s, err := w.OpenStream(w.Alloc(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	w, err = NewUpdaterTo(bytes.NewReader(f.data), int64(len(f.data)), io.Discard,
+		&UpdateOptions{Password: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = w.OpenEmbeddedFileStream(w.Alloc(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestAllIdentityMalformedAuth checks that a file without /StmF, /StrF and
+// /EFF, in which all data is stored as plaintext, opens despite a wrong
+// password and garbage /O and /U values.
+func TestAllIdentityMalformedAuth(t *testing.T) {
+	garbage := func(n int) string {
+		return fmt.Sprintf("<%x>", bytes.Repeat([]byte{0xA5}, n))
+	}
+	cases := []struct {
+		name string
+		enc  string
+	}{
+		{"V4", "<< /Filter /Standard /V 4 /R 4 /Length 128" +
+			" /CF << /StdCF << /CFM /AESV2 >> >>" +
+			" /O " + garbage(32) + " /U " + garbage(32) + " /P -4 >>"},
+		{"V5", "<< /Filter /Standard /V 5 /R 6" +
+			" /CF << /StdCF << /CFM /AESV3 >> >>" +
+			" /O " + garbage(48) + " /U " + garbage(48) +
+			" /OE " + garbage(32) + " /UE " + garbage(32) +
+			" /Perms " + garbage(16) + " /P -4 >>"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			objs := []string{
+				"<< /Type /Catalog /Pages 2 0 R >>",
+				"<< /Type /Pages /Kids [] /Count 0 >>",
+				c.enc,
+				"<< /Length 12 >>\nstream\nplain stream\nendstream",
+			}
+			data := buildRawPDF(objs, 3)
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)),
+				&ReaderOptions{Password: "wrong"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := &Encryption{
+				Streams:       CryptIdentity,
+				Strings:       CryptIdentity,
+				EmbeddedFiles: CryptIdentity,
+			}
+			if diff := cmp.Diff(want, r.GetMeta().Encryption); diff != "" {
+				t.Errorf("wrong Encryption (-want +got):\n%s", diff)
+			}
+			stm, err := NewCursor(r).Stream(NewReference(4, 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := decodeAll(t, r, stm); got != "plain stream" {
+				t.Errorf("got %q", got)
+			}
+		})
+	}
+}
+
+// TestAuthEventRoundTrip checks that a crypt filter used only for embedded
+// files is written with /AuthEvent /EFOpen and reads back unchanged.
+func TestAuthEventRoundTrip(t *testing.T) {
+	for _, v := range []Version{V1_7, V2_0} {
+		t.Run(v.String(), func(t *testing.T) {
+			opt := &WriterOptions{
+				UserPassword:   "secret",
+				EncryptStreams: CryptIdentity,
+				EncryptStrings: CryptIdentity,
+			}
+			buf := &bytes.Buffer{}
+			w, err := NewWriter(buf, v, opt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := w.w.enc.AsDict(v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := addPage(w); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.enc.efF == nil || r.enc.efF.AuthEvent != "EFOpen" {
+				t.Errorf("embedded file filter: got %v", r.enc.efF)
+			}
+			got, err := r.enc.AsDict(v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("encryption dictionary round trip (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestV4RC4KeyLength checks that a V 4 file whose stream filter is RC4 with a
+// key shorter than 128 bits derives the file key length from /CF.
+func TestV4RC4KeyLength(t *testing.T) {
+	const (
+		stmPayload = "short-key stream"
+		strPayload = "short-key string"
+	)
+	for _, cfLength := range []int{5, 40} {
+		t.Run(fmt.Sprintf("Length=%d", cfLength), func(t *testing.T) {
+			id := make([]byte, 16) // matches the /ID written by buildRawPDF
+			sec, err := createStdSecHandler(id, "", "owner", PermAll, 40, 4, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cf := &cryptFilter{Name: "StdCF", Cipher: cipherRC4, Length: 40}
+			enc := &encryptInfo{sec: sec, stmF: cf, strF: cf, efF: cf,
+				cf: map[Name]*cryptFilter{"StdCF": cf}}
+
+			stmRef := NewReference(4, 0)
+			buf := &bytes.Buffer{}
+			sw, err := enc.encryptStream(cf, stmRef, withDummyClose{buf})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := sw.Write([]byte(stmPayload)); err != nil {
+				t.Fatal(err)
+			}
+			if err := sw.Close(); err != nil {
+				t.Fatal(err)
+			}
+			strRef := NewReference(5, 0)
+			encStr, err := enc.EncryptBytes(strRef, []byte(strPayload))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			objs := []string{
+				"<< /Type /Catalog /Pages 2 0 R >>",
+				"<< /Type /Pages /Kids [] /Count 0 >>",
+				fmt.Sprintf("<< /Filter /Standard /V 4 /R 4"+
+					" /CF << /StdCF << /CFM /V2 /Length %d >> >>"+
+					" /StmF /StdCF /StrF /StdCF /O <%x> /U <%x> /P %d >>",
+					cfLength, sec.O, sec.U, int32(sec.P)),
+				fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", buf.Len(), buf.String()),
+				fmt.Sprintf("[<%x>]", encStr),
+			}
+			data := buildRawPDF(objs, 3)
+
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := &Encryption{Streams: CryptRC4, Strings: CryptRC4,
+				EmbeddedFiles: CryptRC4, KeyLength: 40}
+			if diff := cmp.Diff(want, r.GetMeta().Encryption); diff != "" {
+				t.Errorf("wrong encryption (-want +got):\n%s", diff)
+			}
+			stm, err := NewCursor(r).Stream(stmRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := decodeAll(t, r, stm); got != stmPayload {
+				t.Errorf("stream: got %q, want %q", got, stmPayload)
+			}
+			arr, err := NewCursor(r).Array(strRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(Array{String(strPayload)}, arr); diff != "" {
+				t.Errorf("string (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestDecodeStreamMalformedAES checks AES stream bodies which are empty or
+// not valid ciphertext.
+func TestDecodeStreamMalformedAES(t *testing.T) {
+	id := make([]byte, 16) // matches the /ID written by buildRawPDF
+	sec, err := createStdSecHandler(id, "", "owner", PermAll, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name      string
+		body      []byte
+		malformed bool
+	}{
+		{"empty", nil, false},
+		{"short IV", bytes.Repeat([]byte{1}, 8), true},
+		{"partial block", bytes.Repeat([]byte{1}, 20), true},
+		{"bad padding", bytes.Repeat([]byte{1}, 32), true},
+	}
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		fmt.Sprintf("<< /Filter /Standard /V 4 /R 4"+
+			" /CF << /StdCF << /CFM /AESV2 /Length 16 >> >>"+
+			" /StmF /StdCF /StrF /StdCF /O <%x> /U <%x> /P %d >>",
+			sec.O, sec.U, int32(sec.P)),
+	}
+	for _, c := range cases {
+		objs = append(objs, fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream",
+			len(c.body), c.body))
+	}
+	data := buildRawPDF(objs, 3)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			stm, err := NewCursor(r).Stream(NewReference(uint32(4+i), 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []byte
+			rc, err := DecodeStream(r, nil, stm)
+			if err == nil {
+				got, err = io.ReadAll(rc)
+			}
+			switch {
+			case c.malformed && !IsMalformed(err):
+				t.Errorf("expected malformed-file error, got %v", err)
+			case !c.malformed && err != nil:
+				t.Error(err)
+			case !c.malformed && len(got) != 0:
+				t.Errorf("got %q, want empty data", got)
+			}
+		})
+	}
+}
+
+// TestV4ShortKeyAES checks a V 4 file with a 40-bit RC4 stream filter and an
+// AES filter: RC4 streams decrypt, while AES data, which needs a longer file
+// key, is reported as malformed.
+func TestV4ShortKeyAES(t *testing.T) {
+	const payload = "RC4-40 stream"
+	id := make([]byte, 16) // matches the /ID written by buildRawPDF
+	sec, err := createStdSecHandler(id, "", "owner", PermAll, 40, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cf := &cryptFilter{Name: "StdCF", Cipher: cipherRC4, Length: 40}
+	enc := &encryptInfo{sec: sec, stmF: cf, strF: cf, efF: cf,
+		cf: map[Name]*cryptFilter{"StdCF": cf}}
+	rc4Ref := NewReference(4, 0)
+	buf := &bytes.Buffer{}
+	sw, err := enc.encryptStream(cf, rc4Ref, withDummyClose{buf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sw.Write([]byte(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if err := sw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	aesBody := bytes.Repeat([]byte{1}, 32)
+
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		fmt.Sprintf("<< /Filter /Standard /V 4 /R 4"+
+			" /CF << /StdCF << /CFM /V2 /Length 5 >> /MyCF << /CFM /AESV2 >> >>"+
+			" /StmF /StdCF /StrF /StdCF /O <%x> /U <%x> /P %d >>",
+			sec.O, sec.U, int32(sec.P)),
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", buf.Len(), buf.String()),
+		fmt.Sprintf("<< /Length %d /Filter /Crypt /DecodeParms << /Name /MyCF >> >>\nstream\n%s\nendstream",
+			len(aesBody), aesBody),
+	}
+	data := buildRawPDF(objs, 3)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stm, err := NewCursor(r).Stream(rc4Ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := decodeAll(t, r, stm); got != payload {
+		t.Errorf("RC4 stream: got %q, want %q", got, payload)
+	}
+
+	stm, err = NewCursor(r).Stream(NewReference(5, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rc, err := DecodeStream(r, nil, stm)
+	if err == nil {
+		_, err = io.ReadAll(rc)
+	}
+	if !IsMalformed(err) {
+		t.Errorf("AES stream: expected malformed-file error, got %v", err)
+	}
+}
+
+// TestV4RC4KeyLengthEFF checks that the file key length follows /EFF when
+// that is the only RC4 filter.
+func TestV4RC4KeyLengthEFF(t *testing.T) {
+	id := make([]byte, 16) // matches the /ID written by buildRawPDF
+	sec, err := createStdSecHandler(id, "", "owner", PermAll, 40, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		fmt.Sprintf("<< /Filter /Standard /V 4 /R 4"+
+			" /CF << /StdCF << /CFM /V2 /Length 40 >> >>"+
+			" /StmF /Identity /StrF /Identity /EFF /StdCF /O <%x> /U <%x> /P %d >>",
+			sec.O, sec.U, int32(sec.P)),
+	}
+	data := buildRawPDF(objs, 3)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &Encryption{Streams: CryptIdentity, Strings: CryptIdentity,
+		EmbeddedFiles: CryptRC4, KeyLength: 40}
+	if diff := cmp.Diff(want, r.GetMeta().Encryption); diff != "" {
+		t.Errorf("wrong encryption (-want +got):\n%s", diff)
+	}
+	if r.enc.sec.key == nil {
+		t.Error("authentication failed")
 	}
 }

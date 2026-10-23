@@ -487,3 +487,24 @@ func TestFormatNameNull(t *testing.T) {
 		t.Error("expected error for dict key, got nil")
 	}
 }
+
+func TestStreamAsEmbeddedFile(t *testing.T) {
+	x := NewStream(Dict{"Subtype": Name("text/plain")}, []byte("abc"))
+	y := x.AsEmbeddedFile()
+	if x.embeddedFile {
+		t.Error("AsEmbeddedFile modified its receiver")
+	}
+	if y == x || !y.embeddedFile {
+		t.Error("AsEmbeddedFile did not return a marked copy")
+	}
+	if y.AsEmbeddedFile() != y {
+		t.Error("AsEmbeddedFile copied a marked stream")
+	}
+	got, err := io.ReadAll(y.NewReader())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "abc" || y.Dict["Subtype"] != Name("text/plain") {
+		t.Error("AsEmbeddedFile changed the stream contents")
+	}
+}

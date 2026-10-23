@@ -7958,7 +7958,7 @@ types:
     pdfType: array
     required: false
     introduced: '1.5'
-    notes: Adobe Acrobat DC generates an array of names which is undocumented
+    notes: some writers generate an array of names, which is undocumented
   - goName:
     pdfKey: NonEFontNoWarn
     pdfType: boolean
