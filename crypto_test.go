@@ -534,7 +534,7 @@ func TestDecryptBytesRejectsBadAESPadding(t *testing.T) {
 func TestPerm(t *testing.T) {
 	// We iterate over all combinations of bits
 	// 3, 4, 5, 6, 9, 11, and 12 (1-based).
-	for b := range uint32(127) {
+	for b := range uint32(128) {
 		// bit in b -> bit in P
 		//       0  ->  3-1 = 2
 		//       1  ->  4-1 = 3
@@ -558,8 +558,8 @@ func TestPerm(t *testing.T) {
 			t.Error("modify permission without assemble permission")
 		}
 
-		// Remove some combinations which make no sense, e.g. full print
-		// permission without degraded print permission.
+		// skip non-canonical encodings, where a bit is ignored because its
+		// partner bit is clear
 		if P&(1<<(4-1)) != 0 && P&(1<<(11-1)) == 0 {
 			continue
 		}
@@ -575,6 +575,35 @@ func TestPerm(t *testing.T) {
 			mask := uint32(0b00001111_11111111)
 			t.Errorf("perm=%07b P1=%012b P2=%012b diff=%012b",
 				perm, P&mask, P2&mask, P^P2)
+		}
+	}
+}
+
+// TestPermPrintBits checks that bit 3 of P gates all printing, and that
+// bit 12 only restricts printing further for R >= 3.
+func TestPermPrintBits(t *testing.T) {
+	const bit3, bit12 = uint32(1 << (3 - 1)), uint32(1 << (12 - 1))
+	const printPerms = PermPrint | PermPrintDegraded
+	cases := []struct {
+		R    int
+		P    uint32
+		want Perm
+	}{
+		{2, ^(bit3 | bit12), 0},
+		{2, ^bit3, 0},
+		{2, ^bit12, printPerms},
+		{2, ^uint32(0), printPerms},
+		{3, ^(bit3 | bit12), 0},
+		{3, ^bit3, 0},
+		{3, ^bit12, PermPrintDegraded},
+		{3, ^uint32(0), printPerms},
+		{6, ^bit3, 0},
+	}
+	for _, c := range cases {
+		got := stdSecPToPerm(c.R, c.P) & printPerms
+		if got != c.want {
+			t.Errorf("R=%d P=%012b: got print perms %07b, want %07b",
+				c.R, c.P&0xfff, got, c.want)
 		}
 	}
 }

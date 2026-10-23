@@ -1375,21 +1375,15 @@ var zero16 = []byte{
 
 func stdSecPToPerm(R int, P uint32) Perm {
 	perm := PermAll
-	if R == 2 {
-		if P&(1<<(3-1)) == 0 {
-			perm &= ^(PermPrint | PermPrintDegraded)
-		}
-	} else if R >= 3 {
-		// bit 3 | 12
-		//     0 | 0 -> neither full nor degraded printing
-		//     0 | 1 -> full printing
-		//     1 | 0 -> only degraded printing (full printing forbidden)
-		//     1 | 1 -> full printing
-		if P&(1<<(3-1)) == 0 && P&(1<<(12-1)) == 0 {
-			perm &= ^(PermPrint | PermPrintDegraded)
-		} else if P&(1<<(3-1)) != 0 && P&(1<<(12-1)) == 0 {
-			perm &= ^PermPrint
-		}
+	// bit 3 | 12 (bit 12 only for R >= 3)
+	//     0 | 0 -> no printing
+	//     0 | 1 -> no printing
+	//     1 | 0 -> only degraded printing (full printing forbidden)
+	//     1 | 1 -> full printing
+	if P&(1<<(3-1)) == 0 {
+		perm &= ^(PermPrint | PermPrintDegraded)
+	} else if R >= 3 && P&(1<<(12-1)) == 0 {
+		perm &= ^PermPrint
 	}
 
 	// bit 4 | 11
