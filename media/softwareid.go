@@ -86,15 +86,15 @@ func ExtractSoftwareIdentifier(c pdf.Cursor, obj pdf.Object, isDirect bool) (*So
 		s.High = high
 	}
 
-	if li, err := pdf.Optional(c.Boolean(dict["LI"])); err != nil {
+	if li, ok, err := c.OptionalBoolean(dict["LI"]); err != nil {
 		return nil, err
-	} else if dict["LI"] != nil {
-		s.LowExclusive = !bool(li)
+	} else if ok {
+		s.LowExclusive = !li
 	}
-	if hi, err := pdf.Optional(c.Boolean(dict["HI"])); err != nil {
+	if hi, ok, err := c.OptionalBoolean(dict["HI"]); err != nil {
 		return nil, err
-	} else if dict["HI"] != nil {
-		s.HighExclusive = !bool(hi)
+	} else if ok {
+		s.HighExclusive = !hi
 	}
 
 	if os, err := pdf.Optional(c.Array(dict["OS"])); err != nil {
@@ -113,7 +113,7 @@ func ExtractSoftwareIdentifier(c pdf.Cursor, obj pdf.Object, isDirect bool) (*So
 }
 
 // extractVersionArray reads a version array, returning nil if the value is
-// missing, empty, or contains a negative subversion number.
+// missing, empty, or contains a non-integer or negative element.
 func extractVersionArray(c pdf.Cursor, obj pdf.Object) ([]int, error) {
 	arr, err := c.Array(obj)
 	if err != nil {
@@ -124,12 +124,14 @@ func extractVersionArray(c pdf.Cursor, obj pdf.Object) ([]int, error) {
 	}
 	out := make([]int, 0, len(arr))
 	for _, elem := range arr {
-		n, err := pdf.Optional(c.Integer(elem))
-		if err != nil {
+		n, err := c.Integer(elem)
+		if pdf.IsMalformed(err) {
+			return nil, nil // treat the whole array as absent
+		} else if err != nil {
 			return nil, err
 		}
 		if n < 0 {
-			return nil, nil // malformed: treat the whole array as absent
+			return nil, nil
 		}
 		out = append(out, int(n))
 	}

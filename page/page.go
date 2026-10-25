@@ -64,12 +64,11 @@ const (
 // RotationFromDegrees returns the Rotation for a /Rotate value read from a
 // file.  The value is normalized modulo 360, so that -90 gives Rotate270 and
 // 450 gives Rotate90.  A page rotation must be a multiple of 90; any other
-// value yields Rotate0.
-//
-// The result is never RotateInherit: an absent /Rotate entry, not a value,
-// is what selects inheritance.
+// value is invalid and yields RotateInherit, as though the entry were absent.
 func RotationFromDegrees(deg int) Rotation {
 	switch ((deg % 360) + 360) % 360 {
+	case 0:
+		return Rotate0
 	case 90:
 		return Rotate90
 	case 180:
@@ -77,7 +76,7 @@ func RotationFromDegrees(deg int) Rotation {
 	case 270:
 		return Rotate270
 	default:
-		return Rotate0
+		return RotateInherit
 	}
 }
 
@@ -661,8 +660,8 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 		return nil, err
 	}
 
-	// Resources (required, inheritable)
-	if res, err := c.Decode(dict["Resources"], extract.Resources); err != nil {
+	// Resources (required, inheritable); an invalid value reads as absent
+	if res, err := c.DecodeOptional(dict["Resources"], extract.Resources); err != nil {
 		return nil, err
 	} else {
 		p.Resources = res
@@ -716,15 +715,12 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 		p.BoxColorInfo = bci
 	}
 
-	// Rotate (optional, inheritable)
-	if dict["Rotate"] != nil {
-		rotate, err := pdf.Optional(c.Integer(dict["Rotate"]))
-		if err != nil {
-			return nil, err
-		}
+	// Rotate (optional, inheritable); absent or invalid gives RotateInherit
+	if rotate, err := c.Integer(dict["Rotate"]); err == nil {
 		p.Rotate = RotationFromDegrees(int(rotate))
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
-	// If Rotate key is absent, p.Rotate remains RotateInherit (zero value)
 
 	// Group (optional)
 	if grp, err := c.DecodeOptional(dict["Group"], group.ExtractTransparencyAttributes); err != nil {
@@ -767,7 +763,8 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 
 	// Annots
 	if obj := dict["Annots"]; obj != nil {
-		annots, err := c.Decode(obj, decodeAnnots)
+		// single-flighted: the IRT repair modifies shared annotations
+		annots, err := pdf.Optional(c.DecodeExclusive(obj, decodeAnnots))
 		if err != nil {
 			return nil, err
 		}
@@ -775,7 +772,7 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// AA (optional)
-	if aa, err := c.Decode(dict["AA"], triggers.DecodePage); err != nil {
+	if aa, err := c.DecodeOptional(dict["AA"], triggers.DecodePage); err != nil {
 		return nil, err
 	} else {
 		p.AA = aa
@@ -803,12 +800,12 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// StructParents (optional)
-	if dict["StructParents"] != nil {
-		if key, err := pdf.Optional(c.Integer(dict["StructParents"])); err != nil {
-			return nil, err
-		} else if key >= 0 && uint64(key) <= math.MaxUint {
+	if key, err := c.Integer(dict["StructParents"]); err == nil {
+		if key >= 0 && uint64(key) <= math.MaxUint {
 			p.StructParents.Set(uint(key))
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// ID (optional, deprecated)
@@ -826,11 +823,9 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// SeparationInfo (optional)
-	if dict["SeparationInfo"] != nil {
-		sep, err := c.Decode(dict["SeparationInfo"], separation.Decode)
-		if err != nil {
-			return nil, err
-		}
+	if sep, err := c.DecodeOptional(dict["SeparationInfo"], separation.Decode); err != nil {
+		return nil, err
+	} else {
 		p.SeparationInfo = sep
 	}
 
@@ -854,7 +849,7 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// PresSteps (optional)
-	if presSteps, err := c.Decode(dict["PresSteps"], navnode.Decode); err != nil {
+	if presSteps, err := c.DecodeOptional(dict["PresSteps"], navnode.Decode); err != nil {
 		return nil, pdf.Wrap(err, "PresSteps")
 	} else {
 		p.PresSteps = presSteps
@@ -877,17 +872,9 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Page, error) {
 	}
 
 	// AF (optional)
-	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
+	p.AssociatedFiles, err = file.ExtractAssociatedFiles(c, dict["AF"])
+	if err != nil {
 		return nil, err
-	} else if afArray != nil {
-		p.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
-		for _, afObj := range afArray {
-			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
-				return nil, err
-			} else if spec != nil {
-				p.AssociatedFiles = append(p.AssociatedFiles, spec)
-			}
-		}
 	}
 
 	// OutputIntents (optional)

@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
@@ -2118,5 +2119,74 @@ func TestExtractDictFilterSampleBits(t *testing.T) {
 				t.Errorf("second read BitsPerComponent = %d, want %d", img2.BitsPerComponent, c.want)
 			}
 		})
+	}
+}
+
+// TestExtractDictDanglingReference checks that a reference to a free object
+// reads the same as an absent entry.
+func TestExtractDictDanglingReference(t *testing.T) {
+	keys := []pdf.Name{
+		"ColorSpace", "BitsPerComponent", "Intent", "Mask", "Decode",
+		"Interpolate", "Alternates", "SMask", "SMaskInData", "Name",
+		"Metadata", "OC", "Measure", "PtData", "StructParent", "AF", "ID",
+	}
+	dangling := pdf.NewReference(99, 0)
+	for _, key := range keys {
+		t.Run(string(key), func(t *testing.T) {
+			var got [2]*Dict
+			for i, withKey := range []bool{false, true} {
+				extras := pdf.Dict{}
+				if withKey {
+					extras[key] = dangling
+				}
+				img, err := writeJPXImage(t, pdf.V2_0, extras)
+				if err != nil {
+					t.Fatalf("withKey=%t: %v", withKey, err)
+				}
+				got[i] = img
+			}
+			opt := cmpopts.IgnoreFields(Dict{}, "Data")
+			if diff := cmp.Diff(got[0], got[1], opt); diff != "" {
+				t.Errorf("dangling reference differs from absent entry (-absent +dangling):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestExtractDictMalformedStructParent checks that a StructParent entry of
+// the wrong type reads the same as an absent entry.
+func TestExtractDictMalformedStructParent(t *testing.T) {
+	var got [2]*Dict
+	for i, extras := range []pdf.Dict{nil, {"StructParent": pdf.String("bad")}} {
+		img, err := writeJPXImage(t, pdf.V2_0, extras)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got[i] = img
+	}
+	opt := cmpopts.IgnoreFields(Dict{}, "Data")
+	if diff := cmp.Diff(got[0], got[1], opt); diff != "" {
+		t.Errorf("malformed value differs from absent entry (-absent +bad):\n%s", diff)
+	}
+}
+
+// TestExtractDictMalformedOptional checks that Metadata and Measure entries
+// of the wrong type read the same as absent entries.
+func TestExtractDictMalformedOptional(t *testing.T) {
+	want, err := writeJPXImage(t, pdf.V2_0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opt := cmpopts.IgnoreFields(Dict{}, "Data")
+	for _, key := range []pdf.Name{"Metadata", "Measure"} {
+		for _, bad := range []pdf.Object{pdf.Integer(1), pdf.String("bad")} {
+			got, err := writeJPXImage(t, pdf.V2_0, pdf.Dict{key: bad})
+			if err != nil {
+				t.Fatalf("%s %v: %v", key, bad, err)
+			}
+			if diff := cmp.Diff(want, got, opt); diff != "" {
+				t.Errorf("%s %v: malformed value differs from absent entry (-want +got):\n%s", key, bad, diff)
+			}
+		}
 	}
 }

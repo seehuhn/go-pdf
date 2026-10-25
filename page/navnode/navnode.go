@@ -113,28 +113,30 @@ func Encode(rm *pdf.ResourceManager, nodes []*Node) (pdf.Native, error) {
 
 // Decode reads a navigation node list from PDF format.
 // The doubly-linked list starting at obj is flattened into a slice.
-//
-// Always invoke this via [pdf.Cursor.Decode] so that indirect references are
-// resolved and cycle detection covers self- and back-references.
+// A Next link which is malformed, or which leads back to a node already
+// read, ends the list.
 func Decode(c pdf.Cursor, obj pdf.Object, _ bool) ([]*Node, error) {
-	if obj == nil {
-		return nil, nil
-	}
-
 	var nodes []*Node
 
+	// The list is walked iteratively, with its own record of the nodes
+	// seen, so that its length is limited only by the number of objects in
+	// the file and not by the nesting depth of the cursor path.
+	seen := map[pdf.Reference]bool{}
 	for obj != nil {
-		dict, err := c.Dict(obj)
-		if err != nil {
-			return nil, pdf.Wrap(err, "navigation node")
-		}
-		if dict == nil {
-			break
+		if ref, ok := obj.(pdf.Reference); ok {
+			if seen[ref] {
+				break
+			}
+			seen[ref] = true
 		}
 
-		// extend path after resolution, so the next iteration detects cycles
-		if ref, ok := obj.(pdf.Reference); ok {
-			c = pdf.CursorAt(c.Extractor(), &pdf.CycleCheck{Ref: ref, Parent: c.Path()})
+		dict, err := c.Dict(obj)
+		if pdf.IsReadError(err) {
+			return nil, pdf.Wrap(err, "navigation node")
+		}
+		if err != nil || dict == nil {
+			// malformed or missing link ends the list
+			break
 		}
 
 		node, err := decodeNode(c, dict)
@@ -154,29 +156,24 @@ func decodeNode(c pdf.Cursor, dict pdf.Dict) (*Node, error) {
 	node := &Node{}
 
 	// NA (optional)
-	if naObj := dict["NA"]; naObj != nil {
-		na, err := c.Decode(naObj, action.Decode)
-		if err != nil {
-			return nil, pdf.Wrap(err, "NA")
-		}
+	if na, err := c.DecodeOptional(dict["NA"], action.Decode); err != nil {
+		return nil, pdf.Wrap(err, "NA")
+	} else {
 		node.NA = na
 	}
 
 	// PA (optional)
-	if paObj := dict["PA"]; paObj != nil {
-		pa, err := c.Decode(paObj, action.Decode)
-		if err != nil {
-			return nil, pdf.Wrap(err, "PA")
-		}
+	if pa, err := c.DecodeOptional(dict["PA"], action.Decode); err != nil {
+		return nil, pdf.Wrap(err, "PA")
+	} else {
 		node.PA = pa
 	}
 
 	// Dur (optional)
-	if durObj := dict["Dur"]; durObj != nil {
-		dur, err := c.Number(durObj)
-		if err == nil && dur > 0 {
-			node.Dur = dur
-		}
+	if dur, err := pdf.Optional(c.Number(dict["Dur"])); err != nil {
+		return nil, pdf.Wrap(err, "Dur")
+	} else if dur > 0 {
+		node.Dur = dur
 	}
 
 	return node, nil

@@ -69,6 +69,8 @@ func decodeCircle(c pdf.Cursor, dict pdf.Dict) (*annotation.Circle, error) {
 		if rd[0]+rd[2] < circle.Rect.Dx() && rd[1]+rd[3] < circle.Rect.Dy() {
 			circle.Margin = rd
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	return circle, nil

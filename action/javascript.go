@@ -68,15 +68,18 @@ func (a *JavaScript) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeJavaScript(c pdf.Cursor, dict pdf.Dict) (*JavaScript, error) {
-	if dict["JS"] == nil {
+	jsObj, err := readStringOrStream(c, dict["JS"])
+	if err != nil {
+		return nil, err
+	} else if jsObj == nil {
 		return nil, pdf.Error("JavaScript action missing JS entry")
 	}
-	js, err := c.StringOrStream(dict["JS"])
+	js, err := c.StringOrStream(jsObj)
 	if err != nil {
 		return nil, err
 	}
 
-	next, err := c.DecodeOptional(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

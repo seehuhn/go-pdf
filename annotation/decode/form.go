@@ -45,10 +45,15 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.InteractiveForm, erro
 
 	// the document-wide /DA and /Q defaults seed field-attribute inheritance,
 	// which the decoder flattens away; the values are not kept on the form
-	da, _ := pdf.Optional(c.String(dict["DA"]))
+	da, err := pdf.Optional(c.String(dict["DA"]))
+	if err != nil {
+		return nil, err
+	}
 	var q pdf.TextAlign
 	if v, err := pdf.Optional(c.Integer(dict["Q"])); err == nil && v >= 0 && v <= 2 {
 		q = pdf.TextAlign(v)
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 	rootCtx := inherited{da: string(da), q: q}
 
@@ -61,11 +66,11 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.InteractiveForm, erro
 	}
 
 	// NeedAppearances (optional)
-	if na, err := pdf.Optional(c.Boolean(dict["NeedAppearances"])); err != nil {
+	na, _, err := c.OptionalBoolean(dict["NeedAppearances"])
+	if err != nil {
 		return nil, err
-	} else {
-		form.NeedAppearances = bool(na)
 	}
+	form.NeedAppearances = na
 
 	// SigFlags (optional)
 	if sf, err := pdf.Optional(c.Integer(dict["SigFlags"])); err != nil {

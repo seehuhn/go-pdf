@@ -1410,7 +1410,7 @@ func setFilterChain(streamDict Dict, allNames []Object, allParms []Dict) {
 // sourceAwareReader (phase 3) restores them at the top of the stack.
 func asMalformedFilter(rc io.ReadCloser, err error) (io.ReadCloser, error) {
 	if err != nil {
-		if !IsMalformed(err) {
+		if IsReadError(err) {
 			err = &MalformedFileError{Err: err}
 		}
 		return nil, err
@@ -1424,7 +1424,7 @@ type filterContentReader struct {
 
 func (c *filterContentReader) Read(p []byte) (int, error) {
 	n, err := c.ReadCloser.Read(p)
-	if err != nil && !errors.Is(err, io.EOF) && !IsMalformed(err) {
+	if IsReadError(err) && !errors.Is(err, io.EOF) {
 		err = &MalformedFileError{Err: err}
 	}
 	return n, err

@@ -250,6 +250,28 @@ func TestExtractSpaceMalformedSeparationDeviceN(t *testing.T) {
 	}
 }
 
+// TestExtractSpaceBadICCProfile verifies that an ICC profile which cannot
+// be parsed makes the colour space malformed, not a read error.
+func TestExtractSpaceBadICCProfile(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	ref := w.Alloc()
+	stm, err := w.OpenStream(ref, pdf.Dict{"N": pdf.Integer(3)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte("not an ICC profile")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ExtractSpace(pdf.CursorAt(pdf.NewExtractor(w), nil), pdf.Array{pdf.Name("ICCBased"), ref}, false)
+	if !pdf.IsMalformed(err) {
+		t.Errorf("got %v, want malformed error", err)
+	}
+}
+
 // TestExtractDeviceNTooManyColorants verifies that ExtractSpace rejects
 // a /DeviceN color space whose colorant list exceeds
 // limits.MaxImageChannels.  Without this cap, the scanner-level

@@ -83,13 +83,21 @@ func ExtractStyle(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Style, error) {
 	if cArray, err := pdf.Optional(c.Array(dict["C"])); err != nil {
 		return nil, err
 	} else if len(cArray) >= 3 {
-		r, _ := c.Number(cArray[0])
-		g, _ := c.Number(cArray[1])
-		b, _ := c.Number(cArray[2])
-		style.Color = color.DeviceRGB{
-			color.ClipComponent(r, 0, 1),
-			color.ClipComponent(g, 0, 1),
-			color.ClipComponent(b, 0, 1),
+		// a component which is not a number invalidates the colour
+		var rgb color.DeviceRGB
+		valid := true
+		for i := range rgb {
+			v, err := c.Number(cArray[i])
+			if pdf.IsMalformed(err) {
+				valid = false
+				break
+			} else if err != nil {
+				return nil, err
+			}
+			rgb[i] = color.ClipComponent(v, 0, 1)
+		}
+		if valid {
+			style.Color = rgb
 		}
 	}
 
@@ -115,9 +123,16 @@ func ExtractStyle(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Style, error) {
 	if dArray, err := pdf.Optional(c.Array(dict["D"])); err != nil {
 		return nil, err
 	} else if style.Style != StyleSolid {
+		// an element which is not a number invalidates the pattern
 		pattern := make([]float64, len(dArray))
 		for i, v := range dArray {
-			n, _ := c.Number(v)
+			n, err := c.Number(v)
+			if pdf.IsMalformed(err) {
+				pattern = nil
+				break
+			} else if err != nil {
+				return nil, err
+			}
 			pattern[i] = n
 		}
 		if pattern = graphics.RepairDashArray(pattern); len(pattern) > 0 {

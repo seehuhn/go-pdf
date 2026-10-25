@@ -247,38 +247,34 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*Movie, error) {
 		Operation:  MovieOperation(operation),
 	}
 
-	if v := dict["Start"]; v != nil {
-		ts := movie.DecodeTimestamp(c, v)
-		a.Start = &ts
+	a.Start, err = movie.DecodeTimestamp(c, dict["Start"])
+	if err != nil {
+		return nil, err
 	}
-	if v := dict["Duration"]; v != nil {
-		ts := movie.DecodeTimestamp(c, v)
-		a.Duration = &ts
-	}
-
-	if v := dict["Rate"]; v != nil {
-		if num, err := pdf.Optional(c.Number(v)); err != nil {
-			return nil, err
-		} else {
-			a.Rate = num
-		}
+	a.Duration, err = movie.DecodeTimestamp(c, dict["Duration"])
+	if err != nil {
+		return nil, err
 	}
 
-	if v := dict["Volume"]; v != nil {
-		if num, err := pdf.Optional(c.Number(v)); err != nil {
-			return nil, err
-		} else if num >= -1 && num <= 1 {
-			a.Volume.Set(num)
-		}
+	if rate, err := c.Number(dict["Rate"]); err == nil {
+		a.Rate = rate
+	} else if pdf.IsReadError(err) {
+		return nil, err
+	}
+
+	if vol, err := c.Number(dict["Volume"]); err == nil {
 		// out-of-range values: silently drop the override
+		if vol >= -1 && vol <= 1 {
+			a.Volume.Set(vol)
+		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
-	if v := dict["ShowControls"]; v != nil {
-		if sc, err := pdf.Optional(c.Boolean(v)); err != nil {
-			return nil, err
-		} else {
-			a.ShowControls.Set(bool(sc))
-		}
+	if sc, ok, err := c.OptionalBoolean(dict["ShowControls"]); err != nil {
+		return nil, err
+	} else if ok {
+		a.ShowControls.Set(sc)
 	}
 
 	if mode, err := pdf.Optional(c.Name(dict["Mode"])); err != nil {
@@ -287,19 +283,23 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*Movie, error) {
 		a.Mode = movie.Mode(mode)
 	}
 
-	if v := dict["Synchronous"]; v != nil {
-		if sync, err := pdf.Optional(c.Boolean(v)); err != nil {
-			return nil, err
-		} else {
-			a.Synchronous.Set(bool(sync))
-		}
+	if sync, ok, err := c.OptionalBoolean(dict["Synchronous"]); err != nil {
+		return nil, err
+	} else if ok {
+		a.Synchronous.Set(sync)
 	}
 
 	if arr, err := pdf.Optional(c.Array(dict["FWScale"])); err != nil {
 		return nil, err
 	} else if len(arr) >= 2 {
-		n, errN := pdf.Optional(c.Integer(arr[0]))
-		d, errD := pdf.Optional(c.Integer(arr[1]))
+		n, errN := c.Integer(arr[0])
+		d, errD := c.Integer(arr[1])
+		if pdf.IsReadError(errN) {
+			return nil, errN
+		}
+		if pdf.IsReadError(errD) {
+			return nil, errD
+		}
 		if errN == nil && errD == nil && n > 0 && d > 0 {
 			a.FWScale = &movie.Scale{Numerator: int(n), Denominator: int(d)}
 		}
@@ -308,14 +308,20 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*Movie, error) {
 	if arr, err := pdf.Optional(c.Array(dict["FWPosition"])); err != nil {
 		return nil, err
 	} else if len(arr) >= 2 {
-		h, errH := pdf.Optional(c.Number(arr[0]))
-		v, errV := pdf.Optional(c.Number(arr[1]))
+		h, errH := c.Number(arr[0])
+		v, errV := c.Number(arr[1])
+		if pdf.IsReadError(errH) {
+			return nil, errH
+		}
+		if pdf.IsReadError(errV) {
+			return nil, errV
+		}
 		if errH == nil && errV == nil && h >= 0 && h <= 1 && v >= 0 && v <= 1 {
 			a.FWPosition = &movie.Position{Horizontal: h, Vertical: v}
 		}
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

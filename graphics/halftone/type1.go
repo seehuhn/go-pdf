@@ -110,13 +110,11 @@ func extractType1(c pdf.Cursor, dict pdf.Dict) (*Type1, error) {
 		h.SpotFunction = SimpleDot
 	}
 
-	if accurateScreens, ok := dict["AccurateScreens"]; ok {
-		accurate, err := c.Boolean(accurateScreens)
-		if err != nil {
-			return nil, err
-		}
-		h.AccurateScreens = bool(accurate)
+	accurate, _, err := c.OptionalBoolean(dict["AccurateScreens"])
+	if err != nil {
+		return nil, err
 	}
+	h.AccurateScreens = accurate
 
 	if tf, err := c.Resolve(dict["TransferFunction"]); err != nil {
 		return nil, err

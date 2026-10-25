@@ -41,67 +41,83 @@ func decodeAnnot3D(c pdf.Cursor, dict pdf.Dict) (*annotation.Annot3D, error) {
 	}
 
 	// 3DA (optional)
-	if dict["3DA"] != nil {
-		if threeDa, err := c.Dict(dict["3DA"]); err == nil {
-			activation := &annotation.Annot3DActivation{
-				TB: true, // default value
-			}
-
-			// A (optional) - default XA
-			if a, err := c.Name(threeDa["A"]); err == nil {
-				activation.A = a
-			}
-
-			// AIS (optional) - default L
-			if ais, err := c.Name(threeDa["AIS"]); err == nil {
-				activation.AIS = ais
-			}
-
-			// D (optional) - default PI
-			if d, err := c.Name(threeDa["D"]); err == nil {
-				activation.D = d
-			}
-
-			// DIS (optional) - default U
-			if dis, err := c.Name(threeDa["DIS"]); err == nil {
-				activation.DIS = dis
-			}
-
-			// TB (optional, PDF 1.7) - default true
-			if tb, err := c.Boolean(threeDa["TB"]); err == nil {
-				activation.TB = bool(tb)
-			}
-
-			// NP (optional, PDF 1.7) - default false
-			if np, err := c.Boolean(threeDa["NP"]); err == nil {
-				activation.NP = bool(np)
-			}
-
-			// Style (optional, PDF 2.0) - default Embedded
-			if style, err := c.Name(threeDa["Style"]); err == nil {
-				activation.Style = style
-			}
-
-			// Window (optional, PDF 2.0)
-			if window, ok := threeDa["Window"].(pdf.Reference); ok {
-				activation.Window = window
-			}
-
-			// Transparent (optional, PDF 2.0) - default false
-			if transparent, err := c.Boolean(threeDa["Transparent"]); err == nil {
-				activation.Transparent = bool(transparent)
-			}
-
-			annot3D.A = activation
+	if threeDa, err := pdf.Optional(c.Dict(dict["3DA"])); err != nil {
+		return nil, err
+	} else if threeDa != nil {
+		activation := &annotation.Annot3DActivation{
+			TB: true, // default value
 		}
+
+		// A (optional) - default XA
+		if a, err := c.Name(threeDa["A"]); err == nil {
+			activation.A = a
+		} else if pdf.IsReadError(err) {
+			return nil, err
+		}
+
+		// AIS (optional) - default L
+		if ais, err := c.Name(threeDa["AIS"]); err == nil {
+			activation.AIS = ais
+		} else if pdf.IsReadError(err) {
+			return nil, err
+		}
+
+		// D (optional) - default PI
+		if d, err := c.Name(threeDa["D"]); err == nil {
+			activation.D = d
+		} else if pdf.IsReadError(err) {
+			return nil, err
+		}
+
+		// DIS (optional) - default U
+		if dis, err := c.Name(threeDa["DIS"]); err == nil {
+			activation.DIS = dis
+		} else if pdf.IsReadError(err) {
+			return nil, err
+		}
+
+		// TB (optional, PDF 1.7) - default true
+		if tb, ok, err := c.OptionalBoolean(threeDa["TB"]); err != nil {
+			return nil, err
+		} else if ok {
+			activation.TB = tb
+		}
+
+		// NP (optional, PDF 1.7) - default false
+		np, _, err := c.OptionalBoolean(threeDa["NP"])
+		if err != nil {
+			return nil, err
+		}
+		activation.NP = np
+
+		// Style (optional, PDF 2.0) - default Embedded
+		if style, err := c.Name(threeDa["Style"]); err == nil {
+			activation.Style = style
+		} else if pdf.IsReadError(err) {
+			return nil, err
+		}
+
+		// Window (optional, PDF 2.0)
+		if window, ok := threeDa["Window"].(pdf.Reference); ok {
+			activation.Window = window
+		}
+
+		// Transparent (optional, PDF 2.0) - default false
+		transparent, _, err := c.OptionalBoolean(threeDa["Transparent"])
+		if err != nil {
+			return nil, err
+		}
+		activation.Transparent = transparent
+
+		annot3D.A = activation
 	}
 
 	// 3DI (optional) - default true
 	annot3D.I = true // default value
-	if dict["3DI"] != nil {
-		if threeDI, err := c.Boolean(dict["3DI"]); err == nil {
-			annot3D.I = bool(threeDI)
-		}
+	if threeDI, ok, err := c.OptionalBoolean(dict["3DI"]); err != nil {
+		return nil, err
+	} else if ok {
+		annot3D.I = threeDI
 	}
 
 	// 3DB (optional)
@@ -112,6 +128,8 @@ func decodeAnnot3D(c pdf.Cursor, dict pdf.Dict) (*annotation.Annot3D, error) {
 			URx: threeDB[2],
 			URy: threeDB[3],
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// 3DU (optional, PDF 2.0)

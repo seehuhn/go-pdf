@@ -160,11 +160,11 @@ func ExtractNumberFormat(c pdf.Cursor, obj pdf.Object, isDirect bool) (*NumberFo
 		nf.Precision = 0 // not meaningful for round/truncate
 	}
 
-	if fd, err := pdf.Optional(c.Boolean(dict["FD"])); err != nil {
+	fd, _, err := c.OptionalBoolean(dict["FD"])
+	if err != nil {
 		return nil, err
-	} else {
-		nf.ForceExactFraction = bool(fd)
 	}
+	nf.ForceExactFraction = fd
 
 	if rt, err := pdf.Optional(c.TextString(dict["RT"])); err != nil {
 		return nil, err

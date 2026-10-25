@@ -17,6 +17,9 @@
 package pdf_test
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -87,5 +90,32 @@ func TestCheckVersionAtMost(t *testing.T) {
 	w14, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
 	if err := pdf.CheckVersionAtMost(w14, "op", pdf.V1_7); err != nil {
 		t.Errorf("V1.4 writer + max V1.7 should pass, got %v", err)
+	}
+}
+
+func TestIsReadError(t *testing.T) {
+	other := errors.New("some failure")
+	malformed := &pdf.MalformedFileError{Err: errors.New("bad data")}
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"malformed", malformed, false},
+		{"wrapped malformed", fmt.Errorf("context: %w", malformed), false},
+		{"located malformed", pdf.Wrap(malformed, "object 1 0 R"), false},
+		{"other", other, true},
+		{"wrapped other", fmt.Errorf("context: %w", other), true},
+		{"EOF", io.EOF, true},
+		{"version", &pdf.VersionError{Operation: "x", Earliest: pdf.V1_5}, true},
+	}
+	for _, c := range cases {
+		if got := pdf.IsReadError(c.err); got != c.want {
+			t.Errorf("%s: IsReadError = %t, want %t", c.name, got, c.want)
+		}
+		if c.err != nil && pdf.IsReadError(c.err) == pdf.IsMalformed(c.err) {
+			t.Errorf("%s: IsReadError and IsMalformed agree", c.name)
+		}
 	}
 }

@@ -63,16 +63,12 @@ func decodeFreeText(c pdf.Cursor, dict pdf.Dict) (*annotation.FreeText, error) {
 		f.DefaultStyle = ds.String()
 	}
 
-	if cl, err := pdf.Optional(c.Array(dict["CL"])); err != nil {
+	if cl, err := pdf.Optional(c.FloatArray(dict["CL"])); err != nil {
 		return nil, err
 	} else if f.Intent == annotation.FreeTextIntentCallout && (len(cl) == 4 || len(cl) == 6) {
 		points := make([]vec.Vec2, len(cl)/2)
-		for i := range len(points) {
-			if px, err := c.Number(cl[i*2]); err == nil {
-				if py, err := c.Number(cl[i*2+1]); err == nil {
-					points[i] = vec.Vec2{X: px, Y: py}
-				}
-			}
+		for i := range points {
+			points[i] = vec.Vec2{X: cl[i*2], Y: cl[i*2+1]}
 		}
 		f.CalloutLine = points
 	}
@@ -83,13 +79,12 @@ func decodeFreeText(c pdf.Cursor, dict pdf.Dict) (*annotation.FreeText, error) {
 		f.BorderEffect = be
 	}
 
-	if rd, err := pdf.Optional(c.Array(dict["RD"])); err != nil {
+	if rd, err := pdf.Optional(c.FloatArray(dict["RD"])); err != nil {
 		return nil, err
 	} else if len(rd) == 4 {
 		a := make([]float64, 4)
 		for i, diff := range rd {
-			num, _ := c.Number(diff)
-			a[i] = max(num, 0)
+			a[i] = max(diff, 0)
 		}
 		if a[0]+a[2] < f.Rect.Dx() && a[1]+a[3] < f.Rect.Dy() {
 			f.Margin = a

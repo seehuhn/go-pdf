@@ -97,7 +97,7 @@ func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 
 	f.repair()
 	if err := f.validate(); err != nil {
-		return nil, err
+		return nil, &pdf.MalformedFileError{Err: err}
 	}
 
 	return f, nil

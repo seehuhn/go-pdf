@@ -73,7 +73,7 @@ func decodeNamed(c pdf.Cursor, dict pdf.Dict) (*Named, error) {
 		return nil, pdf.Error("Named action: missing N field")
 	}
 
-	next, err := c.DecodeOptional(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

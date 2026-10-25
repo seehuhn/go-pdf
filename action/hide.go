@@ -27,8 +27,9 @@ import (
 // Hide represents a hide action that shows or hides annotations.
 type Hide struct {
 	// T specifies the annotation(s) to hide or show.
-	// Can be: text string (annotation name), dictionary (annotation),
-	// or array of strings/dictionaries.
+	// This is a [pdf.String] (the fully qualified name of a form field), a
+	// [pdf.Dict] or [pdf.Reference] (an annotation dictionary), or a
+	// [pdf.Array] of these.
 	T pdf.Object
 
 	// H indicates whether to hide (true) or show (false) the annotations.
@@ -50,6 +51,9 @@ func (a *Hide) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 	if a.T == nil {
 		return nil, errors.New("Hide action must specify target annotations")
+	}
+	if !validHideTarget(a.T, true) {
+		return nil, errors.New("invalid Hide action T entry")
 	}
 
 	dict := pdf.Dict{
@@ -74,19 +78,81 @@ func (a *Hide) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	return dict, nil
 }
 
+// validHideTarget reports whether t is a value allowed for the T entry of a
+// Hide action.  Arrays are only allowed at the top level.
+func validHideTarget(t pdf.Object, top bool) bool {
+	switch t := t.AsPDF(0).(type) {
+	case pdf.String, pdf.Dict, pdf.Reference:
+		return true
+	case pdf.Array:
+		if !top || len(t) == 0 {
+			return false
+		}
+		for _, e := range t {
+			if e == nil || !validHideTarget(e, false) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// readHideTarget reads the T entry of a Hide action.  Invalid elements of an
+// array are dropped.  The result is nil if there is no usable target.
+//
+// The entry is resolved without the cursor path, since it may name the
+// annotation or field whose action is being read.  Annotation dictionaries
+// are kept as they stand, so that a reference keeps denoting the annotation.
+func readHideTarget(c pdf.Cursor, obj pdf.Object) (pdf.Object, error) {
+	resolved, err := pdf.Optional(pdf.Resolve(c.Getter(), obj))
+	if err != nil {
+		return nil, err
+	}
+	switch v := resolved.(type) {
+	case pdf.Dict:
+		return obj, nil
+	case pdf.String:
+		return v, nil
+	case pdf.Array:
+		var res pdf.Array
+		for _, elem := range v {
+			resolved, err := pdf.Optional(pdf.Resolve(c.Getter(), elem))
+			if err != nil {
+				return nil, err
+			}
+			switch r := resolved.(type) {
+			case pdf.Dict:
+				res = append(res, elem)
+			case pdf.String:
+				res = append(res, r)
+			}
+		}
+		if len(res) == 0 {
+			return nil, nil
+		}
+		return res, nil
+	}
+	return nil, nil
+}
+
 func decodeHide(c pdf.Cursor, dict pdf.Dict) (*Hide, error) {
-	t := dict["T"]
-	if t == nil {
-		return nil, pdf.Error("Hide action missing T entry")
+	t, err := readHideTarget(c, dict["T"])
+	if err != nil {
+		return nil, err
+	} else if t == nil {
+		return nil, pdf.Error("Hide action without valid T entry")
 	}
 
 	h := true // default value
-	if dict["H"] != nil {
-		hVal, _ := pdf.Optional(c.Boolean(dict["H"]))
-		h = bool(hVal)
+	if hVal, ok, err := c.OptionalBoolean(dict["H"]); err != nil {
+		return nil, err
+	} else if ok {
+		h = hVal
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

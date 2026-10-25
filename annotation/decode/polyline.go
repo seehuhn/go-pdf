@@ -53,10 +53,14 @@ func decodePolyline(c pdf.Cursor, dict pdf.Dict) (*annotation.PolyLine, error) {
 	} else if len(le) >= 1 {
 		if name, err := c.Name(le[0]); err == nil {
 			polyline.LineEndingStyle[0] = annotation.LineEndingStyle(name)
+		} else if pdf.IsReadError(err) {
+			return nil, err
 		}
 		if len(le) >= 2 {
 			if name, err := c.Name(le[1]); err == nil {
 				polyline.LineEndingStyle[1] = annotation.LineEndingStyle(name)
+			} else if pdf.IsReadError(err) {
+				return nil, err
 			}
 		} else {
 			// if only one element, copy first element to second

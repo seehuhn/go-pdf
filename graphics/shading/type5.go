@@ -186,12 +186,11 @@ func extractType5(c pdf.Cursor, stream *pdf.Stream) (*Type5, error) {
 	}
 	s.Decode = decode
 
-	// Read optional Function
+	// an unusable function is dropped; an Indexed colour space does not allow one
 	if fnObj, ok := d["Function"]; ok {
 		if fn, err := c.DecodeOptional(fnObj, function.Extract); err != nil {
 			return nil, err
 		} else if fn != nil && s.ColorSpace.Family() != color.FamilyIndexed {
-			// an Indexed colour space does not allow a function
 			s.F = fn
 		}
 	}

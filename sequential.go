@@ -202,8 +202,9 @@ scanLoop:
 		case m[2] != "":
 			// We found an indirect object.
 			// m is of the form ["\n1 0 obj" "1 0 obj" "1" "0"]
+			// object number 0 is the head of the free list
 			n, err := strconv.ParseUint(m[2], 10, 32)
-			if err != nil || n >= maxXRefSize {
+			if err != nil || n == 0 || n >= maxXRefSize {
 				continue scanLoop
 			}
 			g, err := strconv.ParseUint(m[3], 10, 16)

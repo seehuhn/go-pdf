@@ -682,3 +682,149 @@ func TestV20Range(t *testing.T) {
 		}
 	}
 }
+
+// TestExtractDanglingVersion checks that a reference to a free object for
+// one version is treated like an absent entry, so that the other version
+// is used.
+func TestExtractDanglingVersion(t *testing.T) {
+	w, fObj := newFileSpec(t)
+	inner := pdf.Dict{
+		"Type":    pdf.Name("OPI"),
+		"Version": pdf.Number(2),
+		"F":       fObj,
+	}
+	dangling := pdf.NewReference(99, 0)
+	x := pdf.NewExtractor(w)
+
+	want, err := Extract(pdf.CursorAt(x, nil), pdf.Dict{"2.0": inner}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Extract(pdf.CursorAt(x, nil), pdf.Dict{"1.3": dangling, "2.0": inner}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("dangling 1.3 entry changed the result (-want +got):\n%s", diff)
+	}
+
+	if _, err := Extract(pdf.CursorAt(x, nil), pdf.Dict{"1.3": dangling, "2.0": dangling}, true); err == nil {
+		t.Error("expected an error when neither version is present")
+	}
+}
+
+// TestExtractMalformedVersion checks that a 1.3 entry which is of the wrong
+// type or cannot be decoded is treated like an absent entry.
+func TestExtractMalformedVersion(t *testing.T) {
+	w, fObj := newFileSpec(t)
+	inner := pdf.Dict{
+		"Type":    pdf.Name("OPI"),
+		"Version": pdf.Number(2),
+		"F":       fObj,
+	}
+	x := pdf.NewExtractor(w)
+
+	want, err := Extract(pdf.CursorAt(x, nil), pdf.Dict{"2.0": inner}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, bad := range map[string]pdf.Object{
+		"null":       nil,
+		"wrong type": pdf.Integer(5),
+		"no F":       pdf.Dict{"Type": pdf.Name("OPI"), "Version": pdf.Number(1.3)},
+	} {
+		got, err := Extract(pdf.CursorAt(x, nil), pdf.Dict{"1.3": bad, "2.0": inner}, true)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%s: malformed 1.3 entry changed the result (-want +got):\n%s", name, diff)
+		}
+
+		if _, err := Extract(pdf.CursorAt(x, nil), pdf.Dict{"1.3": bad, "2.0": bad}, true); !pdf.IsMalformed(err) {
+			t.Errorf("%s: got %v, want malformed error", name, err)
+		}
+	}
+}
+
+// TestV13TransparencyDangling checks that a dangling Transparency reference
+// reads as absent rather than as false.
+func TestV13TransparencyDangling(t *testing.T) {
+	w, fObj := newFileSpec(t)
+	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+	for _, tc := range []struct {
+		name string
+		obj  pdf.Object
+		want *bool
+	}{
+		{"dangling", pdf.NewReference(9999, 0), nil},
+		{"null", nil, nil},
+		{"wrong type", pdf.Integer(0), nil},
+		{"false", pdf.Boolean(false), new(false)},
+		{"true", pdf.Boolean(true), new(true)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dict := pdf.Dict{
+				"Version":      pdf.Number(1.3),
+				"F":            fObj,
+				"Size":         ints(640, 480),
+				"CropRect":     ints(0, 0, 640, 480),
+				"Position":     nums(0, 0, 0, 480, 640, 480, 640, 0),
+				"Transparency": tc.obj,
+			}
+			v, err := extractV13(c, dict, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.want, v.Transparency); diff != "" {
+				t.Errorf("wrong Transparency (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestOverprintMalformed checks that a dangling, null or wrong-type
+// Overprint entry reads as false, for both OPI versions.
+func TestOverprintMalformed(t *testing.T) {
+	w, fObj := newFileSpec(t)
+	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+	read := func(t *testing.T, version float64, overprint pdf.Object) bool {
+		t.Helper()
+		dict := pdf.Dict{
+			"Version":   pdf.Number(version),
+			"F":         fObj,
+			"Overprint": overprint,
+		}
+		if version == 1.3 {
+			dict["Size"] = ints(640, 480)
+			dict["CropRect"] = ints(0, 0, 640, 480)
+			dict["Position"] = nums(0, 0, 0, 480, 640, 480, 640, 0)
+			v, err := extractV13(c, dict, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return v.Overprint
+		}
+		v, err := extractV20(c, dict, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v.Overprint
+	}
+
+	for _, version := range []float64{1.3, 2.0} {
+		for name, obj := range map[string]pdf.Object{
+			"dangling":   pdf.NewReference(9999, 0),
+			"null":       nil,
+			"wrong type": pdf.Integer(1),
+			"false":      pdf.Boolean(false),
+		} {
+			if read(t, version, obj) {
+				t.Errorf("version %g, %s: Overprint is true", version, name)
+			}
+		}
+		if !read(t, version, pdf.Boolean(true)) {
+			t.Errorf("version %g: Overprint true not read", version)
+		}
+	}
+}

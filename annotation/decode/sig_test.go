@@ -294,3 +294,27 @@ func TestSigFieldLockInvalid(t *testing.T) {
 		t.Errorf("got %+v, want an Exclude lock without fields", lock)
 	}
 }
+
+// TestSigSeedValueInvalidMDP checks that a reference to a nonexistent object,
+// and a value of the wrong type, in the MDP dictionary are read like an absent
+// /P entry.
+func TestSigSeedValueInvalidMDP(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+
+	want, err := sigSeedValue(c, pdf.Dict{"MDP": pdf.Dict{}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range map[string]pdf.Object{
+		"dangling": pdf.NewReference(99, 0),
+		"name":     pdf.Name("x"),
+	} {
+		got, err := sigSeedValue(c, pdf.Dict{"MDP": pdf.Dict{"P": value}}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%s value read differently from absent entry (-absent +got):\n%s", name, diff)
+		}
+	}
+}

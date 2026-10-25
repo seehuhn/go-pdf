@@ -241,11 +241,9 @@ func Extract(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Transition, error) {
 	}
 
 	// Di: direction (can be integer or name "None")
-	if diObj := dict["Di"]; diObj != nil {
-		resolved, err := c.Resolve(diObj)
-		if err != nil {
-			return nil, err
-		}
+	if resolved, err := pdf.Optional(c.Resolve(dict["Di"])); err != nil {
+		return nil, err
+	} else {
 		switch di := resolved.(type) {
 		case pdf.Name:
 			if di == "None" {
@@ -266,11 +264,11 @@ func Extract(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Transition, error) {
 	}
 
 	// B: opaque
-	if b, err := pdf.Optional(c.Boolean(dict["B"])); err != nil {
+	b, _, err := c.OptionalBoolean(dict["B"])
+	if err != nil {
 		return nil, err
-	} else {
-		t.Opaque = bool(b)
 	}
+	t.Opaque = b
 
 	t.SingleUse = isDirect
 

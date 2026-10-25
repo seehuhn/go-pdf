@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 type testCase struct {
@@ -824,7 +825,7 @@ func FuzzRoundTrip(f *testing.F) {
 
 // TestRotationFromDegrees checks the normalization of a /Rotate value read
 // from a file: values outside 0, 90, 180 and 270 are brought into that set
-// modulo 360, and anything left over counts as no rotation.
+// modulo 360, and anything left over is invalid and reads as inherited.
 func TestRotationFromDegrees(t *testing.T) {
 	cases := []struct {
 		in   int
@@ -840,10 +841,10 @@ func TestRotationFromDegrees(t *testing.T) {
 		{-360, Rotate0},
 		{-450, Rotate270},
 		{720, Rotate0},
-		{45, Rotate0},  // not a multiple of 90
-		{-45, Rotate0}, // likewise, and negative
-		{1, Rotate0},
-		{89, Rotate0},
+		{45, RotateInherit},  // not a multiple of 90
+		{-45, RotateInherit}, // likewise, and negative
+		{1, RotateInherit},
+		{89, RotateInherit},
 	}
 	for _, tc := range cases {
 		if got := RotationFromDegrees(tc.in); got != tc.want {
@@ -904,4 +905,244 @@ func TestPage_Decode_MediaBoxInherited(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPage_Decode_DanglingReference checks that a reference to a free object
+// reads the same as an absent entry.
+func TestPage_Decode_DanglingReference(t *testing.T) {
+	keys := []pdf.Name{
+		"MediaBox", "Resources", "Contents", "CropBox", "BleedBox", "TrimBox",
+		"ArtBox", "BoxColorInfo", "Rotate", "Group", "Thumb", "B", "Dur",
+		"Trans", "Annots", "AA", "Metadata", "LastModified", "PieceInfo",
+		"StructParents", "ID", "PZ", "SeparationInfo", "Tabs",
+		"TemplateInstantiated", "PresSteps", "UserUnit", "VP", "AF",
+	}
+	dangling := pdf.NewReference(99, 0)
+	for _, key := range keys {
+		t.Run(string(key), func(t *testing.T) {
+			decode := func(withKey bool) *Page {
+				dict := pdf.Dict{"Type": pdf.Name("Page")}
+				if withKey {
+					dict[key] = dangling
+				}
+				x := pdf.NewExtractor(mock.Getter)
+				p, err := Decode(pdf.CursorAt(x, nil), dict, true)
+				if err != nil {
+					t.Fatalf("decode failed: %v", err)
+				}
+				return p
+			}
+			want := decode(false)
+			got := decode(true)
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("dangling reference differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPage_Decode_MalformedInteger(t *testing.T) {
+	for _, key := range []pdf.Name{"Rotate", "StructParents"} {
+		t.Run(string(key), func(t *testing.T) {
+			decode := func(withKey bool) *Page {
+				dict := pdf.Dict{"Type": pdf.Name("Page")}
+				if withKey {
+					dict[key] = pdf.String("bad")
+				}
+				x := pdf.NewExtractor(mock.Getter)
+				p, err := Decode(pdf.CursorAt(x, nil), dict, true)
+				if err != nil {
+					t.Fatalf("decode failed: %v", err)
+				}
+				return p
+			}
+			if diff := cmp.Diff(decode(false), decode(true)); diff != "" {
+				t.Errorf("malformed value differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestPage_Decode_WrongTypeEntry checks that a wrong-type value for
+// these dictionary entries reads the same as an absent entry.
+func TestPage_Decode_WrongTypeEntry(t *testing.T) {
+	for _, key := range []pdf.Name{"Resources", "AA", "SeparationInfo", "PresSteps"} {
+		t.Run(string(key), func(t *testing.T) {
+			decode := func(withKey bool) *Page {
+				dict := pdf.Dict{"Type": pdf.Name("Page")}
+				if withKey {
+					dict[key] = pdf.Name("bad")
+				}
+				x := pdf.NewExtractor(mock.Getter)
+				p, err := Decode(pdf.CursorAt(x, nil), dict, true)
+				if err != nil {
+					t.Fatalf("decode failed: %v", err)
+				}
+				return p
+			}
+			if diff := cmp.Diff(decode(false), decode(true)); diff != "" {
+				t.Errorf("wrong type differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// pageFromDict writes dict as a page object and reads it back through
+// [pdf.Cursor.Decode], so that the page's own reference is on the cycle path.
+func pageFromDict(t *testing.T, w *pdf.Writer, ref pdf.Reference, dict pdf.Dict) *Page {
+	t.Helper()
+	dict["Type"] = pdf.Name("Page")
+	if err := w.Put(ref, dict); err != nil {
+		t.Fatal(err)
+	}
+	p, err := pdf.CursorAt(pdf.NewExtractor(w), nil).Decode(ref, Decode)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	return p
+}
+
+// TestPage_Decode_UnusableContents checks that unusable /Contents entries are
+// skipped, that usable segments are kept, and that an unusable /Contents
+// reads like an absent one.
+func TestPage_Decode_UnusableContents(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+
+	stream := w.Alloc()
+	stm, err := w.OpenStream(stream, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte("q Q")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	notStream := w.Alloc()
+	loopA, loopB := w.Alloc(), w.Alloc()
+	for ref, obj := range map[pdf.Reference]pdf.Object{
+		notStream: pdf.Dict{"X": pdf.Integer(1)},
+		loopA:     loopB,
+		loopB:     loopA,
+	} {
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	absent := pageFromDict(t, w, w.Alloc(), pdf.Dict{})
+	if absent.Contents != nil {
+		t.Fatalf("absent /Contents read as %v", absent.Contents)
+	}
+
+	unusable := map[string]pdf.Object{
+		"dictionary":        notStream,
+		"direct dictionary": pdf.Dict{},
+		"name":              pdf.Name("x"),
+		"reference loop":    loopA,
+		"array of dict":     pdf.Array{notStream},
+		"array of integer":  pdf.Array{pdf.Integer(42)},
+		"array of loop":     pdf.Array{loopA},
+		"empty array":       pdf.Array{},
+	}
+	for name, obj := range unusable {
+		t.Run(name, func(t *testing.T) {
+			p := pageFromDict(t, w, w.Alloc(), pdf.Dict{"Contents": obj})
+			if diff := cmp.Diff(absent, p); diff != "" {
+				t.Errorf("read differently from absent /Contents (-absent +got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("usable segments are kept", func(t *testing.T) {
+		contents := pdf.Array{notStream, stream, pdf.Integer(42), loopA, stream}
+		p := pageFromDict(t, w, w.Alloc(), pdf.Dict{"Contents": contents})
+		if len(p.Contents) != 2 {
+			t.Errorf("got %d segments, want 2", len(p.Contents))
+		}
+	})
+}
+
+// TestPage_Decode_UnusableAnnots checks that an /Annots entry which cannot be
+// read as an array of annotations, including one which refers back to the
+// page itself, reads like an absent one.
+func TestPage_Decode_UnusableAnnots(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+
+	loopA, loopB := w.Alloc(), w.Alloc()
+	for ref, obj := range map[pdf.Reference]pdf.Object{loopA: loopB, loopB: loopA} {
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	absent := pageFromDict(t, w, w.Alloc(), pdf.Dict{})
+	if absent.Annots != nil {
+		t.Fatalf("absent /Annots read as %v", absent.Annots)
+	}
+
+	selfRef := w.Alloc()
+	cases := map[string]struct {
+		ref   pdf.Reference
+		annot pdf.Object
+	}{
+		"page itself":       {selfRef, selfRef},
+		"reference loop":    {w.Alloc(), loopA},
+		"dictionary":        {w.Alloc(), pdf.Dict{}},
+		"name":              {w.Alloc(), pdf.Name("x")},
+		"array of integers": {w.Alloc(), pdf.Array{pdf.Integer(1)}},
+		"array of loop":     {w.Alloc(), pdf.Array{loopA}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			p := pageFromDict(t, w, tc.ref, pdf.Dict{"Annots": tc.annot})
+			if diff := cmp.Diff(absent, p); diff != "" {
+				t.Errorf("read differently from absent /Annots (-absent +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestPage_Decode_AssociatedFilesWritable checks that associated files which
+// could not be written back are dropped on read, so that the page can be
+// written out again.
+func TestPage_Decode_AssociatedFilesWritable(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+
+	embeddedSpec := func(streamDict pdf.Dict, dict pdf.Dict) pdf.Reference {
+		stream := w.Alloc()
+		stm, err := w.OpenStream(stream, streamDict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := stm.Close(); err != nil {
+			t.Fatal(err)
+		}
+		dict["Type"] = pdf.Name("Filespec")
+		dict["EF"] = pdf.Dict{"F": stream}
+		ref := w.Alloc()
+		if err := w.Put(ref, dict); err != nil {
+			t.Fatal(err)
+		}
+		return ref
+	}
+	typed := pdf.Dict{"Subtype": pdf.Name("text/plain")}
+	embedded := embeddedSpec(typed, pdf.Dict{"F": pdf.String("a.txt")})
+	noName := embeddedSpec(typed, pdf.Dict{})
+	noMIME := embeddedSpec(pdf.Dict{}, pdf.Dict{"F": pdf.String("b.txt")})
+
+	p := pageFromDict(t, w, w.Alloc(), pdf.Dict{
+		"AF": pdf.Array{embedded, noName, noMIME},
+	})
+	if len(p.AssociatedFiles) != 2 {
+		t.Fatalf("got %d associated files, want 2", len(p.AssociatedFiles))
+	}
+	if p.AssociatedFiles[0].FileName != "a.txt" || p.AssociatedFiles[1].FileName != "" {
+		t.Errorf("wrong files kept")
+	}
+
+	p.MediaBox = &pdf.Rectangle{URx: 100, URy: 100}
+	roundTripTest(t, pdf.V2_0, p)
 }

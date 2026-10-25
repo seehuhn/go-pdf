@@ -69,6 +69,8 @@ func decodeSquare(c pdf.Cursor, dict pdf.Dict) (*annotation.Square, error) {
 		if rd[0]+rd[2] < square.Rect.Dx() && rd[1]+rd[3] < square.Rect.Dy() {
 			square.Margin = rd
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	return square, nil

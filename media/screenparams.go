@@ -140,24 +140,22 @@ func extractScreenEntries(c pdf.Cursor, obj pdf.Object) (*MediaScreenEntries, er
 
 	s := &MediaScreenEntries{}
 
-	if dict["W"] != nil {
-		if w, err := pdf.Optional(c.Integer(dict["W"])); err != nil {
-			return nil, err
-		} else {
-			s.Window = windowTypeFromPDF(w)
-		}
+	if w, err := c.Integer(dict["W"]); err == nil {
+		s.Window = windowTypeFromPDF(w)
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 	if b, err := pdf.Optional(c.FloatArray(dict["B"])); err != nil {
 		return nil, err
 	} else if len(b) == 3 && inUnitRange(b) {
 		s.Background = b
 	}
-	if dict["O"] != nil {
-		if o, err := pdf.Optional(c.Number(dict["O"])); err != nil {
-			return nil, err
-		} else if o >= 0 && o <= 1 {
+	if o, err := c.Number(dict["O"]); err == nil {
+		if o >= 0 && o <= 1 {
 			s.Opacity.Set(o)
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 	if m, err := pdf.Optional(c.Integer(dict["M"])); err != nil {
 		return nil, err

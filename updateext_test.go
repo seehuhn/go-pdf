@@ -166,6 +166,38 @@ func TestUpdaterFree(t *testing.T) {
 	}
 }
 
+// TestUpdaterPutGeneration checks that an update writes new object numbers
+// with generation number 0 and existing ones with the generation number from
+// the original file.
+func TestUpdaterPutGeneration(t *testing.T) {
+	f, oldRef := newBaseFile(t, pdf.V1_7, nil)
+	size := trailerSize(t, f.Data)
+	w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bad := []pdf.Reference{
+		pdf.NewReference(size+5, 3),
+		pdf.NewReference(oldRef.Number(), 1),
+		pdf.Reference(0),
+	}
+	for _, ref := range bad {
+		if err := w.Put(ref, pdf.Name("x")); err == nil {
+			t.Errorf("Put(%s) succeeded", ref)
+		}
+	}
+	if _, err := w.OpenStream(pdf.NewReference(size+6, 2), nil); err == nil {
+		t.Error("OpenStream with generation 2 succeeded")
+	}
+
+	for _, ref := range []pdf.Reference{oldRef, pdf.NewReference(size+7, 0)} {
+		if err := w.Put(ref, pdf.Name("x")); err != nil {
+			t.Errorf("Put(%s): %v", ref, err)
+		}
+	}
+}
+
 func TestUpdaterRejectsWrongPassword(t *testing.T) {
 	f, _ := newBaseFile(t, pdf.V1_7, &pdf.WriterOptions{UserPassword: "u", OwnerPassword: "o"})
 	_, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{Password: "wrong"})
@@ -1778,5 +1810,152 @@ func TestUpdateVersionBelowHeaderDropped(t *testing.T) {
 	}
 	if m := reopen(t, f.Data).GetMeta(); m.Version != pdf.V1_4 || m.Catalog.Version != 0 {
 		t.Errorf("version %s, catalog version %s, want 1.4 and 0", m.Version, m.Catalog.Version)
+	}
+}
+
+// handmadeBase returns a PDF 1.4 file with a catalog (object 1), a page tree
+// (object 2) and the extra objects 3 0 R and 3 3 R, followed by a
+// cross-reference table which lists entries and a trailer with the given
+// /Size.  The entries for objects 3 and up are given as table rows.
+func handmadeBase(t testing.TB, size int, rows []string) []byte {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	buf.WriteString("%PDF-1.4\n")
+	o1 := buf.Len()
+	buf.WriteString("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+	o2 := buf.Len()
+	buf.WriteString("2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\n")
+	o3 := buf.Len()
+	buf.WriteString("3 3 obj\n/old\nendobj\n")
+	xref := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 %d\n", 3+len(rows)+1)
+	buf.WriteString("0000000000 65535 f\r\n")
+	fmt.Fprintf(buf, "%010d 00000 n\r\n%010d 00000 n\r\n%010d 00003 n\r\n", o1, o2, o3)
+	for _, row := range rows {
+		buf.WriteString(row + "\r\n")
+	}
+	fmt.Fprintf(buf, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", size, xref)
+	return buf.Bytes()
+}
+
+// TestUpdaterInUseGeneration checks the generation numbers which an update
+// may use for objects with an entry in the original cross-reference table:
+// an object in use keeps its generation number, and a free entry with
+// generation number below 65535 may be reused with exactly that generation
+// number.  A free entry with generation number 65535 cannot be reused.
+func TestUpdaterInUseGeneration(t *testing.T) {
+	data := handmadeBase(t, 7, []string{
+		"0000000000 00007 f", // object 4
+		"0000000000 65535 f", // object 5
+		"0000000000 00000 f", // object 6
+	})
+	open := func() *pdf.Writer {
+		t.Helper()
+		f := &memfile.MemFile{Data: bytes.Clone(data)}
+		w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return w
+	}
+
+	cases := []struct {
+		ref pdf.Reference
+		ok  bool
+	}{
+		{pdf.NewReference(3, 3), true},
+		{pdf.NewReference(3, 0), false},
+		{pdf.NewReference(3, 2), false},
+		{pdf.NewReference(3, 4), false},
+		{pdf.NewReference(4, 7), true},
+		{pdf.NewReference(4, 0), false},
+		{pdf.NewReference(4, 6), false},
+		{pdf.NewReference(4, 8), false},
+		{pdf.NewReference(5, 0), false},
+		{pdf.NewReference(5, 65535), false},
+		{pdf.NewReference(6, 0), true},
+		{pdf.NewReference(6, 1), false},
+		{pdf.NewReference(7, 0), true},
+		{pdf.NewReference(7, 1), false},
+	}
+	for _, c := range cases {
+		t.Run(c.ref.String(), func(t *testing.T) {
+			w := open()
+			err := w.Put(c.ref, pdf.Name("new"))
+			if c.ok && err != nil {
+				t.Errorf("Put failed: %v", err)
+			} else if !c.ok && err == nil {
+				t.Error("Put succeeded")
+			}
+		})
+	}
+
+	t.Run("OpenStream", func(t *testing.T) {
+		w := open()
+		if _, err := w.OpenStream(pdf.NewReference(3, 0), nil); err == nil {
+			t.Error("OpenStream with the wrong generation succeeded")
+		}
+		stm, err := w.OpenStream(pdf.NewReference(3, 3), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := stm.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("round trip", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		w, err := pdf.NewUpdaterTo(bytes.NewReader(data), int64(len(data)), out, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, ref := range []pdf.Reference{pdf.NewReference(3, 3), pdf.NewReference(4, 7)} {
+			if err := w.Put(ref, pdf.Name("new")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		r := reopen(t, out.Bytes())
+		for _, ref := range []pdf.Reference{pdf.NewReference(3, 3), pdf.NewReference(4, 7)} {
+			obj, err := r.Get(ref, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if obj != pdf.Name("new") {
+				t.Errorf("%s reads as %v, want /new", ref, obj)
+			}
+		}
+	})
+}
+
+// TestUpdaterAllocSkipsObjectZero checks that an update never allocates
+// object number 0, even if the /Size entry of the original trailer is 0 or
+// too small to cover the objects in the file.
+func TestUpdaterAllocSkipsObjectZero(t *testing.T) {
+	for _, size := range []int{0, 1, 2, 3} {
+		t.Run(fmt.Sprintf("Size %d", size), func(t *testing.T) {
+			f := &memfile.MemFile{Data: handmadeBase(t, size, nil)}
+			w, err := pdf.NewUpdater(f, int64(len(f.Data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seen := map[uint32]bool{}
+			for range 3 {
+				ref := w.Alloc()
+				if ref.Number() == 0 {
+					t.Fatal("Alloc returned object number 0")
+				}
+				if ref.Number() <= 3 {
+					t.Errorf("Alloc returned %s, which is in use", ref)
+				}
+				if seen[ref.Number()] {
+					t.Errorf("Alloc returned %s twice", ref)
+				}
+				seen[ref.Number()] = true
+			}
+		})
 	}
 }

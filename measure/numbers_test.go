@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 func TestNumberFormatExtractEmbed(t *testing.T) {
@@ -258,5 +259,46 @@ func TestFractionalValueFormatConstants(t *testing.T) {
 	}
 	if FractionTruncate != 3 {
 		t.Errorf("FractionTruncate should be 3, got %d", FractionTruncate)
+	}
+}
+
+// TestNumberFormatForceExactFraction checks that a dangling reference, null
+// and a value of the wrong type in /FD are read like an absent entry.
+func TestNumberFormatForceExactFraction(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+	decode := func(fd pdf.Object, withKey bool) *NumberFormat {
+		t.Helper()
+		dict := pdf.Dict{
+			"U": pdf.String("mi"),
+			"C": pdf.Number(1.0),
+			"D": pdf.Integer(100),
+		}
+		if withKey {
+			dict["FD"] = fd
+		}
+		nf, err := ExtractNumberFormat(c, dict, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return nf
+	}
+
+	absent := decode(nil, false)
+	if absent.ForceExactFraction {
+		t.Fatal("absent FD read as true")
+	}
+	if !decode(pdf.Boolean(true), true).ForceExactFraction {
+		t.Error("FD true has no effect")
+	}
+
+	for name, fd := range map[string]pdf.Object{
+		"dangling": pdf.NewReference(99, 0),
+		"null":     nil,
+		"name":     pdf.Name("x"),
+		"integer":  pdf.Integer(1),
+	} {
+		if diff := cmp.Diff(absent, decode(fd, true)); diff != "" {
+			t.Errorf("FD %s differs from absent entry (-absent +got):\n%s", name, diff)
+		}
 	}
 }

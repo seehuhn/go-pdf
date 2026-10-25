@@ -98,7 +98,7 @@ func decodeGoTo(c pdf.Cursor, dict pdf.Dict) (pdf.Action, error) {
 		}
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

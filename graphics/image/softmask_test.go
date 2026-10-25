@@ -19,9 +19,12 @@ package image
 import (
 	"bytes"
 	"io"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 	"seehuhn.de/go/pdf/internal/limits"
@@ -389,5 +392,87 @@ func TestExtractSoftMaskFilterSampleBits(t *testing.T) {
 	}
 	if sm.BitsPerComponent != 1 {
 		t.Errorf("BitsPerComponent = %d, want 1", sm.BitsPerComponent)
+	}
+}
+
+// extractSoftMaskWith reads a 4x1 soft mask whose dictionary contains the
+// entries in extras.
+func extractSoftMaskWith(t *testing.T, extras pdf.Dict) *SoftMask {
+	t.Helper()
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	dict := pdf.Dict{
+		"Type":             pdf.Name("XObject"),
+		"Subtype":          pdf.Name("Image"),
+		"Width":            pdf.Integer(4),
+		"Height":           pdf.Integer(1),
+		"BitsPerComponent": pdf.Integer(8),
+	}
+	maps.Copy(dict, extras)
+	ref := w.Alloc()
+	body, err := w.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := body.Write(make([]byte, 4)); err != nil {
+		t.Fatal(err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(w)
+	sm, err := ExtractSoftMask(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sm
+}
+
+// TestExtractSoftMaskDanglingReference checks that a reference to a free
+// object reads the same as an absent entry.
+func TestExtractSoftMaskDanglingReference(t *testing.T) {
+	opt := cmpopts.IgnoreFields(SoftMask{}, "Source")
+	want := extractSoftMaskWith(t, nil)
+	for _, key := range []pdf.Name{"ColorSpace", "Decode", "Interpolate", "Matte"} {
+		t.Run(string(key), func(t *testing.T) {
+			got := extractSoftMaskWith(t, pdf.Dict{key: pdf.NewReference(99, 0)})
+			if diff := cmp.Diff(want, got, opt); diff != "" {
+				t.Errorf("dangling reference differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestExtractSoftMaskMalformedOptional checks that null and wrong-type
+// Interpolate, Matte, Decode and ColorSpace entries read the same as absent entries.
+func TestExtractSoftMaskMalformedOptional(t *testing.T) {
+	opt := cmpopts.IgnoreFields(SoftMask{}, "Source")
+	want := extractSoftMaskWith(t, nil)
+	bad := map[pdf.Name][]pdf.Object{
+		"Interpolate": {nil, pdf.Integer(1), pdf.String("bad")},
+		"Matte":       {nil, pdf.Integer(1), pdf.String("bad"), pdf.Array{pdf.String("bad")}},
+		"ColorSpace":  {nil, pdf.Integer(1), pdf.String("bad"), pdf.Name("NoSuchSpace")},
+		"Decode": {
+			pdf.Integer(1),
+			pdf.Array{pdf.Integer(1)},
+			pdf.Array{pdf.Integer(1), pdf.Integer(0), pdf.Integer(1)},
+			pdf.Array{pdf.String("bad"), pdf.Integer(0)},
+		},
+	}
+	for key, objs := range bad {
+		for _, obj := range objs {
+			got := extractSoftMaskWith(t, pdf.Dict{key: obj})
+			if diff := cmp.Diff(want, got, opt); diff != "" {
+				t.Errorf("%s %v: malformed value differs from absent entry (-want +got):\n%s", key, obj, diff)
+			}
+		}
+	}
+
+	got := extractSoftMaskWith(t, pdf.Dict{
+		"Interpolate": pdf.Boolean(true),
+		"Matte":       pdf.Array{pdf.Number(0.5)},
+		"ColorSpace":  pdf.Name("DeviceGray"),
+	})
+	if !got.Interpolate || !slices.Equal(got.Matte, []float64{0.5}) {
+		t.Errorf("valid entries not read: %+v", got)
 	}
 }

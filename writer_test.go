@@ -289,3 +289,24 @@ func TestWriter_ID(t *testing.T) {
 		t.Errorf("expected %v, got %v", w.meta.ID, r.meta.ID)
 	}
 }
+
+// TestWriterGeneration checks that objects in a new file must have object
+// numbers other than 0 and generation number 0 (PDF 7.3.10).
+func TestWriterGeneration(t *testing.T) {
+	w, err := NewWriter(&bytes.Buffer{}, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(NewReference(50, 3), Integer(1)); err == nil {
+		t.Error("Put with generation 3 succeeded")
+	}
+	if _, err := w.OpenStream(NewReference(51, 3), nil); err == nil {
+		t.Error("OpenStream with generation 3 succeeded")
+	}
+	if err := w.Put(Reference(0), Integer(1)); err == nil {
+		t.Error("Put with object number 0 succeeded")
+	}
+	if err := w.Put(NewReference(52, 0), Integer(1)); err != nil {
+		t.Error(err)
+	}
+}

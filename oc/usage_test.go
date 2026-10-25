@@ -293,6 +293,7 @@ func TestExtractUsageLanguage(t *testing.T) {
 		{"malformed", pdf.Dict{"Lang": pdf.Text("en--US")}, &UsageLanguage{Lang: language.Und}},
 		{"missing", pdf.Dict{"Preferred": pdf.Name("ON")}, nil},
 		{"not a string", pdf.Dict{"Lang": pdf.Integer(1)}, nil},
+		{"dangling", pdf.Dict{"Lang": pdf.NewReference(99, 0)}, nil},
 	}
 	c := pdf.NewCursor(mock.Getter)
 	for _, tc := range cases {

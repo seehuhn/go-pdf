@@ -26,7 +26,9 @@ import (
 
 // SubmitForm represents a submit-form action that sends form data to a URL.
 type SubmitForm struct {
-	// F is the URL to which to submit the form data.
+	// F is the URL file specification giving the URL to which to submit the
+	// form data.  This is a [pdf.String] or a [pdf.Dict] (or a [pdf.Reference]
+	// to a file specification dictionary).
 	F pdf.Object
 
 	// Fields specifies which fields to submit.
@@ -50,6 +52,12 @@ func (a *SubmitForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 	if a.F == nil {
 		return nil, errors.New("SubmitForm action must have F entry")
+	}
+	switch a.F.AsPDF(0).(type) {
+	case pdf.String, pdf.Dict, pdf.Reference:
+		// ok
+	default:
+		return nil, errors.New("invalid SubmitForm action F entry")
 	}
 
 	dict := pdf.Dict{
@@ -78,15 +86,29 @@ func (a *SubmitForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeSubmitForm(c pdf.Cursor, dict pdf.Dict) (*SubmitForm, error) {
-	f := dict["F"]
-	if f == nil {
-		return nil, pdf.Error("SubmitForm action missing F entry")
+	// F is a file specification: a string or a dictionary
+	var f pdf.Object
+	resolved, err := pdf.Optional(c.Resolve(dict["F"]))
+	if err != nil {
+		return nil, err
+	}
+	switch resolved.(type) {
+	case pdf.String, pdf.Dict:
+		f = resolved
+	default:
+		return nil, pdf.Error("SubmitForm action without valid F entry")
 	}
 
-	fields, _ := c.Array(dict["Fields"])
-	flags, _ := pdf.Optional(c.Integer(dict["Flags"]))
+	fields, err := pdf.Optional(c.Array(dict["Fields"]))
+	if err != nil {
+		return nil, err
+	}
+	flags, err := pdf.Optional(c.Integer(dict["Flags"]))
+	if err != nil {
+		return nil, err
+	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

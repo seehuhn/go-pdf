@@ -19,6 +19,7 @@ package halftone
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -26,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/function"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 // testCases holds test cases for all halftone types, indexed by type
@@ -606,5 +608,59 @@ func TestType1SpotFunctionUnusable(t *testing.T) {
 				t.Errorf("frequency/angle = %g/%g, want 60/45", h1.Frequency, h1.Angle)
 			}
 		})
+	}
+}
+
+// TestExtractType1DanglingReference checks that a reference to a free object
+// reads the same as an absent entry.
+func TestExtractType1DanglingReference(t *testing.T) {
+	base := pdf.Dict{
+		"HalftoneType": pdf.Integer(1),
+		"Frequency":    pdf.Number(60),
+		"Angle":        pdf.Number(45),
+		"SpotFunction": pdf.Name("SimpleDot"),
+	}
+	x := pdf.NewExtractor(mock.Getter)
+	want, err := Extract(pdf.CursorAt(x, nil), base, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []pdf.Name{"AccurateScreens", "TransferFunction", "HalftoneName"} {
+		t.Run(string(key), func(t *testing.T) {
+			dict := maps.Clone(base)
+			dict[key] = pdf.NewReference(99, 0)
+			got, err := Extract(pdf.CursorAt(x, nil), dict, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("dangling reference differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestExtractType1MalformedAccurateScreens checks that an AccurateScreens
+// entry of the wrong type reads the same as an absent entry.
+func TestExtractType1MalformedAccurateScreens(t *testing.T) {
+	base := pdf.Dict{
+		"HalftoneType": pdf.Integer(1),
+		"Frequency":    pdf.Number(60),
+		"Angle":        pdf.Number(45),
+		"SpotFunction": pdf.Name("SimpleDot"),
+	}
+	x := pdf.NewExtractor(mock.Getter)
+	want, err := Extract(pdf.CursorAt(x, nil), base, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dict := maps.Clone(base)
+	dict["AccurateScreens"] = pdf.String("bad")
+	got, err := Extract(pdf.CursorAt(x, nil), dict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("malformed value differs from absent entry (-want +got):\n%s", diff)
 	}
 }

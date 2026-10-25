@@ -83,7 +83,10 @@ func extractFontCIDType0(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType0, erro
 		return nil, err
 	}
 
-	d.ToUnicode, _ = c.Decode(fontDict["ToUnicode"], cmap.ExtractToUnicode)
+	d.ToUnicode, err = c.DecodeOptional(fontDict["ToUnicode"], cmap.ExtractToUnicode)
+	if err != nil {
+		return nil, err
+	}
 
 	// fields in the CIDFont dictionary
 
@@ -102,18 +105,19 @@ func extractFontCIDType0(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType0, erro
 		return nil, err
 	}
 
-	d.ROS, _ = c.Decode(cidFontDict["CIDSystemInfo"], font.ExtractCIDSystemInfo)
+	d.ROS, err = c.DecodeOptional(cidFontDict["CIDSystemInfo"], font.ExtractCIDSystemInfo)
+	if err != nil {
+		return nil, err
+	}
 
 	d.Width, err = decodeCompositeWidths(c, cidFontDict["W"])
 	if err != nil {
 		return nil, err
 	}
-	if obj, ok := cidFontDict["DW"]; ok {
-		dw, err := c.Number(obj)
-		if pdf.IsReadError(err) {
-			return nil, err
-		}
+	if dw, err := c.Number(cidFontDict["DW"]); err == nil {
 		d.DefaultWidth = dw
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	} else {
 		d.DefaultWidth = dict.DefaultWidthDefault
 	}

@@ -230,12 +230,13 @@ func decodeSetOCGState(c pdf.Cursor, dict pdf.Dict) (*SetOCGState, error) {
 	}
 
 	ignoreRB := false // default: preserve radio-button groups
-	if dict["PreserveRB"] != nil {
-		rb, _ := pdf.Optional(c.Boolean(dict["PreserveRB"]))
-		ignoreRB = !bool(rb)
+	if rb, ok, err := c.OptionalBoolean(dict["PreserveRB"]); err != nil {
+		return nil, err
+	} else if ok {
+		ignoreRB = !rb
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

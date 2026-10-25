@@ -144,31 +144,25 @@ func ExtractTransparencyAttributes(c pdf.Cursor, obj pdf.Object, isDirect bool) 
 	a := &TransparencyAttributes{}
 
 	// extract color space (optional)
-	if csObj, ok := dict["CS"]; ok {
-		cs, err := c.Decode(csObj, color.ExtractSpace)
-		if err != nil {
-			return nil, pdf.Wrap(err, "group color space")
-		}
+	if cs, err := c.DecodeOptional(dict["CS"], color.ExtractSpace); err != nil {
+		return nil, pdf.Wrap(err, "group color space")
+	} else {
 		a.CS = cs
 	}
 
 	// extract isolated flag (default false)
-	if iObj, ok := dict["I"]; ok {
-		isolated, err := c.Boolean(iObj)
-		if err != nil {
-			return nil, err
-		}
-		a.Isolated = bool(isolated)
+	isolated, _, err := c.OptionalBoolean(dict["I"])
+	if err != nil {
+		return nil, err
 	}
+	a.Isolated = isolated
 
 	// extract knockout flag (default false)
-	if kObj, ok := dict["K"]; ok {
-		knockout, err := c.Boolean(kObj)
-		if err != nil {
-			return nil, err
-		}
-		a.Knockout = bool(knockout)
+	knockout, _, err := c.OptionalBoolean(dict["K"])
+	if err != nil {
+		return nil, err
 	}
+	a.Knockout = knockout
 
 	a.SingleUse = isDirect
 

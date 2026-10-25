@@ -47,7 +47,11 @@ func XObject(c pdf.Cursor, obj pdf.Object, isDirect bool) (graphics.XObject, err
 
 	switch subtype {
 	case "Image":
-		if isImageMask, _ := c.Boolean(stm.Dict["ImageMask"]); isImageMask {
+		isImageMask, _, err := c.OptionalBoolean(stm.Dict["ImageMask"])
+		if err != nil {
+			return nil, err
+		}
+		if isImageMask {
 			return image.ExtractMask(c, obj, isDirect)
 		}
 		img, err := image.ExtractDict(c, stm, isDirect)

@@ -70,10 +70,16 @@ func (a *ResetForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeResetForm(c pdf.Cursor, dict pdf.Dict) (*ResetForm, error) {
-	fields, _ := c.Array(dict["Fields"])
-	flags, _ := pdf.Optional(c.Integer(dict["Flags"]))
+	fields, err := pdf.Optional(c.Array(dict["Fields"]))
+	if err != nil {
+		return nil, err
+	}
+	flags, err := pdf.Optional(c.Integer(dict["Flags"]))
+	if err != nil {
+		return nil, err
+	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

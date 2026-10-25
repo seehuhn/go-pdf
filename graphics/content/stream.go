@@ -266,7 +266,7 @@ func (si *scannerIter) All() iter.Seq2[OpName, []pdf.Object] {
 	return func(yield func(OpName, []pdf.Object) bool) {
 		r, err := si.open()
 		if err != nil {
-			if !pdf.IsMalformed(err) {
+			if pdf.IsReadError(err) {
 				si.err = err
 			}
 			return

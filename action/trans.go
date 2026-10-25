@@ -76,7 +76,7 @@ func decodeTrans(c pdf.Cursor, dict pdf.Dict) (*Trans, error) {
 		return nil, err
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

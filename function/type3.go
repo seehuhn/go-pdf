@@ -17,7 +17,6 @@
 package function
 
 import (
-	"errors"
 	"fmt"
 	"math"
 
@@ -109,7 +108,7 @@ func extractType3(c pdf.Cursor, d pdf.Dict) (*Type3, error) {
 		functions[i] = fn
 	}
 	if len(functions) == 0 {
-		return nil, errors.New("missing child functions")
+		return nil, pdf.Error("missing child functions")
 	}
 
 	rnge, err := getFloatArray(c, d["Range"])
@@ -127,7 +126,7 @@ func extractType3(c pdf.Cursor, d pdf.Dict) (*Type3, error) {
 	}
 
 	if err := f.validate(); err != nil {
-		return nil, err
+		return nil, &pdf.MalformedFileError{Err: err}
 	}
 
 	return f, nil

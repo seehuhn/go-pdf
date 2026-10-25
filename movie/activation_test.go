@@ -25,6 +25,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 // defaultsActivation returns a fresh *Activation populated with the
@@ -302,6 +303,12 @@ func TestActivationEmbedValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "unknown Mode",
+			act: &Activation{
+				Rate: 1.0, Volume: 1.0, Mode: Mode("Bounce"),
+			},
+		},
+		{
 			name: "FWPosition out of range",
 			act: &Activation{
 				Rate: 1.0, Volume: 1.0, Mode: ModeOnce,
@@ -423,6 +430,99 @@ func TestActivationDecodePermissive(t *testing.T) {
 	}
 }
 
+// TestActivationInvalidRateVolume verifies that wrong-type, dangling and
+// out-of-range Rate and Volume entries read as the defaults.
+func TestActivationInvalidRateVolume(t *testing.T) {
+	for _, key := range []pdf.Name{"Rate", "Volume"} {
+		cases := map[string]func(w *pdf.Writer) pdf.Object{
+			"wrong type": func(w *pdf.Writer) pdf.Object { return pdf.Name("x") },
+			"dangling":   func(w *pdf.Writer) pdf.Object { return pdf.NewReference(9999, 0) },
+			"out of range": func(w *pdf.Writer) pdf.Object {
+				if key == "Volume" {
+					return pdf.Number(-3)
+				}
+				return pdf.Number(0)
+			},
+		}
+		for name, mk := range cases {
+			t.Run(string(key)+"/"+name, func(t *testing.T) {
+				w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				ref := w.Alloc()
+				if err := w.Put(ref, pdf.Dict{key: mk(w)}); err != nil {
+					t.Fatalf("Put: %v", err)
+				}
+				w.GetMeta().Trailer["Quir:E"] = ref
+				if err := w.Close(); err != nil {
+					t.Fatalf("w.Close: %v", err)
+				}
+
+				x := pdf.NewExtractor(w)
+				got, err := ExtractActivation(pdf.CursorAt(x, nil), w.GetMeta().Trailer["Quir:E"], false)
+				if err != nil {
+					t.Fatalf("extract: %v", err)
+				}
+				if got.Rate != 1.0 || got.Volume != 1.0 {
+					t.Errorf("got Rate=%g Volume=%g, want defaults", got.Rate, got.Volume)
+				}
+			})
+		}
+	}
+}
+
+// TestActivationInvalidEntries verifies that unknown Mode names and
+// wrong-type, dangling or null ShowControls and Synchronous entries read as
+// though they were absent.
+func TestActivationInvalidEntries(t *testing.T) {
+	dangling := pdf.NewReference(9999, 0)
+	cases := []struct {
+		name string
+		dict pdf.Dict
+	}{
+		{"unknown Mode", pdf.Dict{"Mode": pdf.Name("Bounce")}},
+		{"lower-case Mode", pdf.Dict{"Mode": pdf.Name("repeat")}},
+		{"wrong-type Mode", pdf.Dict{"Mode": pdf.Integer(1)}},
+		{"dangling Mode", pdf.Dict{"Mode": dangling}},
+		{"wrong-type ShowControls", pdf.Dict{"ShowControls": pdf.Name("true")}},
+		{"integer ShowControls", pdf.Dict{"ShowControls": pdf.Integer(1)}},
+		{"dangling ShowControls", pdf.Dict{"ShowControls": dangling}},
+		{"wrong-type Synchronous", pdf.Dict{"Synchronous": pdf.String("true")}},
+		{"integer Synchronous", pdf.Dict{"Synchronous": pdf.Integer(1)}},
+		{"dangling Synchronous", pdf.Dict{"Synchronous": dangling}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			ref := w.Alloc()
+			if err := w.Put(ref, tc.dict); err != nil {
+				t.Fatalf("Put: %v", err)
+			}
+			w.GetMeta().Trailer["Quir:E"] = ref
+			if err := w.Close(); err != nil {
+				t.Fatalf("w.Close: %v", err)
+			}
+
+			x := pdf.NewExtractor(w)
+			got, err := ExtractActivation(pdf.CursorAt(x, nil), ref, false)
+			if err != nil {
+				t.Fatalf("extract: %v", err)
+			}
+			if got.Mode != ModeOnce || got.ShowControls || got.Synchronous {
+				t.Errorf("got Mode=%q ShowControls=%t Synchronous=%t, want defaults",
+					got.Mode, got.ShowControls, got.Synchronous)
+			}
+		})
+	}
+}
+
+// TestActivationModes verifies that every defined Mode survives a round trip.
+func TestActivationModes(t *testing.T) {
+	for _, m := range []Mode{ModeOnce, ModeOpen, ModeRepeat, ModePalindrome} {
+		t.Run(string(m), func(t *testing.T) {
+			roundTripActivation(t, pdf.V1_7, &Activation{Rate: 1.0, Volume: 1.0, Mode: m})
+		})
+	}
+}
+
 func FuzzActivationRoundTrip(f *testing.F) {
 	opt := &pdf.WriterOptions{HumanReadable: true}
 
@@ -494,4 +594,43 @@ func FuzzActivationRoundTrip(f *testing.F) {
 			t.Errorf("round trip not stable (-first +second):\n%s", diff)
 		}
 	})
+}
+
+// TestDecodeTimestamp checks that valid Start and Duration values are decoded,
+// and that absent or malformed values give nil.
+func TestDecodeTimestamp(t *testing.T) {
+	big := pdf.String{0, 0, 0, 1, 0, 0, 0, 0}
+	cases := []struct {
+		in   pdf.Object
+		want *Timestamp
+	}{
+		{nil, nil},
+		{pdf.NewReference(99, 0), nil},
+		{pdf.Integer(0), &Timestamp{}},
+		{pdf.Integer(42), &Timestamp{Value: 42}},
+		{pdf.Integer(-1), nil},
+		{big, &Timestamp{Value: 1 << 32}},
+		{pdf.String{0xff, 0, 0, 0, 0, 0, 0, 0}, nil},
+		{pdf.String("short"), nil},
+		{pdf.Name("x"), nil},
+		{pdf.Array{pdf.Integer(10), pdf.Integer(600)}, &Timestamp{Value: 10, TimeScale: 600}},
+		{pdf.Array{big, pdf.Integer(600)}, &Timestamp{Value: 1 << 32, TimeScale: 600}},
+		{pdf.Array{pdf.Integer(0), pdf.Integer(600)}, &Timestamp{TimeScale: 600}},
+		{pdf.Array{pdf.Integer(-1), pdf.Integer(600)}, nil},
+		{pdf.Array{pdf.Name("x"), pdf.Integer(600)}, nil},
+		{pdf.Array{pdf.Integer(10), pdf.Integer(0)}, nil},
+		{pdf.Array{pdf.Integer(10), pdf.Name("x")}, nil},
+		{pdf.Array{pdf.Integer(10)}, nil},
+	}
+	c := pdf.NewCursor(mock.Getter)
+	for _, tc := range cases {
+		got, err := DecodeTimestamp(c, tc.in)
+		if err != nil {
+			t.Errorf("%v: %v", tc.in, err)
+			continue
+		}
+		if diff := cmp.Diff(tc.want, got); diff != "" {
+			t.Errorf("%v: wrong timestamp (-want +got):\n%s", tc.in, diff)
+		}
+	}
 }

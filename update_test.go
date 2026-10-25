@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"slices"
 	"testing"
@@ -402,5 +403,31 @@ func TestUpdatePutIndirectCrypt(t *testing.T) {
 	}
 	if s := decodeAll(t, r, got); s != "abc" {
 		t.Errorf("got %q, want %q", s, "abc")
+	}
+}
+
+// TestUpdatePutExhaustedNumber checks that an object number whose free entry
+// has generation number 65535 cannot be reused (PDF 7.5.4).
+func TestUpdatePutExhaustedNumber(t *testing.T) {
+	b := &bytes.Buffer{}
+	b.WriteString("%PDF-1.7\n")
+	o1 := b.Len()
+	b.WriteString("1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n")
+	o2 := b.Len()
+	b.WriteString("2 0 obj\n<</Type/Pages/Kids[]/Count 0>>\nendobj\n")
+	xref := b.Len()
+	fmt.Fprintf(b, "xref\n0 4\n0000000003 65535 f \n%010d 00000 n \n%010d 00000 n \n0000000000 65535 f \n",
+		o1, o2)
+	fmt.Fprintf(b, "trailer\n<</Size 4/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n", xref)
+	data := b.Bytes()
+
+	w, err := NewUpdaterTo(bytes.NewReader(data), int64(len(data)), &bytes.Buffer{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, gen := range []uint16{0, maxGeneration} {
+		if err := w.Put(NewReference(3, gen), Integer(1)); err == nil {
+			t.Errorf("Put with generation %d succeeded", gen)
+		}
 	}
 }

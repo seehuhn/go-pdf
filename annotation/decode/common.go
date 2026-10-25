@@ -34,11 +34,15 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	// Rect (required)
 	if rect, err := c.Rectangle(dict["Rect"]); err == nil && rect != nil {
 		common.Rect = *rect
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// Contents (optional)
 	if contents, err := c.TextString(dict["Contents"]); err == nil && !contents.IsZero() {
 		common.Contents = contents
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// P (optional)
@@ -49,16 +53,22 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	// NM (optional)
 	if nm, err := c.TextString(dict["NM"]); err == nil && !nm.IsZero() {
 		common.Name = nm.String()
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// M (optional)
 	if m, err := c.TextString(dict["M"]); err == nil && !m.IsZero() {
 		common.LastModified = m.String()
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// F (optional)
 	if f, err := c.Integer(dict["F"]); err == nil && f != 0 {
 		common.Flags = annotation.Flags(f)
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// AP (optional)
@@ -71,6 +81,8 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	// AS (optional)
 	if as, err := c.Name(dict["AS"]); err == nil && as != "" {
 		common.AppearanceState = as
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// Border (optional)
@@ -88,12 +100,12 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// StructParent (optional)
-	if dict["StructParent"] != nil {
-		if key, err := pdf.Optional(c.Integer(dict["StructParent"])); err != nil {
-			return err
-		} else if key >= 0 && uint64(key) <= math.MaxUint {
+	if key, err := c.Integer(dict["StructParent"]); err == nil {
+		if key >= 0 && uint64(key) <= math.MaxUint {
 			common.StructParent.Set(uint(key))
 		}
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// OC (optional)
@@ -104,49 +116,48 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 	}
 
 	// AF (optional)
-	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
+	af, err := file.ExtractAssociatedFiles(c, dict["AF"])
+	if err != nil {
 		return err
-	} else if afArray != nil {
-		common.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
-		for _, afObj := range afArray {
-			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
-				return err
-			} else if spec != nil {
-				common.AssociatedFiles = append(common.AssociatedFiles, spec)
-			}
-		}
 	}
+	common.AssociatedFiles = af
 
 	// CA (optional) - default value is 1.0
-	if dict["CA"] != nil {
-		if ca, err := c.Number(dict["CA"]); err == nil {
-			common.StrokingTransparency = 1 - min(max(ca, 0), 1)
-		}
+	if ca, err := c.Number(dict["CA"]); err == nil {
+		common.StrokingTransparency = 1 - min(max(ca, 0), 1)
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// ca (optional) - if not present, defaults to the same value as CA
-	if dict["ca"] != nil {
-		if ca, err := c.Number(dict["ca"]); err == nil {
-			common.NonStrokingTransparency = 1 - min(max(ca, 0), 1)
-		}
-	} else {
+	if ca, err := c.Number(dict["ca"]); err == nil {
+		common.NonStrokingTransparency = 1 - min(max(ca, 0), 1)
+	} else if pdf.IsMalformed(err) {
 		common.NonStrokingTransparency = common.StrokingTransparency
+	} else {
+		return err
 	}
 
 	// BM (optional)
 	if bm, err := c.Name(dict["BM"]); err == nil && bm != "" {
 		common.BlendMode = bm
+	} else if pdf.IsReadError(err) {
+		return err
 	}
 
 	// Lang (optional).  An empty string or "und" states that the language
 	// is unknown; a malformed value is dropped.
-	if obj := dict["Lang"]; obj != nil {
+	if obj, err := pdf.Optional(c.Resolve(dict["Lang"])); err != nil {
+		return err
+	} else if obj != nil {
 		if lang, err := c.TextString(obj); err == nil {
 			s := lang.String()
 			unknown := s == "" || strings.EqualFold(s, "und")
 			if tag := langtag.Parse(s); unknown || !tag.IsRoot() {
 				common.Lang.Set(tag)
 			}
+		} else if pdf.IsReadError(err) {
+			return err
 		}
 	}
 
@@ -156,14 +167,17 @@ func decodeCommon(c pdf.Cursor, common *annotation.Common, dict pdf.Dict) error 
 // decodeHighlight reads an annotation's /H entry, supplying the default for
 // a missing entry and normalising the deprecated "T" (toggle) mode to
 // [annotation.HighlightPush].
-func decodeHighlight(c pdf.Cursor, obj pdf.Object) annotation.Highlight {
-	h, _ := c.Name(obj)
+func decodeHighlight(c pdf.Cursor, obj pdf.Object) (annotation.Highlight, error) {
+	h, err := pdf.Optional(c.Name(obj))
+	if err != nil {
+		return "", err
+	}
 	switch h {
 	case "":
-		return annotation.HighlightInvert
+		return annotation.HighlightInvert, nil
 	case "T":
-		return annotation.HighlightPush
+		return annotation.HighlightPush, nil
 	default:
-		return annotation.Highlight(h)
+		return annotation.Highlight(h), nil
 	}
 }

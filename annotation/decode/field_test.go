@@ -28,6 +28,7 @@ import (
 	"seehuhn.de/go/pdf/action/triggers"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/opaque"
 )
@@ -331,7 +332,11 @@ func TestIsWidgetKid(t *testing.T) {
 		{"null name is absent", pdf.Dict{"Subtype": pdf.Name("Widget"), "T": nil}, true},
 	}
 	for _, tc := range cases {
-		if got := isWidgetKid(c, tc.dict); got != tc.want {
+		got, err := isWidgetKid(c, tc.dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != tc.want {
 			t.Errorf("%s: isWidgetKid = %v, want %v", tc.name, got, tc.want)
 		}
 	}
@@ -1163,5 +1168,24 @@ func TestDecodeParentChainCycle(t *testing.T) {
 	}
 	if _, ok := an.(*annotation.Widget).Field.(*acroform.TextField); !ok {
 		t.Errorf("widget field = %T, want *acroform.TextField", an.(*annotation.Widget).Field)
+	}
+}
+
+// TestApplyOwnContextDanglingOpt checks that a reference to a nonexistent
+// object in /Opt leaves the inherited value in effect.
+func TestApplyOwnContextDanglingOpt(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+	parent := inherited{opt: pdf.Array{pdf.String("a"), pdf.String("b")}}
+
+	want, err := applyOwnContext(parent, c, pdf.Dict{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := applyOwnContext(parent, c, pdf.Dict{"Opt": pdf.NewReference(99, 0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want.opt, got.opt); diff != "" {
+		t.Errorf("dangling reference read differently from absent entry (-absent +dangling):\n%s", diff)
 	}
 }

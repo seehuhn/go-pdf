@@ -40,6 +40,8 @@ func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 		if len(quadPoints)%8 == 0 {
 			redact.QuadPoints = quadPoints
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// IC (optional) - RGB color components
@@ -57,16 +59,22 @@ func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 	// OverlayText (optional)
 	if overlayText, err := c.TextString(dict["OverlayText"]); err == nil {
 		redact.OverlayText = overlayText
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// Repeat (optional) - default false
-	if repeat, err := c.Boolean(dict["Repeat"]); err == nil {
-		redact.Repeat = bool(repeat)
+	repeat, _, err := c.OptionalBoolean(dict["Repeat"])
+	if err != nil {
+		return nil, err
 	}
+	redact.Repeat = repeat
 
 	// DA (required if OverlayText present)
 	if da, err := c.String(dict["DA"]); err == nil {
 		redact.DefaultAppearance = string(da)
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// If OverlayText is present but DA is missing/empty, provide a reasonable default

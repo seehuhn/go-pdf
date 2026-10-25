@@ -18,6 +18,7 @@ package transition
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -248,4 +249,57 @@ func FuzzRoundTrip(f *testing.F) {
 
 		roundTripTest(t, version, trans)
 	})
+}
+
+// TestInvalidOptionalEntries checks that a dangling reference, null and a
+// value of the wrong type in /B are read like an absent entry, and that a
+// reference loop in /Di drops only that entry.
+func TestInvalidOptionalEntries(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
+	loopA, loopB := w.Alloc(), w.Alloc()
+	for ref, obj := range map[pdf.Reference]pdf.Object{loopA: loopB, loopB: loopA} {
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := pdf.NewCursor(w)
+
+	decode := func(extra pdf.Dict) *Transition {
+		t.Helper()
+		dict := pdf.Dict{
+			"S": pdf.Name("Wipe"),
+			"D": pdf.Integer(2),
+		}
+		maps.Copy(dict, extra)
+		trans, err := Extract(c, dict, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return trans
+	}
+
+	absent := decode(nil)
+	if absent.Opaque {
+		t.Fatal("absent B read as true")
+	}
+	if !decode(pdf.Dict{"B": pdf.Boolean(true)}).Opaque {
+		t.Error("B true has no effect")
+	}
+	for name, b := range map[string]pdf.Object{
+		"dangling": pdf.NewReference(99, 0),
+		"null":     nil,
+		"name":     pdf.Name("x"),
+		"integer":  pdf.Integer(1),
+	} {
+		if diff := cmp.Diff(absent, decode(pdf.Dict{"B": b})); diff != "" {
+			t.Errorf("B %s differs from absent entry (-absent +got):\n%s", name, diff)
+		}
+	}
+
+	if diff := cmp.Diff(absent, decode(pdf.Dict{"Di": loopA})); diff != "" {
+		t.Errorf("Di loop differs from absent entry (-absent +got):\n%s", diff)
+	}
+	if diff := cmp.Diff(absent, decode(pdf.Dict{"Di": pdf.NewReference(99, 0)})); diff != "" {
+		t.Errorf("dangling Di differs from absent entry (-absent +got):\n%s", diff)
+	}
 }

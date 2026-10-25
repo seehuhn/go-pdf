@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestObjectStream(t *testing.T) {
@@ -736,6 +738,23 @@ func TestGetUnreadableObject(t *testing.T) {
 				t.Errorf("got error %v, want MalformedFileError", err)
 			}
 		})
+	}
+}
+
+// TestGetMissingEndobj checks that an object whose "endobj" keyword is
+// missing can be read, when it is followed by the next object.
+func TestGetMissingEndobj(t *testing.T) {
+	data := rawFileWithObject3("3 0 obj\n<</A 1>>\n4 0 obj\n<<>>\nendobj\n", -1)
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := r.Get(NewReference(3, 0), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(Dict{"A": Integer(1)}, obj); diff != "" {
+		t.Errorf("wrong object (-want +got):\n%s", diff)
 	}
 }
 

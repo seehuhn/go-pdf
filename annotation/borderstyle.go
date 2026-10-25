@@ -59,12 +59,12 @@ func ExtractBorderStyle(c pdf.Cursor, obj pdf.Object, _ bool) (*BorderStyle, err
 	style := &BorderStyle{}
 
 	style.Width = 1 // default width
-	if w, ok := dict["W"]; ok {
-		if w, err := pdf.Optional(c.Number(w)); err != nil {
-			return nil, err
-		} else if w >= 0 {
+	if w, err := c.Number(dict["W"]); err == nil {
+		if w >= 0 {
 			style.Width = w
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	if s, err := pdf.Optional(c.Name(dict["S"])); err != nil {

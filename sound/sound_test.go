@@ -19,6 +19,7 @@ package sound
 import (
 	"bytes"
 	"io"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -637,6 +638,117 @@ func TestExtractUnknownEncoding(t *testing.T) {
 	if got.Encoding != EncodingRaw {
 		t.Errorf("Encoding = %q, want %q", got.Encoding, EncodingRaw)
 	}
+}
+
+// TestExtractInvalidChannelsAndBits verifies that a dangling reference, a
+// value of the wrong type, or a number out of range, in /C or /B is read
+// like an absent entry.
+func TestExtractInvalidChannelsAndBits(t *testing.T) {
+	read := func(extra pdf.Dict) *Sound {
+		t.Helper()
+		dict := pdf.Dict{"R": pdf.Number(22050)}
+		maps.Copy(dict, extra)
+		got, err := extractFromDict(t, dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+
+	want := read(nil)
+	for _, key := range []pdf.Name{"C", "B"} {
+		for name, value := range map[string]pdf.Object{
+			"dangling": pdf.NewReference(99, 0),
+			"name":     pdf.Name("x"),
+			"zero":     pdf.Integer(0),
+			"huge":     pdf.Integer(1 << 40),
+		} {
+			got := read(pdf.Dict{key: value})
+			if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(Sound{}, "Data")); diff != "" {
+				t.Errorf("/%s %s value read differently from absent entry (-absent +got):\n%s", key, name, diff)
+			}
+		}
+	}
+}
+
+// TestExtractCompandedBits verifies that a /B other than 8 is dropped for
+// the μ-law and A-law encodings, and that the repaired sound can be
+// written and read back.
+func TestExtractCompandedBits(t *testing.T) {
+	for _, enc := range []Encoding{EncodingMuLaw, EncodingALaw} {
+		got, err := extractFromDict(t, pdf.Dict{
+			"R": pdf.Number(8000),
+			"B": pdf.Integer(16),
+			"E": pdf.Name(enc),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Encoding != enc || got.BitsPerSample != 8 {
+			t.Errorf("%s: got Encoding %q with %d bits, want 8 bits", enc, got.Encoding, got.BitsPerSample)
+		}
+
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		rm := pdf.NewResourceManager(w)
+		ref, err := rm.Embed(got)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rm.Close(); err != nil {
+			t.Fatal(err)
+		}
+		again, err := Extract(pdf.CursorAt(pdf.NewExtractor(w), nil), ref, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(got, again, cmpopts.IgnoreFields(Sound{}, "Data")); diff != "" {
+			t.Errorf("%s: round trip failed (-want +got):\n%s", enc, diff)
+		}
+	}
+}
+
+// TestExtractInvalidSampleRate verifies that a missing or unusable /R
+// makes the sound malformed.
+func TestExtractInvalidSampleRate(t *testing.T) {
+	for name, value := range map[string]pdf.Object{
+		"missing":  nil,
+		"dangling": pdf.NewReference(99, 0),
+		"name":     pdf.Name("x"),
+		"zero":     pdf.Integer(0),
+		"negative": pdf.Number(-8000),
+		"huge":     pdf.Integer(1 << 30),
+	} {
+		dict := pdf.Dict{}
+		if value != nil {
+			dict["R"] = value
+		}
+		_, err := extractFromDict(t, dict)
+		if !pdf.IsMalformed(err) {
+			t.Errorf("/R %s: got %v, want malformed error", name, err)
+		}
+	}
+}
+
+// extractFromDict writes a sound stream with the given dictionary and four
+// bytes of sample data, and reads it back with [Extract].
+func extractFromDict(t *testing.T, dict pdf.Dict) (*Sound, error) {
+	t.Helper()
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref := w.Alloc()
+	stm, err := w.OpenStream(ref, dict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write(bytes.Repeat([]byte{0x80}, 4)); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return Extract(pdf.CursorAt(pdf.NewExtractor(w), nil), ref, false)
 }
 
 func TestEmbedVersionRequirement(t *testing.T) {

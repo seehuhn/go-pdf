@@ -128,3 +128,50 @@ func TestCursorVersion(t *testing.T) {
 		t.Errorf("Version: got %v, want %v", v, pdf.V1_7)
 	}
 }
+
+var errTestRead = errors.New("test read failure")
+
+// failGetter is a pdf.Getter whose Get fails with a non-malformed error.
+type failGetter struct{}
+
+func (failGetter) GetMeta() *pdf.MetaInfo { return &pdf.MetaInfo{Version: pdf.V2_0} }
+
+func (failGetter) Get(pdf.Reference, bool) (pdf.Native, error) {
+	return nil, errTestRead
+}
+
+func TestCursorOptionalBoolean(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	trueRef := w.Alloc()
+	if err := w.Put(trueRef, pdf.Boolean(true)); err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+
+	cases := []struct {
+		name  string
+		obj   pdf.Object
+		v, ok bool
+	}{
+		{"nil", nil, false, false},
+		{"false", pdf.Boolean(false), false, true},
+		{"true", pdf.Boolean(true), true, true},
+		{"reference", trueRef, true, true},
+		{"dangling", pdf.NewReference(999, 0), false, false},
+		{"wrong type", pdf.Integer(1), false, false},
+	}
+	for _, tc := range cases {
+		v, ok, err := c.OptionalBoolean(tc.obj)
+		if err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+		}
+		if v != tc.v || ok != tc.ok {
+			t.Errorf("%s: got (%v, %v), want (%v, %v)", tc.name, v, ok, tc.v, tc.ok)
+		}
+	}
+
+	_, _, err := pdf.NewCursor(failGetter{}).OptionalBoolean(pdf.NewReference(1, 0))
+	if !errors.Is(err, errTestRead) {
+		t.Errorf("read error: got %v, want %v", err, errTestRead)
+	}
+}

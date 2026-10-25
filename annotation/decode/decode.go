@@ -45,7 +45,11 @@ func Annotation(c pdf.Cursor, obj pdf.Object, isDirect bool) (annotation.Annotat
 	// A direct dictionary has no reference of its own: p.Ref names the
 	// enclosing object, which must not be re-decoded as an annotation.
 	p := c.Path()
-	if p == nil || isDirect || !isWidgetSubtype(c, dict) {
+	isWidget, err := isWidgetSubtype(c, dict)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil || isDirect || !isWidget {
 		return annotationBody(c, dict, isDirect)
 	}
 
@@ -54,7 +58,11 @@ func Annotation(c pdf.Cursor, obj pdf.Object, isDirect bool) (annotation.Annotat
 	// DecodeExclusive single-flights the form, so concurrent decoders share
 	// one field tree.
 	if m := c.Getter().GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
-		_, _ = pdf.CursorAt(c.Extractor(), nil).DecodeExclusive(m.Catalog.AcroForm, Form)
+		// a malformed form leaves the widget an orphan
+		_, err := pdf.Optional(pdf.CursorAt(c.Extractor(), nil).DecodeExclusive(m.Catalog.AcroForm, Form))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// If the form claimed this widget, this is a cache hit and returns the
@@ -98,27 +106,32 @@ func repairMissingAppearance(a annotation.Annotation, v pdf.Version) {
 // picked rather than the annotation left undrawn.  A check box or radio button
 // takes its state from the field value; see [buttonAppearanceState].  Anything
 // else falls back to [appearance.Dict.AnyState].
-func repairMissingAppearanceState(c pdf.Cursor, a annotation.Annotation, dict pdf.Dict) {
+func repairMissingAppearanceState(c pdf.Cursor, a annotation.Annotation, dict pdf.Dict) error {
 	common := a.GetCommon()
 	w, isWidget := a.(*annotation.Widget)
 	if common.AppearanceState != "" {
 		// a widget whose state names no appearance is treated as though it
 		// named none; other annotations keep the state they name
 		if !isWidget || common.Appearance == nil || len(common.Appearance.NormalMap) == 0 {
-			return
+			return nil
 		}
 		if _, ok := common.Appearance.NormalMap[common.AppearanceState]; ok {
-			return
+			return nil
 		}
 		common.AppearanceState = ""
 	}
 	if isWidget {
-		if state, ok := buttonAppearanceState(c, w, dict); ok {
+		state, ok, err := buttonAppearanceState(c, w, dict)
+		if err != nil {
+			return err
+		}
+		if ok {
 			common.AppearanceState = state
-			return
+			return nil
 		}
 	}
 	common.AppearanceState = common.Appearance.AnyState()
+	return nil
 }
 
 // linkWidget attaches a widget to its field.
@@ -184,36 +197,46 @@ func reconcileButtonValue(f acroform.Field) {
 // The field of a widget read on its own is not known yet, so the value is
 // reconstructed from the /Parent chain the way the field tree does it.  The
 // answer therefore does not depend on whether the form was read as well.
-func buttonAppearanceState(c pdf.Cursor, w *annotation.Widget, dict pdf.Dict) (pdf.Name, bool) {
+func buttonAppearanceState(c pdf.Cursor, w *annotation.Widget, dict pdf.Dict) (pdf.Name, bool, error) {
 	ap := w.Appearance
 	if ap == nil || len(ap.NormalMap) == 0 {
-		return "", false
+		return "", false, nil
 	}
 
 	var value pdf.Name
 	switch f := w.Field.(type) {
 	case *acroform.ButtonField:
 		if f.Variant() == acroform.ButtonPush {
-			return "", false
+			return "", false, nil
 		}
 		value = f.V
 	case nil:
-		ctx := applyOwnContext(inheritedFromChain(c, dict), c, dict)
-		if ctx.ft != "Btn" || ctx.ff&acroform.FieldPushbutton != 0 {
-			return "", false
+		parent, err := inheritedFromChain(c, dict)
+		if err != nil {
+			return "", false, err
 		}
-		value, _ = pdf.Optional(c.Name(ctx.v))
+		ctx, err := applyOwnContext(parent, c, dict)
+		if err != nil {
+			return "", false, err
+		}
+		if ctx.ft != "Btn" || ctx.ff&acroform.FieldPushbutton != 0 {
+			return "", false, nil
+		}
+		value, err = pdf.Optional(c.Name(ctx.v))
+		if err != nil {
+			return "", false, err
+		}
 	default:
-		return "", false
+		return "", false, nil
 	}
 
 	if value != "" && value != "Off" {
 		if _, ok := ap.NormalMap[value]; ok {
-			return value, true
+			return value, true, nil
 		}
 	}
 	// the off state needs no appearance stream
-	return "Off", true
+	return "Off", true, nil
 }
 
 // emptyAppearance builds an appearance dictionary which draws nothing over the
@@ -247,9 +270,19 @@ func decodeAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error
 	// return the widget half, so the page's /Annots and the field tree's /Kids
 	// share one object. The field's inheritable attributes are flattened against
 	// the context reconstructed from its /Parent chain, matching the field tree.
-	if p := c.Path(); p != nil && isMergedFieldDict(c, dict) {
-		_, w, err := decodeMergedField(c, p.Ref, dict, inheritedFromChain(c, dict), nil)
-		return w, err
+	if p := c.Path(); p != nil {
+		merged, err := isMergedFieldDict(c, dict)
+		if err != nil {
+			return nil, err
+		}
+		if merged {
+			ctx, err := inheritedFromChain(c, dict)
+			if err != nil {
+				return nil, err
+			}
+			_, w, err := decodeMergedField(c, p.Ref, dict, ctx, nil)
+			return w, err
+		}
 	}
 
 	a, err := decodeBySubtype(c, dict)
@@ -257,7 +290,9 @@ func decodeAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error
 		return nil, err
 	}
 	repairMissingAppearance(a, pdf.GetVersion(c.Getter()))
-	repairMissingAppearanceState(c, a, dict)
+	if err := repairMissingAppearanceState(c, a, dict); err != nil {
+		return nil, err
+	}
 	return a, nil
 }
 

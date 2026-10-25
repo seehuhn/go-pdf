@@ -198,12 +198,11 @@ func extractType4(c pdf.Cursor, stream *pdf.Stream) (*Type4, error) {
 	// We'll validate the Decode array length after reading the optional Function
 	// since the number of color components depends on whether a Function is present
 
-	// Read optional Function
+	// an unusable function is dropped; an Indexed colour space does not allow one
 	if fnObj, ok := d["Function"]; ok {
 		if fn, err := c.DecodeOptional(fnObj, function.Extract); err != nil {
 			return nil, err
 		} else if fn != nil && s.ColorSpace.Family() != color.FamilyIndexed {
-			// an Indexed colour space does not allow a function
 			s.F = fn
 		}
 	}

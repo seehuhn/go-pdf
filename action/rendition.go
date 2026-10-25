@@ -122,41 +122,47 @@ func decodeRendition(c pdf.Cursor, dict pdf.Dict) (*Rendition, error) {
 		return nil, err
 	}
 
-	var op optional.UInt
-	if dict["OP"] != nil {
-		if opVal, err := c.Integer(dict["OP"]); err == nil && opVal >= 0 && opVal <= 4 {
-			op.Set(uint(opVal))
+	jsObj, err := readStringOrStream(c, dict["JS"])
+	if err != nil {
+		return nil, err
+	}
+	// a JS stream which cannot be decoded is treated as absent
+	var js *pdf.StringOrStream
+	if jsObj != nil {
+		sos, err := c.StringOrStream(jsObj)
+		if err == nil {
+			js = &sos
+		} else if pdf.IsReadError(err) {
+			return nil, err
 		}
-		// else: invalid OP value, treat as absent
+	}
+
+	var op optional.UInt
+	opObj, err := pdf.Optional(c.Resolve(dict["OP"]))
+	if err != nil {
+		return nil, err
+	}
+	if opObj != nil {
+		// an invalid OP value is treated as absent
+		opVal, err := c.Integer(opObj)
+		if err == nil && opVal >= 0 && opVal <= 4 {
+			op.Set(uint(opVal))
+		} else if pdf.IsReadError(err) {
+			return nil, err
+		}
 	}
 	// An OP value requires AN, and OP 0 and 4 additionally require R.  Drop any
 	// OP that cannot be honoured, so the decoded action stays encodable.
 	if v, ok := op.Get(); ok && (an == 0 || ((v == 0 || v == 4) && r == nil)) {
 		op = optional.UInt{}
 	}
-	// OP is required when JS is absent, and OP needs AN.  Without AN the action
-	// can only be carried by JS; if JS is missing too, it cannot be salvaged.
-	if _, ok := op.Get(); !ok && dict["JS"] == nil {
-		switch {
-		case an == 0:
-			return nil, pdf.Error("rendition action without AN, OP or JS")
-		case r != nil:
-			op.Set(0)
-		default:
-			op.Set(1)
-		}
+	// OP is required when JS is absent.  Substituting a different operation
+	// would change what the action does, so the read fails instead.
+	if _, ok := op.Get(); !ok && js == nil {
+		return nil, pdf.Error("rendition action without usable OP or JS")
 	}
 
-	var js *pdf.StringOrStream
-	if dict["JS"] != nil {
-		sos, err := c.StringOrStream(dict["JS"])
-		if err != nil {
-			return nil, err
-		}
-		js = &sos
-	}
-
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

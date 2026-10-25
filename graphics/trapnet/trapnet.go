@@ -152,15 +152,28 @@ func (a *Attributes) FillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
 
 // ExtractAttributes reads the trap network entries from a form XObject
 // dictionary.  It returns nil if the dictionary contains none of them.
+// An entry of the wrong type counts as absent.
 //
 // A dictionary which uses any of the trap network entries but does not give
 // a valid process colour model is repaired by assuming DeviceCMYK.
 func ExtractAttributes(c pdf.Cursor, dict pdf.Dict) (*Attributes, error) {
-	_, hasPCM := dict["PCM"]
-	_, hasNames := dict["SeparationColorNames"]
-	_, hasRegions := dict["TrapRegions"]
-	_, hasStyles := dict["TrapStyles"]
-	if !hasPCM && !hasNames && !hasRegions && !hasStyles {
+	// an entry of the wrong type counts as absent
+	used := false
+	for key, isValid := range map[pdf.Name]func(pdf.Native) bool{
+		"PCM":                  func(obj pdf.Native) bool { _, ok := obj.(pdf.Name); return ok },
+		"SeparationColorNames": func(obj pdf.Native) bool { _, ok := obj.(pdf.Array); return ok },
+		"TrapRegions":          func(obj pdf.Native) bool { _, ok := obj.(pdf.Array); return ok },
+		"TrapStyles":           func(obj pdf.Native) bool { _, ok := obj.(pdf.String); return ok },
+	} {
+		obj, err := pdf.Optional(c.Resolve(dict[key]))
+		if err != nil {
+			return nil, err
+		}
+		if obj != nil && isValid(obj) {
+			used = true
+		}
+	}
+	if !used {
 		return nil, nil
 	}
 

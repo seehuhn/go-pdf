@@ -238,7 +238,8 @@ func ExtractSpace(c pdf.Cursor, desc pdf.Object, _ bool) (Space, error) {
 		}
 		res, err = ICCBased(d.data, meta)
 		if err != nil {
-			d.SetError(err)
+			// the profile data has been read, so any error is in the data
+			d.SetError(&pdf.MalformedFileError{Err: err})
 		}
 
 	case FamilyIndexed:
@@ -478,7 +479,7 @@ func (d *decoder) SetError(err error) {
 		} else {
 			d.err = err
 		}
-	case pdf.IsMalformed(d.err) && !pdf.IsMalformed(err):
+	case pdf.IsMalformed(d.err) && pdf.IsReadError(err):
 		// read errors take priority over file format errors
 		d.err = err
 	default:
@@ -519,7 +520,7 @@ func (d *decoder) getOptionalNumber(entry pdf.Name, defValue float64) float64 {
 
 	x, err := d.c.Number(obj)
 	if err != nil {
-		if !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			d.SetError(err)
 		}
 		return defValue
@@ -547,7 +548,7 @@ func (d *decoder) getArrayN(entry pdf.Name, n int) []float64 {
 
 	arr, err := d.c.Array(obj)
 	if err != nil {
-		if !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			d.SetError(err)
 		}
 		return nil
@@ -561,7 +562,7 @@ func (d *decoder) getArrayN(entry pdf.Name, n int) []float64 {
 	for i, elem := range arr[:n] {
 		x, err := d.c.Number(elem)
 		if err != nil {
-			if !pdf.IsMalformed(err) {
+			if pdf.IsReadError(err) {
 				d.SetError(err)
 				return nil
 			}

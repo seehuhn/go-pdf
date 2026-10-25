@@ -18,13 +18,18 @@ package action
 
 import (
 	"errors"
+	"maps"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/pdf/internal/limits"
+	"seehuhn.de/go/pdf/sound"
 )
 
 func TestActionListEncode_Empty(t *testing.T) {
@@ -206,7 +211,7 @@ func TestNewWindowMode(t *testing.T) {
 }
 
 // TestDecodeActionListNextCycleSelf checks that a URI action with a /Next
-// entry pointing back at itself is rejected with pdf.ErrCycle instead of
+// entry pointing back at itself fails with a cycle error, instead of
 // recursing until the goroutine stack is exhausted.
 func TestDecodeActionListNextCycleSelf(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
@@ -225,14 +230,14 @@ func TestDecodeActionListNextCycleSelf(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.CursorAt(x, nil).Decode(ref, Decode)
-	if !errors.Is(err, pdf.ErrCycle) {
-		t.Errorf("expected cycle error, got %v", err)
+	if _, err := pdf.CursorAt(x, nil).Decode(ref, Decode); !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("got %v, want cycle error", err)
 	}
 }
 
 // TestDecodeActionListNextCycleMutual checks that two URI actions with
-// /Next entries pointing at each other are rejected with pdf.ErrCycle.
+// /Next entries pointing at each other fail with a cycle error, whichever
+// of them is read first.
 func TestDecodeActionListNextCycleMutual(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 
@@ -256,10 +261,67 @@ func TestDecodeActionListNextCycleMutual(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	x := pdf.NewExtractor(w)
-	_, err := pdf.CursorAt(x, nil).Decode(refA, Decode)
-	if !errors.Is(err, pdf.ErrCycle) {
-		t.Errorf("expected cycle error, got %v", err)
+	for _, order := range [][]pdf.Reference{{refA, refB}, {refB, refA}} {
+		c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+		for _, ref := range order {
+			if _, err := c.Decode(ref, Decode); !errors.Is(err, pdf.ErrCycle) {
+				t.Errorf("order %v, %v: got %v, want cycle error", order, ref, err)
+			}
+		}
+	}
+}
+
+// TestDecodeActionListNextCycleOtherTypes checks that a /Next cycle is
+// detected for action types other than URI, whichever action of the cycle
+// is read first.
+func TestDecodeActionListNextCycleOtherTypes(t *testing.T) {
+	spec := pdf.Dict{"Type": pdf.Name("Filespec"), "FS": pdf.Name("URL"), "F": pdf.String("a.pdf")}
+	bases := map[string]pdf.Dict{
+		"Named":      {"S": pdf.Name("Named"), "N": pdf.Name("NextPage")},
+		"Hide":       {"S": pdf.Name("Hide"), "T": pdf.String("btn")},
+		"Launch":     {"S": pdf.Name("Launch"), "F": spec},
+		"JavaScript": {"S": pdf.Name("JavaScript"), "JS": pdf.String("1;")},
+		"SubmitForm": {"S": pdf.Name("SubmitForm"), "F": pdf.String("https://example.com/")},
+		"Rendition":  {"S": pdf.Name("Rendition"), "AN": pdf.NewReference(99, 0), "OP": pdf.Integer(1)},
+	}
+
+	for name, base := range bases {
+		t.Run(name+" self", func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			ref := w.Alloc()
+			dict := maps.Clone(base)
+			dict["Next"] = ref
+			if err := w.Put(ref, dict); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := pdf.CursorAt(pdf.NewExtractor(w), nil).Decode(ref, Decode); !errors.Is(err, pdf.ErrCycle) {
+				t.Errorf("got %v, want cycle error", err)
+			}
+		})
+
+		t.Run(name+" mutual with Named", func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			refA := w.Alloc()
+			refB := w.Alloc()
+			dictA := maps.Clone(base)
+			dictA["Next"] = refB
+			dictB := maps.Clone(bases["Named"])
+			dictB["Next"] = refA
+			if err := w.Put(refA, dictA); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Put(refB, dictB); err != nil {
+				t.Fatal(err)
+			}
+			for _, order := range [][]pdf.Reference{{refA, refB}, {refB, refA}} {
+				c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+				for _, ref := range order {
+					if _, err := c.Decode(ref, Decode); !errors.Is(err, pdf.ErrCycle) {
+						t.Errorf("order %v, %v: got %v, want cycle error", order, ref, err)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -287,9 +349,8 @@ func TestDecodeActionListNextCycleInlineDict(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.CursorAt(x, nil).Decode(ref, Decode)
-	if !errors.Is(err, pdf.ErrCycle) {
-		t.Errorf("expected cycle error, got %v", err)
+	if _, err := pdf.CursorAt(x, nil).Decode(ref, Decode); !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("got %v, want cycle error", err)
 	}
 }
 
@@ -330,9 +391,8 @@ func TestDecodeActionListNextCycleDeep(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err := pdf.CursorAt(x, nil).Decode(refA, Decode)
-	if !errors.Is(err, pdf.ErrCycle) {
-		t.Errorf("expected cycle error, got %v", err)
+	if _, err := pdf.CursorAt(x, nil).Decode(refA, Decode); !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("got %v, want cycle error", err)
 	}
 }
 
@@ -355,17 +415,15 @@ func TestDecodeActionListNextCycleArray(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	_, err = pdf.CursorAt(x, nil).Decode(ref, Decode)
-	if !errors.Is(err, pdf.ErrCycle) {
-		t.Errorf("expected cycle error, got %v", err)
+	if _, err := pdf.CursorAt(x, nil).Decode(ref, Decode); !errors.Is(err, pdf.ErrCycle) {
+		t.Errorf("got %v, want cycle error", err)
 	}
 }
 
 // TestDecodeActionListNextDeepChainBounded guards against a stack-overflow
 // DoS: a /Next chain of distinct URI actions is acyclic, so the cycle guard
 // never trips, yet recursing one frame per level would exhaust the Go stack.
-// The Decode depth cap must turn this into a malformed-file error
-// rather than a crash.
+// The Decode depth cap must fail the action rather than crash.
 func TestDecodeActionListNextDeepChainBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
@@ -385,7 +443,244 @@ func TestDecodeActionListNextDeepChainBounded(t *testing.T) {
 	}
 
 	x := pdf.NewExtractor(w)
-	if _, err := pdf.CursorAt(x, nil).Decode(refs[0], Decode); !pdf.IsMalformed(err) {
-		t.Errorf("err = %v, want malformed", err)
+	if _, err := pdf.CursorAt(x, nil).Decode(refs[0], Decode); !errors.Is(err, pdf.ErrDepth) {
+		t.Errorf("got %v, want depth error", err)
+	}
+}
+
+// TestNextInvalidIsAbsent checks that a /Next entry of the wrong type or
+// pointing at a nonexistent object reads like an absent entry, for every
+// action type.
+func TestNextInvalidIsAbsent(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+	spec := pdf.Dict{"Type": pdf.Name("Filespec"), "FS": pdf.Name("URL"), "F": pdf.String("a.pdf")}
+	bases := []pdf.Dict{
+		{"S": pdf.Name("URI"), "URI": pdf.String("https://example.com/")},
+		{"S": pdf.Name("Named"), "N": pdf.Name("NextPage")},
+		{"S": pdf.Name("GoTo"), "D": pdf.String("dest")},
+		{"S": pdf.Name("GoToR"), "F": spec, "D": pdf.String("dest")},
+		{"S": pdf.Name("Launch"), "F": spec},
+		{"S": pdf.Name("Hide"), "T": pdf.String("btn")},
+		{"S": pdf.Name("JavaScript"), "JS": pdf.String("1;")},
+		{"S": pdf.Name("ResetForm")},
+		{"S": pdf.Name("Thread"), "D": pdf.Integer(0)},
+	}
+	invalid := map[string]pdf.Object{
+		"name":     pdf.Name("x"),
+		"integer":  pdf.Integer(5),
+		"dangling": pdf.NewReference(99, 0),
+		"array":    pdf.Array{pdf.Integer(1), pdf.NewReference(99, 0)},
+	}
+	for _, base := range bases {
+		for name, bad := range invalid {
+			t.Run(string(base["S"].(pdf.Name))+"/"+name, func(t *testing.T) {
+				dict := maps.Clone(base)
+				dict["Next"] = bad
+				want, err := Decode(c, base, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := Decode(c, dict, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("invalid Next read differently from absent entry (-absent +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+// TestInvalidEntryIsAbsent checks that a reference to a nonexistent object,
+// and a value of the wrong type, are read like an absent entry.
+func TestInvalidEntryIsAbsent(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	soundRef, err := rm.Embed(testSound)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	invalid := map[string]pdf.Object{
+		"dangling": pdf.NewReference(99, 0),
+		"name":     pdf.Name("x"),
+		"integer":  pdf.Integer(5),
+	}
+	// an integer is a valid value for the other entries
+	integerInvalid := map[pdf.Name]bool{
+		"NewWindow": true, "H": true, "PreserveRB": true,
+		"ShowControls": true, "Synchronous": true,
+		"IsMap": true, "Repeat": true, "Mix": true,
+		"Fields": true, "State": true, "FWScale": true, "FWPosition": true,
+	}
+	c := pdf.NewCursor(w)
+	spec := pdf.Dict{"Type": pdf.Name("Filespec"), "FS": pdf.Name("URL"), "F": pdf.String("a.pdf")}
+
+	cases := []struct {
+		name string
+		base pdf.Dict
+		keys []pdf.Name
+	}{
+		{
+			"GoToR",
+			pdf.Dict{"S": pdf.Name("GoToR"), "F": spec, "D": pdf.String("dest")},
+			[]pdf.Name{"NewWindow"},
+		},
+		{
+			"GoToE",
+			pdf.Dict{"S": pdf.Name("GoToE"), "F": spec, "D": pdf.String("dest")},
+			[]pdf.Name{"NewWindow"},
+		},
+		{
+			"Launch",
+			pdf.Dict{"S": pdf.Name("Launch"), "F": spec},
+			[]pdf.Name{"NewWindow"},
+		},
+		{
+			"URI",
+			pdf.Dict{"S": pdf.Name("URI"), "URI": pdf.String("https://example.com/")},
+			[]pdf.Name{"IsMap"},
+		},
+		{
+			"Sound",
+			pdf.Dict{"S": pdf.Name("Sound"), "Sound": soundRef},
+			[]pdf.Name{"Volume", "Synchronous", "Repeat", "Mix"},
+		},
+		{
+			"Hide",
+			pdf.Dict{"S": pdf.Name("Hide"), "T": pdf.String("field")},
+			[]pdf.Name{"H"},
+		},
+		{
+			"SubmitForm",
+			pdf.Dict{"S": pdf.Name("SubmitForm"), "F": pdf.String("https://example.com/")},
+			[]pdf.Name{"Fields", "Flags"},
+		},
+		{
+			"ResetForm",
+			pdf.Dict{"S": pdf.Name("ResetForm")},
+			[]pdf.Name{"Fields", "Flags"},
+		},
+		{
+			"SetOCGState",
+			pdf.Dict{"S": pdf.Name("SetOCGState")},
+			[]pdf.Name{"State", "PreserveRB"},
+		},
+		{
+			"Movie",
+			pdf.Dict{"S": pdf.Name("Movie"), "T": pdf.String("movie")},
+			[]pdf.Name{
+				"Start", "Duration", "Rate", "Volume", "ShowControls",
+				"Synchronous", "FWScale", "FWPosition",
+			},
+		},
+		{
+			"Rendition with OP",
+			pdf.Dict{"S": pdf.Name("Rendition"), "AN": pdf.NewReference(5, 0), "OP": pdf.Integer(1)},
+			[]pdf.Name{"JS"},
+		},
+		{
+			"Rendition with JS",
+			pdf.Dict{"S": pdf.Name("Rendition"), "AN": pdf.NewReference(5, 0), "JS": pdf.String("x")},
+			[]pdf.Name{"OP"},
+		},
+	}
+	for _, tc := range cases {
+		for _, key := range tc.keys {
+			for variant, value := range invalid {
+				if variant == "integer" && !integerInvalid[key] {
+					continue
+				}
+				t.Run(tc.name+" "+string(key)+" "+variant, func(t *testing.T) {
+					absent := maps.Clone(tc.base)
+					withInvalid := maps.Clone(tc.base)
+					withInvalid[key] = value
+
+					want, err := Decode(c, absent, true)
+					if err != nil {
+						t.Fatal(err)
+					}
+					got, err := Decode(c, withInvalid, true)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(sound.Sound{}, "Data")); diff != "" {
+						t.Errorf("%s value read differently from absent entry (-absent +got):\n%s", variant, diff)
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestDanglingRequiredEntry checks that a reference to a nonexistent object,
+// and a value of the wrong type, do not satisfy a required entry.
+func TestDanglingRequiredEntry(t *testing.T) {
+	dangling := pdf.NewReference(99, 0)
+	c := pdf.NewCursor(mock.Getter)
+
+	cases := []struct {
+		name string
+		dict pdf.Dict
+	}{
+		{"JavaScript JS", pdf.Dict{"S": pdf.Name("JavaScript"), "JS": dangling}},
+		{"JavaScript JS name", pdf.Dict{"S": pdf.Name("JavaScript"), "JS": pdf.Name("x")}},
+		{"Hide T", pdf.Dict{"S": pdf.Name("Hide"), "T": dangling}},
+		{"Hide T name", pdf.Dict{"S": pdf.Name("Hide"), "T": pdf.Name("x")}},
+		{"Hide T integer", pdf.Dict{"S": pdf.Name("Hide"), "T": pdf.Integer(1)}},
+		{"SubmitForm F", pdf.Dict{"S": pdf.Name("SubmitForm"), "F": dangling}},
+		{"SubmitForm F name", pdf.Dict{"S": pdf.Name("SubmitForm"), "F": pdf.Name("x")}},
+		{"SubmitForm F integer", pdf.Dict{"S": pdf.Name("SubmitForm"), "F": pdf.Integer(1)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := Decode(c, tc.dict, true); err == nil {
+				t.Error("missing error")
+			}
+		})
+	}
+}
+
+// TestNextArrayKeepsUsableElements checks that null, dangling and malformed
+// elements of a /Next array are skipped while the other elements are kept.
+func TestNextArrayKeepsUsableElements(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+	good := pdf.Dict{"S": pdf.Name("Named"), "N": pdf.Name("NextPage")}
+	dict := pdf.Dict{
+		"S":   pdf.Name("URI"),
+		"URI": pdf.String("https://example.com/"),
+		"Next": pdf.Array{
+			nil,
+			pdf.NewReference(99, 0),
+			pdf.Integer(3),
+			pdf.Dict{"S": pdf.Name("NoSuchAction")},
+			good,
+		},
+	}
+	got, err := Decode(c, dict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &URI{URI: "https://example.com/", Next: ActionList{&Named{N: "NextPage"}}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected action (-want +got):\n%s", diff)
+	}
+
+	// an array without usable elements reads like an absent entry
+	dict["Next"] = pdf.Array{nil, pdf.NewReference(99, 0)}
+	got, err = Decode(c, dict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = &URI{URI: "https://example.com/"}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("unexpected action (-want +got):\n%s", diff)
 	}
 }

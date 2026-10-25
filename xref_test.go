@@ -288,6 +288,32 @@ func TestNewReferenceOverflowPanics(t *testing.T) {
 	NewReference(maxXRefSize, 0)
 }
 
+// TestNewReferenceZeroPanics verifies that NewReference panics for object
+// number 0, which is not a valid object number (PDF 32000-2 §7.3.10).
+func TestNewReferenceZeroPanics(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("NewReference(0, 0) did not panic")
+		}
+	}()
+	NewReference(0, 0)
+}
+
+// TestXRefStreamObjStmZero verifies that an entry for an object in object
+// stream number 0 is skipped.
+func TestXRefStreamObjStmZero(t *testing.T) {
+	xref := map[uint32]*xRefEntry{}
+	w := []int{1, 1, 1}
+	ss := []*xRefSubSection{{Start: 5, Size: 1}}
+	data := []byte{2, 0, 0}
+	if err := decodeXRefStream(xref, bytes.NewReader(data), w, ss); err != nil {
+		t.Fatalf("decodeXRefStream: %v", err)
+	}
+	if _, ok := xref[5]; ok {
+		t.Errorf("entry in object stream 0 should have been skipped")
+	}
+}
+
 func TestLastOccurence(t *testing.T) {
 	buf := make([]byte, 2048)
 	pat := "ABC"
@@ -739,6 +765,78 @@ func TestRepairFreeList(t *testing.T) {
 	repairFreeList(xref)
 	if xref[1].NextFree != 2 {
 		t.Errorf("orphan links to %d, want 2", xref[1].NextFree)
+	}
+	// an in-use entry 0 is made free
+	for _, head := range []*xRefEntry{used(), {Pos: 3, InStream: NewReference(7, 0)}} {
+		xref = map[uint32]*xRefEntry{0: head}
+		repairFreeList(xref)
+		if e := xref[0]; !e.IsFree() || e.InStream != 0 || e.Generation != maxGeneration {
+			t.Errorf("entry 0 = %+v, want free with generation %d", e, maxGeneration)
+		}
+	}
+}
+
+// TestObjectZeroReadsAsNull verifies that object number 0 reads as null,
+// even if the cross-reference data lists it as an object in use.
+func TestObjectZeroReadsAsNull(t *testing.T) {
+	// xref table with an in-use entry 0 pointing at an object "0 0 obj"
+	table := func() []byte {
+		b := &bytes.Buffer{}
+		b.WriteString("%PDF-1.7\n")
+		o0 := b.Len()
+		b.WriteString("0 0 obj\n42\nendobj\n")
+		o1 := b.Len()
+		b.WriteString("1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n")
+		o2 := b.Len()
+		b.WriteString("2 0 obj\n<</Type/Pages/Kids[]/Count 0>>\nendobj\n")
+		xref := b.Len()
+		fmt.Fprintf(b, "xref\n0 3\n%010d 00000 n \n%010d 00000 n \n%010d 00000 n \n", o0, o1, o2)
+		fmt.Fprintf(b, "trailer\n<</Size 3/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n", xref)
+		return b.Bytes()
+	}
+
+	// xref stream whose entry 0 is a type-2 (compressed) entry, placing
+	// object 0 at index 0 of object stream 3, and whose index does list an
+	// object 0; the entry must be replaced by the free-list head
+	stream := func() []byte {
+		b := &bytes.Buffer{}
+		b.WriteString("%PDF-1.7\n")
+		o1 := b.Len()
+		b.WriteString("1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n")
+		o2 := b.Len()
+		b.WriteString("2 0 obj\n<</Type/Pages/Kids[]/Count 0>>\nendobj\n")
+		o3 := b.Len()
+		body := "0 0 42"
+		fmt.Fprintf(b, "3 0 obj\n<</Type/ObjStm/N 1/First 4/Length %d>>\nstream\n%s\nendstream\nendobj\n",
+			len(body), body)
+		var data bytes.Buffer
+		for _, row := range [][3]uint64{{2, 3, 0}, {1, uint64(o1), 0}, {1, uint64(o2), 0}, {1, uint64(o3), 0}} {
+			putBE(&data, row[0], 1)
+			putBE(&data, row[1], 4)
+			putBE(&data, row[2], 2)
+		}
+		xref := b.Len()
+		fmt.Fprintf(b, "4 0 obj\n<</Type/XRef/Size 4/W[1 4 2]/Root 1 0 R/Length %d>>\nstream\n", data.Len())
+		b.Write(data.Bytes())
+		fmt.Fprintf(b, "\nendstream\nendobj\nstartxref\n%d\n%%%%EOF\n", xref)
+		return b.Bytes()
+	}
+
+	for name, mk := range map[string]func() []byte{"table": table, "stream": stream} {
+		t.Run(name, func(t *testing.T) {
+			data := mk()
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, gen := range []uint16{0, maxGeneration} {
+				ref := Reference(uint64(gen) << 32)
+				obj, err := r.Get(ref, true)
+				if err != nil || obj != nil {
+					t.Errorf("object 0 %d R = %v, %v; want null", gen, obj, err)
+				}
+			}
+		})
 	}
 }
 

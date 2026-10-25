@@ -48,34 +48,50 @@ type inherited struct {
 // applyOwnContext returns ctx overridden by dict's own inheritable entries. It
 // is used both to extend the context as the tree is walked down and, for a
 // terminal field, to compute the field's own effective values.
-func applyOwnContext(ctx inherited, c pdf.Cursor, dict pdf.Dict) inherited {
-	if name, _ := pdf.Optional(c.Name(dict["FT"])); isValidFieldType(name) {
+func applyOwnContext(ctx inherited, c pdf.Cursor, dict pdf.Dict) (inherited, error) {
+	if name, err := pdf.Optional(c.Name(dict["FT"])); err != nil {
+		return ctx, err
+	} else if isValidFieldType(name) {
 		ctx.ft = name
 	}
 	// an entry that is null or fails to decode is treated as absent, so that
 	// the inherited value stays in effect
 	if ff, err := c.Integer(dict["Ff"]); err == nil {
 		ctx.ff = acroform.FieldFlags(uint32(ff))
+	} else if pdf.IsReadError(err) {
+		return ctx, err
 	}
-	if v := nonNull(c, dict["V"]); v != nil {
+	if v, err := nonNull(c, dict["V"]); err != nil {
+		return ctx, err
+	} else if v != nil {
 		ctx.v = v
 	}
-	if dv := nonNull(c, dict["DV"]); dv != nil {
+	if dv, err := nonNull(c, dict["DV"]); err != nil {
+		return ctx, err
+	} else if dv != nil {
 		ctx.dv = dv
 	}
 	if da, err := c.String(dict["DA"]); err == nil && da != nil {
 		ctx.da = string(da)
+	} else if pdf.IsReadError(err) {
+		return ctx, err
 	}
 	if q, err := c.Integer(dict["Q"]); err == nil && q >= 0 && q <= 2 {
 		ctx.q = pdf.TextAlign(q)
+	} else if pdf.IsReadError(err) {
+		return ctx, err
 	}
 	if ml, err := c.Integer(dict["MaxLen"]); err == nil && ml > 0 {
 		ctx.maxLen = int(ml)
+	} else if pdf.IsReadError(err) {
+		return ctx, err
 	}
-	if opt, ok := dict["Opt"]; ok {
+	if opt, err := nonNull(c, dict["Opt"]); err != nil {
+		return ctx, err
+	} else if opt != nil {
 		ctx.opt = opt
 	}
-	return ctx
+	return ctx, nil
 }
 
 // fieldTreeDecoder decodes one interactive form's field tree. It deduplicates
@@ -164,7 +180,13 @@ func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherite
 	// and a Widget annotation; decode it as a linked field+widget pair so the
 	// page's /Annots entry and the field tree share one widget object
 	p := c.Path()
-	if p != nil && isMergedFieldDict(c, dict) {
+	merged := false
+	if p != nil {
+		if merged, err = isMergedFieldDict(c, dict); err != nil {
+			return nil, err
+		}
+	}
+	if merged {
 		f, _, err := decodeMergedField(c, p.Ref, dict, ctx, d.byName)
 		if err != nil {
 			return nil, err
@@ -199,7 +221,11 @@ func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherite
 		if kidDict == nil {
 			continue
 		}
-		if isWidgetKid(c, kidDict) {
+		isWidget, err := isWidgetKid(c, kidDict)
+		if err != nil {
+			return nil, err
+		}
+		if isWidget {
 			widgetKids = append(widgetKids, ref)
 		} else {
 			fieldKids = append(fieldKids, ref)
@@ -219,8 +245,15 @@ func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherite
 // otherwise dropped (its TU/TM/AA and value entries are not represented). A
 // group whose children all drop out is itself dropped.
 func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherited, fieldKids []pdf.Reference) (acroform.Node, error) {
-	childCtx := applyOwnContext(ctx, c, dict)
-	g := &acroform.Group{Name: partialName(c, dict)}
+	childCtx, err := applyOwnContext(ctx, c, dict)
+	if err != nil {
+		return nil, err
+	}
+	name, err := partialName(c, dict)
+	if err != nil {
+		return nil, err
+	}
+	g := &acroform.Group{Name: name}
 	childCtx.name = joinName(ctx.name, g.Name)
 	for _, ref := range fieldKids {
 		if d.seen[ref] {
@@ -308,18 +341,30 @@ func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string
 // flattening the inheritable attributes against ctx. It returns nil if the
 // dictionary is not a field of one of the four defined types.
 func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Field, error) {
-	eff := applyOwnContext(ctx, c, dict)
+	eff, err := applyOwnContext(ctx, c, dict)
+	if err != nil {
+		return nil, err
+	}
 	if !isValidFieldType(eff.ft) {
 		return nil, nil
 	}
 
 	// a dictionary without a partial name is not a field (12.7.4.2)
-	name := partialName(c, dict)
+	name, err := partialName(c, dict)
+	if err != nil {
+		return nil, err
+	}
 	if name == "" {
 		return nil, nil
 	}
-	tu, _ := pdf.Optional(c.TextString(dict["TU"]))
-	tm, _ := pdf.Optional(c.TextString(dict["TM"]))
+	tu, err := pdf.Optional(c.TextString(dict["TU"]))
+	if err != nil {
+		return nil, err
+	}
+	tm, err := pdf.Optional(c.TextString(dict["TM"]))
+	if err != nil {
+		return nil, err
+	}
 	aa, err := decodeFieldAA(c, dict)
 	if err != nil {
 		return nil, err
@@ -395,7 +440,11 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 			return nil, err
 		} else {
 			for i, el := range arr {
-				if opt, ok := decodeChoiceOption(c, el); ok {
+				opt, ok, err := decodeChoiceOption(c, el)
+				if err != nil {
+					return nil, err
+				}
+				if ok {
 					f.Opt = append(f.Opt, opt)
 				} else {
 					dropped = append(dropped, i)
@@ -493,12 +542,13 @@ func sigValue(c pdf.Cursor, obj pdf.Object) *opaque.Object {
 }
 
 // nonNull returns obj unchanged, or nil if obj is absent, null, or a reference
-// which cannot be resolved.
-func nonNull(c pdf.Cursor, obj pdf.Object) pdf.Object {
-	if resolved, err := c.Resolve(obj); err != nil || resolved == nil {
-		return nil
+// which cannot be resolved.  Read errors are returned.
+func nonNull(c pdf.Cursor, obj pdf.Object) (pdf.Object, error) {
+	resolved, err := pdf.Optional(c.Resolve(obj))
+	if err != nil || resolved == nil {
+		return nil, err
 	}
-	return obj
+	return obj, nil
 }
 
 // stringOrStreamPtr decodes an optional "text string or stream" value, returning
@@ -526,7 +576,9 @@ func stringOrStreamPtr(c pdf.Cursor, obj pdf.Object) (*pdf.StringOrStream, error
 func fillVariableText(c pdf.Cursor, dict pdf.Dict, eff inherited, v *acroform.VariableText) error {
 	v.DefaultAppearance = eff.da
 	v.Align = eff.q
-	if ds, err := pdf.Optional(c.TextString(dict["DS"])); err == nil {
+	if ds, err := pdf.Optional(c.TextString(dict["DS"])); err != nil {
+		return err
+	} else {
 		v.DefaultStyle = ds.String()
 	}
 	rv, err := stringOrStreamPtr(c, dict["RV"])
@@ -563,9 +615,12 @@ func joinName(prefix, partial string) string {
 // partialName reads a field's partial name (/T), stripping any period so the
 // name can be written back (a partial name must not contain the separator used
 // in fully qualified names).
-func partialName(c pdf.Cursor, dict pdf.Dict) string {
-	t, _ := pdf.Optional(c.TextString(dict["T"]))
-	return strings.ReplaceAll(t.String(), ".", "")
+func partialName(c pdf.Cursor, dict pdf.Dict) (string, error) {
+	t, err := pdf.Optional(c.TextString(dict["T"]))
+	if err != nil {
+		return "", err
+	}
+	return strings.ReplaceAll(t.String(), ".", ""), nil
 }
 
 // isValidFieldType reports whether name is one of the defined field types.
@@ -603,19 +658,30 @@ func decodeExportValues(c pdf.Cursor, obj pdf.Object, out *[]string) error {
 // decodeChoiceOption reads a single /Opt entry, which is either a string (used
 // for both export and display) or a two-element [export, display] array. An
 // entry that is neither is skipped (ok is false).
-func decodeChoiceOption(c pdf.Cursor, el pdf.Object) (acroform.ChoiceOption, bool) {
-	if arr, err := pdf.Optional(c.Array(el)); err == nil && len(arr) == 2 {
-		export, ok1 := choiceOptionString(c, arr[0])
-		display, ok2 := choiceOptionString(c, arr[1])
-		if ok1 && ok2 {
-			return acroform.ChoiceOption{Export: export, Display: display}, true
+func decodeChoiceOption(c pdf.Cursor, el pdf.Object) (acroform.ChoiceOption, bool, error) {
+	arr, err := pdf.Optional(c.Array(el))
+	if err != nil {
+		return acroform.ChoiceOption{}, false, err
+	}
+	if len(arr) == 2 {
+		export, ok1, err := choiceOptionString(c, arr[0])
+		if err != nil {
+			return acroform.ChoiceOption{}, false, err
 		}
-		return acroform.ChoiceOption{}, false
+		display, ok2, err := choiceOptionString(c, arr[1])
+		if err != nil {
+			return acroform.ChoiceOption{}, false, err
+		}
+		if ok1 && ok2 {
+			return acroform.ChoiceOption{Export: export, Display: display}, true, nil
+		}
+		return acroform.ChoiceOption{}, false, nil
 	}
-	if s, ok := choiceOptionString(c, el); ok {
-		return acroform.ChoiceOption{Export: s, Display: s}, true
+	s, ok, err := choiceOptionString(c, el)
+	if err != nil || !ok {
+		return acroform.ChoiceOption{}, false, err
 	}
-	return acroform.ChoiceOption{}, false
+	return acroform.ChoiceOption{Export: s, Display: s}, true, nil
 }
 
 // remapOptIndex translates an index into the original /Opt array to an index
@@ -668,37 +734,41 @@ func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]pdf.TextString, error) {
 // choiceOptionString reads obj as a text string. It returns false if obj is
 // absent or not a string, so that a non-string /Opt entry is skipped rather
 // than silently turned into an empty option.
-func choiceOptionString(c pdf.Cursor, obj pdf.Object) (pdf.TextString, bool) {
-	resolved, err := c.Resolve(obj)
+func choiceOptionString(c pdf.Cursor, obj pdf.Object) (pdf.TextString, bool, error) {
+	resolved, err := pdf.Optional(c.Resolve(obj))
 	if err != nil {
-		return pdf.TextString{}, false
+		return pdf.TextString{}, false, err
 	}
 	s, ok := resolved.(pdf.String)
 	if !ok {
-		return pdf.TextString{}, false
+		return pdf.TextString{}, false, nil
 	}
-	return s.AsTextString(), true
+	return s.AsTextString(), true, nil
 }
 
 // acroFormDefaults returns the interactive form dictionary's document-wide /DA
 // and /Q defaults, the root of field-attribute inheritance. It is used on the
 // page side, where the field tree's top-down context is not available.
-func acroFormDefaults(c pdf.Cursor) (da string, q pdf.TextAlign) {
+func acroFormDefaults(c pdf.Cursor) (da string, q pdf.TextAlign, err error) {
 	meta := c.Getter().GetMeta()
 	if meta == nil || meta.Catalog == nil {
-		return "", pdf.TextAlignLeft
+		return "", pdf.TextAlignLeft, nil
 	}
 	form, err := pdf.Optional(c.Dict(meta.Catalog.AcroForm))
 	if err != nil || form == nil {
-		return "", pdf.TextAlignLeft
+		return "", pdf.TextAlignLeft, err
 	}
-	if s, err := pdf.Optional(c.String(form["DA"])); err == nil {
+	if s, err := pdf.Optional(c.String(form["DA"])); err != nil {
+		return "", pdf.TextAlignLeft, err
+	} else {
 		da = string(s)
 	}
-	if v, err := pdf.Optional(c.Integer(form["Q"])); err == nil && v >= 0 && v <= 2 {
+	if v, err := pdf.Optional(c.Integer(form["Q"])); err != nil {
+		return "", pdf.TextAlignLeft, err
+	} else if v >= 0 && v <= 2 {
 		q = pdf.TextAlign(v)
 	}
-	return da, q
+	return da, q, nil
 }
 
 // inheritedFromChain reconstructs a field's inherited context from its
@@ -710,15 +780,23 @@ func acroFormDefaults(c pdf.Cursor) (da string, q pdf.TextAlign) {
 //
 // Each ancestor's context is decoded through [pdf.Cursor.Decode], so it is computed
 // once per ancestor and shared by every widget below it, the chain is bounded
-// by the extract depth limit, and a cycle ends the chain.
-func inheritedFromChain(c pdf.Cursor, dict pdf.Dict) inherited {
+// by the extract depth limit, and a cycle ends the chain.  A malformed
+// ancestor also ends the chain; read errors are returned.
+func inheritedFromChain(c pdf.Cursor, dict pdf.Dict) (inherited, error) {
 	if ref, ok := dict["Parent"].(pdf.Reference); ok {
-		if ctx, err := c.Decode(ref, ancestorContext); err == nil {
-			return *ctx
+		ctx, err := pdf.Optional(c.Decode(ref, ancestorContext))
+		if err != nil {
+			return inherited{}, err
+		}
+		if ctx != nil {
+			return *ctx, nil
 		}
 	}
-	da, q := acroFormDefaults(c)
-	return inherited{da: da, q: q}
+	da, q, err := acroFormDefaults(c)
+	if err != nil {
+		return inherited{}, err
+	}
+	return inherited{da: da, q: q}, nil
 }
 
 // ancestorContext decodes the context a field dictionary passes on to its
@@ -730,7 +808,14 @@ func ancestorContext(c pdf.Cursor, obj pdf.Object, _ bool) (*inherited, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx := applyOwnContext(inheritedFromChain(c, dict), c, dict)
+	parent, err := inheritedFromChain(c, dict)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err := applyOwnContext(parent, c, dict)
+	if err != nil {
+		return nil, err
+	}
 	return &ctx, nil
 }
 
@@ -754,7 +839,9 @@ func decodeMergedField(c pdf.Cursor, ref pdf.Reference, dict pdf.Dict, ctx inher
 	// the merged path returns before decodeAnnotation's own repairs, so the
 	// widget half is repaired here
 	repairMissingAppearance(w, pdf.GetVersion(c.Getter()))
-	repairMissingAppearanceState(c, w, dict)
+	if err := repairMissingAppearanceState(c, w, dict); err != nil {
+		return nil, nil, err
+	}
 	if f == nil {
 		// not a recognisable field: decode as a plain widget only
 		return nil, w, nil
@@ -772,16 +859,19 @@ func decodeMergedField(c pdf.Cursor, ref pdf.Reference, dict pdf.Dict, ctx inher
 // isMergedFieldDict reports whether a dictionary is a form field merged with its
 // single widget annotation: a Widget annotation that also carries field entries
 // and omits /Kids (12.5.6.19, 12.7.4.1).
-func isMergedFieldDict(c pdf.Cursor, dict pdf.Dict) bool {
-	if !isWidgetSubtype(c, dict) || hasEntry(c, dict, "Kids") {
-		return false
+func isMergedFieldDict(c pdf.Cursor, dict pdf.Dict) (bool, error) {
+	if isWidget, err := isWidgetSubtype(c, dict); err != nil || !isWidget {
+		return false, err
+	}
+	if has, err := hasEntry(c, dict, "Kids"); err != nil || has {
+		return false, err
 	}
 	for _, key := range []pdf.Name{"FT", "T", "TU", "TM", "Ff", "V", "DV", "DA", "Q", "MaxLen", "Opt", "Lock", "SV"} {
-		if hasEntry(c, dict, key) {
-			return true
+		if has, err := hasEntry(c, dict, key); err != nil || has {
+			return has, err
 		}
 	}
-	return false
+	return false, nil
 }
 
 // isWidgetKid reports whether a child dictionary is a widget annotation of its
@@ -789,26 +879,29 @@ func isMergedFieldDict(c pdf.Cursor, dict pdf.Dict) bool {
 // subtype and neither a partial name (T) nor Kids. A dictionary without T is
 // not a field (12.7.4.2), so any other field entries it carries, such as a
 // redundant FT, do not make it one.
-func isWidgetKid(c pdf.Cursor, dict pdf.Dict) bool {
-	if !isWidgetSubtype(c, dict) {
-		return false
+func isWidgetKid(c pdf.Cursor, dict pdf.Dict) (bool, error) {
+	if isWidget, err := isWidgetSubtype(c, dict); err != nil || !isWidget {
+		return false, err
 	}
-	if hasEntry(c, dict, "T") || hasEntry(c, dict, "Kids") {
-		return false
+	for _, key := range []pdf.Name{"T", "Kids"} {
+		if has, err := hasEntry(c, dict, key); err != nil || has {
+			return false, err
+		}
 	}
-	return true
+	return true, nil
 }
 
 // isWidgetSubtype reports whether the dictionary's Subtype entry is Widget.
 // The entry is resolved, since a name may be written as an indirect object.
-func isWidgetSubtype(c pdf.Cursor, dict pdf.Dict) bool {
-	subtype, err := c.Name(dict["Subtype"])
-	return err == nil && subtype == "Widget"
+func isWidgetSubtype(c pdf.Cursor, dict pdf.Dict) (bool, error) {
+	subtype, err := pdf.Optional(c.Name(dict["Subtype"]))
+	return subtype == "Widget", err
 }
 
 // hasEntry reports whether the dictionary has the given key with a non-null
 // value.  An entry whose value is null, or a reference which cannot be
 // resolved, counts as absent.
-func hasEntry(c pdf.Cursor, dict pdf.Dict, key pdf.Name) bool {
-	return nonNull(c, dict[key]) != nil
+func hasEntry(c pdf.Cursor, dict pdf.Dict, key pdf.Name) (bool, error) {
+	v, err := nonNull(c, dict[key])
+	return v != nil, err
 }

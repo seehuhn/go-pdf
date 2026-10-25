@@ -37,11 +37,15 @@ func decodeCaret(c pdf.Cursor, dict pdf.Dict) (*annotation.Caret, error) {
 	// RD (optional)
 	if rd, err := c.FloatArray(dict["RD"]); err == nil && len(rd) == 4 {
 		caret.Margin = rd
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// Sy (optional)
 	if sy, err := c.Name(dict["Sy"]); err == nil && sy != "" {
 		caret.Symbol = sy
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 	if caret.Symbol == "" {
 		caret.Symbol = "None"

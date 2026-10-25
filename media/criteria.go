@@ -84,22 +84,19 @@ func ExtractMediaCriteria(c pdf.Cursor, obj pdf.Object, isDirect bool) (*MediaCr
 		"O": &crit.Overdubs,
 		"S": &crit.Subtitles,
 	} {
-		if dict[key] == nil {
-			continue
-		}
-		if b, err := pdf.Optional(c.Boolean(dict[key])); err != nil {
+		if b, ok, err := c.OptionalBoolean(dict[key]); err != nil {
 			return nil, err
-		} else {
-			field.Set(bool(b))
+		} else if ok {
+			field.Set(b)
 		}
 	}
 
-	if dict["R"] != nil {
-		if r, err := pdf.Optional(c.Integer(dict["R"])); err != nil {
-			return nil, err
-		} else if r >= 0 {
+	if r, err := c.Integer(dict["R"]); err == nil {
+		if r >= 0 {
 			crit.Bandwidth.Set(uint(r))
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	if d, err := c.DecodeOptional(dict["D"], ExtractMinBitDepth); err != nil {

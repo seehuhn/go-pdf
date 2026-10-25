@@ -199,10 +199,12 @@ func (s *streamSource) WriteStream(e *pdf.EmbedHelper, ref pdf.Reference, dict p
 // is accepted for signature uniformity but ignored, because sound objects
 // are always indirect stream objects.
 //
-// Extract aborts with an error if the sound has obviously invalid
-// metadata (negative or non-finite SampleRate, zero or absurdly large
-// Channels or BitsPerSample, etc.).  Unknown Encoding values are
-// substituted with the default EncodingRaw.
+// Extract aborts with an error if the sound has an invalid SampleRate.
+// Invalid values of the optional entries, such as zero or absurdly large
+// Channels or BitsPerSample, are read as though the entry were absent.
+// Unknown Encoding values are substituted with the default EncodingRaw.
+// For [EncodingMuLaw] and [EncodingALaw], a BitsPerSample other than 8 is
+// dropped.  The result always passes [Sound.Validate].
 func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*Sound, error) {
 	stream, err := c.Stream(obj)
 	if err != nil {
@@ -220,39 +222,34 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*Sound, error) {
 		Encoding:      EncodingRaw,
 	}
 
-	// SampleRate (R) — required.
-	if r, err := pdf.Optional(c.Number(stream.Dict["R"])); err != nil {
+	// SampleRate (R) — required, and there is no value to repair it to.
+	r, err := pdf.Optional(c.Number(stream.Dict["R"]))
+	if err != nil {
 		return nil, err
-	} else {
-		res.SampleRate = r
+	}
+	if !(r > 0 && r <= maxSampleRate) {
+		return nil, pdf.Errorf("invalid sound sample rate %g", r)
+	}
+	res.SampleRate = r
+
+	// Channels (C) — optional in PDF, default 1.  A value which is not a
+	// number, or is outside the supported range, is dropped.
+	if ch, err := c.Integer(stream.Dict["C"]); err == nil {
+		if ch > 0 && ch <= maxChannels {
+			res.Channels = int(ch)
+		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
-	// Channels (C) — optional in PDF, default 1.  When present, the
-	// value must be a positive integer in the supported range;
-	// non-integer or out-of-range values are rejected rather than
-	// silently fixed.
-	if cObj := stream.Dict["C"]; cObj != nil {
-		c, err := c.Integer(cObj)
-		if err != nil {
-			return nil, err
+	// BitsPerSample (B) — optional in PDF, default 8.  Same handling
+	// as /C.
+	if b, err := c.Integer(stream.Dict["B"]); err == nil {
+		if b > 0 && b <= maxBitsPerSample {
+			res.BitsPerSample = int(b)
 		}
-		if c <= 0 || c > maxChannels {
-			return nil, pdf.Errorf("sound: invalid C entry %d", c)
-		}
-		res.Channels = int(c)
-	}
-
-	// BitsPerSample (B) — optional in PDF, default 8.  Same strictness
-	// as /C: non-integer or out-of-range values are rejected.
-	if bObj := stream.Dict["B"]; bObj != nil {
-		b, err := c.Integer(bObj)
-		if err != nil {
-			return nil, err
-		}
-		if b <= 0 || b > maxBitsPerSample {
-			return nil, pdf.Errorf("sound: invalid B entry %d", b)
-		}
-		res.BitsPerSample = int(b)
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// Encoding (E) — optional, default Raw; unknown names ignored.
@@ -263,6 +260,11 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*Sound, error) {
 		case EncodingRaw, EncodingSigned, EncodingMuLaw, EncodingALaw:
 			res.Encoding = Encoding(enc)
 		}
+	}
+	// μ-law and A-law samples have 8 bits by definition, so any other /B
+	// is dropped
+	if res.Encoding == EncodingMuLaw || res.Encoding == EncodingALaw {
+		res.BitsPerSample = 8
 	}
 
 	// CompressionFormat (CO) — optional, opaque.
@@ -290,9 +292,6 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*Sound, error) {
 		res.Data = &streamSource{inner: opaque.ExtractStream(c.Extractor(), stream)}
 	}
 
-	if err := res.Validate(); err != nil {
-		return nil, err
-	}
 	return res, nil
 }
 
@@ -317,9 +316,8 @@ const (
 // is [EncodingMuLaw] or [EncodingALaw], BitsPerSample must be 8: those
 // are 8-bit-by-definition G.711 codecs.
 //
-// Validate is called by both [Sound.Embed] (to refuse writing a
-// malformed sound) and [Extract] (to refuse loading one).  External
-// callers may use it to pre-validate a sound built in memory.
+// Validate is called by [Sound.Embed] to refuse writing a malformed sound.
+// External callers may use it to pre-validate a sound built in memory.
 func (s *Sound) Validate() error {
 	if s == nil {
 		return errors.New("sound: nil Sound")

@@ -47,7 +47,9 @@ func decodeSound(c pdf.Cursor, dict pdf.Dict) (*annotation.Sound, error) {
 	a.Sound = s
 
 	// Name (optional) - default to "Speaker" if not specified
-	if name, err := c.Name(dict["Name"]); err == nil && name != "" {
+	if name, err := pdf.Optional(c.Name(dict["Name"])); err != nil {
+		return nil, err
+	} else if name != "" {
 		a.Icon = annotation.SoundIcon(name)
 	} else {
 		a.Icon = annotation.SoundIconSpeaker

@@ -398,7 +398,7 @@ func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
 			}
 			name, ok := fi.(Name)
 			if !ok {
-				return nil, fmt.Errorf("wrong type, expected Name but got %T", fi)
+				return nil, Errorf("wrong type, expected Name but got %T", fi)
 			}
 			pai, err := resolve(r, pa[i], false)
 			if err != nil {

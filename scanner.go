@@ -120,7 +120,9 @@ func (s *scanner) CurrentPos() int64 {
 
 // ReadIndirectObject reads an indirect object, from the object number up to
 // and including the "endobj" keyword.  If the input ends before the object is
-// complete, a [MalformedFileError] is returned.
+// complete, a [MalformedFileError] is returned.  If "endobj" is missing but
+// other data follows, the object is returned and the scanner position after
+// the call is unspecified.
 func (s *scanner) ReadIndirectObject() (_ Native, _ Reference, err error) {
 	defer func() {
 		err = eofToMalformed(err, "indirect object")
@@ -148,7 +150,7 @@ func (s *scanner) ReadIndirectObject() (_ Native, _ Reference, err error) {
 		return nil, 0, err
 	}
 
-	if number < 0 || number >= maxXRefSize || generation < 0 || generation > maxGeneration {
+	if number <= 0 || number >= maxXRefSize || generation < 0 || generation > maxGeneration {
 		return nil, 0, &MalformedFileError{
 			Err: fmt.Errorf("invalid reference %d %d", number, generation),
 		}
@@ -172,44 +174,71 @@ func (s *scanner) ReadIndirectObject() (_ Native, _ Reference, err error) {
 
 	if a, ok := obj.(Integer); ok {
 		// Check whether this is the start of a reference to an indirect
-		// object.
+		// object.  If not, the integer is the value of the object.
 		buf, err := s.PeekN(6)
 		if err != nil {
 			return nil, 0, err
 		}
 		if !bytes.Equal(buf, []byte("endobj")) {
-			b, err := s.ReadInteger()
-			if err != nil {
-				return nil, 0, err
-			}
-			err = s.SkipWhiteSpace()
-			if err != nil {
-				return nil, 0, err
-			}
-			err = s.SkipString("R")
-			if err != nil {
-				return nil, 0, err
-			}
-			err = s.SkipWhiteSpace()
-			if err != nil {
-				return nil, 0, err
-			}
-
-			if a < 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
-				return nil, 0, &MalformedFileError{
-					Err: fmt.Errorf("invalid reference %d %d", a, b),
+			b, err := s.readReferenceTail()
+			if err == nil {
+				// A reference to an object which cannot exist is a
+				// reference to the null object (PDF 7.3.10).
+				if a <= 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
+					obj = nil
+				} else {
+					obj = NewReference(uint32(a), uint16(b))
 				}
+			} else if IsReadError(err) {
+				return nil, 0, err
 			}
-			obj = NewReference(uint32(a), uint16(b))
 		}
 	}
 
-	err = s.SkipString("endobj")
+	// A missing "endobj" keyword is tolerated if other data follows, since the
+	// value has been read in full.  If the input ends within a prefix of the
+	// keyword (including the empty prefix), the object may have been
+	// truncated, as is the case for a dictionary followed by a prefix of
+	// "stream".  A buffer shorter than the keyword means the input has ended.
+	buf, err := s.PeekN(6)
 	if err != nil {
 		return nil, 0, err
 	}
+	if bytes.Equal(buf, []byte("endobj")) {
+		s.pos += len(buf)
+	} else if len(buf) < 6 {
+		_, isDict := obj.(Dict)
+		if bytes.HasPrefix([]byte("endobj"), buf) ||
+			isDict && bytes.HasPrefix([]byte("stream"), buf) {
+			return nil, 0, &MalformedFileError{
+				Err: fmt.Errorf("expected \"endobj\" but found %q", buf),
+			}
+		}
+	}
 
 	return obj, ref, nil
+}
+
+// readReferenceTail reads the generation number and the keyword "R" of an
+// indirect reference, together with any following white space.
+func (s *scanner) readReferenceTail() (Integer, error) {
+	b, err := s.ReadInteger()
+	if err != nil {
+		return 0, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+	err = s.SkipString("R")
+	if err != nil {
+		return 0, err
+	}
+	err = s.SkipWhiteSpace()
+	if err != nil {
+		return 0, err
+	}
+	return b, nil
 }
 
 func (s *scanner) ReadObject() (Native, error) {
@@ -656,7 +685,7 @@ func (s *scanner) ReadArray() (array Array, err error) {
 			k := len(array)
 			a := array[k-2].(Integer)
 			b := array[k-1].(Integer)
-			if a < 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
+			if a <= 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
 				array = append(array[:k-2], nil)
 			} else {
 				array = append(array[:k-2], NewReference(uint32(a), uint16(b)))
@@ -798,7 +827,7 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 					return nil, err
 				}
 
-				if a < 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
+				if a <= 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
 					val = nil
 				} else {
 					val = NewReference(uint32(a), uint16(b))

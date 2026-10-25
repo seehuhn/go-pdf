@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/media"
 	"seehuhn.de/go/pdf/movie"
 	"seehuhn.de/go/pdf/oc"
+	"seehuhn.de/go/pdf/opaque"
 	"seehuhn.de/go/pdf/optional"
 	"seehuhn.de/go/pdf/page/transition"
 	"seehuhn.de/go/pdf/sound"
@@ -111,6 +112,10 @@ var actionTestCases = []pdf.Action{
 		D: &destination.Fit{Page: pdf.Integer(0)},
 		T: &TargetNamedChild{Name: pdf.String("child.pdf"), Next: &TargetParent{}},
 	},
+	&GoToE{
+		D: &destination.Fit{Page: pdf.Integer(0)},
+		T: &TargetNamedChild{Name: pdf.String("child.pdf")},
+	},
 
 	// GoToDp (PDF 2.0)
 	&GoToDp{DPart: pdf.Reference(1)},
@@ -119,6 +124,9 @@ var actionTestCases = []pdf.Action{
 	&Launch{F: &file.Specification{FileName: "app.exe", AFRelationship: "Unspecified"}},
 	&Launch{F: &file.Specification{FileName: "app.exe", AFRelationship: "Unspecified"}, NewWindow: NewWindowNew},
 	&Launch{F: &file.Specification{FileName: "app.exe", AFRelationship: "Unspecified"}, NewWindow: NewWindowReplace},
+	&Launch{Win: pdf.Dict{"F": pdf.String("app.exe")}},
+	&Launch{Mac: opaque.Direct(pdf.Dict{"Key": pdf.Name("Value")})},
+	&Launch{Unix: opaque.Direct(pdf.Array{pdf.Integer(1), pdf.String("x")})},
 
 	// Thread
 	&Thread{D: pdf.Integer(0)},

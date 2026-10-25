@@ -185,13 +185,16 @@ func nextFreeNumber(a int64) uint32 {
 // repairFreeList truncates the list of free entries headed by entry 0 at
 // the first link which does not lead to a free entry with generation
 // number below 65535, or which closes a cycle.  Free entries not in the
-// list keep their next-free numbers.  Entry 0 is given the generation
-// number 65535 which the specification requires.
+// list keep their next-free numbers.  Since object number 0 cannot be used
+// (PDF 7.3.10), entry 0 is made free, with the generation number 65535
+// which the specification requires.
 func repairFreeList(xref map[uint32]*xRefEntry) {
 	head := xref[0]
 	if head == nil {
 		return
 	}
+	head.Pos = -1
+	head.InStream = 0
 	head.Generation = maxGeneration
 
 	seen := map[uint32]bool{0: true}
@@ -555,7 +558,7 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 				// used object, compressed
 				// a = object number of the compressed stream (generation number 0)
 				// b = index within the stream
-				if a >= maxXRefSize {
+				if a == 0 || a >= maxXRefSize {
 					continue
 				}
 				xref[i] = &xRefEntry{
@@ -619,10 +622,40 @@ func (w *Writer) setXRef(ref Reference, entry *xRefEntry) error {
 	if seen {
 		return errDuplicateRef
 	}
+	if !entry.IsFree() {
+		if err := w.checkInUseRef(ref); err != nil {
+			return err
+		}
+	}
 	if w.nextRef <= ref.Number() {
 		w.nextRef = ref.Number() + 1
 	}
 	w.xref[ref.Number()] = entry
+	return nil
+}
+
+// checkInUseRef checks that an object may be written under ref.  In a newly
+// created file, all objects have generation number 0 (PDF 7.3.10).  In an
+// incremental update, an object number new to the file has generation
+// number 0, and an existing object number keeps the generation number
+// recorded in the xref table of the original file (PDF 7.5.4).
+func (w *Writer) checkInUseRef(ref Reference) error {
+	if ref.Number() == 0 {
+		return errors.New("object number 0 is reserved")
+	}
+
+	var gen uint16
+	if w.base != nil {
+		if e := w.base.xref[ref.Number()]; e != nil {
+			if e.IsFree() && e.Generation == maxGeneration {
+				return fmt.Errorf("object number %d cannot be reused", ref.Number())
+			}
+			gen = e.Generation
+		}
+	}
+	if ref.Generation() != gen {
+		return fmt.Errorf("object %s: expected generation number %d", ref, gen)
+	}
 	return nil
 }
 

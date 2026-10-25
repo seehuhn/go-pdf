@@ -18,7 +18,9 @@ package file
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"maps"
 	"testing"
 	"time"
 
@@ -28,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/image/thumbnail"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 var testCases = []struct {
@@ -316,6 +319,18 @@ func TestSpecificationValidation(t *testing.T) {
 		}
 	})
 
+	t.Run("Unicode file name only", func(t *testing.T) {
+		spec := &Specification{FileNameUnicode: pdf.Text("test.txt")}
+
+		buf, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		rm := pdf.NewResourceManager(buf)
+
+		_, err := rm.Embed(spec)
+		if err == nil {
+			t.Error("expected error for UF without F")
+		}
+	})
+
 	t.Run("version requirement - UF", func(t *testing.T) {
 		spec := &Specification{
 			FileName:        "test.txt",
@@ -543,6 +558,312 @@ func TestSpecificationMalformedInput(t *testing.T) {
 			t.Error("incomplete ID array should be ignored")
 		}
 	})
+}
+
+// TestSpecificationString verifies that a file specification string is read
+// like a file specification dictionary with only an F entry, and that the
+// result survives a round trip.
+func TestSpecificationString(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref := w.Alloc()
+	if err := w.Put(ref, pdf.String("dir/a.pdf")); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		obj  pdf.Object
+		want string
+	}{
+		{"direct", pdf.String("dir/a.pdf"), "dir/a.pdf"},
+		{"indirect", ref, "dir/a.pdf"},
+		{"escaped separator", pdf.String(`in\/out`), `in\/out`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+			spec, err := c.Decode(tc.obj, ExtractSpecification)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, isRef := tc.obj.(pdf.Reference)
+			fromDict, err := ExtractSpecification(c, pdf.Dict{"F": pdf.String(tc.want)}, !isRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(fromDict, spec); diff != "" {
+				t.Errorf("string and dictionary differ (-dict +string):\n%s", diff)
+			}
+
+			roundTripTest(t, pdf.V1_7, spec)
+		})
+	}
+
+	t.Run("empty", func(t *testing.T) {
+		c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+		_, err := ExtractSpecification(c, pdf.String(""), true)
+		if !pdf.IsMalformed(err) {
+			t.Errorf("empty string: got %v, want malformed error", err)
+		}
+	})
+}
+
+// TestSpecificationFileNameRepair verifies how a missing F entry is
+// repaired on read: it is taken from UF, it may stay absent if DOS, Mac or
+// Unix is present, and a specification without any name is malformed.
+func TestSpecificationFileNameRepair(t *testing.T) {
+	cases := []struct {
+		name string
+		dict pdf.Dict
+		want string // expected FileName
+	}{
+		{"UF in PDFDocEncoding", pdf.Dict{"UF": pdf.Text("a.pdf")}, "a.pdf"},
+		{"UF outside PDFDocEncoding", pdf.Dict{"UF": pdf.Text("日本.pdf")}, "日本.pdf"},
+		{"empty F and UF", pdf.Dict{"F": pdf.String(""), "UF": pdf.Text("a.pdf")}, "a.pdf"},
+		{"DOS only", pdf.Dict{"DOS": pdf.String("A.PDF")}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			spec, err := ExtractSpecification(pdf.CursorAt(pdf.NewExtractor(w), nil), tc.dict, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if spec.FileName != tc.want {
+				t.Errorf("FileName = %q, want %q", spec.FileName, tc.want)
+			}
+			roundTripTest(t, pdf.V1_7, spec)
+		})
+	}
+
+	for name, dict := range map[string]pdf.Dict{
+		"no entries": {},
+		"empty F":    {"F": pdf.String("")},
+		"invalid F":  {"F": pdf.Integer(1)},
+	} {
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		_, err := ExtractSpecification(pdf.CursorAt(pdf.NewExtractor(w), nil), dict, true)
+		if !pdf.IsMalformed(err) {
+			t.Errorf("%s: got %v, want malformed error", name, err)
+		}
+	}
+}
+
+// TestSpecificationEmbeddedWithoutName verifies that a specification whose
+// only content is an embedded file is written with an empty F entry, and
+// reads back unchanged.
+func TestSpecificationEmbeddedWithoutName(t *testing.T) {
+	spec := &Specification{
+		AFRelationship: RelationshipUnspecified,
+		EmbeddedFiles: map[string]*Stream{
+			"F": {
+				WriteData: func(w io.Writer) error {
+					_, err := w.Write([]byte("content"))
+					return err
+				},
+			},
+		},
+	}
+
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	obj, err := rm.Embed(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+	dict, err := c.Dict(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, ok := dict["F"].(pdf.String); !ok || len(f) != 0 {
+		t.Errorf("F = %v, want empty string", dict["F"])
+	}
+
+	got, err := c.Decode(obj, ExtractSpecification)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(spec, got, cmp.Comparer(func(a, b *Stream) bool {
+		return a.Equal(b)
+	})); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// TestCanBeAFErrors verifies that CanBeAF reports write-side errors, never
+// malformed-file errors.
+func TestCanBeAFErrors(t *testing.T) {
+	named := &Specification{FileName: "a.txt"}
+	if err := named.CanBeAF(pdf.V1_7); !pdf.IsWrongVersion(err) {
+		t.Errorf("version 1.7: got %v, want version error", err)
+	}
+
+	cases := map[string]*Specification{
+		"no file name":      {},
+		"unicode name only": {FileNameUnicode: pdf.Text("a.txt")},
+		"only nil stream":   {EmbeddedFiles: map[string]*Stream{"F": nil}},
+		"no MIME type":      {FileName: "a.txt", EmbeddedFiles: map[string]*Stream{"F": {}}},
+	}
+	for name, spec := range cases {
+		err := spec.CanBeAF(pdf.V2_0)
+		if err == nil || pdf.IsMalformed(err) {
+			t.Errorf("%s: got %v, want a write-side error", name, err)
+		}
+	}
+}
+
+// TestCanBeAFAgreesWithEmbed verifies that CanBeAF and Embed agree on
+// whether a specification has a usable file name, and that CanBeAF accepts
+// the specifications which can be read back from a file.
+func TestCanBeAFAgreesWithEmbed(t *testing.T) {
+	stream := func(mime string) *Stream {
+		return &Stream{
+			MimeType:  mime,
+			WriteData: func(w io.Writer) error { return nil },
+		}
+	}
+	cases := []struct {
+		name string
+		spec *Specification
+		ok   bool
+	}{
+		{"file name", &Specification{FileName: "a.txt"}, true},
+		{"embedded file only", &Specification{
+			EmbeddedFiles: map[string]*Stream{"F": stream("text/plain")},
+		}, true},
+		{"embedded file without ModDate", &Specification{
+			FileName:      "a.txt",
+			EmbeddedFiles: map[string]*Stream{"F": stream("text/plain")},
+		}, true},
+		{"no name", &Specification{}, false},
+		{"unicode name only", &Specification{FileNameUnicode: pdf.Text("a.txt")}, false},
+		{"nil stream only", &Specification{EmbeddedFiles: map[string]*Stream{"F": nil}}, false},
+		{"empty embedded files", &Specification{EmbeddedFiles: map[string]*Stream{}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
+			_, embedErr := rm.Embed(tc.spec)
+			afErr := tc.spec.CanBeAF(pdf.V2_0)
+			if (embedErr == nil) != tc.ok || (afErr == nil) != tc.ok {
+				t.Errorf("Embed: %v, CanBeAF: %v, want ok=%v", embedErr, afErr, tc.ok)
+			}
+		})
+	}
+}
+
+// errGetter is a pdf.Getter which fails for one reference with an error which
+// is not a malformed-file error.
+type errGetter struct {
+	pdf.Getter
+	fail pdf.Reference
+	err  error
+}
+
+func (g errGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
+	if ref == g.fail {
+		return nil, g.err
+	}
+	return g.Getter.Get(ref, canObjStm)
+}
+
+// TestSpecificationOptionalEntries verifies that invalid ID and EP entries
+// are dropped on read, while the rest of the specification is kept.
+func TestSpecificationOptionalEntries(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	dangling := pdf.NewReference(99, 0)
+
+	cases := []struct {
+		name   string
+		extra  pdf.Dict
+		wantID []string
+		wantEP bool
+	}{
+		{"valid ID", pdf.Dict{"ID": pdf.Array{pdf.String("a"), pdf.String("b")}}, []string{"a", "b"}, false},
+		{"integer ID elements", pdf.Dict{"ID": pdf.Array{pdf.Integer(1), pdf.Integer(2)}}, nil, false},
+		{"one bad ID element", pdf.Dict{"ID": pdf.Array{pdf.String("a"), pdf.Integer(2)}}, nil, false},
+		{"dangling ID elements", pdf.Dict{"ID": pdf.Array{dangling, dangling}}, nil, false},
+		{"short ID", pdf.Dict{"ID": pdf.Array{pdf.String("a")}}, nil, false},
+		{"wrong type ID", pdf.Dict{"ID": pdf.Integer(1)}, nil, false},
+		{"malformed EP", pdf.Dict{"EP": pdf.Integer(1)}, nil, false},
+		{"EP without fields", pdf.Dict{"EP": pdf.Dict{}}, nil, false},
+		{"dangling EP", pdf.Dict{"EP": dangling}, nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dict := pdf.Dict{"F": pdf.String("a.txt")}
+			maps.Copy(dict, tc.extra)
+			c := pdf.CursorAt(pdf.NewExtractor(w), nil)
+			spec, err := ExtractSpecification(c, dict, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if spec.FileName != "a.txt" {
+				t.Errorf("FileName = %q, want a.txt", spec.FileName)
+			}
+			if diff := cmp.Diff(tc.wantID, spec.ID); diff != "" {
+				t.Errorf("ID differs (-want +got):\n%s", diff)
+			}
+			if (spec.EncryptedPayload != nil) != tc.wantEP {
+				t.Errorf("EncryptedPayload = %v", spec.EncryptedPayload)
+			}
+			roundTripTest(t, pdf.V2_0, spec)
+		})
+	}
+}
+
+// TestSpecificationReadErrors verifies that read errors which are not
+// malformed-file errors are propagated from all entries.
+func TestSpecificationReadErrors(t *testing.T) {
+	failRef := pdf.NewReference(7, 0)
+	errTest := errors.New("test read error")
+	g := errGetter{Getter: mock.Getter, fail: failRef, err: errTest}
+
+	cases := map[string]pdf.Dict{
+		"ID first":  {"ID": pdf.Array{failRef, pdf.String("b")}},
+		"ID second": {"ID": pdf.Array{pdf.String("a"), failRef}},
+		"EP":        {"EP": failRef},
+		"RF array": {
+			"EF": pdf.Dict{},
+			"RF": pdf.Dict{"F": failRef},
+		},
+		"RF name": {
+			"EF": pdf.Dict{},
+			"RF": pdf.Dict{"F": pdf.Array{failRef, pdf.Dict{}}},
+		},
+		"RF stream": {
+			"EF": pdf.Dict{},
+			"RF": pdf.Dict{"F": pdf.Array{pdf.String("x"), failRef}},
+		},
+	}
+	for name, extra := range cases {
+		t.Run(name, func(t *testing.T) {
+			dict := pdf.Dict{"F": pdf.String("a.txt")}
+			maps.Copy(dict, extra)
+			c := pdf.NewCursor(g)
+			_, err := ExtractSpecification(c, dict, true)
+			if !errors.Is(err, errTest) {
+				t.Errorf("got %v, want the read error", err)
+			}
+		})
+	}
+}
+
+// TestSpecificationNilEmbeddedFile verifies that a nil embedded file stream
+// does not count as an embedded file when checking for a file name.
+func TestSpecificationNilEmbeddedFile(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	_, err := rm.Embed(&Specification{EmbeddedFiles: map[string]*Stream{"F": nil}})
+	if err == nil {
+		t.Error("expected error for a specification without file name")
+	}
 }
 
 func roundTripTest(t *testing.T, v pdf.Version, spec1 *Specification) {

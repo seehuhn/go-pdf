@@ -18,12 +18,14 @@ package trapnet
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/pdf/opaque"
 )
 
@@ -170,7 +172,7 @@ func TestExtractRepairsPCM(t *testing.T) {
 		},
 		{
 			name: "PCM of wrong type",
-			dict: pdf.Dict{"PCM": pdf.Integer(3)},
+			dict: pdf.Dict{"PCM": pdf.Integer(3), "TrapStyles": pdf.Text("some traps")},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -309,5 +311,69 @@ func FuzzRoundTrip(f *testing.F) {
 		}
 
 		roundTripTest(t, version, attrs)
+	})
+}
+
+// TestExtractAttributesDanglingReference checks that a reference to a free
+// object reads the same as an absent entry.
+func TestExtractAttributesDanglingReference(t *testing.T) {
+	testExtractUnusable(t, "dangling", pdf.NewReference(99, 0))
+}
+
+// TestExtractAttributesWrongType checks that an entry of the wrong type reads
+// the same as an absent entry.
+func TestExtractAttributesWrongType(t *testing.T) {
+	testExtractUnusable(t, "wrong type", pdf.Integer(5))
+}
+
+// testExtractUnusable checks that adding any single entry with the value bad
+// to a dictionary does not change the result of ExtractAttributes.
+func testExtractUnusable(t *testing.T, name string, bad pdf.Object) {
+	keys := []pdf.Name{"PCM", "SeparationColorNames", "TrapRegions", "TrapStyles"}
+	bases := map[string]pdf.Dict{
+		"empty": {},
+		"other": {"PCM": pdf.Name("DeviceRGB")},
+		"style": {"TrapStyles": pdf.String("style")},
+	}
+	x := pdf.NewExtractor(mock.Getter)
+	for baseName, base := range bases {
+		var extra []pdf.Name
+		for _, key := range keys {
+			if _, ok := base[key]; !ok {
+				extra = append(extra, key)
+			}
+		}
+		for _, key := range extra {
+			t.Run(name+"/"+baseName+"/"+string(key), func(t *testing.T) {
+				dict := maps.Clone(base)
+				dict[key] = bad
+
+				want, err := ExtractAttributes(pdf.CursorAt(x, nil), base)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := ExtractAttributes(pdf.CursorAt(x, nil), dict)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("%s entry differs from absent entry (-want +got):\n%s", name, diff)
+				}
+			})
+		}
+	}
+
+	t.Run(name+"/all", func(t *testing.T) {
+		dict := pdf.Dict{}
+		for _, key := range keys {
+			dict[key] = bad
+		}
+		got, err := ExtractAttributes(pdf.CursorAt(x, nil), dict)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Errorf("got %v, want nil", got)
+		}
 	})
 }

@@ -85,9 +85,12 @@ func decodeURI(c pdf.Cursor, dict pdf.Dict) (*URI, error) {
 		return nil, pdf.Error("URI action: missing URI")
 	}
 
-	isMap, _ := pdf.Optional(c.Boolean(dict["IsMap"]))
+	isMap, _, err := c.OptionalBoolean(dict["IsMap"])
+	if err != nil {
+		return nil, err
+	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

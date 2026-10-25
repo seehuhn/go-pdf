@@ -60,6 +60,9 @@ func (a *GoToE) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if a.D == nil {
 		return nil, errors.New("GoToE action must have D entry")
 	}
+	if a.F == nil && a.T == nil {
+		return nil, errors.New("GoToE action needs F or T")
+	}
 
 	destObj, err := a.D.Encode(rm)
 	if err != nil {
@@ -112,14 +115,18 @@ func decodeGoToE(c pdf.Cursor, dict pdf.Dict) (*GoToE, error) {
 		return nil, pdf.Error("GoToE action missing D entry")
 	}
 
-	f, err := c.Decode(dict["F"], file.ExtractSpecification)
+	// F and T together locate the target document, and D is a destination
+	// within it.  A broken F or T fails the action: dropping either would
+	// leave a destination in a different document.
+	f, err := decodePresent(c, dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
 
 	newWindow := NewWindowDefault
-	if dict["NewWindow"] != nil {
-		nw, _ := pdf.Optional(c.Boolean(dict["NewWindow"]))
+	if nw, ok, err := c.OptionalBoolean(dict["NewWindow"]); err != nil {
+		return nil, err
+	} else if ok {
 		if nw {
 			newWindow = NewWindowNew
 		} else {
@@ -127,15 +134,15 @@ func decodeGoToE(c pdf.Cursor, dict pdf.Dict) (*GoToE, error) {
 		}
 	}
 
-	var target Target
-	if dict["T"] != nil {
-		target, err = c.Decode(dict["T"], DecodeTarget)
-		if err != nil {
-			return nil, err
-		}
+	target, err := decodePresent(c, dict["T"], DecodeTarget)
+	if err != nil {
+		return nil, err
+	}
+	if f == nil && target == nil {
+		return nil, pdf.Error("GoToE action without F or T entry")
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

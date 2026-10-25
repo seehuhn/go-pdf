@@ -16,7 +16,11 @@
 
 package file
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // PDF 2.0 sections: 7.6.7
 
@@ -84,7 +88,7 @@ func (ep *EncryptedPayload) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if ep.FilterName == "" {
-		return nil, pdf.Errorf("missing required Subtype in encrypted payload dictionary")
+		return nil, errors.New("missing required Subtype in encrypted payload dictionary")
 	}
 
 	dict := pdf.Dict{

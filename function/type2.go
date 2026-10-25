@@ -113,7 +113,7 @@ func extractType2(c pdf.Cursor, d pdf.Dict) (*Type2, error) {
 
 	f.repair()
 	if err := f.validate(); err != nil {
-		return nil, err
+		return nil, &pdf.MalformedFileError{Err: err}
 	}
 
 	return f, nil

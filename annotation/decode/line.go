@@ -37,12 +37,10 @@ func decodeLine(c pdf.Cursor, dict pdf.Dict) (*annotation.Line, error) {
 
 	// Extract line-specific fields
 	// L (required)
-	if l, err := c.Array(dict["L"]); err == nil && len(l) == 4 {
-		for i, coord := range l {
-			if num, err := c.Number(coord); err == nil {
-				line.Coords[i] = num
-			}
-		}
+	if l, err := pdf.Optional(c.FloatArray(dict["L"])); err != nil {
+		return nil, err
+	} else if len(l) == 4 {
+		copy(line.Coords[:], l)
 	}
 
 	// BS (optional)
@@ -63,10 +61,14 @@ func decodeLine(c pdf.Cursor, dict pdf.Dict) (*annotation.Line, error) {
 	} else if len(le) >= 1 {
 		if name, err := c.Name(le[0]); err == nil {
 			line.LineEndingStyle[0] = annotation.LineEndingStyle(name)
+		} else if pdf.IsReadError(err) {
+			return nil, err
 		}
 		if len(le) >= 2 {
 			if name, err := c.Name(le[1]); err == nil {
 				line.LineEndingStyle[1] = annotation.LineEndingStyle(name)
+			} else if pdf.IsReadError(err) {
+				return nil, err
 			}
 		} else {
 			// if only one element, copy first element to second
@@ -82,14 +84,18 @@ func decodeLine(c pdf.Cursor, dict pdf.Dict) (*annotation.Line, error) {
 	}
 
 	// Cap (optional)
-	if cap, err := c.Boolean(dict["Cap"]); err == nil {
-		line.Caption = bool(cap)
+	caption, _, err := c.OptionalBoolean(dict["Cap"])
+	if err != nil {
+		return nil, err
 	}
+	line.Caption = caption
 
 	if line.Caption {
 		// CP (optional)
 		if cp, err := c.Name(dict["CP"]); err == nil && cp == "Top" {
 			line.CaptionAbove = true
+		} else if pdf.IsReadError(err) {
+			return nil, err
 		}
 
 		// CO (optional)

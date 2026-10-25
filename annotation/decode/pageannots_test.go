@@ -17,6 +17,7 @@
 package decode
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -119,6 +120,68 @@ func TestPageAnnotationsSkip(t *testing.T) {
 	if _, ok := annots[1].(*annotation.Square); !ok {
 		t.Errorf("annots[1] is %T, want *annotation.Square", annots[1])
 	}
+}
+
+// TestPageAnnotationsReadError checks that an I/O error while decoding an
+// annotation fails the whole read, while an annotation with a malformed
+// sound is skipped.
+func TestPageAnnotationsReadError(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+
+	// a sound without the required /R
+	snd := w.Alloc()
+	stm, err := w.OpenStream(snd, pdf.Dict{"Type": pdf.Name("Sound")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte{0x80, 0x80}); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	badSound := w.Alloc()
+	w.Put(badSound, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Sound"),
+		"Rect": pageAnnotRect, "Sound": snd,
+	})
+
+	unreadable := w.Alloc()
+	w.Put(unreadable, pdf.Text("note"))
+	text := w.Alloc()
+	w.Put(text, pdf.Dict{
+		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Text"),
+		"Rect": pageAnnotRect, "Contents": unreadable,
+	})
+
+	c := pdf.NewCursor(w)
+	refs, _, err := PageAnnotations(c, pdf.Array{badSound, text})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 1 || refs[0] != text {
+		t.Errorf("refs = %v, want [%v]", refs, text)
+	}
+
+	c = pdf.CursorAt(pdf.NewExtractor(failingGetter{Getter: w, bad: unreadable}), nil)
+	_, _, err = PageAnnotations(c, pdf.Array{badSound, text})
+	if !pdf.IsReadError(err) {
+		t.Errorf("got %v, want read error", err)
+	}
+}
+
+// failingGetter wraps a [pdf.Getter] and fails to read the object bad with
+// an I/O error, which is not a sign of a malformed file.
+type failingGetter struct {
+	pdf.Getter
+	bad pdf.Reference
+}
+
+func (g failingGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
+	if ref == g.bad {
+		return nil, errors.New("I/O error")
+	}
+	return g.Getter.Get(ref, canObjStm)
 }
 
 // TestPageAnnotationsLinksWidgets checks that reading a page's annotations

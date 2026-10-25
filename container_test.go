@@ -273,6 +273,15 @@ func TestGetFiltersDecodeParmsShape(t *testing.T) {
 	}
 }
 
+// TestGetFiltersBadElement verifies that a /Filter array element which is
+// not a name makes the filter chain malformed.
+func TestGetFiltersBadElement(t *testing.T) {
+	_, err := GetFilters(nil, nil, Dict{"Filter": Array{Name("FlateDecode"), Integer(5)}})
+	if !IsMalformed(err) {
+		t.Errorf("got %v, want malformed error", err)
+	}
+}
+
 // TestAlignDecodeParmsBadFilter verifies that a /Filter value which is
 // neither a name nor an array yields no parms entries, so that a chain
 // built on top of it stays aligned.

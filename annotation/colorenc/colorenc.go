@@ -57,18 +57,17 @@ func (transparent) RGBA() (r, g, b, a uint32) {
 // The number of array elements selects the colour space: 1 for DeviceGray,
 // 3 for DeviceRGB, and 4 for DeviceCMYK. An empty array yields
 // [Transparent]; a missing object yields a nil colour. Component values are
-// clipped to the range 0.0 to 1.0.
+// clipped to the range 0.0 to 1.0.  An object which is not an array of
+// numbers is reported as a malformed-file error.
 func Extract(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
-	a, _ := c.Array(obj)
-	if a == nil {
+	colors, err := c.FloatArray(obj)
+	if err != nil {
+		return nil, err
+	} else if colors == nil {
 		return nil, nil
 	}
-
-	colors := make([]float64, len(a))
-	for i, colorVal := range a {
-		if num, err := c.Number(colorVal); err == nil {
-			colors[i] = color.ClipComponent(num, 0, 1)
-		}
+	for i, x := range colors {
+		colors[i] = color.ClipComponent(x, 0, 1)
 	}
 
 	switch len(colors) {
@@ -121,26 +120,26 @@ func Encode(c color.Color) (pdf.Array, error) {
 // ExtractRGB converts a 3-element device-colour array into a DeviceRGB
 // [color.Color]. An empty array yields [Transparent] and a missing object a
 // nil colour; arrays of any other length are rejected. Component values are
-// clipped to the range 0.0 to 1.0.
+// clipped to the range 0.0 to 1.0.  An object which is not an array of
+// numbers is reported as a malformed-file error.
 func ExtractRGB(c pdf.Cursor, obj pdf.Object) (color.Color, error) {
-	a, _ := c.Array(obj)
-	if a == nil {
+	colors, err := c.FloatArray(obj)
+	if err != nil {
+		return nil, err
+	} else if colors == nil {
 		return nil, nil
 	}
 
-	if len(a) == 0 {
+	if len(colors) == 0 {
 		return Transparent, nil
 	}
 
-	if len(a) != 3 {
-		return nil, pdf.Errorf("color array must have 3 components for RGB, got %d", len(a))
+	if len(colors) != 3 {
+		return nil, pdf.Errorf("color array must have 3 components for RGB, got %d", len(colors))
 	}
 
-	colors := make([]float64, 3)
-	for i, colorVal := range a {
-		if num, err := c.Number(colorVal); err == nil {
-			colors[i] = color.ClipComponent(num, 0, 1)
-		}
+	for i, x := range colors {
+		colors[i] = color.ClipComponent(x, 0, 1)
 	}
 
 	return color.DeviceRGB{colors[0], colors[1], colors[2]}, nil

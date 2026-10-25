@@ -131,6 +131,15 @@ const (
 	ModePalindrome Mode = "Palindrome"
 )
 
+// isValid reports whether m is one of the four defined play modes.
+func (m Mode) isValid() bool {
+	switch m {
+	case ModeOnce, ModeOpen, ModeRepeat, ModePalindrome:
+		return true
+	}
+	return false
+}
+
 // DefaultActivation is a sentinel value used as the Activation field
 // of a movie annotation to request playback with the default
 // parameters.
@@ -165,44 +174,56 @@ func ExtractActivation(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Activation
 		SingleUse: isDirect,
 	}
 
-	a.Start = DecodeTimestamp(c, dict["Start"])
-	a.Duration = DecodeTimestamp(c, dict["Duration"])
+	if ts, err := DecodeTimestamp(c, dict["Start"]); err != nil {
+		return nil, err
+	} else if ts != nil {
+		a.Start = *ts
+	}
+	if ts, err := DecodeTimestamp(c, dict["Duration"]); err != nil {
+		return nil, err
+	} else if ts != nil {
+		a.Duration = *ts
+	}
 
 	if v := dict["Rate"]; v != nil {
-		if num, err := pdf.Optional(c.Number(v)); err != nil {
+		if num, err := c.Number(v); err == nil {
+			// Rate=0 collapses to the default 1.0
+			if num != 0 {
+				a.Rate = num
+			}
+		} else if pdf.IsReadError(err) {
 			return nil, err
-		} else if num != 0 {
-			a.Rate = num
 		}
-		// Rate=0 collapses to the default 1.0
 	}
 
 	if v := dict["Volume"]; v != nil {
-		if num, err := pdf.Optional(c.Number(v)); err != nil {
+		if num, err := c.Number(v); err == nil {
+			// out-of-range values keep the default 1.0
+			if num >= -1 && num <= 1 {
+				a.Volume = num
+			}
+		} else if pdf.IsReadError(err) {
 			return nil, err
-		} else if num >= -1 && num <= 1 {
-			a.Volume = num
 		}
-		// out-of-range values: silently keep default 1.0
 	}
 
-	if sc, err := pdf.Optional(c.Boolean(dict["ShowControls"])); err != nil {
+	sc, _, err := c.OptionalBoolean(dict["ShowControls"])
+	if err != nil {
 		return nil, err
-	} else {
-		a.ShowControls = bool(sc)
 	}
+	a.ShowControls = sc
 
 	if mode, err := pdf.Optional(c.Name(dict["Mode"])); err != nil {
 		return nil, err
-	} else if mode != "" {
-		a.Mode = Mode(mode)
+	} else if m := Mode(mode); m.isValid() {
+		a.Mode = m
 	}
 
-	if sync, err := pdf.Optional(c.Boolean(dict["Synchronous"])); err != nil {
+	sync, _, err := c.OptionalBoolean(dict["Synchronous"])
+	if err != nil {
 		return nil, err
-	} else {
-		a.Synchronous = bool(sync)
 	}
+	a.Synchronous = sync
 
 	if arr, err := pdf.Optional(c.Array(dict["FWScale"])); err != nil {
 		return nil, err
@@ -263,6 +284,9 @@ func (a *Activation) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, fmt.Errorf("movie: FWPosition [%g %g] components must lie in [0, 1]",
 				a.FWPosition.Horizontal, a.FWPosition.Vertical)
 		}
+	}
+	if a.Mode != "" && !a.Mode.isValid() {
+		return nil, fmt.Errorf("movie: invalid Mode %q", a.Mode)
 	}
 	dict := pdf.Dict{}
 
@@ -336,59 +360,53 @@ func encodeTime(v int64) pdf.Object {
 }
 
 // DecodeTimestamp parses a movie-activation Start or Duration entry.
-// Malformed entries are silently treated as omitted (zero value).
-func DecodeTimestamp(c pdf.Cursor, obj pdf.Object) Timestamp {
-	if obj == nil {
-		return Timestamp{}
-	}
-	resolved, err := c.Resolve(obj)
+// The result is nil if the entry is absent or malformed.
+func DecodeTimestamp(c pdf.Cursor, obj pdf.Object) (*Timestamp, error) {
+	resolved, err := pdf.Optional(c.Resolve(obj))
 	if err != nil {
-		return Timestamp{}
+		return nil, err
 	}
-	switch v := resolved.(type) {
-	case pdf.Integer:
-		if v < 0 {
-			return Timestamp{}
+
+	arr, isArray := resolved.(pdf.Array)
+	if !isArray {
+		value, ok := decodeTime(resolved)
+		if !ok {
+			return nil, nil
 		}
-		return Timestamp{Value: int64(v)}
-	case pdf.String:
-		if t, ok := decodeTime8(v); ok {
-			return Timestamp{Value: t}
-		}
-		return Timestamp{}
-	case pdf.Array:
-		if len(v) < 2 {
-			return Timestamp{}
-		}
-		t := decodeTimeOnly(c, v[0])
-		scale, _ := pdf.Optional(c.Integer(v[1]))
-		if scale <= 0 {
-			return Timestamp{}
-		}
-		return Timestamp{Value: t, TimeScale: int(scale)}
+		return &Timestamp{Value: value}, nil
 	}
-	return Timestamp{}
+
+	// [time scale]
+	if len(arr) < 2 {
+		return nil, nil
+	}
+	t, err := pdf.Optional(c.Resolve(arr[0]))
+	if err != nil {
+		return nil, err
+	}
+	value, ok := decodeTime(t)
+	if !ok {
+		return nil, nil
+	}
+	scale, err := c.Integer(arr[1])
+	if pdf.IsReadError(err) {
+		return nil, err
+	} else if err != nil || scale <= 0 {
+		return nil, nil
+	}
+	return &Timestamp{Value: value, TimeScale: int(scale)}, nil
 }
 
-// decodeTimeOnly parses the time component of a [time scale] array,
-// accepting either an integer or an 8-byte two's-complement string.
-func decodeTimeOnly(c pdf.Cursor, obj pdf.Object) int64 {
-	resolved, err := c.Resolve(obj)
-	if err != nil {
-		return 0
-	}
-	switch v := resolved.(type) {
+// decodeTime parses a time count, given either as a non-negative integer or
+// as an 8-byte two's-complement string.
+func decodeTime(obj pdf.Native) (int64, bool) {
+	switch v := obj.(type) {
 	case pdf.Integer:
-		if v < 0 {
-			return 0
-		}
-		return int64(v)
+		return int64(v), v >= 0
 	case pdf.String:
-		if t, ok := decodeTime8(v); ok {
-			return t
-		}
+		return decodeTime8(v)
 	}
-	return 0
+	return 0, false
 }
 
 // decodeTime8 parses an 8-byte big-endian two's-complement byte string

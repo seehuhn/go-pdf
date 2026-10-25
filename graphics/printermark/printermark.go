@@ -111,9 +111,17 @@ func (a *Attributes) FillDict(e *pdf.EmbedHelper, dict pdf.Dict) error {
 // Colorants entries which are not Separation colour spaces, and those whose
 // colorant name does not match the key they are stored under, are ignored.
 func ExtractAttributes(c pdf.Cursor, dict pdf.Dict) (*Attributes, error) {
-	_, hasStyle := dict["MarkStyle"]
-	_, hasColorants := dict["Colorants"]
-	if !hasStyle && !hasColorants {
+	used := false
+	for _, key := range []pdf.Name{"MarkStyle", "Colorants"} {
+		obj, err := pdf.Optional(c.Resolve(dict[key]))
+		if err != nil {
+			return nil, err
+		}
+		if obj != nil {
+			used = true
+		}
+	}
+	if !used {
 		return nil, nil
 	}
 

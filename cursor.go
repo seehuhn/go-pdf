@@ -113,6 +113,23 @@ func (c Cursor) Array(obj Object) (Array, error) { return c.cast[Array](obj) }
 // A nil object yields false.
 func (c Cursor) Boolean(obj Object) (Boolean, error) { return c.cast[Boolean](obj) }
 
+// OptionalBoolean resolves any indirect reference and returns the value of
+// an optional boolean entry.  The entry counts as absent (ok is false) if obj
+// is nil, resolves to null, is not a Boolean, or cannot be read because the
+// file is malformed.  Only errors other than [MalformedFileError] are
+// returned.
+//
+// Use this instead of [Cursor.Boolean] where an absent entry must be told
+// apart from false, for example when the default value is true.
+func (c Cursor) OptionalBoolean(obj Object) (v, ok bool, err error) {
+	resolved, err := Optional(c.resolve(obj))
+	if err != nil {
+		return false, false, err
+	}
+	b, ok := resolved.(Boolean)
+	return bool(b), ok, nil
+}
+
 // Dict resolves any indirect reference and returns the object as a Dict.
 // A nil object yields nil.
 func (c Cursor) Dict(obj Object) (Dict, error) { return c.cast[Dict](obj) }

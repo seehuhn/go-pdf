@@ -109,7 +109,11 @@ func ExtractAlternate(c pdf.Cursor, obj pdf.Object, _ bool) (*Alternate, error) 
 	if stm == nil {
 		return nil, pdf.Error("missing Image stream in alternate image dictionary")
 	}
-	if isImageMask, _ := c.Boolean(stm.Dict["ImageMask"]); isImageMask {
+	isImageMask, _, err := c.OptionalBoolean(stm.Dict["ImageMask"])
+	if err != nil {
+		return nil, err
+	}
+	if isImageMask {
 		mask, err := c.Decode(imgObj, ExtractMask)
 		if err != nil {
 			return nil, fmt.Errorf("invalid Image: %w", err)
@@ -131,9 +135,11 @@ func ExtractAlternate(c pdf.Cursor, obj pdf.Object, _ bool) (*Alternate, error) 
 		Image: img,
 	}
 
-	if dfp, err := c.Boolean(dict["DefaultForPrinting"]); err == nil {
-		alt.DefaultForPrinting = bool(dfp)
+	dfp, _, err := c.OptionalBoolean(dict["DefaultForPrinting"])
+	if err != nil {
+		return nil, err
 	}
+	alt.DefaultForPrinting = dfp
 
 	if ocObj, ok := dict["OC"]; ok {
 		if oc, err := c.DecodeOptional(ocObj, oc.ExtractConditional); err != nil {

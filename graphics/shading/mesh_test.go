@@ -132,6 +132,93 @@ func TestMeshReadFunctionShape(t *testing.T) {
 	}
 }
 
+// meshFunction returns the function of a mesh shading.
+func meshFunction(t *testing.T, sh graphics.Shading) pdf.Function {
+	t.Helper()
+	switch sh := sh.(type) {
+	case *Type4:
+		return sh.F
+	case *Type5:
+		return sh.F
+	case *Type6:
+		return sh.F
+	case *Type7:
+		return sh.F
+	}
+	t.Fatalf("unexpected shading type %T", sh)
+	return nil
+}
+
+// Reading a mesh shading drops a function which is unusable, or which is a
+// dangling reference.  With a one-component colour space the Decode array has
+// the same length with and without the function, and the shading survives a
+// read-write-read cycle.
+func TestMeshReadInvalidFunction(t *testing.T) {
+	invalid := map[string]pdf.Object{
+		"wrong shape": pdf.Dict{
+			"FunctionType": pdf.Integer(2),
+			"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+			"C0":           pdf.Array{pdf.Integer(0), pdf.Integer(0)},
+			"C1":           pdf.Array{pdf.Integer(1)},
+			"N":            pdf.Integer(1),
+		},
+		"wrong type": pdf.Integer(5),
+		"dangling":   pdf.NewReference(999, 0),
+	}
+	for name, fnObj := range invalid {
+		for _, tc := range meshTypes {
+			t.Run(fmt.Sprintf("type%d %s", tc.shadingType, name), func(t *testing.T) {
+				buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+				x := pdf.NewExtractor(buf)
+
+				ref := writeMeshShading(t, buf, tc.shadingType, tc.dataLen, pdf.Name("DeviceGray"), fnObj, 0, 1)
+				sh, err := Extract(pdf.CursorAt(x, nil), ref, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if meshFunction(t, sh) != nil {
+					t.Error("function not dropped")
+				}
+
+				buf2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+				rm := pdf.NewResourceManager(buf2)
+				ref2, err := rm.Embed(sh)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := rm.Close(); err != nil {
+					t.Fatal(err)
+				}
+				sh2, err := Extract(pdf.CursorAt(pdf.NewExtractor(buf2), nil), ref2, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(sh, sh2); diff != "" {
+					t.Errorf("round trip failed (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+// Where a dropped function leaves a Decode array of the length used with a
+// function, but the colour space has more than one component, the Decode
+// array cannot be repaired and the read fails with a malformed error.
+func TestMeshReadDroppedFunctionDecode(t *testing.T) {
+	for _, tc := range meshTypes {
+		t.Run(fmt.Sprintf("type%d", tc.shadingType), func(t *testing.T) {
+			buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			x := pdf.NewExtractor(buf)
+
+			ref := writeMeshShading(t, buf, tc.shadingType, tc.dataLen, pdf.Name("DeviceRGB"), pdf.Integer(5), 0, 1)
+			_, err := Extract(pdf.CursorAt(x, nil), ref, false)
+			if !pdf.IsMalformed(err) {
+				t.Errorf("got %v, want malformed error", err)
+			}
+		})
+	}
+}
+
 // Reading a mesh shading drops a function given with an Indexed colour
 // space, so that the result can be written again.
 func TestMeshIndexedFunctionDropped(t *testing.T) {
@@ -153,19 +240,7 @@ func TestMeshIndexedFunctionDropped(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var f pdf.Function
-			switch sh := sh.(type) {
-			case *Type4:
-				f = sh.F
-			case *Type5:
-				f = sh.F
-			case *Type6:
-				f = sh.F
-			case *Type7:
-				f = sh.F
-			default:
-				t.Fatalf("unexpected shading type %T", sh)
-			}
+			f := meshFunction(t, sh)
 			if f != nil {
 				t.Error("function not dropped")
 			}

@@ -121,13 +121,11 @@ func extractCommon(c pdf.Cursor, d pdf.Dict, out *Common, allowIndexed bool) err
 		}
 	}
 
-	if aaObj, ok := d["AntiAlias"]; ok {
-		if aa, err := pdf.Optional(c.Boolean(aaObj)); err != nil {
-			return err
-		} else {
-			out.AntiAlias = bool(aa)
-		}
+	aa, _, err := c.OptionalBoolean(d["AntiAlias"])
+	if err != nil {
+		return err
 	}
+	out.AntiAlias = aa
 
 	return nil
 }

@@ -126,9 +126,12 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (*Outline, error) {
 }
 
 func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, depth int) (*Item, pdf.Dict, error) {
-	dict, err := c.Dict(ref)
+	dict, err := pdf.Optional(c.Dict(ref))
 	if err != nil {
 		return nil, nil, err
+	}
+	if dict == nil {
+		return nil, nil, nil
 	}
 
 	// extend the path with ref so nested decodes detect back-references
@@ -136,22 +139,25 @@ func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, d
 
 	item := &Item{}
 
-	title, err := c.TextString(dict["Title"])
+	// an invalid title reads as an empty one
+	title, err := pdf.Optional(c.TextString(dict["Title"]))
 	if err != nil {
 		return nil, nil, pdf.Wrap(err, "/Title in outline")
 	}
 	item.Title = title
 
-	count, _ := c.Integer(dict["Count"])
-	item.Open = count > 0
+	count, err := pdf.Optional(c.Integer(dict["Count"]))
+	if err != nil {
+		return nil, nil, pdf.Wrap(err, "/Count in outline")
+	}
 
-	if dict["Dest"] != nil {
-		dest, err := c.DecodeOptional(dict["Dest"], destination.Decode)
-		if err != nil {
-			return nil, nil, pdf.Wrap(err, "/Dest in outline")
-		}
+	dest, err := c.DecodeOptional(dict["Dest"], destination.Decode)
+	if err != nil {
+		return nil, nil, pdf.Wrap(err, "/Dest in outline")
+	}
+	if dest != nil {
 		item.Destination = dest
-	} else if dict["A"] != nil {
+	} else {
 		a, err := c.DecodeOptional(dict["A"], action.Decode)
 		if err != nil {
 			return nil, nil, pdf.Wrap(err, "/A in outline")
@@ -159,22 +165,47 @@ func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, d
 		item.Action = a
 	}
 
-	if cArr, _ := c.Array(dict["C"]); len(cArr) == 3 {
+	cArr, err := pdf.Optional(c.Array(dict["C"]))
+	if err != nil {
+		return nil, nil, pdf.Wrap(err, "/C in outline")
+	}
+	if len(cArr) == 3 {
 		// components out of range are clamped, so that anything we read can
 		// be written back out through the strict writer
-		cr, _ := c.Number(cArr[0])
-		cg, _ := c.Number(cArr[1])
-		cb, _ := c.Number(cArr[2])
-		item.Color = color.DeviceRGB{clamp01(cr), clamp01(cg), clamp01(cb)}
+		// a component which is not a number invalidates the colour
+		var rgb [3]float64
+		valid := true
+		for i, obj := range cArr {
+			v, err := c.Number(obj)
+			if pdf.IsMalformed(err) {
+				valid = false
+				break
+			} else if err != nil {
+				return nil, nil, pdf.Wrap(err, "/C in outline")
+			}
+			rgb[i] = clamp01(v)
+		}
+		if valid {
+			item.Color = color.DeviceRGB(rgb)
+		}
 	}
 
-	if f, _ := c.Integer(dict["F"]); f != 0 {
+	f, err := pdf.Optional(c.Integer(dict["F"]))
+	if err != nil {
+		return nil, nil, pdf.Wrap(err, "/F in outline")
+	}
+	if f != 0 {
 		item.Italic = f&1 != 0
 		item.Bold = f&2 != 0
 	}
 
 	if se, ok := dict["SE"].(pdf.Reference); ok {
-		item.StructEntry = se
+		// a reference to a free object is the same as no entry
+		if obj, err := pdf.Optional(c.Resolve(se)); err != nil {
+			return nil, nil, err
+		} else if obj != nil {
+			item.StructEntry = se
+		}
 	}
 
 	firstRef, _ := dict["First"].(pdf.Reference)
@@ -183,6 +214,8 @@ func readItem(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Reference, d
 		return nil, nil, err
 	}
 	item.Children = children
+	// an item without children is always written as closed
+	item.Open = count > 0 && len(children) > 0
 
 	return item, dict, nil
 }
@@ -205,6 +238,9 @@ func readChildren(c pdf.Cursor, visited map[pdf.Reference]bool, ref pdf.Referenc
 		item, dict, err := readItem(c, visited, ref, depth)
 		if err != nil {
 			return nil, err
+		}
+		if item == nil {
+			break // link to a missing or malformed item
 		}
 
 		res = append(res, item)

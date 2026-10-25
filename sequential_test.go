@@ -19,6 +19,7 @@ package pdf
 import (
 	"bytes"
 	"cmp"
+	"fmt"
 	"io"
 	"maps"
 	"os"
@@ -323,5 +324,63 @@ func TestSequentialEOLInHeader(t *testing.T) {
 		if !found {
 			t.Errorf("header %q: object 3 not found", header)
 		}
+	}
+}
+
+// TestSequentialObjectZero checks that an object with number 0 is ignored,
+// since object number 0 is the head of the free list, while the other objects
+// of the file are still found.
+func TestSequentialObjectZero(t *testing.T) {
+	file := "%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n" +
+		"2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\n" +
+		"0 0 obj\n<< /A 1 >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n"
+	info, err := SequentialScan(strings.NewReader(file), int64(len(file)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[uint32]bool{}
+	for _, sect := range info.Sections {
+		for _, obj := range sect.Objects {
+			if obj.Reference.Number() == 0 {
+				t.Error("object number 0 was recorded")
+			}
+			if !obj.Broken {
+				found[obj.Reference.Number()] = true
+			}
+		}
+	}
+	if len(found) != 2 || !found[1] || !found[2] {
+		t.Errorf("found objects %v, want 1 and 2", found)
+	}
+
+	xref := info.makeXRef()
+	if xref[0] != nil {
+		t.Errorf("xref has an entry for object 0: %v", xref[0])
+	}
+	if xref[1] == nil || xref[2] == nil {
+		t.Errorf("xref misses objects 1 or 2: %v", xref)
+	}
+}
+
+// TestSequentialObjStmObjectZero checks that an object stream index entry
+// for object number 0 is ignored when the cross-reference table is rebuilt,
+// while the other entries of the stream are kept.
+func TestSequentialObjStmObjectZero(t *testing.T) {
+	body := "0 0 5 3 42 43"
+	file := "%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n" +
+		"2 0 obj\n<< /Type /Pages /Kids [] /Count 0 >>\nendobj\n" +
+		fmt.Sprintf("3 0 obj\n<< /Type /ObjStm /N 2 /First 8 /Length %d >>\nstream\n%s\nendstream\nendobj\n",
+			len(body), body) +
+		"trailer\n<< /Root 1 0 R >>\n"
+	info, err := SequentialScan(strings.NewReader(file), int64(len(file)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	xref := info.makeXRef()
+	if xref[0] != nil {
+		t.Errorf("xref has an entry for object 0: %v", xref[0])
+	}
+	if e := xref[5]; e == nil || e.InStream != NewReference(3, 0) || e.Pos != 1 {
+		t.Errorf("wrong entry for object 5: %v", e)
 	}
 }

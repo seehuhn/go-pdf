@@ -18,6 +18,7 @@ package shading
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -852,6 +853,89 @@ func TestBackgroundWrongLengthIgnored(t *testing.T) {
 	}
 	if s2.Background != nil {
 		t.Errorf("wrong-length Background not ignored: %v", s2.Background)
+	}
+}
+
+// A dangling, null or wrong-type AntiAlias entry, or Extend element, reads
+// as the default false, and does not affect the other Extend element.
+func TestReadOptionalBooleans(t *testing.T) {
+	fn := pdf.Dict{
+		"FunctionType": pdf.Integer(2),
+		"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+		"C0":           pdf.Array{pdf.Number(1)},
+		"C1":           pdf.Array{pdf.Number(0)},
+		"N":            pdf.Number(1),
+	}
+	bad := map[string]pdf.Object{
+		"dangling":   pdf.NewReference(999, 0),
+		"null":       nil,
+		"wrong type": pdf.Integer(5),
+	}
+	dicts := map[string]pdf.Dict{
+		"type2": {
+			"ShadingType": pdf.Integer(2),
+			"ColorSpace":  pdf.Name("DeviceGray"),
+			"Coords":      pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(100), pdf.Integer(100)},
+			"Function":    fn,
+		},
+		"type3": {
+			"ShadingType": pdf.Integer(3),
+			"ColorSpace":  pdf.Name("DeviceGray"),
+			"Coords":      pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(0), pdf.Integer(0), pdf.Integer(0), pdf.Integer(10)},
+			"Function":    fn,
+		},
+	}
+
+	read := func(t *testing.T, d pdf.Dict) (aa, start, end bool) {
+		t.Helper()
+		buf, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+		s, err := Extract(pdf.CursorAt(pdf.NewExtractor(buf), nil), d, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch s := s.(type) {
+		case *Type2:
+			return s.AntiAlias, s.ExtendStart, s.ExtendEnd
+		case *Type3:
+			return s.AntiAlias, s.ExtendStart, s.ExtendEnd
+		}
+		t.Fatalf("unexpected shading type %T", s)
+		return
+	}
+
+	for dname, base := range dicts {
+		for bname, b := range bad {
+			t.Run(dname+" AntiAlias "+bname, func(t *testing.T) {
+				d := maps.Clone(base)
+				d["AntiAlias"] = b
+				if aa, _, _ := read(t, d); aa {
+					t.Error("AntiAlias not read as false")
+				}
+			})
+			t.Run(dname+" Extend start "+bname, func(t *testing.T) {
+				d := maps.Clone(base)
+				d["Extend"] = pdf.Array{b, pdf.Boolean(true)}
+				if _, start, end := read(t, d); start || !end {
+					t.Errorf("got Extend [%v %v], want [false true]", start, end)
+				}
+			})
+			t.Run(dname+" Extend end "+bname, func(t *testing.T) {
+				d := maps.Clone(base)
+				d["Extend"] = pdf.Array{pdf.Boolean(true), b}
+				if _, start, end := read(t, d); !start || end {
+					t.Errorf("got Extend [%v %v], want [true false]", start, end)
+				}
+			})
+		}
+
+		t.Run(dname+" valid", func(t *testing.T) {
+			d := maps.Clone(base)
+			d["AntiAlias"] = pdf.Boolean(true)
+			d["Extend"] = pdf.Array{pdf.Boolean(true), pdf.Boolean(true)}
+			if aa, start, end := read(t, d); !aa || !start || !end {
+				t.Errorf("got %v %v %v, want all true", aa, start, end)
+			}
+		})
 	}
 }
 

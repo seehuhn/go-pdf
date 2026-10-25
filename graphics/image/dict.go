@@ -195,7 +195,11 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 		return nil, pdf.Errorf("invalid Subtype %q for image XObject", subtypeName)
 	}
 
-	if isImageMask, err := c.Boolean(dict["ImageMask"]); err == nil && isImageMask {
+	isImageMask, _, err := c.OptionalBoolean(dict["ImageMask"])
+	if err != nil {
+		return nil, err
+	}
+	if isImageMask {
 		return nil, pdf.Error("use ExtractImageMask for image masks")
 	}
 
@@ -238,8 +242,10 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// Extract ColorSpace (required for images, Pattern not allowed)
-	if csObj, ok := dict["ColorSpace"]; ok {
-		cs, err := c.Decode(csObj, color.ExtractSpace)
+	if csObj, err := pdf.Optional(c.Resolve(dict["ColorSpace"])); err != nil {
+		return nil, err
+	} else if csObj != nil {
+		cs, err := c.Decode(dict["ColorSpace"], color.ExtractSpace)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ColorSpace: %w", err)
 		}
@@ -390,9 +396,11 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// Extract Interpolate
-	if interp, err := c.Boolean(dict["Interpolate"]); err == nil {
-		img.Interpolate = bool(interp)
+	interp, _, err := c.OptionalBoolean(dict["Interpolate"])
+	if err != nil {
+		return nil, err
 	}
+	img.Interpolate = interp
 
 	// extract alternates (Table 89); drop the whole list if it exceeds
 	// MaxAlternates rather than silently truncate
@@ -449,11 +457,9 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// Extract Metadata
-	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := c.Decode(metaObj, pdf.ExtractMetadataStream)
-		if err != nil {
-			return nil, fmt.Errorf("invalid Metadata: %w", err)
-		}
+	if meta, err := c.DecodeOptional(dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
+		return nil, err
+	} else {
 		img.Metadata = meta
 	}
 
@@ -465,11 +471,9 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// Extract Measure
-	if measureObj, ok := dict["Measure"]; ok {
-		m, err := c.Decode(measureObj, measure.Extract)
-		if err != nil {
-			return nil, fmt.Errorf("invalid Measure: %w", err)
-		}
+	if m, err := c.DecodeOptional(dict["Measure"], measure.Extract); err != nil {
+		return nil, err
+	} else {
 		img.Measure = m
 	}
 
@@ -481,27 +485,17 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	}
 
 	// Extract StructParent
-	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(c.Integer(dict["StructParent"])); err != nil {
-			return nil, err
-		} else if key >= 0 && uint64(key) <= math.MaxUint {
+	if key, err := c.Integer(dict["StructParent"]); err == nil {
+		if key >= 0 && uint64(key) <= math.MaxUint {
 			img.StructParent.Set(uint(key))
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
-	// Extract AssociatedFiles (AF); drop the whole list if it exceeds
-	// MaxAssociatedFiles rather than silently truncate
-	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
+	img.AssociatedFiles, err = file.ExtractAssociatedFiles(c, dict["AF"])
+	if err != nil {
 		return nil, err
-	} else if afArray != nil && len(afArray) <= limits.MaxAssociatedFiles {
-		img.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
-		for _, afObj := range afArray {
-			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
-				return nil, err
-			} else if spec != nil {
-				img.AssociatedFiles = append(img.AssociatedFiles, spec)
-			}
-		}
 	}
 
 	// Extract WebCaptureID (ID)

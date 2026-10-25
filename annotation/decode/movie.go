@@ -49,7 +49,10 @@ func decodeMovie(c pdf.Cursor, dict pdf.Dict) (*annotation.Movie, error) {
 
 	// A (optional) — bool, dict, or absent (PDF default true)
 	if aObj, ok := dict["A"]; ok {
-		resolved, _ := c.Resolve(aObj)
+		resolved, err := pdf.Optional(c.Resolve(aObj))
+		if err != nil {
+			return nil, err
+		}
 		switch v := resolved.(type) {
 		case pdf.Boolean:
 			if bool(v) {

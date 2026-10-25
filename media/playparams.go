@@ -169,45 +169,39 @@ func extractPlayEntries(c pdf.Cursor, obj pdf.Object) (*MediaPlayEntries, error)
 
 	p := &MediaPlayEntries{}
 
-	if dict["V"] != nil {
-		if v, err := pdf.Optional(c.Integer(dict["V"])); err != nil {
-			return nil, err
-		} else if v >= 0 {
+	if v, err := c.Integer(dict["V"]); err == nil {
+		if v >= 0 {
 			p.Volume.Set(uint(v))
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
-	if dict["C"] != nil {
-		if c, err := pdf.Optional(c.Boolean(dict["C"])); err != nil {
-			return nil, err
-		} else {
-			p.Controller.Set(bool(c))
-		}
+	if ctrl, ok, err := c.OptionalBoolean(dict["C"]); err != nil {
+		return nil, err
+	} else if ok {
+		p.Controller.Set(ctrl)
 	}
-	if dict["F"] != nil {
-		if f, err := pdf.Optional(c.Integer(dict["F"])); err != nil {
-			return nil, err
-		} else {
-			p.Fit = fitFromPDF(f)
-		}
+	if f, err := c.Integer(dict["F"]); err == nil {
+		p.Fit = fitFromPDF(f)
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 	if d, err := c.DecodeOptional(dict["D"], ExtractMediaDuration); err != nil {
 		return nil, err
 	} else {
 		p.Duration = d
 	}
-	if dict["A"] != nil {
-		if a, err := pdf.Optional(c.Boolean(dict["A"])); err != nil {
-			return nil, err
-		} else {
-			p.AutoPlay.Set(bool(a))
-		}
+	if a, ok, err := c.OptionalBoolean(dict["A"]); err != nil {
+		return nil, err
+	} else if ok {
+		p.AutoPlay.Set(a)
 	}
-	if dict["RC"] != nil {
-		if rc, err := pdf.Optional(c.Number(dict["RC"])); err != nil {
-			return nil, err
-		} else if rc >= 0 {
+	if rc, err := c.Number(dict["RC"]); err == nil {
+		if rc >= 0 {
 			p.RepeatCount.Set(rc)
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	if p.isEmpty() {

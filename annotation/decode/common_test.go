@@ -17,8 +17,10 @@
 package decode
 
 import (
+	"maps"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
@@ -67,5 +69,95 @@ func TestLangDecode(t *testing.T) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestInvalidEntryIsAbsent checks that a reference to a nonexistent object,
+// and a value of the wrong type, are read like an absent entry.
+func TestInvalidEntryIsAbsent(t *testing.T) {
+	invalid := map[string]pdf.Object{
+		"dangling": pdf.NewReference(99, 0),
+		"name":     pdf.Name("x"),
+		"integer":  pdf.Integer(5),
+	}
+	// boolean entries; an integer is the wrong type for these
+	boolKeys := map[pdf.Name]bool{"3DI": true, "TB": true, "NP": true}
+	rect := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(10), pdf.Integer(10)}
+
+	cases := []struct {
+		name string
+		base pdf.Dict
+		key  pdf.Name
+		// sub, if set, names the sub-dictionary of base which holds key
+		sub pdf.Name
+	}{
+		{"StructParent", pdf.Dict{"Subtype": pdf.Name("Text")}, "StructParent", ""},
+		{"CA", pdf.Dict{"Subtype": pdf.Name("Text")}, "CA", ""},
+		{"ca", pdf.Dict{"Subtype": pdf.Name("Text"), "CA": pdf.Real(0.25)}, "ca", ""},
+		{"Lang", pdf.Dict{"Subtype": pdf.Name("Text")}, "Lang", ""},
+		{"3DI", pdf.Dict{"Subtype": pdf.Name("3D"), "3DD": pdf.NewReference(98, 0)}, "3DI", ""},
+		{"3DA", pdf.Dict{"Subtype": pdf.Name("3D"), "3DD": pdf.NewReference(98, 0)}, "3DA", ""},
+		{
+			"3DA TB",
+			pdf.Dict{"Subtype": pdf.Name("3D"), "3DD": pdf.NewReference(98, 0), "3DA": pdf.Dict{"A": pdf.Name("PO")}},
+			"TB", "3DA",
+		},
+		{
+			"3DA NP",
+			pdf.Dict{"Subtype": pdf.Name("3D"), "3DD": pdf.NewReference(98, 0), "3DA": pdf.Dict{"A": pdf.Name("PO")}},
+			"NP", "3DA",
+		},
+	}
+	for _, tc := range cases {
+		for variant, value := range invalid {
+			if variant == "integer" && !boolKeys[tc.key] {
+				continue
+			}
+			t.Run(tc.name+" "+variant, func(t *testing.T) {
+				c := pdf.NewCursor(mock.Getter)
+
+				absent := maps.Clone(tc.base)
+				absent["Rect"] = rect
+				withInvalid := maps.Clone(absent)
+				if tc.sub != "" {
+					inner := maps.Clone(absent[tc.sub].(pdf.Dict))
+					inner[tc.key] = value
+					withInvalid[tc.sub] = inner
+				} else {
+					withInvalid[tc.key] = value
+				}
+
+				want, err := Annotation(c, absent, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := Annotation(c, withInvalid, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("%s value read differently from absent entry (-absent +got):\n%s", variant, diff)
+				}
+			})
+		}
+	}
+}
+
+// TestAnnot3DActivationDefaults checks the defaults for absent entries of the
+// 3D activation dictionary.
+func TestAnnot3DActivationDefaults(t *testing.T) {
+	dict := pdf.Dict{
+		"Subtype": pdf.Name("3D"),
+		"Rect":    pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(10), pdf.Integer(10)},
+		"3DD":     pdf.NewReference(98, 0),
+		"3DA":     pdf.Dict{"A": pdf.Name("PO")},
+	}
+	a, err := Annotation(pdf.NewCursor(mock.Getter), dict, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	act := a.(*annotation.Annot3D).A
+	if act == nil || !act.TB || act.NP || !a.(*annotation.Annot3D).I {
+		t.Errorf("wrong defaults: %+v", act)
 	}
 }

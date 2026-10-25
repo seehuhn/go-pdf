@@ -41,32 +41,30 @@ func NewSource(stream *pdf.Stream, x *pdf.Extractor) *Source {
 // A stream reached through a Reference is decoded via [pdf.Cursor.Decode], through
 // c, so it carries provenance (see [Source]).  An array entry that is itself
 // a direct stream is malformed (streams must be indirect); such entries are
-// read permissively but carry no provenance.  A nil or unrecognised object
-// yields a nil segment list.
+// read permissively but carry no provenance.  Array entries which are not
+// streams, and entries which cannot be resolved, are skipped.  A nil or
+// unusable object yields a nil segment list.
 func ExtractContents(c pdf.Cursor, contents pdf.Object) ([]Segment, error) {
-	resolved, err := c.Resolve(contents)
+	resolved, err := pdf.Optional(c.Resolve(contents))
 	if err != nil {
 		return nil, err
 	}
 	switch v := resolved.(type) {
 	case *pdf.Stream:
 		if ref, ok := contents.(pdf.Reference); ok {
-			src, err := c.Decode(ref, decodeSource)
-			if err != nil {
+			src, err := c.DecodeOptional(ref, decodeSource)
+			if err != nil || src == nil {
 				return nil, err
-			}
-			if src == nil {
-				return nil, nil
 			}
 			return []Segment{src}, nil
 		}
 		// malformed: a direct stream where an indirect one is required
 		return []Segment{NewSource(v, c.Extractor())}, nil
 	case pdf.Array:
-		segments := make([]Segment, 0, len(v))
+		var segments []Segment
 		for _, item := range v {
 			if ref, ok := item.(pdf.Reference); ok {
-				src, err := c.Decode(ref, decodeSource)
+				src, err := c.DecodeOptional(ref, decodeSource)
 				if err != nil {
 					return nil, err
 				}
@@ -76,7 +74,7 @@ func ExtractContents(c pdf.Cursor, contents pdf.Object) ([]Segment, error) {
 				continue
 			}
 			// malformed: a direct stream where an indirect one is required
-			stm, err := c.Stream(item)
+			stm, err := pdf.Optional(c.Stream(item))
 			if err != nil {
 				return nil, err
 			}
@@ -138,7 +136,7 @@ func (s *Source) RawBytes() (io.ReadCloser, error) {
 func (s *Source) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	r, err := s.RawBytes()
 	if err != nil {
-		if !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			return nil, err
 		}
 		// The segment uses a filter the library cannot decode (e.g. an
@@ -163,7 +161,7 @@ func (s *Source) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		// a corrupt or truncated filter stream yields a malformed error
 		// part-way through; keep the bytes decoded so far, matching the way
 		// a reader uses the decoded prefix (see contentReader.Read)
-		if !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			stm.Close()
 			return nil, err
 		}

@@ -89,7 +89,7 @@ func SoftMaskDict(c pdf.Cursor, obj pdf.Object, _ bool) (graphics.SoftClip, erro
 	// BC - backdrop color (optional, Luminosity only)
 	if m.S == softclip.Luminosity {
 		bc, err := c.FloatArray(dict["BC"])
-		if err != nil && !pdf.IsMalformed(err) {
+		if pdf.IsReadError(err) {
 			return nil, err
 		}
 		if cs := g.Group.CS; cs != nil && len(bc) == cs.Channels() {

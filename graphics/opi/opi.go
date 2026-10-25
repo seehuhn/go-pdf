@@ -55,18 +55,15 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (Dict, error) {
 		return nil, pdf.Error("missing OPI version dictionary")
 	}
 
-	if _, ok := dict["1.3"]; ok {
-		v, err := c.Decode(dict["1.3"], extractV13)
-		if err != nil {
-			return nil, err
-		}
+	// a malformed entry for one version counts as absent
+	if v, err := c.DecodeOptional(dict["1.3"], extractV13); err != nil {
+		return nil, err
+	} else if v != nil {
 		return v, nil
 	}
-	if _, ok := dict["2.0"]; ok {
-		v, err := c.Decode(dict["2.0"], extractV20)
-		if err != nil {
-			return nil, err
-		}
+	if v, err := c.DecodeOptional(dict["2.0"], extractV20); err != nil {
+		return nil, err
+	} else if v != nil {
 		return v, nil
 	}
 	return nil, pdf.Error("OPI version dictionary has no 1.3 or 2.0 entry")

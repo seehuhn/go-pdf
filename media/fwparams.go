@@ -235,33 +235,25 @@ func ExtractFloatingWindowParameters(c pdf.Cursor, obj pdf.Object, isDirect bool
 	} else if WindowRelativeTo(rt).isValid() {
 		f.RelativeTo = WindowRelativeTo(rt)
 	}
-	if dict["P"] != nil {
-		if p, err := pdf.Optional(c.Integer(dict["P"])); err != nil {
-			return nil, err
-		} else {
-			f.Position = windowPositionFromPDF(p)
-		}
+	if p, err := c.Integer(dict["P"]); err == nil {
+		f.Position = windowPositionFromPDF(p)
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
-	if dict["O"] != nil {
-		if o, err := pdf.Optional(c.Integer(dict["O"])); err != nil {
-			return nil, err
-		} else {
-			f.Offscreen = offscreenActionFromPDF(o)
-		}
+	if o, err := c.Integer(dict["O"]); err == nil {
+		f.Offscreen = offscreenActionFromPDF(o)
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
-	if dict["T"] != nil {
-		if t, err := pdf.Optional(c.Boolean(dict["T"])); err != nil {
-			return nil, err
-		} else {
-			f.TitleBar.Set(bool(t))
-		}
+	if t, ok, err := c.OptionalBoolean(dict["T"]); err != nil {
+		return nil, err
+	} else if ok {
+		f.TitleBar.Set(t)
 	}
-	if dict["UC"] != nil {
-		if uc, err := pdf.Optional(c.Boolean(dict["UC"])); err != nil {
-			return nil, err
-		} else {
-			f.UserCanClose.Set(bool(uc))
-		}
+	if uc, ok, err := c.OptionalBoolean(dict["UC"]); err != nil {
+		return nil, err
+	} else if ok {
+		f.UserCanClose.Set(uc)
 	}
 	if r, err := pdf.Optional(c.Integer(dict["R"])); err != nil {
 		return nil, err

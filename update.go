@@ -135,8 +135,9 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 		return nil, errInvalidID
 	}
 
-	// the highest object number in use, whether listed by /Size or not
-	next := base.trailerSize
+	// the highest object number in use, whether listed by /Size or not;
+	// object number 0 is never allocated
+	next := max(base.trailerSize, 1)
 	for n := range base.xref {
 		next = max(next, int64(n)+1)
 	}

@@ -611,8 +611,6 @@ func TestPermPrintBits(t *testing.T) {
 // TestAuthEmbed tests that encryption information is correctly embedded in the
 // PDF file.
 func TestAuthEmbed(t *testing.T) {
-	ref := NewReference(1, 2)
-
 	opt := &WriterOptions{
 		UserPassword:  "A",
 		OwnerPassword: "B",
@@ -623,6 +621,7 @@ func TestAuthEmbed(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
+	ref := w.Alloc()
 	err = w.Put(ref, Text("Hello, World!"))
 	if err != nil {
 		t.Fatal(err)
@@ -706,6 +705,42 @@ func TestMalformedVR(t *testing.T) {
 		if _, err := openStdSecHandler(NewCursor(mockGetter), enc, Integer(test.V), test.keyBytes, id); err != nil {
 			t.Errorf("V=%d R=%d: unexpected error: %v", test.V, test.R, err)
 		}
+	}
+}
+
+func TestEncryptMetadataRead(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	cases := []struct {
+		name  string
+		V     int
+		entry Object
+		want  bool // unencryptedMetadata
+	}{
+		{"absent", 4, nil, false},
+		{"true", 4, Boolean(true), false},
+		{"false", 4, Boolean(false), true},
+		{"wrong type", 4, Integer(0), false},
+		{"ignored for V<4", 2, Boolean(false), false},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			R := 4
+			if test.V < 4 {
+				R = 3
+			}
+			enc := encDictForR(test.V, R)
+			if test.entry != nil {
+				enc["EncryptMetadata"] = test.entry
+			}
+			sec, err := openStdSecHandler(NewCursor(mockGetter), enc, Integer(test.V), 16, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if sec.unencryptedMetadata != test.want {
+				t.Errorf("unencryptedMetadata: got %v, want %v",
+					sec.unencryptedMetadata, test.want)
+			}
+		})
 	}
 }
 

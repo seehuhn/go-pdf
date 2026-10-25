@@ -17,10 +17,15 @@
 package media
 
 import (
+	"maps"
+	"slices"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/pdf/optional"
 )
 
@@ -226,4 +231,188 @@ func memfileGetter(t *testing.T) pdf.Getter {
 	t.Helper()
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	return w
+}
+
+// TestInvalidEntryIsAbsent checks that a reference to a nonexistent object,
+// and a value of the wrong type, are read like an absent entry.
+func TestInvalidEntryIsAbsent(t *testing.T) {
+	invalid := map[string]pdf.Object{
+		"dangling": pdf.NewReference(99, 0),
+		"name":     pdf.Name("x"),
+		"integer":  pdf.Integer(5),
+	}
+	c := pdf.NewCursor(mock.Getter)
+
+	fwBase := pdf.Dict{"D": pdf.Array{pdf.Integer(100), pdf.Integer(200)}}
+	wrapMH := func(key pdf.Name, entries pdf.Dict) pdf.Dict {
+		return pdf.Dict{key: entries}
+	}
+
+	// boolEntry marks boolean entries, for which an integer is a wrong type
+	type entryCase struct {
+		name      string
+		key       pdf.Name
+		base      pdf.Dict
+		boolEntry bool
+		decode    func(pdf.Dict) (any, error)
+	}
+	decodeSoftware := func(d pdf.Dict) (any, error) { return ExtractSoftwareIdentifier(c, d, true) }
+	decodeCriteria := func(d pdf.Dict) (any, error) { return ExtractMediaCriteria(c, d, true) }
+	decodeFW := func(d pdf.Dict) (any, error) { return ExtractFloatingWindowParameters(c, d, true) }
+	decodePlay := func(d pdf.Dict) (any, error) { return ExtractMediaPlayParameters(c, wrapMH("MH", d), true) }
+	decodeScreen := func(d pdf.Dict) (any, error) { return ExtractMediaScreenParameters(c, wrapMH("MH", d), true) }
+
+	swBase := pdf.Dict{"U": pdf.String("app")}
+	playBase := pdf.Dict{"M": pdf.Integer(1)}
+	cases := []entryCase{
+		{"softwareid LI", "LI", swBase, true, decodeSoftware},
+		{"softwareid HI", "HI", swBase, true, decodeSoftware},
+		{"criteria A", "A", pdf.Dict{}, true, decodeCriteria},
+		{"criteria C", "C", pdf.Dict{}, true, decodeCriteria},
+		{"criteria O", "O", pdf.Dict{}, true, decodeCriteria},
+		{"criteria S", "S", pdf.Dict{}, true, decodeCriteria},
+		{"criteria R", "R", pdf.Dict{}, false, decodeCriteria},
+		{"floating window P", "P", fwBase, false, decodeFW},
+		{"floating window O", "O", fwBase, false, decodeFW},
+		{"floating window T", "T", fwBase, true, decodeFW},
+		{"floating window UC", "UC", fwBase, true, decodeFW},
+		{"play entries V", "V", playBase, false, decodePlay},
+		{"play entries C", "C", playBase, true, decodePlay},
+		{"play entries F", "F", playBase, false, decodePlay},
+		{"play entries A", "A", playBase, true, decodePlay},
+		{"play entries RC", "RC", playBase, false, decodePlay},
+		{"screen entries W", "W", playBase, false, decodeScreen},
+		{"screen entries O", "O", playBase, false, decodeScreen},
+	}
+
+	for _, tc := range cases {
+		for variant, value := range invalid {
+			if variant == "integer" && !tc.boolEntry {
+				continue
+			}
+			t.Run(tc.name+" "+variant, func(t *testing.T) {
+				absent := maps.Clone(tc.base)
+				withInvalid := maps.Clone(tc.base)
+				withInvalid[tc.key] = value
+
+				want, err := tc.decode(absent)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := tc.decode(withInvalid)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("%s value read differently from absent entry (-absent +got):\n%s", variant, diff)
+				}
+			})
+		}
+	}
+}
+
+// TestRequiredEntryMissing checks that a missing, dangling or non-numeric
+// required value fails the read rather than reading as zero, and that an
+// optional parent drops the failed offset.
+func TestRequiredEntryMissing(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+	bad := map[string]pdf.Object{
+		"missing":  nil,
+		"dangling": pdf.NewReference(99, 0),
+		"name":     pdf.Name("x"),
+	}
+	for name, v := range bad {
+		timespan := pdf.Dict{"S": pdf.Name("S")}
+		frame := pdf.Dict{"S": pdf.Name("F")}
+		if v != nil {
+			timespan["V"] = v
+			frame["F"] = v
+		}
+
+		t.Run("timespan "+name, func(t *testing.T) {
+			if _, err := ExtractTimespan(c, timespan, true); !pdf.IsMalformed(err) {
+				t.Errorf("got error %v, want MalformedFileError", err)
+			}
+		})
+		t.Run("time offset "+name, func(t *testing.T) {
+			dict := pdf.Dict{"S": pdf.Name("T"), "T": timespan}
+			if _, err := ExtractMediaOffset(c, dict, true); !pdf.IsMalformed(err) {
+				t.Errorf("got error %v, want MalformedFileError", err)
+			}
+		})
+		t.Run("frame offset "+name, func(t *testing.T) {
+			if _, err := ExtractMediaOffset(c, frame, true); !pdf.IsMalformed(err) {
+				t.Errorf("got error %v, want MalformedFileError", err)
+			}
+		})
+		t.Run("section "+name, func(t *testing.T) {
+			// the invalid begin offset is dropped, the valid end offset is kept
+			sec := pdf.Dict{
+				"B": frame,
+				"E": pdf.Dict{"S": pdf.Name("F"), "F": pdf.Integer(7)},
+			}
+			begin, end, err := extractSectionOffsets(c, sec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if begin != nil {
+				t.Errorf("got begin offset %v, want nil", begin)
+			}
+			if f, ok := end.(*MediaOffsetFrame); !ok || f.Frame != 7 {
+				t.Errorf("got end offset %v, want frame 7", end)
+			}
+		})
+	}
+
+	// zero is a valid value
+	ts, err := ExtractTimespan(c, pdf.Dict{"V": pdf.Integer(0)}, true)
+	if err != nil || ts.Seconds != 0 {
+		t.Errorf("got %v, %v, want zero timespan", ts, err)
+	}
+	of, err := ExtractMediaOffset(c, pdf.Dict{"S": pdf.Name("F"), "F": pdf.Integer(0)}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, ok := of.(*MediaOffsetFrame); !ok || f.Frame != 0 {
+		t.Errorf("got %v, want frame 0", of)
+	}
+}
+
+// TestVersionArrayInvalidElement checks that a version array with a
+// non-integer or negative element is dropped as a whole.
+func TestVersionArrayInvalidElement(t *testing.T) {
+	c := pdf.NewCursor(mock.Getter)
+	cases := map[string]pdf.Array{
+		"name":     {pdf.Integer(1), pdf.Name("x"), pdf.Integer(3)},
+		"string":   {pdf.String("1")},
+		"null":     {pdf.Integer(1), nil},
+		"dangling": {pdf.Integer(1), pdf.NewReference(99, 0)},
+		"negative": {pdf.Integer(1), pdf.Integer(-2)},
+	}
+	for name, arr := range cases {
+		t.Run(name, func(t *testing.T) {
+			s, err := ExtractSoftwareIdentifier(c, pdf.Dict{
+				"U": pdf.String("app"),
+				"L": arr,
+				"H": arr,
+			}, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s.Low != nil || s.High != nil {
+				t.Errorf("got Low=%v High=%v, want both dropped", s.Low, s.High)
+			}
+		})
+	}
+
+	s, err := ExtractSoftwareIdentifier(c, pdf.Dict{
+		"U": pdf.String("app"),
+		"L": pdf.Array{pdf.Integer(1), pdf.Integer(0), pdf.Integer(3)},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(s.Low, []int{1, 0, 3}) {
+		t.Errorf("got Low=%v, want [1 0 3]", s.Low)
+	}
 }

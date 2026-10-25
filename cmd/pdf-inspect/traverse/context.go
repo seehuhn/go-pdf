@@ -168,6 +168,9 @@ func (c *fileCtx) Next() []Step {
 				if err != nil {
 					return nil, err
 				}
+				if number == 0 || number >= 1<<24 {
+					return nil, fmt.Errorf("invalid object number %d", number)
+				}
 				var generation uint16
 				if m[2] != "" {
 					tmp, err := strconv.ParseUint(m[2], 10, 16)

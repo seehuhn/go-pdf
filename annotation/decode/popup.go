@@ -35,9 +35,11 @@ func decodePopup(c pdf.Cursor, dict pdf.Dict) (*annotation.Popup, error) {
 	}
 
 	// Open (optional)
-	if open, err := c.Boolean(dict["Open"]); err == nil {
-		popup.Open = bool(open)
+	open, _, err := c.OptionalBoolean(dict["Open"])
+	if err != nil {
+		return nil, err
 	}
+	popup.Open = open
 
 	return popup, nil
 }

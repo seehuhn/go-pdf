@@ -296,7 +296,9 @@ func (c *Concat) prepareForm(r *pdf.Reader, cp *pdf.Copier) ([]preparedField, ma
 			}
 		}
 	}
-	if na, _ := cur.Boolean(acro["NeedAppearances"]); na {
+	if na, _, err := cur.OptionalBoolean(acro["NeedAppearances"]); err != nil {
+		return nil, nil, err
+	} else if na {
 		c.formNeedAppearances = true
 	}
 	if sf, _ := cur.Integer(acro["SigFlags"]); sf != 0 {

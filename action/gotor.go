@@ -141,8 +141,9 @@ func decodeGoToR(c pdf.Cursor, dict pdf.Dict) (*GoToR, error) {
 	}
 
 	newWindow := NewWindowDefault
-	if dict["NewWindow"] != nil {
-		nw, _ := pdf.Optional(c.Boolean(dict["NewWindow"]))
+	if nw, ok, err := c.OptionalBoolean(dict["NewWindow"]); err != nil {
+		return nil, err
+	} else if ok {
 		if nw {
 			newWindow = NewWindowNew
 		} else {
@@ -150,7 +151,7 @@ func decodeGoToR(c pdf.Cursor, dict pdf.Dict) (*GoToR, error) {
 		}
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

@@ -420,6 +420,9 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		return true, err
 
 	case Reference:
+		if x.Number() == 0 {
+			return false, errors.New("reference to object number 0")
+		}
 		if needSep {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
@@ -1080,9 +1083,9 @@ func ReadAll(r Getter, path *CycleCheck, s *Stream, maxBytes int64) ([]byte, err
 // and a generation number.  Use [NewReference] to construct one and
 // [Reference.Number] / [Reference.Generation] to extract the parts.
 //
-// The zero value refers to PDF object 0, which PDF 32000-2 §7.5.4 reserves
-// as the head of the free-object list; it resolves to the null object and so
-// serves as a "no reference" sentinel.
+// Object number 0 is not a valid object number.  References to object 0 are
+// never returned by the reader, and attempting to write such a reference is an
+// error.
 type Reference uint64
 
 func (x Reference) isNative() {}
@@ -1092,11 +1095,15 @@ func (x Reference) AsPDF(opt OutputOptions) Native {
 }
 
 // NewReference creates a new reference object.  The object number must be
-// less than 2^24: per PDF 32000-2 §7.6.3.2 step (b), only the low 3 bytes
-// of the object number feed the per-object encryption-key derivation, so
-// this library caps object numbers at 2^24-1 to keep that derivation
-// injective.  NewReference panics on out-of-range input.
+// positive (PDF 32000-2 §7.3.10) and less than 2^24: per §7.6.3.2 step (b),
+// only the low 3 bytes of the object number feed the per-object
+// encryption-key derivation, so this library caps object numbers at 2^24-1
+// to keep that derivation injective.  NewReference panics on out-of-range
+// input.
 func NewReference(number uint32, generation uint16) Reference {
+	if number == 0 {
+		panic("pdf.NewReference: object number must be > 0")
+	}
 	if number >= maxXRefSize {
 		panic("pdf.NewReference: object number must be < 2^24")
 	}
@@ -1264,13 +1271,14 @@ func (x *Placeholder) Set(val Native) error {
 	return nil
 }
 
-// AsString formats a PDF object as a string, in the same way as the
-// it would be written to a PDF file.
+// AsString formats a PDF object as a string, in the same way as it would be
+// written to a PDF file.
 //
 // AsString panics if obj cannot be formatted as PDF text.  This is the case
 // for direct stream objects, for content-stream operators outside a content
-// stream, for names containing a null byte, and for numbers PDF cannot
-// represent (infinities and NaN); ordinary PDF objects never panic.
+// stream, for names containing a null byte, for references to object number
+// 0, and for numbers PDF cannot represent (infinities and NaN); ordinary PDF
+// objects never panic.
 func AsString(obj Object) string {
 	buf := &bytes.Buffer{}
 	err := Format(buf, OptPretty, obj)

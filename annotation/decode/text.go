@@ -32,11 +32,11 @@ func decodeText(c pdf.Cursor, dict pdf.Dict) (*annotation.Text, error) {
 		return nil, err
 	}
 
-	if open, err := pdf.Optional(c.Boolean(dict["Open"])); err != nil {
+	open, _, err := c.OptionalBoolean(dict["Open"])
+	if err != nil {
 		return nil, err
-	} else {
-		text.Open = bool(open)
 	}
+	text.Open = open
 
 	if name, err := pdf.Optional(c.Name(dict["Name"])); err != nil {
 		return nil, err

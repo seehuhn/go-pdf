@@ -106,28 +106,29 @@ func decodeSound(c pdf.Cursor, dict pdf.Dict) (*Sound, error) {
 	}
 
 	volume := 1.0
-	if dict["Volume"] != nil {
-		v, err := pdf.Optional(c.Number(dict["Volume"]))
-		if err != nil {
-			return nil, err
+	if v, err := c.Number(dict["Volume"]); err == nil {
+		// out-of-range values are dropped
+		if v >= -1 && v <= 1 {
+			volume = v
 		}
-		volume = v
-	}
-
-	synchronous, err := pdf.Optional(c.Boolean(dict["Synchronous"]))
-	if err != nil {
-		return nil, err
-	}
-	repeat, err := pdf.Optional(c.Boolean(dict["Repeat"]))
-	if err != nil {
-		return nil, err
-	}
-	mix, err := pdf.Optional(c.Boolean(dict["Mix"]))
-	if err != nil {
+	} else if pdf.IsReadError(err) {
 		return nil, err
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	synchronous, _, err := c.OptionalBoolean(dict["Synchronous"])
+	if err != nil {
+		return nil, err
+	}
+	repeat, _, err := c.OptionalBoolean(dict["Repeat"])
+	if err != nil {
+		return nil, err
+	}
+	mix, _, err := c.OptionalBoolean(dict["Mix"])
+	if err != nil {
+		return nil, err
+	}
+
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

@@ -319,16 +319,15 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 	}
 	jpxIndex := jpxFilterIndex(filters)
 
-	// validate ColorSpace is DeviceGray (required for soft masks)
-	csObj, hasColorSpace := dict["ColorSpace"]
-	if hasColorSpace {
-		cs, err := c.Decode(csObj, color.ExtractSpace)
-		if err != nil {
-			return nil, err
-		}
-		if cs.Family() != color.FamilyDeviceGray {
-			return nil, pdf.Errorf("soft mask ColorSpace must be DeviceGray, got %s", cs.Family())
-		}
+	// validate ColorSpace is DeviceGray (required for soft masks);
+	// an unusable entry is dropped
+	cs, err := c.DecodeOptional(dict["ColorSpace"], color.ExtractSpace)
+	if err != nil {
+		return nil, err
+	}
+	hasColorSpace := cs != nil
+	if hasColorSpace && cs.Family() != color.FamilyDeviceGray {
+		return nil, pdf.Errorf("soft mask ColorSpace must be DeviceGray, got %s", cs.Family())
 	}
 	// missing ColorSpace defaults to DeviceGray (the only valid value)
 
@@ -399,24 +398,29 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 	}
 	if decodeArray, err := pdf.Optional(c.Array(decodeObj)); err != nil {
 		return nil, err
-	} else if decodeArray != nil {
-		if len(decodeArray) != 2 {
-			return nil, pdf.Errorf("invalid Decode array length %d for soft mask (must be 2)", len(decodeArray))
-		}
-		softMask.Decode = make([]float64, 2)
+	} else if len(decodeArray) == 2 {
+		// a Decode array of the wrong length, or with a malformed element,
+		// is dropped
+		decode := make([]float64, 2)
 		for i, val := range decodeArray {
-			if num, err := c.Number(val); err != nil {
-				return nil, fmt.Errorf("invalid Decode[%d]: %w", i, err)
-			} else {
-				softMask.Decode[i] = num
+			num, err := c.Number(val)
+			if pdf.IsMalformed(err) {
+				decode = nil
+				break
+			} else if err != nil {
+				return nil, err
 			}
+			decode[i] = num
 		}
+		softMask.Decode = decode
 	}
 
 	// Extract Interpolate
-	if interp, err := c.Boolean(dict["Interpolate"]); err == nil {
-		softMask.Interpolate = bool(interp)
+	interp, _, err := c.OptionalBoolean(dict["Interpolate"])
+	if err != nil {
+		return nil, err
 	}
+	softMask.Interpolate = interp
 
 	// Extract Matte array (specific to soft masks); drop wholesale if it
 	// exceeds the largest plausible parent-image channel count rather
@@ -426,14 +430,19 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 	if matteArray, err := pdf.Optional(c.Array(dict["Matte"])); err != nil {
 		return nil, err
 	} else if matteArray != nil && len(matteArray) <= limits.MaxImageChannels {
-		softMask.Matte = make([]float64, len(matteArray))
+		// the array is positional, so one malformed element drops all of it
+		matte := make([]float64, len(matteArray))
 		for i, val := range matteArray {
-			if num, err := c.Number(val); err != nil {
-				return nil, fmt.Errorf("invalid Matte[%d]: %w", i, err)
-			} else {
-				softMask.Matte[i] = num
+			num, err := c.Number(val)
+			if pdf.IsMalformed(err) {
+				matte = nil
+				break
+			} else if err != nil {
+				return nil, err
 			}
+			matte[i] = num
 		}
+		softMask.Matte = matte
 	}
 
 	softMask.Source, err = newStreamData(c, stm, jpxIndex,

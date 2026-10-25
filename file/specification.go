@@ -17,6 +17,8 @@
 package file
 
 import (
+	"errors"
+	"fmt"
 	"maps"
 	"slices"
 
@@ -44,29 +46,37 @@ type Specification struct {
 	// This corresponds to the /UF entry in the PDF dictionary.
 	FileNameUnicode pdf.TextString
 
-	// FileName specifies the file path in platform-independent format.
-	// Components are separated by forward slashes.
+	// FileName (optional) specifies the file path in platform-independent
+	// format.  Components are separated by forward slashes.
+	// At least one of FileName, FileNameDOS, FileNameMac and FileNameUnix
+	// must be set, unless EmbeddedFiles is non-empty.
 	//
-	// The characters in this string must be in the PDFDocEncoding character
-	// set.
+	// The characters in this string should be in the PDFDocEncoding
+	// character set.  Other names are written in UTF-16.
 	//
 	// This corresponds to the /F entry in the PDF file specification
 	// dictionary.
 	FileName string
 
 	// FileNameDOS (optional, deprecated in PDF 2.0) specifies a DOS file name.
+	// At least one of FileName, FileNameDOS, FileNameMac and FileNameUnix
+	// must be set, unless EmbeddedFiles is non-empty.
 	//
 	// This corresponds to the /DOS entry in the PDF dictionary.
 	FileNameDOS pdf.String
 
 	// FileNameMac (optional, deprecated in PDF 2.0) specifies a MacOS
 	// file name.
+	// At least one of FileName, FileNameDOS, FileNameMac and FileNameUnix
+	// must be set, unless EmbeddedFiles is non-empty.
 	//
 	// This corresponds to the /Mac entry in the PDF dictionary.
 	FileNameMac pdf.String
 
 	// FileNameUnix (optional, deprecated in PDF 2.0) specifies a Unix
 	// file name.
+	// At least one of FileName, FileNameDOS, FileNameMac and FileNameUnix
+	// must be set, unless EmbeddedFiles is non-empty.
 	//
 	// This corresponds to the /Unix entry in the PDF dictionary.
 	FileNameUnix pdf.String
@@ -129,13 +139,29 @@ type Specification struct {
 	SingleUse bool
 }
 
-// ExtractSpecification extracts a file specification dictionary from a PDF object.
+// ExtractSpecification extracts a file specification from a PDF object.
+// Both forms of file specification are accepted: a dictionary, and a string,
+// which is read like a dictionary with only an F entry.
 func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specification, error) {
-	dict, err := c.DictTyped(obj, "Filespec")
+	resolved, err := c.Resolve(obj)
 	if err != nil {
 		return nil, err
-	} else if dict == nil {
-		return nil, pdf.Errorf("missing file specification dictionary")
+	}
+
+	var dict pdf.Dict
+	if s, ok := resolved.(pdf.String); ok {
+		// file specification string (PDF 7.11.1)
+		if s.AsTextString().IsZero() {
+			return nil, pdf.Errorf("empty file specification string")
+		}
+		dict = pdf.Dict{"F": s}
+	} else {
+		dict, err = c.DictTyped(resolved, "Filespec")
+		if err != nil {
+			return nil, err
+		} else if dict == nil {
+			return nil, pdf.Errorf("missing file specification dictionary")
+		}
 	}
 
 	spec := &Specification{}
@@ -189,19 +215,28 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 	if idArray, err := pdf.Optional(c.Array(dict["ID"])); err != nil {
 		return nil, err
 	} else if len(idArray) >= 2 {
-		id1, err1 := pdf.Optional(c.String(idArray[0]))
-		id2, err2 := pdf.Optional(c.String(idArray[1]))
-		if err1 == nil && err2 == nil {
-			spec.ID = []string{string(id1), string(id2)}
+		// both elements must be strings, otherwise ID is dropped
+		id1, err := pdf.Optional(c.Resolve(idArray[0]))
+		if err != nil {
+			return nil, err
+		}
+		id2, err := pdf.Optional(c.Resolve(idArray[1]))
+		if err != nil {
+			return nil, err
+		}
+		s1, ok1 := id1.(pdf.String)
+		s2, ok2 := id2.(pdf.String)
+		if ok1 && ok2 {
+			spec.ID = []string{string(s1), string(s2)}
 		}
 	}
 
 	// Volatile
-	if volatile, err := pdf.Optional(c.Boolean(dict["V"])); err != nil {
+	volatile, _, err := c.OptionalBoolean(dict["V"])
+	if err != nil {
 		return nil, err
-	} else {
-		spec.Volatile = bool(volatile)
 	}
+	spec.Volatile = volatile
 
 	// EmbeddedFiles (EF)
 	if efDict, err := pdf.Optional(c.Dict(dict["EF"])); err != nil {
@@ -252,26 +287,44 @@ func ExtractSpecification(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Specifi
 	}
 
 	// EncryptedPayload (EP)
-	if epObj := dict["EP"]; epObj != nil {
-		ep, err := c.Decode(epObj, ExtractEncryptedPayload)
-		if err != nil {
-			return nil, err
-		}
+	if ep, err := c.DecodeOptional(dict["EP"], ExtractEncryptedPayload); err != nil {
+		return nil, err
+	} else {
 		spec.EncryptedPayload = ep
 	}
 
-	// Ensure at least one filename is set for round-trip compatibility.
+	// F is required if DOS, Mac and Unix are all absent, and UF is an
+	// addition to F, not a replacement.  A missing F is taken from UF.
+	// Without any name, only a specification with embedded files is still
+	// usable; it is written with an empty F.
 	if spec.FileName == "" && len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
-		if _, ok := pdf.PDFDocEncode(spec.FileNameUnicode.String()); ok && !spec.FileNameUnicode.IsZero() {
+		if !spec.FileNameUnicode.IsZero() {
 			spec.FileName = spec.FileNameUnicode.String()
-		} else {
-			spec.FileName = "file"
+		} else if len(spec.EmbeddedFiles) == 0 {
+			return nil, pdf.Error("file specification without a file name")
 		}
 	}
 
 	spec.SingleUse = isDirect
 
 	return spec, nil
+}
+
+// checkNamed checks that the specification can be written with an F entry
+// which a reader accepts: either a file name is given, or the specification
+// consists of embedded files which stand in for it.
+func (spec *Specification) checkNamed() error {
+	hasName := spec.FileName != "" ||
+		len(spec.FileNameDOS) > 0 || len(spec.FileNameMac) > 0 || len(spec.FileNameUnix) > 0
+	if hasName {
+		return nil
+	}
+	for _, stream := range spec.EmbeddedFiles {
+		if stream != nil {
+			return nil
+		}
+	}
+	return errors.New("file specification needs FileName, FileNameDOS, FileNameMac or FileNameUnix")
 }
 
 // Embed converts the file specification to a PDF dictionary.
@@ -295,9 +348,10 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 	}
 
-	// Validate that F is present if DOS/Mac/Unix are all absent
-	if spec.FileName == "" && len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
-		return nil, pdf.Errorf("file specification must have F entry if DOS, Mac, and Unix entries are all absent")
+	// F is required if DOS, Mac and Unix are all absent
+	hasPlatformName := len(spec.FileNameDOS) > 0 || len(spec.FileNameMac) > 0 || len(spec.FileNameUnix) > 0
+	if err := spec.checkNamed(); err != nil {
+		return nil, err
 	}
 
 	dict := pdf.Dict{}
@@ -314,7 +368,7 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	// File names
-	if spec.FileName != "" {
+	if spec.FileName != "" || !hasPlatformName {
 		dict["F"] = pdf.Text(spec.FileName)
 	}
 
@@ -370,7 +424,7 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// Per spec, RF requires EF to be present.
 	if spec.RelatedFiles != nil {
 		if spec.EmbeddedFiles == nil {
-			return nil, pdf.Error("RelatedFiles requires EmbeddedFiles to be present")
+			return nil, errors.New("RelatedFiles requires EmbeddedFiles to be present")
 		}
 		rfDict, err := encodeRelatedFiles(rm, spec.RelatedFiles)
 		if err != nil {
@@ -415,7 +469,7 @@ func (spec *Specification) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	mustBeIndirect := spec.EmbeddedFiles != nil || spec.RelatedFiles != nil
 
 	if mustBeIndirect && spec.SingleUse {
-		return nil, pdf.Errorf("file specification with EF or RF entries must be indirect (SingleUse must be false)")
+		return nil, errors.New("file specification with EF or RF entries must be indirect (SingleUse must be false)")
 	}
 
 	if spec.SingleUse {
@@ -441,9 +495,9 @@ func extractRelatedFiles(c pdf.Cursor, rfDict pdf.Dict) (map[string][]RelatedFil
 	result := make(map[string][]RelatedFile)
 
 	for key, value := range rfDict {
-		array, err := c.Array(value)
+		array, err := pdf.Optional(c.Array(value))
 		if err != nil {
-			continue // skip malformed entries
+			return nil, err
 		}
 
 		var relatedFiles []RelatedFile
@@ -454,11 +508,11 @@ func extractRelatedFiles(c pdf.Cursor, rfDict pdf.Dict) (map[string][]RelatedFil
 
 			name, err := pdf.Optional(c.TextString(array[i]))
 			if err != nil {
-				continue
+				return nil, err
 			}
 
 			if stream, err := c.DecodeOptional(array[i+1], ExtractStream); err != nil {
-				continue // skip malformed stream
+				return nil, err
 			} else if stream != nil {
 				relatedFiles = append(relatedFiles, RelatedFile{
 					Name:   name,
@@ -515,35 +569,28 @@ const (
 )
 
 // CanBeAF checks if this file specification can be used as an associated file
-// for the given PDF version. Returns an error if requirements are not met.
+// for the given PDF version.  It returns an error if requirements are not met.
+//
+// The conditions are those which [Specification.Embed] imposes on the file
+// specification, plus PDF 2.0 and the requirement that every embedded file
+// stream has a MIME type (PDF 2.0, section 14.13.2).  The modification date
+// of an embedded file is recommended but not required.
 func (spec *Specification) CanBeAF(v pdf.Version) error {
 	// Associated files require PDF 2.0
 	if v < pdf.V2_0 {
-		return pdf.Errorf("associated files require PDF 2.0 or later")
+		return &pdf.VersionError{Operation: "associated files", Earliest: pdf.V2_0}
 	}
 
-	// Must have at least one file name
-	if spec.FileName == "" && spec.FileNameUnicode.IsZero() &&
-		len(spec.FileNameDOS) == 0 && len(spec.FileNameMac) == 0 && len(spec.FileNameUnix) == 0 {
-		return pdf.Errorf("file specification must have at least one file name")
+	if err := spec.checkNamed(); err != nil {
+		return err
 	}
 
-	// Check embedded file requirements (per spec 14.13.2).  The keys are
-	// sorted so that a file with several faults always reports the same one.
+	// The keys are sorted so that a file with several faults always reports
+	// the same one.
 	for _, key := range slices.Sorted(maps.Keys(spec.EmbeddedFiles)) {
 		stream := spec.EmbeddedFiles[key]
-		if stream == nil {
-			continue
-		}
-
-		// Subtype (MIME type) is required for associated files
-		if stream.MimeType == "" {
-			return pdf.Errorf("embedded file %q must have Subtype (MIME type) for associated files", key)
-		}
-
-		// ModDate is required in Params for associated files
-		if stream.ModDate.IsZero() {
-			return pdf.Errorf("embedded file %q must have ModDate in Params for associated files", key)
+		if stream != nil && stream.MimeType == "" {
+			return fmt.Errorf("embedded file %q must have Subtype (MIME type) for associated files", key)
 		}
 	}
 

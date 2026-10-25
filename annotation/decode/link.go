@@ -47,7 +47,11 @@ func decodeLink(c pdf.Cursor, dict pdf.Dict) (*annotation.Link, error) {
 		link.Destination = dest
 	}
 
-	link.Highlight = decodeHighlight(c, dict["H"])
+	if h, err := decodeHighlight(c, dict["H"]); err != nil {
+		return nil, err
+	} else {
+		link.Highlight = h
+	}
 
 	if pa, ok := dict["PA"].(pdf.Reference); ok {
 		link.Backup = pa
@@ -64,6 +68,8 @@ func decodeLink(c pdf.Cursor, dict pdf.Dict) (*annotation.Link, error) {
 			}
 		}
 		link.QuadPoints = points
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	if bs, err := c.DecodeOptional(dict["BS"], annotation.ExtractBorderStyle); err != nil {

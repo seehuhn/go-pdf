@@ -155,7 +155,8 @@ func writeImageMaskData(w io.Writer, img image.Image) error {
 	return nil
 }
 
-// ExtractMask extracts an image mask from a PDF stream.
+// ExtractMask extracts an image mask from a PDF stream.  ColorSpace and
+// Mask entries, which are not allowed for image masks, are ignored.
 func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	stream, err := c.Stream(obj)
 	if err != nil {
@@ -185,8 +186,11 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	}
 
 	// Check ImageMask flag
-	isImageMask, err := c.Boolean(dict["ImageMask"])
-	if err != nil || !bool(isImageMask) {
+	isImageMask, _, err := c.OptionalBoolean(dict["ImageMask"])
+	if err != nil {
+		return nil, err
+	}
+	if !isImageMask {
 		return nil, pdf.Error("ImageMask flag not set for image mask")
 	}
 
@@ -235,30 +239,29 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 		return nil, pdf.Errorf("invalid BitsPerComponent %d for image mask (must be 1)", bpc)
 	}
 
-	// ColorSpace must not be present for image masks
-	if _, hasColorSpace := dict["ColorSpace"]; hasColorSpace {
-		return nil, pdf.Error("ColorSpace not allowed for image masks")
-	}
-
-	// Mask entry must not be present for image masks
-	if _, hasMask := dict["Mask"]; hasMask {
-		return nil, pdf.Error("Mask not allowed for image masks")
-	}
-
-	// Extract Decode array (for image masks, must be [0 1] or [1 0])
+	// Decode must be [0 1] or [1 0] for image masks
 	if decodeArray, err := pdf.Optional(c.Array(dict["Decode"])); err != nil {
 		return nil, err
 	} else if len(decodeArray) == 2 {
-		d0, _ := c.Number(decodeArray[0])
-		d1, _ := c.Number(decodeArray[1])
-		if d0 == 1 && d1 == 0 {
+		// a Decode array with a malformed element is dropped
+		d0, err := c.Number(decodeArray[0])
+		if pdf.IsReadError(err) {
+			return nil, err
+		}
+		d1, err2 := c.Number(decodeArray[1])
+		if pdf.IsReadError(err2) {
+			return nil, err2
+		}
+		if err == nil && err2 == nil && d0 == 1 && d1 == 0 {
 			mask.Inverted = true
 		}
 	}
 
-	if interp, err := c.Boolean(dict["Interpolate"]); err == nil {
-		mask.Interpolate = bool(interp)
+	interp, _, err := c.OptionalBoolean(dict["Interpolate"])
+	if err != nil {
+		return nil, err
 	}
+	mask.Interpolate = interp
 
 	// drop the whole Alternates list if it exceeds MaxAlternates rather
 	// than silently truncate
@@ -283,11 +286,9 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	}
 
 	// Extract Metadata
-	if metaObj, ok := dict["Metadata"]; ok {
-		meta, err := c.Decode(metaObj, pdf.ExtractMetadataStream)
-		if err != nil {
-			return nil, fmt.Errorf("invalid Metadata: %w", err)
-		}
+	if meta, err := c.DecodeOptional(dict["Metadata"], pdf.ExtractMetadataStream); err != nil {
+		return nil, err
+	} else {
 		mask.Metadata = meta
 	}
 
@@ -298,11 +299,9 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	}
 
 	// Extract Measure
-	if measureObj, ok := dict["Measure"]; ok {
-		m, err := c.Decode(measureObj, measure.Extract)
-		if err != nil {
-			return nil, fmt.Errorf("invalid Measure: %w", err)
-		}
+	if m, err := c.DecodeOptional(dict["Measure"], measure.Extract); err != nil {
+		return nil, err
+	} else {
 		mask.Measure = m
 	}
 
@@ -313,19 +312,9 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 		mask.PtData = ptData
 	}
 
-	// Extract AssociatedFiles (AF); drop the whole list if it exceeds
-	// MaxAssociatedFiles rather than silently truncate
-	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
+	mask.AssociatedFiles, err = file.ExtractAssociatedFiles(c, dict["AF"])
+	if err != nil {
 		return nil, err
-	} else if afArray != nil && len(afArray) <= limits.MaxAssociatedFiles {
-		mask.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
-		for _, afObj := range afArray {
-			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
-				return nil, err
-			} else if spec != nil {
-				mask.AssociatedFiles = append(mask.AssociatedFiles, spec)
-			}
-		}
 	}
 
 	// Extract WebCaptureID (ID)
@@ -336,12 +325,12 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	}
 
 	// Extract StructParent
-	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(c.Integer(dict["StructParent"])); err != nil {
-			return nil, err
-		} else if key >= 0 && uint64(key) <= math.MaxUint {
+	if key, err := c.Integer(dict["StructParent"]); err == nil {
+		if key >= 0 && uint64(key) <= math.MaxUint {
 			mask.StructParent.Set(uint(key))
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	mask.Source, err = newStreamData(c, stream, jpxIndex,

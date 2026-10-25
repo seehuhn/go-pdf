@@ -153,6 +153,9 @@ func DecodeActionList(c pdf.Cursor, obj pdf.Object, _ bool) (ActionList, error) 
 
 	// try single action dictionary first
 	dict, err := c.Dict(obj)
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
 	if err == nil && dict != nil {
 		// The dict has already been resolved; any indirect ref it came
 		// from was added to path by the outer Decode, so calling
@@ -170,13 +173,19 @@ func DecodeActionList(c pdf.Cursor, obj pdf.Object, _ bool) (ActionList, error) 
 		return nil, err
 	}
 
-	result := make(ActionList, 0, len(arr))
+	var result ActionList
 	for _, item := range arr {
+		// null, dangling and malformed elements are skipped; for cycles see
+		// decodeNext
 		action, err := c.Decode(item, Decode)
-		if err != nil {
+		if pdf.IsMalformed(err) && !isLoop(err) {
+			continue
+		} else if err != nil {
 			return nil, err
 		}
-		result = append(result, action)
+		if action != nil {
+			result = append(result, action)
+		}
 	}
 	return result, nil
 }

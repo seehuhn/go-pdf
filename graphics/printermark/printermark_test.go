@@ -18,6 +18,7 @@ package printermark
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -342,5 +343,40 @@ func TestExtractEmptyIsAbsent(t *testing.T) {
 				t.Errorf("expected nil attributes, got %+v", attrs)
 			}
 		})
+	}
+}
+
+// TestExtractAttributesDanglingReference checks that a reference to a free
+// object reads the same as an absent entry.
+func TestExtractAttributesDanglingReference(t *testing.T) {
+	keys := []pdf.Name{"MarkStyle", "Colorants"}
+	bases := map[string]pdf.Dict{
+		"empty": {},
+		"other": {"MarkStyle": pdf.String("style")},
+	}
+	dangling := pdf.NewReference(99, 0)
+	x := pdf.NewExtractor(mock.Getter)
+	for baseName, base := range bases {
+		for _, key := range keys {
+			t.Run(baseName+"/"+string(key), func(t *testing.T) {
+				if _, ok := base[key]; ok {
+					t.Skip("key is part of the base")
+				}
+				dict := maps.Clone(base)
+				dict[key] = dangling
+
+				want, err := ExtractAttributes(pdf.CursorAt(x, nil), base)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := ExtractAttributes(pdf.CursorAt(x, nil), dict)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("dangling reference differs from absent entry (-want +got):\n%s", diff)
+				}
+			})
+		}
 	}
 }

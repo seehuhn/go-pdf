@@ -80,22 +80,17 @@ func ExtractIconFit(c pdf.Cursor, obj pdf.Object, isDirect bool) (*IconFit, erro
 		res.Scaling = IconScaling(s)
 	}
 
-	if a, err := pdf.Optional(c.Array(dict["A"])); err != nil {
+	if a, err := pdf.Optional(c.FloatArray(dict["A"])); err != nil {
 		return nil, err
-	} else if len(a) == 2 {
-		v0, err0 := c.Number(a[0])
-		v1, err1 := c.Number(a[1])
-		if err0 == nil && err1 == nil &&
-			v0 >= 0 && v0 <= 1 && v1 >= 0 && v1 <= 1 {
-			res.LeftoverSpace = &[2]float64{v0, v1}
-		}
+	} else if len(a) == 2 && a[0] >= 0 && a[0] <= 1 && a[1] >= 0 && a[1] <= 1 {
+		res.LeftoverSpace = &[2]float64{a[0], a[1]}
 	}
 
-	if fb, err := pdf.Optional(c.Boolean(dict["FB"])); err != nil {
+	fb, _, err := c.OptionalBoolean(dict["FB"])
+	if err != nil {
 		return nil, err
-	} else {
-		res.FitToBounds = bool(fb)
 	}
+	res.FitToBounds = fb
 
 	return res, nil
 }

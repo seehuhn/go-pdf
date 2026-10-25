@@ -18,12 +18,14 @@ package navnode
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/action"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 var testCases = []struct {
@@ -193,4 +195,125 @@ func FuzzRoundTrip(f *testing.F) {
 
 		roundTripTest(t, version, nodes)
 	})
+}
+
+// TestDecodeDanglingReference checks that a reference to a free object reads
+// the same as an absent entry.
+func TestDecodeDanglingReference(t *testing.T) {
+	dangling := pdf.NewReference(99, 0)
+	decode := func(t *testing.T, extras pdf.Dict) []*Node {
+		t.Helper()
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
+		ref := w.Alloc()
+		dict := pdf.Dict{"Type": pdf.Name("NavNode")}
+		maps.Copy(dict, extras)
+		if err := w.Put(ref, dict); err != nil {
+			t.Fatal(err)
+		}
+		x := pdf.NewExtractor(w)
+		nodes, err := Decode(pdf.CursorAt(x, nil), ref, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return nodes
+	}
+
+	want := decode(t, nil)
+	for _, key := range []pdf.Name{"NA", "PA", "Dur", "Next", "Prev"} {
+		t.Run(string(key), func(t *testing.T) {
+			got := decode(t, pdf.Dict{key: dangling})
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("dangling reference differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestDecodeWrongType checks that wrong-type entries read the same as absent
+// entries, and that a malformed Next link ends the list.
+func TestDecodeWrongType(t *testing.T) {
+	decode := func(t *testing.T, extras pdf.Dict) []*Node {
+		t.Helper()
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
+		ref := w.Alloc()
+		dict := pdf.Dict{"Type": pdf.Name("NavNode")}
+		maps.Copy(dict, extras)
+		if err := w.Put(ref, dict); err != nil {
+			t.Fatal(err)
+		}
+		x := pdf.NewExtractor(w)
+		nodes, err := Decode(pdf.CursorAt(x, nil), ref, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return nodes
+	}
+
+	want := decode(t, nil)
+	for _, key := range []pdf.Name{"NA", "PA", "Dur", "Next", "Prev"} {
+		t.Run(string(key), func(t *testing.T) {
+			got := decode(t, pdf.Dict{key: pdf.Name("wrong")})
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("wrong type differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestDecodeLongChain checks that a list longer than the nesting depth
+// limit of the cursor path is read in full.
+func TestDecodeLongChain(t *testing.T) {
+	n := limits.MaxExtractDepth + 10
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
+	refs := make([]pdf.Reference, n)
+	for i := range refs {
+		refs[i] = w.Alloc()
+	}
+	for i, ref := range refs {
+		dict := pdf.Dict{"Type": pdf.Name("NavNode"), "Dur": pdf.Integer(i + 1)}
+		if i+1 < n {
+			dict["Next"] = refs[i+1]
+		}
+		if err := w.Put(ref, dict); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	nodes, err := pdf.CursorAt(pdf.NewExtractor(w), nil).Decode(refs[0], Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != n {
+		t.Fatalf("got %d nodes, want %d", len(nodes), n)
+	}
+	for i, node := range nodes {
+		if node.Dur != float64(i+1) {
+			t.Errorf("node %d has Dur %g, want %d", i, node.Dur, i+1)
+		}
+	}
+}
+
+// TestDecodeCycle checks that a Next link back to a node already read ends
+// the list, so that each node is read once.
+func TestDecodeCycle(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_5, nil)
+	a, b, c := w.Alloc(), w.Alloc(), w.Alloc()
+	for ref, dict := range map[pdf.Reference]pdf.Dict{
+		a: {"Dur": pdf.Integer(1), "Next": b},
+		b: {"Dur": pdf.Integer(2), "Next": c},
+		c: {"Dur": pdf.Integer(3), "Next": b},
+	} {
+		if err := w.Put(ref, dict); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	nodes, err := pdf.CursorAt(pdf.NewExtractor(w), nil).Decode(a, Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []*Node{{Dur: 1}, {Dur: 2}, {Dur: 3}}
+	if diff := cmp.Diff(want, nodes); diff != "" {
+		t.Errorf("unexpected nodes (-want +got):\n%s", diff)
+	}
 }

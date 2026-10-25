@@ -155,26 +155,18 @@ func Form(c pdf.Cursor, obj pdf.Object, _ bool) (*form.Form, error) {
 	}
 
 	// extract StructParent
-	if keyObj := dict["StructParent"]; keyObj != nil {
-		if key, err := pdf.Optional(c.Integer(dict["StructParent"])); err != nil {
-			return nil, err
-		} else if key >= 0 && uint64(key) <= math.MaxUint {
+	if key, err := c.Integer(dict["StructParent"]); err == nil {
+		if key >= 0 && uint64(key) <= math.MaxUint {
 			f.StructParent.Set(uint(key))
 		}
+	} else if pdf.IsReadError(err) {
+		return nil, err
 	}
 
 	// extract AssociatedFiles (AF)
-	if afArray, err := pdf.Optional(c.Array(dict["AF"])); err != nil {
+	f.AssociatedFiles, err = file.ExtractAssociatedFiles(c, dict["AF"])
+	if err != nil {
 		return nil, err
-	} else if afArray != nil {
-		f.AssociatedFiles = make([]*file.Specification, 0, len(afArray))
-		for _, afObj := range afArray {
-			if spec, err := c.DecodeOptional(afObj, file.ExtractSpecification); err != nil {
-				return nil, err
-			} else if spec != nil {
-				f.AssociatedFiles = append(f.AssociatedFiles, spec)
-			}
-		}
 	}
 
 	// extract resources

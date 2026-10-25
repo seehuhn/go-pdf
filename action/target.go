@@ -108,11 +108,13 @@ func (t *TargetNamedChild) encodeTargetSafe(rm *pdf.ResourceManager, visited map
 // TargetAnnotationChild navigates down to a child document via a file attachment annotation.
 type TargetAnnotationChild struct {
 	// Page specifies the page containing the annotation.
-	// Can be pdf.Integer (zero-based page number) or pdf.String (named destination).
+	// This is a [pdf.Integer] (non-negative, zero-based page number) or a
+	// [pdf.String] (named destination).
 	Page pdf.Object
 
 	// Annotation specifies which annotation on the page.
-	// Can be pdf.Integer (zero-based index in Annots array) or pdf.String (NM field).
+	// This is a [pdf.Integer] (non-negative, zero-based index in the Annots
+	// array) or a [pdf.String] (value of the NM entry).
 	Annotation pdf.Object
 
 	// Next is the next step in the target path, or nil if this child is the final target.
@@ -136,6 +138,12 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 	if t.Annotation == nil {
 		return nil, errors.New("TargetAnnotationChild must have an Annotation")
 	}
+	if !validIndexOrString(t.Page) {
+		return nil, errors.New("TargetAnnotationChild Page must be a non-negative integer or a string")
+	}
+	if !validIndexOrString(t.Annotation) {
+		return nil, errors.New("TargetAnnotationChild Annotation must be a non-negative integer or a string")
+	}
 
 	dict := pdf.Dict{
 		"R": pdf.Name("C"),
@@ -152,6 +160,40 @@ func (t *TargetAnnotationChild) encodeTargetSafe(rm *pdf.ResourceManager, visite
 	}
 
 	return dict, nil
+}
+
+// validIndexOrString reports whether obj is a non-negative integer or a string.
+func validIndexOrString(obj pdf.Object) bool {
+	switch v := obj.AsPDF(0).(type) {
+	case pdf.Integer:
+		return v >= 0
+	case pdf.String:
+		return true
+	default:
+		return false
+	}
+}
+
+// readIndexOrString reads a required entry which is a non-negative integer
+// or a string.
+func readIndexOrString(c pdf.Cursor, obj pdf.Object) (pdf.Object, error) {
+	resolved, err := pdf.Optional(c.Resolve(obj))
+	if err != nil {
+		return nil, err
+	}
+	switch v := resolved.(type) {
+	case pdf.String:
+		return v, nil
+	case pdf.Integer, pdf.Real:
+		n, err := c.Integer(v)
+		if err != nil {
+			return nil, err
+		}
+		if n >= 0 {
+			return n, nil
+		}
+	}
+	return nil, pdf.Error("target entry must be a non-negative integer or a string")
 }
 
 // DecodeTarget reads a target dictionary from a PDF object.
@@ -173,13 +215,12 @@ func DecodeTarget(c pdf.Cursor, obj pdf.Object, _ bool) (Target, error) {
 		return nil, err
 	}
 
-	// recursively decode nested target
-	var next Target
-	if dict["T"] != nil {
-		next, err = c.Decode(dict["T"], DecodeTarget)
-		if err != nil {
-			return nil, err
-		}
+	// Recursively decode the nested target.  A broken nested target fails
+	// the whole target: dropping it would shorten the path to one leading
+	// to a different document.
+	next, err := decodePresent(c, dict["T"], DecodeTarget)
+	if err != nil {
+		return nil, err
 	}
 
 	switch relationship {
@@ -190,7 +231,11 @@ func DecodeTarget(c pdf.Cursor, obj pdf.Object, _ bool) (Target, error) {
 
 	case "C":
 		// check if it's named or annotation-based
-		if name, _ := c.String(dict["N"]); name != nil {
+		name, err := pdf.Optional(c.String(dict["N"]))
+		if err != nil {
+			return nil, err
+		}
+		if len(name) > 0 {
 			return &TargetNamedChild{
 				Name: name,
 				Next: next,
@@ -198,10 +243,13 @@ func DecodeTarget(c pdf.Cursor, obj pdf.Object, _ bool) (Target, error) {
 		}
 
 		// must be annotation-based
-		page := dict["P"]
-		annotation := dict["A"]
-		if page == nil || annotation == nil {
-			return nil, pdf.Error("child target must have either N or both P and A")
+		page, err := readIndexOrString(c, dict["P"])
+		if err != nil {
+			return nil, err
+		}
+		annotation, err := readIndexOrString(c, dict["A"])
+		if err != nil {
+			return nil, err
 		}
 
 		return &TargetAnnotationChild{

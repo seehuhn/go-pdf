@@ -120,12 +120,14 @@ func sigSeedValue(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.SigSeedValue,
 
 	if mdp, err := pdf.Optional(c.Dict(dict["MDP"])); err != nil {
 		return nil, err
-	} else if mdp != nil && mdp["P"] != nil {
+	} else if mdp != nil {
 		// an MDP dict without /P defines no rules, so /P must stay unset
-		if p, err := pdf.Optional(c.Integer(mdp["P"])); err != nil {
+		if p, err := c.Integer(mdp["P"]); err == nil {
+			if p >= 0 && p <= 3 {
+				sv.MDP.Set(uint(p))
+			}
+		} else if pdf.IsReadError(err) {
 			return nil, err
-		} else if p >= 0 && p <= 3 {
-			sv.MDP.Set(uint(p))
 		}
 	}
 
@@ -153,11 +155,11 @@ func sigSeedValue(c pdf.Cursor, obj pdf.Object, _ bool) (*acroform.SigSeedValue,
 		return nil, err
 	}
 
-	if rev, err := pdf.Optional(c.Boolean(dict["AddRevInfo"])); err != nil {
+	rev, _, err := c.OptionalBoolean(dict["AddRevInfo"])
+	if err != nil {
 		return nil, err
-	} else {
-		sv.AddRevInfo = bool(rev)
 	}
+	sv.AddRevInfo = rev
 
 	if ld, err := pdf.Optional(c.Name(dict["LockDocument"])); err != nil {
 		return nil, err

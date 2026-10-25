@@ -17,8 +17,11 @@
 package action
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
+	"seehuhn.de/go/pdf/opaque"
 )
 
 // PDF 2.0 sections: 12.6.2 12.6.4.6
@@ -33,10 +36,12 @@ type Launch struct {
 	Win pdf.Dict
 
 	// Mac (deprecated in PDF 2.0) is Mac OS launch parameters.
-	Mac pdf.Object
+	// The specification does not define the value, so it is kept uninterpreted.
+	Mac *opaque.Object
 
 	// Unix (deprecated in PDF 2.0) is UNIX launch parameters.
-	Unix pdf.Object
+	// The specification does not define the value, so it is kept uninterpreted.
+	Unix *opaque.Object
 
 	// NewWindow specifies how the target document should be displayed.
 	NewWindow NewWindowMode
@@ -53,6 +58,9 @@ func (a *Launch) GetNext() []pdf.Action { return []pdf.Action(a.Next) }
 func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "Launch action", pdf.V1_1); err != nil {
 		return nil, err
+	}
+	if a.F == nil && a.Win == nil && a.Mac == nil && a.Unix == nil {
+		return nil, errors.New("Launch action needs F, Win, Mac or Unix")
 	}
 
 	dict := pdf.Dict{
@@ -75,11 +83,19 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	}
 
 	if a.Mac != nil {
-		dict["Mac"] = a.Mac
+		mac, err := rm.Embed(a.Mac)
+		if err != nil {
+			return nil, err
+		}
+		dict["Mac"] = mac
 	}
 
 	if a.Unix != nil {
-		dict["Unix"] = a.Unix
+		unix, err := rm.Embed(a.Unix)
+		if err != nil {
+			return nil, err
+		}
+		dict["Unix"] = unix
 	}
 
 	if a.NewWindow != NewWindowDefault {
@@ -102,16 +118,30 @@ func (a *Launch) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 }
 
 func decodeLaunch(c pdf.Cursor, dict pdf.Dict) (*Launch, error) {
-	f, err := c.Decode(dict["F"], file.ExtractSpecification)
+	f, err := c.DecodeOptional(dict["F"], file.ExtractSpecification)
 	if err != nil {
 		return nil, err
 	}
-
-	win, _ := c.Dict(dict["Win"])
+	win, err := pdf.Optional(c.Dict(dict["Win"]))
+	if err != nil {
+		return nil, err
+	}
+	mac, err := readOpaque(c, dict["Mac"])
+	if err != nil {
+		return nil, err
+	}
+	unix, err := readOpaque(c, dict["Unix"])
+	if err != nil {
+		return nil, err
+	}
+	if f == nil && win == nil && mac == nil && unix == nil {
+		return nil, pdf.Error("Launch action without F, Win, Mac or Unix entry")
+	}
 
 	newWindow := NewWindowDefault
-	if dict["NewWindow"] != nil {
-		nw, _ := pdf.Optional(c.Boolean(dict["NewWindow"]))
+	if nw, ok, err := c.OptionalBoolean(dict["NewWindow"]); err != nil {
+		return nil, err
+	} else if ok {
 		if nw {
 			newWindow = NewWindowNew
 		} else {
@@ -119,7 +149,7 @@ func decodeLaunch(c pdf.Cursor, dict pdf.Dict) (*Launch, error) {
 		}
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}
@@ -127,8 +157,8 @@ func decodeLaunch(c pdf.Cursor, dict pdf.Dict) (*Launch, error) {
 	return &Launch{
 		F:         f,
 		Win:       win,
-		Mac:       dict["Mac"],
-		Unix:      dict["Unix"],
+		Mac:       mac,
+		Unix:      unix,
 		NewWindow: newWindow,
 		Next:      next,
 	}, nil

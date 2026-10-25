@@ -309,14 +309,14 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 		if inUnitRange(t) {
 			v.Tint = &t
 		}
-	} else if !pdf.IsMalformed(err) {
+	} else if pdf.IsReadError(err) {
 		return nil, err
 	}
-	if o, err := pdf.Optional(c.Boolean(dict["Overprint"])); err != nil {
+	o, _, err := c.OptionalBoolean(dict["Overprint"])
+	if err != nil {
 		return nil, err
-	} else {
-		v.Overprint = bool(o)
 	}
+	v.Overprint = o
 	if it, err := readInts(c, dict["ImageType"]); err != nil {
 		return nil, err
 	} else if len(it) == 2 {
@@ -327,13 +327,10 @@ func extractV13(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V13, error) {
 	} else if validGrayMap(gm, v.ImageType) {
 		v.GrayMap = gm
 	}
-	if _, ok := dict["Transparency"]; ok {
-		if tr, err := c.Boolean(dict["Transparency"]); err == nil {
-			b := bool(tr)
-			v.Transparency = &b
-		} else if !pdf.IsMalformed(err) {
-			return nil, err
-		}
+	if tr, ok, err := c.OptionalBoolean(dict["Transparency"]); err != nil {
+		return nil, err
+	} else if ok {
+		v.Transparency = &tr
 	}
 	if tags, err := pdf.Optional(c.Array(dict["Tags"])); err != nil {
 		return nil, err

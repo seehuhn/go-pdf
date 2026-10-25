@@ -175,18 +175,18 @@ func extractType3(c pdf.Cursor, d pdf.Dict, isDirect bool) (*Type3, error) {
 			return nil, err
 		} else {
 			if len(extendArray) >= 1 {
-				if extendStart, err := pdf.Optional(c.Boolean(extendArray[0])); err != nil {
+				extendStart, _, err := c.OptionalBoolean(extendArray[0])
+				if err != nil {
 					return nil, err
-				} else {
-					s.ExtendStart = bool(extendStart)
 				}
+				s.ExtendStart = extendStart
 			}
 			if len(extendArray) >= 2 {
-				if extendEnd, err := pdf.Optional(c.Boolean(extendArray[1])); err != nil {
+				extendEnd, _, err := c.OptionalBoolean(extendArray[1])
+				if err != nil {
 					return nil, err
-				} else {
-					s.ExtendEnd = bool(extendEnd)
 				}
+				s.ExtendEnd = extendEnd
 			}
 		}
 	}

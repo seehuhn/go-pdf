@@ -79,7 +79,7 @@ func decodeImportData(c pdf.Cursor, dict pdf.Dict) (*ImportData, error) {
 		return nil, pdf.Error("ImportData action missing F entry")
 	}
 
-	next, err := c.Decode(dict["Next"], DecodeActionList)
+	next, err := decodeNext(c, dict["Next"])
 	if err != nil {
 		return nil, err
 	}

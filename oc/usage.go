@@ -112,13 +112,17 @@ func ExtractUsage(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Usage, error) {
 	// extract Language dictionary
 	if langDict, err := pdf.Optional(c.Dict(dict["Language"])); err != nil {
 		return nil, err
-	} else if langDict != nil && langDict["Lang"] != nil {
+	} else if langDict != nil {
 		// Lang is required; without a usable value the dictionary is dropped
-		langStr, err := c.TextString(langDict["Lang"])
-		if err != nil && !pdf.IsMalformed(err) {
+		langObj, err := pdf.Optional(c.Resolve(langDict["Lang"]))
+		if err != nil {
 			return nil, err
 		}
-		if err == nil {
+		langStr, err := c.TextString(langObj)
+		if pdf.IsReadError(err) {
+			return nil, err
+		}
+		if langObj != nil && err == nil {
 			info := &UsageLanguage{Lang: langtag.Parse(langStr.String())}
 
 			if preferred, err := pdf.Optional(c.Name(langDict["Preferred"])); err != nil {

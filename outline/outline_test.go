@@ -18,6 +18,7 @@ package outline
 
 import (
 	"bytes"
+	"maps"
 	"math"
 	"testing"
 
@@ -588,5 +589,172 @@ func TestColorNaN(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 	if _, err := o.Encode(rm); err == nil {
 		t.Error("expected an error for a NaN colour component")
+	}
+}
+
+func decodeOutlineItem(t *testing.T, extras pdf.Dict) *Outline {
+	t.Helper()
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+
+	rootRef := w.Alloc()
+	itemRef := w.Alloc()
+	item := pdf.Dict{
+		"Title":  pdf.Text("item"),
+		"Parent": rootRef,
+	}
+	maps.Copy(item, extras)
+	if err := w.Put(itemRef, item); err != nil {
+		t.Fatal(err)
+	}
+	err := w.Put(rootRef, pdf.Dict{
+		"Type":  pdf.Name("Outlines"),
+		"First": itemRef,
+		"Last":  itemRef,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x := pdf.NewExtractor(w)
+	o, err := pdf.CursorAt(x, nil).Decode(rootRef, Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return o
+}
+
+// TestDanglingReference checks that a reference to a free object reads the
+// same as an absent entry.
+func TestDanglingReference(t *testing.T) {
+	dangling := pdf.NewReference(99, 0)
+	for _, key := range []pdf.Name{"Dest", "A", "Count", "C", "F", "SE", "First", "Next"} {
+		t.Run(string(key), func(t *testing.T) {
+			want := decodeOutlineItem(t, nil)
+			got := decodeOutlineItem(t, pdf.Dict{key: dangling})
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("dangling reference differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestActionFallback checks that the action is used whenever Dest does not
+// give a usable destination.
+func TestActionFallback(t *testing.T) {
+	act := pdf.Dict{
+		"S":   pdf.Name("URI"),
+		"URI": pdf.String("https://example.com/"),
+	}
+	want := decodeOutlineItem(t, pdf.Dict{"A": act})
+	if want.Items[0].Action == nil {
+		t.Fatal("action not read")
+	}
+
+	for name, dest := range map[string]pdf.Object{
+		"dangling": pdf.NewReference(99, 0),
+		"empty":    pdf.Array{},
+		"wrong":    pdf.Integer(7),
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := decodeOutlineItem(t, pdf.Dict{"Dest": dest, "A": act})
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("unexpected outline (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("destination wins", func(t *testing.T) {
+		got := decodeOutlineItem(t, pdf.Dict{"Dest": pdf.String("named"), "A": act})
+		if got.Items[0].Destination == nil || got.Items[0].Action != nil {
+			t.Errorf("got %v, want a destination and no action", got.Items[0])
+		}
+	})
+}
+
+// TestWrongTypeEntries checks that wrong-type values read like absent
+// entries, and that an invalid title reads as an empty title.
+func TestWrongTypeEntries(t *testing.T) {
+	for _, key := range []pdf.Name{"Count", "C", "F", "A"} {
+		t.Run(string(key), func(t *testing.T) {
+			want := decodeOutlineItem(t, nil)
+			got := decodeOutlineItem(t, pdf.Dict{key: pdf.Name("bad")})
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("wrong type differs from absent entry (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	t.Run("Title", func(t *testing.T) {
+		for name, title := range map[string]pdf.Object{
+			"wrong type": pdf.Dict{},
+			"dangling":   pdf.NewReference(99, 0),
+		} {
+			o := decodeOutlineItem(t, pdf.Dict{"Title": title})
+			if len(o.Items) != 1 || o.Items[0].Title != (pdf.TextString{}) {
+				t.Errorf("%s: got %v, want one item with empty title", name, o.Items)
+			}
+		}
+	})
+}
+
+// TestOpenWithoutChildren checks that an item with a positive /Count but no
+// children reads as closed, so that a read-write-read cycle is stable.
+func TestOpenWithoutChildren(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+
+	rootRef := w.Alloc()
+	itemRef := w.Alloc()
+	err := w.Put(itemRef, pdf.Dict{
+		"Title":  pdf.Text("childless"),
+		"Parent": rootRef,
+		"Count":  pdf.Integer(5),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(rootRef, pdf.Dict{
+		"Type":  pdf.Name("Outlines"),
+		"First": itemRef,
+		"Last":  itemRef,
+		"Count": pdf.Integer(1),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	o1, err := pdf.CursorAt(pdf.NewExtractor(w), nil).Decode(rootRef, Decode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o1.Items[0].Open {
+		t.Error("item without children reads as open")
+	}
+
+	testRoundTrip(t, pdf.V2_0, o1)
+}
+
+// TestColorNonNumeric checks that a /C entry with a component which is not a
+// number reads as absent, rather than with that component set to zero.
+func TestColorNonNumeric(t *testing.T) {
+	absent := decodeOutlineItem(t, nil)
+	if absent.Items[0].Color != (color.DeviceRGB{}) {
+		t.Fatalf("absent /C read as %v", absent.Items[0].Color)
+	}
+
+	for name, c := range map[string]pdf.Array{
+		"name":     {pdf.Integer(1), pdf.Name("x"), pdf.Integer(0)},
+		"null":     {pdf.Integer(1), nil, pdf.Integer(0)},
+		"dangling": {pdf.Integer(1), pdf.NewReference(99, 0), pdf.Integer(0)},
+		"string":   {pdf.String("1"), pdf.Integer(0), pdf.Integer(0)},
+	} {
+		got := decodeOutlineItem(t, pdf.Dict{"C": c})
+		if diff := cmp.Diff(absent, got); diff != "" {
+			t.Errorf("%s: differs from absent entry (-absent +got):\n%s", name, diff)
+		}
+	}
+
+	got := decodeOutlineItem(t, pdf.Dict{"C": pdf.Array{pdf.Integer(1), pdf.Integer(0), pdf.Integer(0)}})
+	if want := (color.DeviceRGB{1, 0, 0}); got.Items[0].Color != want {
+		t.Errorf("valid colour %v, want %v", got.Items[0].Color, want)
 	}
 }

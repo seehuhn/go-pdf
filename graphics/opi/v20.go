@@ -248,11 +248,11 @@ func extractV20(c pdf.Cursor, obj pdf.Object, isDirect bool) (*V20, error) {
 	} else if len(cr) == 4 {
 		v.CropRect = &[4]float64{cr[0], cr[1], cr[2], cr[3]}
 	}
-	if o, err := pdf.Optional(c.Boolean(dict["Overprint"])); err != nil {
+	o, _, err := c.OptionalBoolean(dict["Overprint"])
+	if err != nil {
 		return nil, err
-	} else {
-		v.Overprint = bool(o)
 	}
+	v.Overprint = o
 	if inks, err := readInks(c, dict["Inks"]); err != nil {
 		return nil, err
 	} else {
@@ -333,7 +333,7 @@ func readInks(c pdf.Cursor, obj pdf.Object) (*Inks20, error) {
 		if len(t)%2 != 1 {
 			return nil, nil
 		}
-		if kind, err := c.Name(t[0]); err != nil && !pdf.IsMalformed(err) {
+		if kind, err := c.Name(t[0]); pdf.IsReadError(err) {
 			return nil, err
 		} else if kind != "monochrome" {
 			return nil, nil

@@ -18,13 +18,17 @@ package boxcolor
 
 import (
 	"bytes"
+	"errors"
+	"maps"
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 var testCases = []struct {
@@ -348,4 +352,93 @@ func TestStyleDashRules(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestStyleNonNumeric checks that a colour or dash pattern with an element
+// which is not a number is read as absent, rather than with that element
+// replaced by zero.
+func TestStyleNonNumeric(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	c := pdf.NewCursor(w)
+	decode := func(extra pdf.Dict) *Style {
+		t.Helper()
+		dict := pdf.Dict{"S": pdf.Name("D")}
+		maps.Copy(dict, extra)
+		style, err := ExtractStyle(c, dict, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rm := pdf.NewResourceManager(w)
+		if _, err := rm.Embed(style); err != nil {
+			t.Errorf("cannot write back: %v", err)
+		}
+		return style
+	}
+	absent := decode(nil)
+
+	for name, arr := range map[string]pdf.Array{
+		"name":     {pdf.Integer(1), pdf.Name("x"), pdf.Integer(0)},
+		"null":     {pdf.Integer(1), nil, pdf.Integer(0)},
+		"dangling": {pdf.NewReference(99, 0), pdf.Integer(1), pdf.Integer(0)},
+	} {
+		if diff := cmp.Diff(absent, decode(pdf.Dict{"C": arr})); diff != "" {
+			t.Errorf("C %s differs from absent entry (-absent +got):\n%s", name, diff)
+		}
+	}
+
+	// elements beyond the first three are not used
+	extra := pdf.Array{pdf.Integer(1), pdf.Integer(0), pdf.Integer(0), pdf.Name("x")}
+	if got := decode(pdf.Dict{"C": extra}); got.Color != (color.DeviceRGB{1, 0, 0}) {
+		t.Errorf("colour %v, want red", got.Color)
+	}
+
+	if got := decode(pdf.Dict{"C": pdf.Array{pdf.Integer(1), pdf.Integer(0), pdf.Integer(0)}}); got.Color != (color.DeviceRGB{1, 0, 0}) {
+		t.Errorf("valid colour %v, want red", got.Color)
+	}
+
+	for name, arr := range map[string]pdf.Array{
+		"name":     {pdf.Integer(5), pdf.Name("x")},
+		"null":     {pdf.Integer(5), nil},
+		"dangling": {pdf.NewReference(99, 0), pdf.Integer(5)},
+	} {
+		if diff := cmp.Diff(absent, decode(pdf.Dict{"D": arr})); diff != "" {
+			t.Errorf("D %s differs from absent entry (-absent +got):\n%s", name, diff)
+		}
+	}
+	if got := decode(pdf.Dict{"D": pdf.Array{pdf.Integer(5), pdf.Integer(2)}}); !slices.Equal(got.DashPattern, []float64{5, 2}) {
+		t.Errorf("valid dash pattern %v, want [5 2]", got.DashPattern)
+	}
+}
+
+// TestStyleReadErrors checks that read errors are returned from the colour
+// and dash pattern entries.
+func TestStyleReadErrors(t *testing.T) {
+	errTest := errors.New("test read error")
+	failRef := pdf.NewReference(7, 0)
+	c := pdf.NewCursor(failGetter{Getter: mock.Getter, fail: failRef, err: errTest})
+	for name, dict := range map[string]pdf.Dict{
+		"C":         {"C": failRef},
+		"C element": {"C": pdf.Array{pdf.Integer(1), failRef, pdf.Integer(0)}},
+		"D":         {"S": pdf.Name("D"), "D": failRef},
+		"D element": {"S": pdf.Name("D"), "D": pdf.Array{pdf.Integer(1), failRef}},
+	} {
+		if _, err := ExtractStyle(c, dict, true); !errors.Is(err, errTest) {
+			t.Errorf("%s: got %v, want the read error", name, err)
+		}
+	}
+}
+
+// failGetter is a pdf.Getter which fails for one reference with an error
+// that is not a malformed-file error.
+type failGetter struct {
+	pdf.Getter
+	fail pdf.Reference
+	err  error
+}
+
+func (g failGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
+	if ref == g.fail {
+		return nil, g.err
+	}
+	return g.Getter.Get(ref, canObjStm)
 }

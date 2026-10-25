@@ -18,12 +18,14 @@ package group
 
 import (
 	"bytes"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 )
 
 var testCases = []struct {
@@ -167,4 +169,82 @@ func FuzzRoundTrip(f *testing.F) {
 
 		roundTripTest(t, attrs)
 	})
+}
+
+// TestExtractDanglingReference checks that a reference to a free object
+// reads the same as an absent entry.
+func TestExtractDanglingReference(t *testing.T) {
+	bases := map[string]struct {
+		dict pdf.Dict
+		keys []pdf.Name
+	}{
+		"plain":    {pdf.Dict{"S": pdf.Name("Transparency")}, []pdf.Name{"CS", "I", "K"}},
+		"isolated": {pdf.Dict{"S": pdf.Name("Transparency"), "I": pdf.Boolean(true)}, []pdf.Name{"CS", "K"}},
+	}
+	dangling := pdf.NewReference(99, 0)
+	x := pdf.NewExtractor(mock.Getter)
+	for baseName, base := range bases {
+		for _, key := range base.keys {
+			t.Run(baseName+"/"+string(key), func(t *testing.T) {
+				dict := maps.Clone(base.dict)
+				dict[key] = dangling
+
+				want, err := ExtractTransparencyAttributes(pdf.CursorAt(x, nil), base.dict, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := ExtractTransparencyAttributes(pdf.CursorAt(x, nil), dict, true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("dangling reference differs from absent entry (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+// TestExtractMalformedFlag checks that a flag of the wrong type reads the
+// same as an absent entry.
+func TestExtractMalformedFlag(t *testing.T) {
+	x := pdf.NewExtractor(mock.Getter)
+	base := pdf.Dict{"S": pdf.Name("Transparency")}
+	want, err := ExtractTransparencyAttributes(pdf.CursorAt(x, nil), base, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []pdf.Name{"I", "K"} {
+		dict := maps.Clone(base)
+		dict[key] = pdf.String("bad")
+		got, err := ExtractTransparencyAttributes(pdf.CursorAt(x, nil), dict, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%s: malformed value differs from absent entry (-want +got):\n%s", key, diff)
+		}
+	}
+}
+
+// TestExtractMalformedCS checks that a CS entry of the wrong type reads the
+// same as an absent entry.
+func TestExtractMalformedCS(t *testing.T) {
+	x := pdf.NewExtractor(mock.Getter)
+	base := pdf.Dict{"S": pdf.Name("Transparency")}
+	want, err := ExtractTransparencyAttributes(pdf.CursorAt(x, nil), base, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []pdf.Object{pdf.Integer(1), pdf.String("bad"), pdf.Dict{}, pdf.Name("NoSuchSpace")} {
+		dict := maps.Clone(base)
+		dict["CS"] = bad
+		got, err := ExtractTransparencyAttributes(pdf.CursorAt(x, nil), dict, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("malformed CS %v differs from absent entry (-want +got):\n%s", bad, diff)
+		}
+	}
 }

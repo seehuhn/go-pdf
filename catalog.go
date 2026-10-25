@@ -231,7 +231,10 @@ func DecodeCatalog(c Cursor, obj Object, _ bool) (*Catalog, error) {
 		}
 	}
 
-	needsRendering, _ := c.Boolean(dict["NeedsRendering"])
+	needsRendering, _, err := c.OptionalBoolean(dict["NeedsRendering"])
+	if err != nil {
+		return nil, err
+	}
 
 	// Metadata stream (eager decode; PDF 1.4)
 	metadata, err := c.DecodeOptional(dict["Metadata"], ExtractMetadataStream)

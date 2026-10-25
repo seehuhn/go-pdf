@@ -323,3 +323,57 @@ var t2Dicts = []*dict.CIDFontType2{
 		},
 	},
 }
+
+// TestCIDDefaultWidth checks that a /DW entry which is a reference to a free
+// object, or which is not a number, reads as the default width.
+func TestCIDDefaultWidth(t *testing.T) {
+	for _, cidType := range []pdf.Name{"CIDFontType0", "CIDFontType2"} {
+		for name, dw := range map[string]pdf.Object{
+			"absent":    nil,
+			"dangling":  pdf.NewReference(99, 0),
+			"malformed": pdf.String("bad"),
+		} {
+			t.Run(string(cidType)+"-"+name, func(t *testing.T) {
+				w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				cidFont := pdf.Dict{
+					"Type":     pdf.Name("Font"),
+					"Subtype":  cidType,
+					"BaseFont": pdf.Name("Test"),
+					"CIDSystemInfo": pdf.Dict{
+						"Registry":   pdf.String("Adobe"),
+						"Ordering":   pdf.String("Identity"),
+						"Supplement": pdf.Integer(0),
+					},
+				}
+				if dw != nil {
+					cidFont["DW"] = dw
+				}
+				fontDict := pdf.Dict{
+					"Type":            pdf.Name("Font"),
+					"Subtype":         pdf.Name("Type0"),
+					"BaseFont":        pdf.Name("Test"),
+					"Encoding":        pdf.Name("Identity-H"),
+					"DescendantFonts": pdf.Array{cidFont},
+				}
+
+				x := pdf.NewExtractor(w)
+				d, err := extract.Dict(pdf.CursorAt(x, nil), fontDict, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got float64
+				switch d := d.(type) {
+				case *dict.CIDFontType0:
+					got = d.DefaultWidth
+				case *dict.CIDFontType2:
+					got = d.DefaultWidth
+				default:
+					t.Fatalf("unexpected font type %T", d)
+				}
+				if got != dict.DefaultWidthDefault {
+					t.Errorf("got DefaultWidth %g, want %d", got, dict.DefaultWidthDefault)
+				}
+			})
+		}
+	}
+}

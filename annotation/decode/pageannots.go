@@ -29,8 +29,8 @@ import (
 // clearing the entry makes it an ordinary annotation instead.
 //
 // Array entries that are not indirect references are skipped, as are entries
-// that fail to decode.  The two slices are aligned: refs[i] is the reference
-// annots[i] was read from.
+// that are malformed.  Other errors, such as I/O errors, are returned.  The
+// two slices are aligned: refs[i] is the reference annots[i] was read from.
 //
 // Every consumer of a page's annotations should obtain them through this
 // function (or through the page decoder, which does).  An annotation decoded
@@ -55,8 +55,10 @@ func PageAnnotations(c pdf.Cursor, obj pdf.Object) (refs []pdf.Reference, annots
 			continue
 		}
 		a, err := c.Decode(item, Annotation)
-		if err != nil {
-			// permissive: skip invalid annotations
+		if pdf.IsReadError(err) {
+			return nil, nil, err
+		} else if err != nil {
+			// permissive: skip malformed annotations
 			continue
 		}
 		refs = append(refs, ref)

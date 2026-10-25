@@ -42,7 +42,7 @@ func ExtractTimespan(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Timespan, er
 		return nil, pdf.Error("missing timespan dictionary")
 	}
 
-	v, err := pdf.Optional(c.Number(dict["V"]))
+	v, err := c.Number(dict["V"])
 	if err != nil {
 		return nil, err
 	} else if v < 0 {
@@ -146,7 +146,7 @@ func ExtractMediaOffset(c pdf.Cursor, obj pdf.Object, isDirect bool) (MediaOffse
 		}
 		return &MediaOffsetTime{Time: t, SingleUse: isDirect}, nil
 	case "F":
-		f, err := pdf.Optional(c.Integer(dict["F"]))
+		f, err := c.Integer(dict["F"])
 		if err != nil {
 			return nil, err
 		} else if f < 0 {

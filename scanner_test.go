@@ -181,6 +181,68 @@ func TestReadIndirectObjectTruncated(t *testing.T) {
 	}
 }
 
+// TestReadIndirectObjectEndobj checks the handling of a missing "endobj"
+// keyword.  Other data after the value is tolerated, whatever its length.  If
+// the input ends within a prefix of the keyword, the object may have been
+// truncated.
+func TestReadIndirectObjectEndobj(t *testing.T) {
+	cases := []struct {
+		name      string
+		tail      string
+		malformed bool
+	}{
+		{"keyword", "endobj", false},
+		{"keyword and more", "endobj\n1 0 obj", false},
+		{"eof", "", true},
+		{"white space then eof", "\n", true},
+		{"prefix e", "e", true},
+		{"prefix endob", "endob", true},
+		{"prefix of stream", "stre", true},
+		{"comment then eof", "%%EOF", true},
+		{"short junk", "trail", false},
+		{"one junk byte", "x", false},
+		{"six junk bytes", "trailer", false},
+		{"long junk", "xref\n0 1\n", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := testScanner("4 0 obj\n<</A 1>>\n" + c.tail)
+			obj, ref, err := s.ReadIndirectObject()
+			if c.malformed {
+				if !IsMalformed(err) {
+					t.Fatalf("got error %v, want MalformedFileError", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ref != NewReference(4, 0) {
+				t.Errorf("wrong reference %v", ref)
+			}
+			if _, ok := obj.(Dict); !ok {
+				t.Errorf("got %T, want Dict", obj)
+			}
+		})
+	}
+}
+
+// TestReadIndirectObjectEndobjReadError checks that a read error while
+// looking for the "endobj" keyword is propagated.
+func TestReadIndirectObjectEndobjReadError(t *testing.T) {
+	errTest := errors.New("test read error")
+	src := io.MultiReader(strings.NewReader("4 0 obj\n<</A 1>>\n"), errReader{errTest})
+	s := newScanner(src, func(o Object) (Integer, error) { return 0, nil }, nil)
+	_, _, err := s.ReadIndirectObject()
+	if !IsReadError(err) {
+		t.Errorf("got error %v, want a non-malformed read error", err)
+	}
+}
+
+type errReader struct{ err error }
+
+func (r errReader) Read([]byte) (int, error) { return 0, r.err }
+
 // TestReadObjectTruncatedString checks that unterminated strings are
 // reported as malformed, so that ReadObject never returns a bare io.EOF.
 func TestReadObjectTruncatedString(t *testing.T) {
@@ -915,6 +977,96 @@ func TestReadStreamDataUnencryptedCrypt(t *testing.T) {
 		}
 		if diff := cmp.Diff(tc.wantParms, stm.Dict["DecodeParms"]); diff != "" {
 			t.Errorf("%s: wrong /DecodeParms (-want +got):\n%s", tc.dict, diff)
+		}
+	}
+}
+
+// TestReadIndirectObjectNoEndobj checks that an object whose "endobj" keyword
+// is missing is still read, as long as more data follows.
+func TestReadIndirectObjectNoEndobj(t *testing.T) {
+	cases := []struct {
+		body string
+		want Native
+	}{
+		{"<</A 1>>\n4 0 obj\n<<>>\nendobj\n", Dict{"A": Integer(1)}},
+		{"[1 2]\nxref\n0 1\n", Array{Integer(1), Integer(2)}},
+		{"(abc)\n4 0 obj\n", String("abc")},
+		{"5\n4 0 obj\n<<>>\nendobj\n", Integer(5)},
+		{"5 6 endobj\n", Integer(5)},
+		{"7 0 R\nxref\n0 1\n", NewReference(7, 0)},
+		{"/N\n4 0 obj\n", Name("N")},
+	}
+	for _, c := range cases {
+		obj, ref, err := testScanner("3 0 obj\n" + c.body).ReadIndirectObject()
+		if err != nil {
+			t.Errorf("%q: %v", c.body, err)
+			continue
+		}
+		if ref != NewReference(3, 0) {
+			t.Errorf("%q: got reference %s", c.body, ref)
+		}
+		if diff := cmp.Diff(c.want, obj); diff != "" {
+			t.Errorf("%q: wrong object (-want +got):\n%s", c.body, diff)
+		}
+	}
+
+	const stm = "3 0 obj\n<</Length 5>>\nstream\nhello\nendstream\n4 0 obj\n"
+	obj, _, err := testScanner(stm).ReadIndirectObject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := obj.(*Stream); !ok {
+		t.Errorf("got %T, want *Stream", obj)
+	}
+}
+
+// TestReadIndirectObjectInvalidRef checks that an object whose value is a
+// reference to an object which cannot exist reads as null (PDF 7.3.10).
+func TestReadIndirectObjectInvalidRef(t *testing.T) {
+	for _, body := range []string{"99999999 0 R", "5 70000 R", "-1 0 R", "0 0 R", "0 5 R"} {
+		obj, ref, err := testScanner("3 0 obj\n" + body + "\nendobj").ReadIndirectObject()
+		if err != nil {
+			t.Errorf("%q: %v", body, err)
+			continue
+		}
+		if obj != nil {
+			t.Errorf("%q: got %v, want nil", body, obj)
+		}
+		if ref != NewReference(3, 0) {
+			t.Errorf("%q: got reference %s", body, ref)
+		}
+	}
+}
+
+// TestReadIndirectObjectNumberZero checks that an object definition with
+// object number 0 is rejected as malformed (PDF 7.3.10).
+func TestReadIndirectObjectNumberZero(t *testing.T) {
+	for _, in := range []string{"0 0 obj\n1\nendobj", "0 65535 obj\n1\nendobj"} {
+		_, _, err := testScanner(in).ReadIndirectObject()
+		if !IsMalformed(err) {
+			t.Errorf("%q: got %v, want MalformedFileError", in, err)
+		}
+	}
+}
+
+// TestReadObjectRefZero checks that references to object number 0 inside
+// arrays and dictionaries read as null.
+func TestReadObjectRefZero(t *testing.T) {
+	cases := []struct {
+		in   string
+		want Native
+	}{
+		{"[0 0 R 2 0 R]", Array{nil, NewReference(2, 0)}},
+		{"<</A 0 5 R/B 2 0 R>>", Dict{"B": NewReference(2, 0)}},
+	}
+	for _, c := range cases {
+		obj, err := testScanner(c.in).ReadObject()
+		if err != nil {
+			t.Errorf("%q: %v", c.in, err)
+			continue
+		}
+		if diff := cmp.Diff(c.want, obj); diff != "" {
+			t.Errorf("%q: wrong object (-want +got):\n%s", c.in, diff)
 		}
 	}
 }

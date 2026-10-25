@@ -714,12 +714,14 @@ func openStdSecHandler(c Cursor, enc Dict, V Integer, keyBytes int, ID []byte) (
 	}
 
 	emd := true
-	if _, ok := enc["EncryptMetadata"]; ok && V >= 4 {
-		b, err := c.Boolean(enc["EncryptMetadata"])
+	if V >= 4 {
+		b, ok, err := c.OptionalBoolean(enc["EncryptMetadata"])
 		if err != nil {
 			return nil, err
 		}
-		emd = bool(b)
+		if ok {
+			emd = b
+		}
 	}
 
 	sec := &stdSecHandler{

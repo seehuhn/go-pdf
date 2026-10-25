@@ -805,7 +805,7 @@ types:
     required: false
     introduced: '1.1'
     deprecated: '2.0'
-    goType: pdf.Object
+    goType: "*opaque.Object"
     purpose: Mac (deprecated in PDF 2.0) is Mac OS launch parameters.
   - goName: Unix
     pdfKey: Unix
@@ -813,7 +813,7 @@ types:
     required: false
     introduced: '1.1'
     deprecated: '2.0'
-    goType: pdf.Object
+    goType: "*opaque.Object"
     purpose: Unix (deprecated in PDF 2.0) is UNIX launch parameters.
   - goName: NewWindow
     pdfKey: NewWindow

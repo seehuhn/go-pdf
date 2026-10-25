@@ -35,7 +35,11 @@ func decodeWidgetBody(c pdf.Cursor, dict pdf.Dict) (*annotation.Widget, error) {
 	}
 
 	// H (optional)
-	widget.Highlight = decodeHighlight(c, dict["H"])
+	if h, err := decodeHighlight(c, dict["H"]); err != nil {
+		return nil, err
+	} else {
+		widget.Highlight = h
+	}
 
 	// MK (optional)
 	if mk, err := c.DecodeOptional(dict["MK"], appearance.ExtractCharacteristics); err != nil {

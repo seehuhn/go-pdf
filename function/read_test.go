@@ -418,6 +418,117 @@ func TestFunctionEvaluation(t *testing.T) {
 	}
 }
 
+// TestExtractInvalidIsMalformed verifies that a function which fails
+// validation on read is reported as malformed, not as a read error.
+func TestExtractInvalidIsMalformed(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	ref := w.Alloc()
+	stm, err := w.OpenStream(ref, pdf.Dict{
+		"FunctionType": pdf.Integer(4),
+		"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+		"Range":        pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte("{ 1 add")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ref0 := w.Alloc()
+	stm, err = w.OpenStream(ref0, pdf.Dict{
+		"FunctionType":  pdf.Integer(0),
+		"Domain":        pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+		"Range":         pdf.Array{pdf.Integer(1), pdf.Integer(0)},
+		"Size":          pdf.Array{pdf.Integer(2)},
+		"BitsPerSample": pdf.Integer(8),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte{0, 255}); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := map[string]pdf.Object{
+		"type 0 with inverted range": ref0,
+		"type 2 with mismatched C0 and C1": pdf.Dict{
+			"FunctionType": pdf.Integer(2),
+			"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+			"C0":           pdf.Array{pdf.Integer(0), pdf.Integer(0)},
+			"C1":           pdf.Array{pdf.Integer(1)},
+			"N":            pdf.Integer(1),
+		},
+		"type 3 without child functions": pdf.Dict{
+			"FunctionType": pdf.Integer(3),
+			"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+			"Bounds":       pdf.Array{},
+			"Encode":       pdf.Array{},
+		},
+		"type 4 with unbalanced braces": ref,
+	}
+	for name, obj := range cases {
+		_, err := Extract(pdf.CursorAt(pdf.NewExtractor(w), nil), obj, false)
+		if !pdf.IsMalformed(err) {
+			t.Errorf("%s: got %v, want malformed error", name, err)
+		}
+	}
+}
+
+// TestExtractType3MalformedChild verifies that a malformed child function
+// inside a type 3 function is reported as malformed, not as a read error.
+func TestExtractType3MalformedChild(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	good := pdf.Dict{
+		"FunctionType": pdf.Integer(2),
+		"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+		"C0":           pdf.Array{pdf.Integer(0)},
+		"C1":           pdf.Array{pdf.Integer(1)},
+		"N":            pdf.Integer(1),
+	}
+	children := map[string]pdf.Object{
+		"wrong type": pdf.Integer(5),
+		"dangling":   pdf.NewReference(999, 0),
+		"null":       nil,
+		"bad type":   pdf.Dict{"FunctionType": pdf.Integer(99)},
+		"mismatched C0 and C1": pdf.Dict{
+			"FunctionType": pdf.Integer(2),
+			"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+			"C0":           pdf.Array{pdf.Integer(0), pdf.Integer(0)},
+			"C1":           pdf.Array{pdf.Integer(1)},
+			"N":            pdf.Integer(1),
+		},
+	}
+	for name, child := range children {
+		for pos, funcs := range map[string]pdf.Array{
+			"only child":  {child},
+			"second":      {good, child},
+			"first child": {child, good},
+		} {
+			obj := pdf.Dict{
+				"FunctionType": pdf.Integer(3),
+				"Domain":       pdf.Array{pdf.Integer(0), pdf.Integer(1)},
+				"Functions":    funcs,
+				"Bounds":       pdf.Array{pdf.Number(0.5)},
+				"Encode":       pdf.Array{pdf.Integer(0), pdf.Integer(1), pdf.Integer(0), pdf.Integer(1)},
+			}
+			if len(funcs) == 1 {
+				obj["Bounds"] = pdf.Array{}
+				obj["Encode"] = pdf.Array{pdf.Integer(0), pdf.Integer(1)}
+			}
+			_, err := Extract(pdf.CursorAt(pdf.NewExtractor(w), nil), obj, false)
+			if !pdf.IsMalformed(err) {
+				t.Errorf("%s (%s): got %v, want malformed error", name, pos, err)
+			}
+		}
+	}
+}
+
 func TestFunctionValidation(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -508,3 +508,12 @@ func TestStreamAsEmbeddedFile(t *testing.T) {
 		t.Error("AsEmbeddedFile changed the stream contents")
 	}
 }
+
+// TestFormatRefZero checks that a reference to object number 0 is refused.
+func TestFormatRefZero(t *testing.T) {
+	for _, obj := range []Object{Reference(0), Array{Reference(5 << 32)}} {
+		if err := Format(io.Discard, 0, obj); err == nil {
+			t.Errorf("%v: expected error, got nil", obj)
+		}
+	}
+}

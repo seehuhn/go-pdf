@@ -87,13 +87,13 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			res.TextFontSize = size
 			set |= graphics.StateTextFont
 		case "TK":
-			val, err := c.Boolean(v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			val, ok, err := c.OptionalBoolean(v)
+			if err != nil {
 				return nil, err
+			} else if !ok {
+				break
 			}
-			res.TextKnockout = bool(val)
+			res.TextKnockout = val
 			set |= graphics.StateTextKnockout
 		case "LW":
 			lw, err := c.Number(v)
@@ -151,22 +151,22 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 				set |= graphics.StateLineDash
 			}
 		case "RI":
-			ri, err := c.Name(v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			ri, err := pdf.Optional(c.Name(v))
+			if err != nil {
 				return nil, err
+			} else if ri == "" {
+				break
 			}
 			res.RenderingIntent = graphics.RenderingIntent(ri)
 			set |= graphics.StateRenderingIntent
 		case "SA":
-			val, err := c.Boolean(v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			val, ok, err := c.OptionalBoolean(v)
+			if err != nil {
 				return nil, err
+			} else if !ok {
+				break
 			}
-			res.StrokeAdjustment = bool(val)
+			res.StrokeAdjustment = val
 			set |= graphics.StateStrokeAdjustment
 		case "BM":
 			bm, err := extractBlendMode(c, v)
@@ -205,40 +205,40 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 			res.FillAlpha = min(max(ca, 0), 1)
 			set |= graphics.StateFillAlpha
 		case "AIS":
-			ais, err := c.Boolean(v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			ais, ok, err := c.OptionalBoolean(v)
+			if err != nil {
 				return nil, err
+			} else if !ok {
+				break
 			}
-			res.AlphaSourceFlag = bool(ais)
+			res.AlphaSourceFlag = ais
 			set |= graphics.StateAlphaSourceFlag
 		case "UseBlackPtComp":
-			val, err := c.Name(v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			val, err := pdf.Optional(c.Name(v))
+			if err != nil {
 				return nil, err
+			} else if val == "" {
+				break
 			}
 			res.BlackPointCompensation = val
 			set |= graphics.StateBlackPointCompensation
 		case "OP":
-			op, err := c.Boolean(v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			op, ok, err := c.OptionalBoolean(v)
+			if err != nil {
 				return nil, err
+			} else if !ok {
+				break
 			}
-			res.OverprintStroke = bool(op)
+			res.OverprintStroke = op
 			set |= graphics.StateOverprint
 		case "op":
-			op, err := c.Boolean(v)
-			if pdf.IsMalformed(err) {
-				break
-			} else if err != nil {
+			op, ok, err := c.OptionalBoolean(v)
+			if err != nil {
 				return nil, err
+			} else if !ok {
+				break
 			}
-			res.OverprintFill = bool(op)
+			res.OverprintFill = op
 			set |= graphics.StateOverprint
 			overprintFillSet = true
 		case "OPM":
@@ -333,71 +333,61 @@ func ExtGState(c pdf.Cursor, obj pdf.Object, isDirect bool) (*extgstate.ExtGStat
 	}
 
 	// Handle BlackGeneration precedence: BG2 > BG
-	if bg2 == pdf.Name("Default") {
+	if isDefault, err := isNameDefault(c, bg2); err != nil {
+		return nil, err
+	} else if isDefault {
 		res.BlackGeneration = nil
 		bg2 = nil
 		set |= graphics.StateBlackGeneration
 	}
-	if set&graphics.StateBlackGeneration == 0 && bg2 != nil {
-		fn, err := c.Decode(bg2, function.Extract)
-		if err == nil {
-			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
-				res.BlackGeneration = fn
-				set |= graphics.StateBlackGeneration
-			}
+	for _, obj := range []pdf.Object{bg2, bg1} {
+		if set&graphics.StateBlackGeneration != 0 || obj == nil {
+			continue
 		}
-	}
-	if set&graphics.StateBlackGeneration == 0 && bg1 != nil {
-		fn, err := c.Decode(bg1, function.Extract)
-		if err == nil {
-			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
-				res.BlackGeneration = fn
-				set |= graphics.StateBlackGeneration
-			}
+		fn, ok, err := readUnaryFunction(c, obj)
+		if err != nil {
+			return nil, err
+		} else if ok {
+			res.BlackGeneration = fn
+			set |= graphics.StateBlackGeneration
 		}
 	}
 
 	// Handle UndercolorRemoval precedence: UCR2 > UCR
-	if ucr2 == pdf.Name("Default") {
+	if isDefault, err := isNameDefault(c, ucr2); err != nil {
+		return nil, err
+	} else if isDefault {
 		res.UndercolorRemoval = nil
 		ucr2 = nil
 		set |= graphics.StateUndercolorRemoval
 	}
-	if set&graphics.StateUndercolorRemoval == 0 && ucr2 != nil {
-		fn, err := c.Decode(ucr2, function.Extract)
-		if err == nil {
-			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
-				res.UndercolorRemoval = fn
-				set |= graphics.StateUndercolorRemoval
-			}
+	for _, obj := range []pdf.Object{ucr2, ucr1} {
+		if set&graphics.StateUndercolorRemoval != 0 || obj == nil {
+			continue
 		}
-	}
-	if set&graphics.StateUndercolorRemoval == 0 && ucr1 != nil {
-		fn, err := c.Decode(ucr1, function.Extract)
-		if err == nil {
-			if nIn, nOut := fn.Shape(); nIn == 1 && nOut == 1 {
-				res.UndercolorRemoval = fn
-				set |= graphics.StateUndercolorRemoval
-			}
+		fn, ok, err := readUnaryFunction(c, obj)
+		if err != nil {
+			return nil, err
+		} else if ok {
+			res.UndercolorRemoval = fn
+			set |= graphics.StateUndercolorRemoval
 		}
 	}
 
 	// Handle TransferFunction precedence: TR2 > TR (deprecated in PDF 2.0)
 	if c.Version() < pdf.V2_0 {
-		if tr2 != nil {
-			fn, err := parseTransferFunction(c, tr2)
+		for _, obj := range []pdf.Object{tr2, tr1} {
+			if obj == nil {
+				continue
+			}
+			fn, ok, err := parseTransferFunction(c, obj)
 			if err != nil {
 				return nil, err
+			} else if ok {
+				res.TransferFunctions = fn
+				set |= graphics.StateTransferFunction
+				break
 			}
-			res.TransferFunctions = fn
-			set |= graphics.StateTransferFunction
-		} else if tr1 != nil {
-			fn, err := parseTransferFunction(c, tr1)
-			if err != nil {
-				return nil, err
-			}
-			res.TransferFunctions = fn
-			set |= graphics.StateTransferFunction
 		}
 	}
 
@@ -470,77 +460,85 @@ func readDash(c pdf.Cursor, obj pdf.Object) (pat []float64, ph float64, err erro
 	return pat, phase, nil
 }
 
-func parseTransferFunction(c pdf.Cursor, obj pdf.Object) (graphics.TransferFunctions, error) {
-	var zero graphics.TransferFunctions
+// isNameDefault reports whether obj is the name /Default, after resolving
+// any indirect reference.
+func isNameDefault(c pdf.Cursor, obj pdf.Object) (bool, error) {
+	if obj == nil {
+		return false, nil
+	}
+	resolved, err := pdf.Optional(c.Resolve(obj))
+	return resolved == pdf.Name("Default"), err
+}
 
-	// check if it's an array of four or more transfer functions
-	if arr, err := c.Array(obj); err == nil && len(arr) >= 4 {
-		var result graphics.TransferFunctions
+// readUnaryFunction reads a function with one input and one output.
+// The result ok is false if obj is not such a function.
+func readUnaryFunction(c pdf.Cursor, obj pdf.Object) (fn pdf.Function, ok bool, err error) {
+	fn, err = pdf.Optional(c.Decode(obj, function.Extract))
+	if fn == nil || err != nil {
+		return nil, false, err
+	}
+	if nIn, nOut := fn.Shape(); nIn != 1 || nOut != 1 {
+		return nil, false, nil
+	}
+	return fn, true, nil
+}
 
-		// parse Red component
-		fn, err := parseSingleTransfer(c, arr[0])
-		if err != nil {
-			return zero, err
+// parseTransferFunction reads a transfer function entry, either a single
+// function or an array of four functions.  The result ok is false if the
+// entry is malformed.
+func parseTransferFunction(c pdf.Cursor, obj pdf.Object) (tf graphics.TransferFunctions, ok bool, err error) {
+	resolved, err := pdf.Optional(c.Resolve(obj))
+	if resolved == nil || err != nil {
+		return tf, false, err
+	}
+
+	// an array of four or more transfer functions
+	if arr, isArray := resolved.(pdf.Array); isArray {
+		if len(arr) < 4 {
+			return tf, false, nil
 		}
-		result.Red = fn
-
-		// parse Green component
-		fn, err = parseSingleTransfer(c, arr[1])
-		if err != nil {
-			return zero, err
+		var fns [4]pdf.Function
+		for i := range fns {
+			fns[i], ok, err = parseSingleTransfer(c, arr[i])
+			if !ok || err != nil {
+				return tf, false, err
+			}
 		}
-		result.Green = fn
-
-		// parse Blue component
-		fn, err = parseSingleTransfer(c, arr[2])
-		if err != nil {
-			return zero, err
-		}
-		result.Blue = fn
-
-		// parse Gray component
-		fn, err = parseSingleTransfer(c, arr[3])
-		if err != nil {
-			return zero, err
-		}
-		result.Gray = fn
-
-		return result, nil
+		return graphics.TransferFunctions{
+			Red:   fns[0],
+			Green: fns[1],
+			Blue:  fns[2],
+			Gray:  fns[3],
+		}, true, nil
 	}
 
 	// single transfer function - apply to all components
-	fn, err := parseSingleTransfer(c, obj)
-	if err != nil {
-		return zero, err
+	fn, ok, err := parseSingleTransfer(c, obj)
+	if !ok || err != nil {
+		return tf, false, err
 	}
 	return graphics.TransferFunctions{
 		Red:   fn,
 		Green: fn,
 		Blue:  fn,
 		Gray:  fn,
-	}, nil
+	}, true, nil
 }
 
-func parseSingleTransfer(c pdf.Cursor, obj pdf.Object) (pdf.Function, error) {
-	if name, isName := obj.(pdf.Name); isName {
-		switch name {
-		case "Identity":
-			return function.Identity, nil
-		default:
-			// treat all other names (including "Default") as the default
-			// transfer function.
-			return nil, nil
+// parseSingleTransfer reads one transfer function.  The result ok is false if
+// obj is neither a name nor a function with one input and one output.
+func parseSingleTransfer(c pdf.Cursor, obj pdf.Object) (fn pdf.Function, ok bool, err error) {
+	resolved, err := pdf.Optional(c.Resolve(obj))
+	if resolved == nil || err != nil {
+		return nil, false, err
+	}
+	if name, isName := resolved.(pdf.Name); isName {
+		if name == "Identity" {
+			return function.Identity, true, nil
 		}
+		// treat all other names (including "Default") as the default
+		// transfer function.
+		return nil, true, nil
 	}
-
-	fn, err := c.Decode(obj, function.Extract)
-	if err != nil {
-		return nil, err
-	}
-
-	if nIn, nOut := fn.Shape(); nIn != 1 || nOut != 1 {
-		return nil, pdf.Errorf("wrong transfer function shape (%d,%d) != (1,1)", nIn, nOut)
-	}
-
-	return fn, nil
+	return readUnaryFunction(c, obj)
 }
