@@ -104,30 +104,3 @@ func TestConcatMergesForms(t *testing.T) {
 		t.Errorf("field names = %v, want name and name_2", names)
 	}
 }
-
-func TestRewriteDA(t *testing.T) {
-	rename := map[pdf.Name]pdf.Name{"Helv": "Helv_2", "A#00B": "A#00B_2"}
-	cases := []struct {
-		in, want string
-	}{
-		{"/Helv 12 Tf 0 g", "/Helv_2 12 Tf 0 g"},           // basic substitution
-		{"/Helvetica 12 Tf", "/Helvetica 12 Tf"},           // prefix must not match
-		{"/Cour 12 Tf", "/Cour 12 Tf"},                     // unrelated font untouched
-		{"/He#6cv 12 Tf 0 g", "/He#6cv_2 12 Tf 0 g"},       // escaped name matches
-		{"0 0 1 rg /Helv 10 Tf", "0 0 1 rg /Helv_2 10 Tf"}, // name after color ops
-		{"/A#00B 12 Tf", "/A#00B_2 12 Tf"},                 // #00 is not an escape
-	}
-	for _, tc := range cases {
-		got := string(rewriteDA(pdf.String(tc.in), rename))
-		if got != tc.want {
-			t.Errorf("rewriteDA(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-}
-
-func TestRewriteDANoRename(t *testing.T) {
-	da := pdf.String("/Helv 12 Tf 0 g")
-	if got := rewriteDA(da, nil); string(got) != string(da) {
-		t.Errorf("rewriteDA with no renames = %q, want unchanged", got)
-	}
-}

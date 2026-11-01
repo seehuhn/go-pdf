@@ -283,3 +283,43 @@ func TestDAColorOperatorNoExponent(t *testing.T) {
 		}
 	}
 }
+
+// TestParseDA checks that a default-appearance string is tokenised as a
+// content-stream fragment: delimiters end tokens, NUL is white space,
+// comments are ignored, and only PDF number syntax gives an operand.
+func TestParseDA(t *testing.T) {
+	cases := []struct {
+		name string
+		da   string
+		size float64
+		col  color.Color
+	}{
+		{"plain", "/Helv 12 Tf 0 0 1 rg", 12, color.DeviceRGB{0, 0, 1}},
+		{"name after operator", "0 0 1 rg/Helv 12 Tf", 12, color.DeviceRGB{0, 0, 1}},
+		{"NUL separator", "/Helv 12 Tf\x000 0 1 rg", 12, color.DeviceRGB{0, 0, 1}},
+		{"comment", "/Helv 12 Tf 0 g %1 0 0 rg\n", 12, color.DeviceGray(0)},
+		{"comment between operands", "/Helv 12 Tf 0 0%x\n1 rg", 12, color.DeviceRGB{0, 0, 1}},
+		{"vertical tab is regular", "/Helv 12 Tf 0\v1 g", 12, quireInk},
+		{"exponent is no number", "/Helv 1e1 Tf 1e0 g", 0, quireInk},
+		{"NaN is no number", "/Helv 12 Tf NaN g", 12, quireInk},
+		{"gray", "/Helv 9.5 Tf 0.5 g", 9.5, color.DeviceGray(0.5)},
+		{"cmyk", "/Helv 12 Tf 0 1 1 0 k", 12, color.DeviceCMYK{0, 1, 1, 0}},
+		{"last colour wins", "1 g /Helv 12 Tf 0 0 1 rg", 12, color.DeviceRGB{0, 0, 1}},
+		{"out of range clipped", "/Helv 12 Tf 2 -1 0.5 rg", 12, color.DeviceRGB{1, 0, 0.5}},
+		{"too few operands", "/Helv 12 Tf 0 1 rg", 12, quireInk},
+		{"font operand not a name", "(Helv) 12 Tf", 0, quireInk},
+		{"negative size", "/Helv -12 Tf", 0, quireInk},
+		{"empty", "", 0, quireInk},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			size, col := parseDA(c.da)
+			if size != c.size {
+				t.Errorf("parseDA(%q) size = %v, want %v", c.da, size, c.size)
+			}
+			if col != c.col {
+				t.Errorf("parseDA(%q) colour = %v, want %v", c.da, col, c.col)
+			}
+		})
+	}
+}

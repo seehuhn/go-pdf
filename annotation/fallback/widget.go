@@ -17,7 +17,7 @@
 package fallback
 
 import (
-	"math"
+	"io"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -29,6 +29,7 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/text"
@@ -761,55 +762,67 @@ func clampFloat(v, lo, hi float64) float64 {
 // something this package can lay text out with, so the appearance is drawn with
 // [Generator.ContentFont] whatever the string asks for.  A caller which wants
 // the two to agree can name the generator's font in its default resources.
+//
+// The string is tokenised as a content-stream fragment.  As in a content
+// stream, operands are taken from the start of an operator's operand list,
+// surplus operands are ignored, and colour components are clipped to [0, 1].
 func parseDA(da string) (size float64, col color.Color) {
 	col = quireInk
-	fields := strings.Fields(da)
-	for i, tok := range fields {
-		switch tok {
-		case "Tf":
-			if i >= 1 {
-				if v, ok := daFloat(fields[i-1]); ok && v >= 0 {
-					size = v
-				}
+	stream := content.NewScanner(func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(da)), nil
+	})
+	for op, args := range stream.NewIter().All() {
+		switch op {
+		case content.OpTextSetFont:
+			if len(args) < 2 {
+				continue
 			}
-		case "g":
-			if i >= 1 {
-				if g, ok := daFloat(fields[i-1]); ok {
-					col = color.DeviceGray(g)
-				}
+			_, isName := args[0].(pdf.Name)
+			if v, ok := daNumber(args, 1); isName && ok && v >= 0 {
+				size = v
 			}
-		case "rg":
-			if i >= 3 {
-				r, ok1 := daFloat(fields[i-3])
-				g, ok2 := daFloat(fields[i-2])
-				bl, ok3 := daFloat(fields[i-1])
-				if ok1 && ok2 && ok3 {
-					col = color.DeviceRGB{r, g, bl}
-				}
+		case content.OpSetFillGray:
+			if g, ok := daNumber(args, 0); ok {
+				col = color.DeviceGray(clip01(g))
 			}
-		case "k":
-			if i >= 4 {
-				c, ok1 := daFloat(fields[i-4])
-				mm, ok2 := daFloat(fields[i-3])
-				y, ok3 := daFloat(fields[i-2])
-				kk, ok4 := daFloat(fields[i-1])
-				if ok1 && ok2 && ok3 && ok4 {
-					col = color.DeviceCMYK{c, mm, y, kk}
-				}
+		case content.OpSetFillRGB:
+			r, ok1 := daNumber(args, 0)
+			g, ok2 := daNumber(args, 1)
+			b, ok3 := daNumber(args, 2)
+			if ok1 && ok2 && ok3 {
+				col = color.DeviceRGB{clip01(r), clip01(g), clip01(b)}
+			}
+		case content.OpSetFillCMYK:
+			c, ok1 := daNumber(args, 0)
+			m, ok2 := daNumber(args, 1)
+			y, ok3 := daNumber(args, 2)
+			k, ok4 := daNumber(args, 3)
+			if ok1 && ok2 && ok3 && ok4 {
+				col = color.DeviceCMYK{clip01(c), clip01(m), clip01(y), clip01(k)}
 			}
 		}
 	}
 	return size, col
 }
 
-func daFloat(s string) (float64, bool) {
-	v, err := strconv.ParseFloat(s, 64)
-	// a PDF file cannot hold an infinity or a NaN, so a token which reads as
-	// one names no number the appearance could use
-	if err != nil || math.IsInf(v, 0) || math.IsNaN(v) {
+// daNumber returns operand idx of a default-appearance operator as a number.
+// The operands come from the content-stream scanner, which gives numbers as
+// [pdf.Integer] or [pdf.Real].
+func daNumber(args []pdf.Object, idx int) (float64, bool) {
+	if idx >= len(args) {
 		return 0, false
 	}
-	return v, true
+	switch v := args[idx].(type) {
+	case pdf.Integer:
+		return float64(v), true
+	case pdf.Real:
+		return float64(v), true
+	}
+	return 0, false
+}
+
+func clip01(x float64) float64 {
+	return color.ClipComponent(x, 0, 1)
 }
 
 // daColorOperator formats a colour as the colour-setting operator of a

@@ -16,9 +16,9 @@
 
 // Concat concatenates PDF files.
 //
-// This is a simplistic implementation which copies the page contents
-// and the document outlines, but ignores all other document structure
-// and document-level meta information.
+// This is a simplistic implementation which copies the pages, the
+// document outlines and the interactive forms, but ignores all other
+// document structure and document-level meta information.
 package main
 
 import (
