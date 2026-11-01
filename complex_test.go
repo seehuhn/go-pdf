@@ -18,7 +18,6 @@ package pdf
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +32,10 @@ func TestDateString(t *testing.T) {
 		time.Date(1998, 12, 23, 19, 52, 0, 0, PST),
 		time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 		time.Date(2020, 12, 24, 16, 30, 12, 0, time.FixedZone("", 90*60)),
+		time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC),
+		time.Date(2020, 1, 1, 0, 0, 0, 0, time.FixedZone("", 90*60+30)),
+		time.Date(2020, 1, 1, 0, 0, 0, 0, time.FixedZone("", -25*3600)),
 	}
 	for _, t1 := range cases {
 		enc := Date(t1).AsPDF(0).(String)
@@ -40,9 +43,27 @@ func TestDateString(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		} else if t2 := time.Time(out); !t1.Equal(t2) {
-			fmt.Println(t1, string(enc), out)
-			t.Errorf("wrong time: %s != %s", t2, t1)
+			t.Errorf("wrong time for %q: %s != %s", enc, t2, t1)
 		}
+	}
+}
+
+func TestDateYearOutOfRange(t *testing.T) {
+	cases := []time.Time{
+		time.Date(-1, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC),
+		// year 10000 only after conversion to UTC
+		time.Date(9999, 12, 31, 23, 0, 0, 0, time.FixedZone("", -5*3600+30)),
+	}
+	for _, t1 := range cases {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s: expected panic", t1)
+				}
+			}()
+			Date(t1).AsPDF(0)
+		}()
 	}
 }
 

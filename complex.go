@@ -44,6 +44,8 @@ func (x Number) AsPDF(opt OutputOptions) Native {
 	return obj
 }
 
+// Date represents a PDF date, stored as a text string of the form
+// "D:YYYYMMDDHHmmSSOHH'mm".  The zero value represents an absent date.
 type Date time.Time
 
 // Now returns the current date and time as a Date object.
@@ -51,21 +53,32 @@ func Now() Date {
 	return Date(time.Now())
 }
 
+// String formats the date in RFC 3339 format.
 func (d Date) String() string {
 	return time.Time(d).Format(time.RFC3339)
 }
 
+// IsZero reports whether d is the zero time instant.
 func (d Date) IsZero() bool {
 	return time.Time(d).IsZero()
 }
 
+// Equal reports whether d and other represent the same time instant.
 func (d Date) Equal(other Date) bool {
 	return time.Time(d).Equal(time.Time(other))
 }
 
 // AsPDF creates a PDF String object encoding the given date and time.
 func (d Date) AsPDF(opt OutputOptions) Native {
-	s := time.Time(d).Format("D:20060102150405-0700")
+	t := time.Time(d)
+	// PDF offsets are whole minutes below 24 hours; otherwise keep the instant
+	if _, off := t.Zone(); off%60 != 0 || off <= -24*3600 || off >= 24*3600 {
+		t = t.UTC()
+	}
+	if y := t.Year(); y < 0 || y > 9999 {
+		panic(fmt.Sprintf("year %d not representable in a PDF date", y))
+	}
+	s := t.Format("D:20060102150405-0700")
 	k := len(s) - 2
 	s = s[:k] + "'" + s[k:]
 	return String(s)
