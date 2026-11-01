@@ -36,14 +36,11 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	s, err := r.scannerFrom(pos+9, false)
-	if err != nil {
-		return 0, err
-	}
+	s := r.scannerFrom(pos+9, false)
 
 	xRefPos, err := s.ReadInteger()
 	if err != nil {
-		return 0, Wrap(err, fmt.Sprintf("byte %d", pos+9))
+		return 0, Wrap(eofToMalformed(err, "startxref"), fmt.Sprintf("byte %d", pos+9))
 	}
 
 	if xRefPos <= 0 || int64(xRefPos) >= size-r.headerOffset {
@@ -57,9 +54,7 @@ func (r *Reader) findXRef(size int64) (int64, error) {
 }
 
 func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
-	size := r.size
-
-	start, err := r.findXRef(size)
+	start, err := r.findXRef(r.size)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,57 +67,17 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 	seen := make(map[int64]bool)
 	for !seen[start] {
 		seen[start] = true
+
+		sec, dict, err := r.readXRefSection(start, xref, seen)
+		if err != nil {
+			if first || IsReadError(err) {
+				return nil, nil, err
+			}
+			// a malformed older section ends the /Prev chain
+			break
+		}
 		r.xrefOffsets = append(r.xrefOffsets, start)
-
-		s, err := r.scannerFrom(start, false)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		buf, err := s.PeekN(4)
-		if err != nil {
-			return nil, nil, err
-		}
-		var dict Dict
-		var ref Reference
-		switch {
-		case bytes.Equal(buf, []byte("xref")):
-			dict, err = readXRefTable(xref, s)
-			if err != nil {
-				return nil, nil, Wrap(err, fmt.Sprintf("table at byte %d", start))
-			}
-
-			if xRefStm, ok := dict["XRefStm"]; ok {
-				zStart, ok := xRefStm.(Integer)
-				if !ok {
-					return nil, nil, &MalformedFileError{
-						Err: errInvalidXref,
-					}
-				}
-				// decode each distinct cross-reference stream at most once;
-				// a /Prev chain may share one /XRefStm across all its tables
-				stmStart := int64(zStart) + r.headerOffset
-				if !seen[stmStart] {
-					seen[stmStart] = true
-					s, err = r.scannerFrom(stmStart, false)
-					if err != nil {
-						return nil, nil, err
-					}
-					_, ref, err = r.readXRefStream(xref, s)
-					if err != nil {
-						return nil, nil, Wrap(err, "XRefStm")
-					}
-				}
-			}
-		default:
-			dict, ref, err = r.readXRefStream(xref, s)
-			if err != nil {
-				return nil, nil, Wrap(err, fmt.Sprintf("stream at byte %d", start))
-			}
-		}
-		if ref != 0 {
-			r.unencrypted[ref] = true
-		}
+		mergeXRef(xref, sec)
 
 		if first {
 			for key, val := range dict {
@@ -159,17 +114,84 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 			break
 		}
 		prevStart, ok := prev.(Integer)
-		if !ok || prevStart <= 0 || int64(prevStart) >= size-r.headerOffset {
-			return nil, nil, &MalformedFileError{
-				Err: errors.New("invalid /Prev"),
-				Loc: []string{fmt.Sprintf("xref at byte %d", start)},
-			}
+		if !ok || prevStart <= 0 || int64(prevStart) >= r.size-r.headerOffset {
+			// an invalid /Prev is dropped and ends the chain
+			break
 		}
 		start = int64(prevStart) + r.headerOffset
 	}
 
 	repairFreeList(xref)
 	return xref, trailer, nil
+}
+
+// readXRefSection reads the cross-reference section at byte offset start,
+// together with the cross-reference stream named by a hybrid-reference
+// table's /XRefStm entry.  The entries are returned in a new map, so that
+// a section which fails to read leaves no partial entries behind.  The map
+// newer holds the entries of all newer sections; table entries which these
+// shadow are not decoded.
+func (r *Reader) readXRefSection(start int64, newer map[uint32]*xRefEntry, seen map[int64]bool) (map[uint32]*xRefEntry, Dict, error) {
+	s := r.scannerFrom(start, false)
+	buf, err := s.PeekN(4)
+	if err != nil {
+		return nil, nil, Wrap(err, fmt.Sprintf("xref at byte %d", start))
+	}
+
+	sec := make(map[uint32]*xRefEntry)
+	if !bytes.Equal(buf, []byte("xref")) {
+		dict, ref, err := r.readXRefStream(sec, s)
+		if err != nil {
+			return nil, nil, Wrap(err, fmt.Sprintf("stream at byte %d", start))
+		}
+		if ref != 0 {
+			r.unencrypted[ref] = true
+		}
+		return sec, dict, nil
+	}
+
+	dict, err := readXRefTable(sec, newer, s)
+	if err != nil {
+		return nil, nil, Wrap(err, fmt.Sprintf("table at byte %d", start))
+	}
+
+	// /XRefStm is optional: an invalid value, or one which does not lead
+	// to a well-formed cross-reference stream, is dropped
+	zStart, ok := dict["XRefStm"].(Integer)
+	if !ok || zStart <= 0 || int64(zStart) >= r.size-r.headerOffset {
+		return sec, dict, nil
+	}
+	// decode each distinct cross-reference stream at most once;
+	// a /Prev chain may share one /XRefStm across all its tables
+	stmStart := int64(zStart) + r.headerOffset
+	if seen[stmStart] {
+		return sec, dict, nil
+	}
+	seen[stmStart] = true
+	s = r.scannerFrom(stmStart, false)
+	stm := make(map[uint32]*xRefEntry)
+	_, ref, err := r.readXRefStream(stm, s)
+	if IsReadError(err) {
+		return nil, nil, Wrap(err, "XRefStm")
+	} else if err != nil {
+		return sec, dict, nil
+	}
+	if ref != 0 {
+		r.unencrypted[ref] = true
+	}
+	// table entries take precedence over the stream's
+	mergeXRef(sec, stm)
+	return sec, dict, nil
+}
+
+// mergeXRef adds the entries of older to xref, for object numbers which
+// xref does not yet define.
+func mergeXRef(xref, older map[uint32]*xRefEntry) {
+	for n, entry := range older {
+		if xref[n] == nil {
+			xref[n] = entry
+		}
+	}
 }
 
 // nextFreeNumber converts the next-free field of a free entry to an object
@@ -214,8 +236,15 @@ func repairFreeList(xref map[uint32]*xRefEntry) {
 	}
 }
 
-func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
-	err := s.SkipString("xref")
+// readXRefTable decodes a cross-reference table into xref and returns its
+// trailer dictionary.  Entries for object numbers which newer defines are
+// skipped without being decoded.
+func readXRefTable(xref, newer map[uint32]*xRefEntry, s *scanner) (_ Dict, err error) {
+	defer func() {
+		err = eofToMalformed(err, "xref table")
+	}()
+
+	err = s.SkipString("xref")
 	if err != nil {
 		return nil, err
 	}
@@ -235,11 +264,11 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 
 		start, err := s.ReadInteger()
 		if err != nil {
-			return nil, Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
+			return nil, Wrap(eofToMalformed(err, "xref table"), fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 		length, err := s.ReadInteger()
 		if err != nil {
-			return nil, Wrap(err, fmt.Sprintf("byte %d", s.CurrentPos()))
+			return nil, Wrap(eofToMalformed(err, "xref table"), fmt.Sprintf("byte %d", s.CurrentPos()))
 		}
 
 		if start < 0 || length < 0 || start >= maxXRefSize || start+length > maxXRefSize {
@@ -254,7 +283,7 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 			return nil, err
 		}
 
-		err = decodeXRefSection(xref, s, uint32(start), uint32(start+length))
+		err = decodeXRefSection(xref, newer, s, uint32(start), uint32(start+length))
 		if err != nil {
 			return nil, err
 		}
@@ -279,7 +308,7 @@ func readXRefTable(xref map[uint32]*xRefEntry, s *scanner) (Dict, error) {
 	return s.ReadDict()
 }
 
-func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32) error {
+func decodeXRefSection(xref, newer map[uint32]*xRefEntry, s *scanner, start, end uint32) error {
 	offByOne := uint32(0)
 	for i := start; i < end; i++ {
 		buf, err := s.PeekN(20)
@@ -300,31 +329,32 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 			width = 19
 		}
 
-		// offByOne is fixed for every entry but the first (see below),
-		// so this checks the same key the entry would be stored under
-		if xref[i-offByOne] != nil {
+		// Some PDF files number the first section "1 n" although its
+		// first entry is that of object 0.  This is detected before the
+		// skip below, so that later entries go to the correct numbers
+		// even when a newer section defines object 1.
+		if i == start && start == 1 && isObjectZeroEntry(buf) {
+			offByOne = 1
+		}
+
+		if xref[i-offByOne] != nil || newer[i-offByOne] != nil {
 			s.pos += width
 			continue
 		}
 
 		a, err := strconv.ParseInt(string(buf[:10]), 10, 64)
 		if err != nil {
-			return err
+			return &MalformedFileError{Err: err}
 		}
 		b, err := strconv.ParseUint(string(buf[11:16]), 10, 16)
 		if err != nil {
 			// fix an error seen in some PDF files
-			if bytes.HasPrefix(buf, []byte("0000000000 65536 ")) {
+			if bytes.HasPrefix(buf, objectZeroGen65536) {
 				b = maxGeneration
 				buf[17] = 'f'
 			} else {
-				return err
+				return &MalformedFileError{Err: err}
 			}
-		}
-
-		// fix an error seen in some PDF files
-		if i == start && start == 1 && a == 0 && b == maxGeneration {
-			offByOne = 1
 		}
 
 		c := buf[17]
@@ -350,6 +380,25 @@ func decodeXRefSection(xref map[uint32]*xRefEntry, s *scanner, start, end uint32
 		s.pos += width
 	}
 	return nil
+}
+
+// objectZeroGen65536 starts the entry for object 0 as written by some PDF
+// files, with the out-of-range generation 65536 instead of 65535.
+var objectZeroGen65536 = []byte("0000000000 65536 ")
+
+// isObjectZeroEntry reports whether a 20-byte cross-reference table entry
+// has the form of the entry for object 0: offset 0 and generation 65535.
+// The malformed generation 65536, seen in some PDF files, is accepted too.
+func isObjectZeroEntry(buf []byte) bool {
+	if bytes.HasPrefix(buf, objectZeroGen65536) {
+		return true
+	}
+	a, err := strconv.ParseInt(string(buf[:10]), 10, 64)
+	if err != nil || a != 0 {
+		return false
+	}
+	b, err := strconv.ParseUint(string(buf[11:16]), 10, 16)
+	return err == nil && b == maxGeneration
 }
 
 func (r *Reader) readXRefStream(xref map[uint32]*xRefEntry, s *scanner) (Dict, Reference, error) {
@@ -497,7 +546,7 @@ func decodeXRefStream(xref map[uint32]*xRefEntry, r io.Reader, w []int, ss []*xR
 		for i := sec.Start; i < sec.Start+sec.Size; i++ {
 			_, err := io.ReadFull(r, buf)
 			if err != nil {
-				return err
+				return eofToMalformed(err, "xref stream")
 			}
 
 			if i >= maxXRefSize || xref[i] != nil {

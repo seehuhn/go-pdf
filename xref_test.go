@@ -18,6 +18,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -601,11 +602,69 @@ func TestDecodeXRefSectionOffByOneSkipUsesCorrectedKey(t *testing.T) {
 		4: {Pos: 358}, // object 4, already defined by a newer xref section
 	}
 	s := newScanner(bytes.NewReader(data), nil, nil)
-	if err := decodeXRefSection(xref, s, 1, 5); err != nil {
+	if err := decodeXRefSection(xref, nil, s, 1, 5); err != nil {
 		t.Fatal(err)
 	}
 	if xref[3] == nil || xref[3].Pos != 161 {
 		t.Errorf("xref[3] = %v, want an entry with Pos 161", xref[3])
+	}
+}
+
+// TestDecodeXRefSectionOffByOneFirstShadowed checks that an off-by-one
+// section is detected when a newer section defines object 1, so that the
+// first raw entry is not itself skipped as object 1.
+func TestDecodeXRefSectionOffByOneFirstShadowed(t *testing.T) {
+	data := []byte(
+		"0000000000 65535 f\r\n" + // raw index 1 -> object 0 (free)
+			"0000000017 00000 n\r\n" + // raw index 2 -> object 1 (shadowed)
+			"0000000099 00000 n\r\n") // raw index 3 -> object 2
+
+	newer := map[uint32]*xRefEntry{
+		1: {Pos: 500},
+	}
+	xref := make(map[uint32]*xRefEntry)
+	s := newScanner(bytes.NewReader(data), nil, nil)
+	if err := decodeXRefSection(xref, newer, s, 1, 4); err != nil {
+		t.Fatal(err)
+	}
+	want := map[uint32]*xRefEntry{
+		0: {Pos: -1, Generation: maxGeneration},
+		2: {Pos: 99},
+	}
+	if diff := cmp.Diff(want, xref); diff != "" {
+		t.Errorf("decoded entries mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// TestDecodeXRefSectionFirstEntry checks how the first entry of a table
+// subsection is numbered, including the malformed generation 65536 and
+// subsections numbered "1 n" which start with the entry for object 0.
+func TestDecodeXRefSectionFirstEntry(t *testing.T) {
+	free0 := &xRefEntry{Pos: -1, Generation: maxGeneration}
+	cases := []struct {
+		name  string
+		first string
+		start uint32
+		want  map[uint32]*xRefEntry
+	}{
+		{"gen65535 at 0", "0000000000 65535 f\r\n", 0, map[uint32]*xRefEntry{0: free0, 1: {Pos: 99}}},
+		{"gen65536 at 0", "0000000000 65536 f\r\n", 0, map[uint32]*xRefEntry{0: free0, 1: {Pos: 99}}},
+		{"gen65535 at 1", "0000000000 65535 f\r\n", 1, map[uint32]*xRefEntry{0: free0, 1: {Pos: 99}}},
+		{"gen65536 at 1", "0000000000 65536 f\r\n", 1, map[uint32]*xRefEntry{0: free0, 1: {Pos: 99}}},
+		{"object 1", "0000000017 00000 n\r\n", 1, map[uint32]*xRefEntry{1: {Pos: 17}, 2: {Pos: 99}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			data := []byte(c.first + "0000000099 00000 n\r\n")
+			xref := make(map[uint32]*xRefEntry)
+			s := newScanner(bytes.NewReader(data), nil, nil)
+			if err := decodeXRefSection(xref, nil, s, c.start, c.start+2); err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(c.want, xref); diff != "" {
+				t.Errorf("decoded entries mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 
@@ -1165,5 +1224,275 @@ func TestXRefStreamEntry0Generation(t *testing.T) {
 	entry := r.xref[0]
 	if entry == nil || !entry.IsFree() || entry.Generation != maxGeneration {
 		t.Errorf("entry 0 = %+v, want free with generation %d", entry, maxGeneration)
+	}
+}
+
+// appendTableUpdate appends an empty cross-reference table to data, whose
+// trailer points back to the original section and carries extra.
+func appendTableUpdate(t *testing.T, data []byte, extra string) []byte {
+	t.Helper()
+	prev := lastStartXRef(t, data)
+	buf := bytes.NewBuffer(bytes.Clone(data))
+	xrefPos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 0\ntrailer\n<< /Size %d /Root %d 0 R /Prev %d %s >>\nstartxref\n%d\n%%%%EOF\n",
+		trailerSize(t, data), rootRef(t, data).Number(), prev, extra, xrefPos)
+	return buf.Bytes()
+}
+
+func TestReadXRefInvalidXRefStmDropped(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	for _, val := range []string{
+		"(abc)", "/N", "9 0 R", "12.5", "5", "-5", "100000", "[]",
+	} {
+		t.Run(val, func(t *testing.T) {
+			data := appendTableUpdate(t, base, "/XRefStm "+val)
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.meta.Catalog.Pages == 0 {
+				t.Error("catalog lost")
+			}
+			if n := len(r.XRefOffsets()); n != 2 {
+				t.Errorf("got %d sections, want 2", n)
+			}
+		})
+	}
+}
+
+// TestReadXRefTruncatedXRefStmLeavesNoEntries checks that a cross-reference
+// stream which fails part way through contributes none of its entries.
+func TestReadXRefTruncatedXRefStmLeavesNoEntries(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	r0, err := NewReader(bytes.NewReader(base), int64(len(base)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := r0.xref[1]
+	if want == nil {
+		t.Fatal("base file has no object 1")
+	}
+
+	buf := bytes.NewBuffer(bytes.Clone(base))
+	stmPos := buf.Len()
+	// a complete entry for object 1, then a truncated one for object 2
+	body := []byte{1, 0, 0, 0, 9, 0, 0, 1, 0, 0}
+	fmt.Fprintf(buf, "%d 0 obj\n<< /Type /XRef /Size %d /W [1 4 2] /Index [1 2] /Length %d >>\nstream\n",
+		trailerSize(t, base), trailerSize(t, base)+1, len(body))
+	buf.Write(body)
+	buf.WriteString("\nendstream\nendobj\n")
+	data := appendTableUpdate(t, buf.Bytes(), fmt.Sprintf("/XRefStm %d", stmPos))
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, r.xref[1]); diff != "" {
+		t.Errorf("object 1 entry mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestReadXRefInvalidPrevDropped(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	if bytes.Count(base, []byte("/Root")) != 1 {
+		t.Fatal("expected exactly one /Root in the base file")
+	}
+
+	// a table whose first entry is valid and whose second is malformed
+	broken := len(base)
+	base = append(bytes.Clone(base), "xref\n1000 2\n0000000009 00000 n\r\n0000000009 00000 x\r\n"...)
+	// tables whose entries have unparsable offset or generation fields
+	badOffset := len(base)
+	base = append(base, "xref\n1000 1\n00000x0009 00000 n\r\ntrailer\n<< >>\n"...)
+	badGen := len(base)
+	base = append(base, "xref\n1000 1\n0000000009 0000x n\r\ntrailer\n<< >>\n"...)
+	// a table which is cut off by the end of the file
+	truncated := len(base)
+	base = append(base, "xref\n1000 1\n0000000009 00000 n\r\n"...)
+
+	// Inserting "/Prev <val> " into the trailer moves the broken tables.
+	// A zero-padded value has a known width, so the shift is fixed.
+	const prevWidth = 10
+	shift := len("/Prev  ") + prevWidth
+	brokenVal := fmt.Sprintf("%0*d", prevWidth, broken+shift)
+	badOffsetVal := fmt.Sprintf("%0*d", prevWidth, badOffset+shift)
+	badGenVal := fmt.Sprintf("%0*d", prevWidth, badGen+shift)
+	truncatedVal := fmt.Sprintf("%0*d", prevWidth, truncated+shift)
+	// too close to the end of the file to hold a section
+	nearEndVal := fmt.Sprintf("%0*d", prevWidth, len(base)+shift-2)
+
+	targets := map[string]struct {
+		pos    int
+		prefix string
+	}{
+		brokenVal:    {broken, "xref\n1000 2\n"},
+		badOffsetVal: {badOffset, "xref\n1000 1\n00000x"},
+		badGenVal:    {badGen, "xref\n1000 1\n0000000009 0000x"},
+		truncatedVal: {truncated, "xref\n1000 1\n0000000009 00000 n\r\n"},
+	}
+
+	for _, val := range []string{
+		"(abc)", "0", "-5", "5", "99999999", "1.5",
+		brokenVal, badOffsetVal, badGenVal, truncatedVal, nearEndVal,
+	} {
+		t.Run(val, func(t *testing.T) {
+			data := bytes.Replace(base, []byte("/Root"), []byte("/Prev "+val+" /Root"), 1)
+			if tgt, ok := targets[val]; ok && !bytes.HasPrefix(data[tgt.pos+shift:], []byte(tgt.prefix)) {
+				t.Fatal("/Prev does not point at the intended table")
+			}
+			r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.meta.Catalog.Pages == 0 {
+				t.Error("catalog lost")
+			}
+			if n := len(r.XRefOffsets()); n != 1 {
+				t.Errorf("got %d sections, want 1", n)
+			}
+			if r.xref[1000] != nil {
+				t.Error("entry from a broken section kept")
+			}
+		})
+	}
+}
+
+// TestReadXRefSharedXRefStm checks a /Prev chain whose tables all name the
+// same cross-reference stream.
+func TestReadXRefSharedXRefStm(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	n := trailerSize(t, base)
+
+	// a cross-reference stream whose only entry is for itself
+	buf := bytes.NewBuffer(bytes.Clone(base))
+	stmPos := buf.Len()
+	body := []byte{1, byte(stmPos >> 24), byte(stmPos >> 16), byte(stmPos >> 8), byte(stmPos), 0, 0}
+	fmt.Fprintf(buf, "%d 0 obj\n<< /Type /XRef /Size %d /W [1 4 2] /Index [%d 1] /Length %d >>\nstream\n",
+		n, n+1, n, len(body))
+	buf.Write(body)
+	buf.WriteString("\nendstream\nendobj\n")
+
+	extra := fmt.Sprintf("/XRefStm %d", stmPos)
+	data := appendTableUpdate(t, buf.Bytes(), extra)
+	data = appendTableUpdate(t, data, extra)
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := len(r.XRefOffsets()); got != 3 {
+		t.Errorf("got %d sections, want 3", got)
+	}
+	want := &xRefEntry{Pos: int64(stmPos)}
+	if diff := cmp.Diff(want, r.xref[uint32(n)]); diff != "" {
+		t.Errorf("stream entry mismatch (-want +got):\n%s", diff)
+	}
+}
+
+// failAtReaderAt fails every read which starts at byte offset off.
+type failAtReaderAt struct {
+	r   *bytes.Reader
+	off int64
+}
+
+func (f failAtReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if off == f.off {
+		return 0, errors.New("read failed")
+	}
+	return f.r.ReadAt(p, off)
+}
+
+func TestReadXRefSectionReadError(t *testing.T) {
+	data := writeBaseFile(t, nil, "")
+	r := failAtReaderAt{r: bytes.NewReader(data), off: lastStartXRef(t, data)}
+	_, err := NewReader(r, int64(len(data)), nil)
+	if err == nil {
+		t.Error("expected error from failing reader")
+	}
+}
+
+// TestReadXRefOlderSectionReadError checks that a read error in an older
+// section is reported, rather than ending the /Prev chain.  The newest
+// section repeats every entry, so the file would open without the older one.
+func TestReadXRefOlderSectionReadError(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	r0, err := NewReader(bytes.NewReader(base), int64(len(base)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	size := trailerSize(t, base)
+	prev := lastStartXRef(t, base)
+
+	buf := bytes.NewBuffer(bytes.Clone(base))
+	xrefPos := buf.Len()
+	fmt.Fprintf(buf, "xref\n0 %d\n", size)
+	for i := range uint32(size) {
+		entry := r0.xref[i]
+		switch {
+		case entry == nil:
+			fmt.Fprintf(buf, "%010d %05d f\r\n", 0, 0)
+		case entry.InStream != 0:
+			t.Fatalf("object %d is in an object stream", i)
+		case entry.Pos < 0:
+			fmt.Fprintf(buf, "%010d %05d f\r\n", entry.NextFree, entry.Generation)
+		default:
+			fmt.Fprintf(buf, "%010d %05d n\r\n", entry.Pos, entry.Generation)
+		}
+	}
+	fmt.Fprintf(buf, "trailer\n<< /Size %d /Root %d 0 R /Prev %d >>\nstartxref\n%d\n%%%%EOF\n",
+		size, rootRef(t, base).Number(), prev, xrefPos)
+	data := buf.Bytes()
+
+	// the file opens without the failure
+	if _, err := NewReader(bytes.NewReader(data), int64(len(data)), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	r := failAtReaderAt{r: bytes.NewReader(data), off: prev}
+	_, err = NewReader(r, int64(len(data)), nil)
+	if err == nil {
+		t.Error("expected error from failing reader")
+	}
+}
+
+// TestReadXRefStmReadError checks that a read error in the stream named by
+// /XRefStm is reported, rather than dropping the stream.
+func TestReadXRefStmReadError(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	n := trailerSize(t, base)
+
+	buf := bytes.NewBuffer(bytes.Clone(base))
+	stmPos := buf.Len()
+	body := []byte{1, byte(stmPos >> 24), byte(stmPos >> 16), byte(stmPos >> 8), byte(stmPos), 0, 0}
+	fmt.Fprintf(buf, "%d 0 obj\n<< /Type /XRef /Size %d /W [1 4 2] /Index [%d 1] /Length %d >>\nstream\n",
+		n, n+1, n, len(body))
+	buf.Write(body)
+	buf.WriteString("\nendstream\nendobj\n")
+	data := appendTableUpdate(t, buf.Bytes(), fmt.Sprintf("/XRefStm %d", stmPos))
+
+	// the stream is readable without the failure
+	if _, err := NewReader(bytes.NewReader(data), int64(len(data)), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	r := failAtReaderAt{r: bytes.NewReader(data), off: int64(stmPos)}
+	_, err := NewReader(r, int64(len(data)), nil)
+	if err == nil {
+		t.Error("expected error from failing reader")
+	}
+}
+
+// TestFindXRefTruncatedIsMalformed checks that a file which ends right after
+// the startxref keyword is reported as malformed, not as a read error.
+func TestFindXRefTruncatedIsMalformed(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	idx := bytes.LastIndex(base, []byte("startxref"))
+	if idx < 0 {
+		t.Fatal("no startxref in the base file")
+	}
+	data := base[:idx+len("startxref\n")]
+	_, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if !IsMalformed(err) {
+		t.Errorf("got %v, want a malformed-file error", err)
 	}
 }

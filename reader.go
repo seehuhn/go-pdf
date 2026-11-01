@@ -88,9 +88,9 @@ type Reader struct {
 	startXRef   int64
 	trailerSize int64
 
-	// xrefOffsets holds the offsets of the file's cross-reference
-	// sections, newest first, as visited by the Prev chain.  Read-only
-	// after construction.
+	// xrefOffsets holds the offsets of the file's well-formed
+	// cross-reference sections, newest first, as visited by the Prev
+	// chain.  Read-only after construction.
 	xrefOffsets []int64
 
 	enc         *encryptInfo       // read-only after construction
@@ -342,12 +342,13 @@ func (r *Reader) GetMeta() *MetaInfo {
 }
 
 // XRefOffsets returns the byte offsets of the file's cross-reference
-// sections, newest first.  Offsets count from the start of the data, so
-// they are comparable with file lengths; in a file with bytes before the
-// %PDF- header they exceed the values written after startxref and Prev
-// by that header offset.  A hybrid-reference file's cross-reference
-// stream belongs to the table whose trailer names it and is not listed
-// separately.
+// sections, newest first.  The list ends before the first malformed
+// section, since such a section also breaks the Prev chain.  Offsets
+// count from the start of the data, so they are comparable with file
+// lengths; in a file with bytes before the %PDF- header they exceed the
+// values written after startxref and Prev by that header offset.  A
+// hybrid-reference file's cross-reference stream belongs to the table
+// whose trailer names it and is not listed separately.
 func (r *Reader) XRefOffsets() []int64 {
 	return slices.Clone(r.xrefOffsets)
 }
@@ -390,10 +391,7 @@ func (r *Reader) get(ref Reference, canObjStm, scalarOnly bool) (_ Native, err e
 		return getFromObjStm(r, ref.Number(), entry.InStream, getInt, r.objstms)
 	}
 
-	s, err := r.scannerFrom(entry.Pos+r.headerOffset, canObjStm)
-	if err != nil {
-		return nil, err
-	}
+	s := r.scannerFrom(entry.Pos+r.headerOffset, canObjStm)
 	s.scalarOnly = scalarOnly
 	obj, fileRef, err := s.ReadIndirectObject()
 	if err != nil {
@@ -597,12 +595,12 @@ func safeGetInteger(r Getter, canObjStm bool) getIntFn {
 	}
 }
 
-func (r *Reader) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
+func (r *Reader) scannerFrom(pos int64, canObjStm bool) *scanner {
 	getInt := safeGetInteger(lengthGetter{r}, canObjStm)
 	sr := io.NewSectionReader(r.r, pos, r.size-pos)
 	s := newScanner(sr, getInt, r.enc)
 	s.fileReader = r.r
 	s.unencrypted = r.unencrypted
 	s.filePos = pos
-	return s, nil
+	return s
 }
