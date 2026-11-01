@@ -65,10 +65,11 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 	trailer := Dict{}
 	first := true
 	seen := make(map[int64]bool)
+	stmTried := make(map[int64]bool)
 	for !seen[start] {
 		seen[start] = true
 
-		sec, dict, err := r.readXRefSection(start, xref, seen)
+		sec, dict, err := r.readXRefSection(start, xref, stmTried)
 		if err != nil {
 			if first || IsReadError(err) {
 				return nil, nil, err
@@ -130,8 +131,9 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 // table's /XRefStm entry.  The entries are returned in a new map, so that
 // a section which fails to read leaves no partial entries behind.  The map
 // newer holds the entries of all newer sections; table entries which these
-// shadow are not decoded.
-func (r *Reader) readXRefSection(start int64, newer map[uint32]*xRefEntry, seen map[int64]bool) (map[uint32]*xRefEntry, Dict, error) {
+// shadow are not decoded.  The map stmTried holds the offsets of all
+// /XRefStm streams already tried, so that each is decoded at most once.
+func (r *Reader) readXRefSection(start int64, newer map[uint32]*xRefEntry, stmTried map[int64]bool) (map[uint32]*xRefEntry, Dict, error) {
 	s := r.scannerFrom(start, false)
 	buf, err := s.PeekN(4)
 	if err != nil {
@@ -161,13 +163,12 @@ func (r *Reader) readXRefSection(start int64, newer map[uint32]*xRefEntry, seen 
 	if !ok || zStart <= 0 || int64(zStart) >= r.size-r.headerOffset {
 		return sec, dict, nil
 	}
-	// decode each distinct cross-reference stream at most once;
 	// a /Prev chain may share one /XRefStm across all its tables
 	stmStart := int64(zStart) + r.headerOffset
-	if seen[stmStart] {
+	if stmTried[stmStart] {
 		return sec, dict, nil
 	}
-	seen[stmStart] = true
+	stmTried[stmStart] = true
 	s = r.scannerFrom(stmStart, false)
 	stm := make(map[uint32]*xRefEntry)
 	_, ref, err := r.readXRefStream(stm, s)

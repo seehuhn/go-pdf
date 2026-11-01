@@ -1292,6 +1292,26 @@ func TestReadXRefTruncatedXRefStmLeavesNoEntries(t *testing.T) {
 	}
 }
 
+// TestReadXRefStmAtPrevTable checks that an /XRefStm which names the
+// previous cross-reference table is dropped without cutting the /Prev chain
+// short.
+func TestReadXRefStmAtPrevTable(t *testing.T) {
+	base := writeBaseFile(t, nil, "")
+	prev := lastStartXRef(t, base)
+	data := appendTableUpdate(t, base, fmt.Sprintf("/XRefStm %d", prev))
+
+	r, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.meta.Catalog.Pages == 0 {
+		t.Error("catalog lost")
+	}
+	if n := len(r.XRefOffsets()); n != 2 {
+		t.Errorf("got %d sections, want 2", n)
+	}
+}
+
 func TestReadXRefInvalidPrevDropped(t *testing.T) {
 	base := writeBaseFile(t, nil, "")
 	if bytes.Count(base, []byte("/Root")) != 1 {
