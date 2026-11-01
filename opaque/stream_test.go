@@ -22,6 +22,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -52,7 +54,10 @@ func TestStreamReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	s := ExtractStream(srcX, stream)
+	s, err := ExtractStream(srcX, stream)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rc, err := s.Reader()
 	if err != nil {
@@ -110,7 +115,10 @@ func TestStreamWriteAtCrossFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	s := ExtractStream(srcX, srcStream)
+	s, err := ExtractStream(srcX, srcStream)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(dst)
@@ -213,7 +221,10 @@ func TestStreamWriteAtCrossEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	s := ExtractStream(srcX, srcStream)
+	s, err := ExtractStream(srcX, srcStream)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// embed into an unencrypted destination.
 	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
@@ -277,9 +288,12 @@ func TestStreamWriteAtRejectsForbiddenKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStream: %v", err)
 	}
-	s := ExtractStream(srcX, stream)
+	s, err := ExtractStream(srcX, stream)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	forbidden := []pdf.Name{"Length", "Filter", "DecodeParms", "F", "FFilter", "FDecodeParms"}
+	forbidden := []pdf.Name{"Length", "Filter", "DecodeParms", "DP", "F", "FFilter", "FDecodeParms"}
 	for _, key := range forbidden {
 		dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 		rm := pdf.NewResourceManager(dst)
@@ -339,7 +353,10 @@ func TestStreamWriteAtUnreadable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := ExtractStream(srcX, srcStream)
+	s, err := ExtractStream(srcX, srcStream)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(dst)
@@ -370,5 +387,187 @@ func TestStreamWriteAtUnreadable(t *testing.T) {
 	}
 	if val != nil {
 		t.Errorf("K resolves to %v, want null", val)
+	}
+}
+
+// readTestStream writes a stream with the given dictionary and raw body to
+// a PDF 1.7 file and reads it back.
+func readTestStream(t *testing.T, dict pdf.Dict, body []byte) (*pdf.Extractor, *pdf.Stream) {
+	t.Helper()
+	src, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	ref := src.Alloc()
+	if err := src.Put(ref, pdf.NewStream(dict, body)); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	src.GetMeta().Trailer["Quir:E"] = ref
+	if err := src.Close(); err != nil {
+		t.Fatalf("src.Close: %v", err)
+	}
+	srcX := pdf.NewExtractor(src)
+	stream, err := pdf.CursorAt(srcX, nil).Stream(ref)
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	return srcX, stream
+}
+
+// TestStreamWriteAtVersion verifies that WriteAt refuses to copy a stream
+// into a file whose PDF version predates one of the stream's filters.
+func TestStreamWriteAtVersion(t *testing.T) {
+	cases := []struct {
+		dict     pdf.Dict
+		earliest pdf.Version
+	}{
+		{pdf.Dict{"Filter": pdf.Name("FlateDecode")}, pdf.V1_2},
+		{pdf.Dict{"Filter": pdf.Array{pdf.Name("ASCIIHexDecode"), pdf.Name("JBIG2Decode")}}, pdf.V1_4},
+		{pdf.Dict{"Filter": pdf.Name("JPXDecode")}, pdf.V1_5},
+		{pdf.Dict{
+			"Filter":      pdf.Name("FlateDecode"),
+			"DecodeParms": pdf.Dict{"Predictor": pdf.Integer(12), "BitsPerComponent": pdf.Integer(16)},
+		}, pdf.V1_5},
+	}
+	for i, c := range cases {
+		srcX, stream := readTestStream(t, c.dict, []byte("data"))
+		s, err := ExtractStream(srcX, stream)
+		if err != nil {
+			t.Fatalf("%d: ExtractStream: %v", i, err)
+		}
+		for _, v := range []pdf.Version{c.earliest - 1, c.earliest} {
+			dst, _ := memfile.NewPDFWriter(t, v, nil)
+			rm := pdf.NewResourceManager(dst)
+			_, err := rm.Embed(&streamCarrier{s: s, ref: dst.Alloc()})
+			if (err == nil) != (v >= c.earliest) {
+				t.Errorf("%d: %s: unexpected error state %v", i, v, err)
+			}
+		}
+	}
+}
+
+// TestExtractStreamMalformed verifies that ExtractStream rejects streams
+// whose filter chain cannot be decoded.
+func TestExtractStreamMalformed(t *testing.T) {
+	cases := []pdf.Dict{
+		{"Filter": pdf.Name("NoSuchDecode")},
+		{"Filter": pdf.Array{pdf.Name("FlateDecode"), pdf.Integer(1)}},
+		{"Filter": pdf.Array{pdf.Name("FlateDecode"), pdf.Name("Crypt")}},
+	}
+	for i, dict := range cases {
+		srcX, stream := readTestStream(t, dict, []byte("data"))
+		if _, err := ExtractStream(srcX, stream); err == nil {
+			t.Errorf("%d: expected error, got nil", i)
+		}
+	}
+}
+
+// TestStreamWriteAtCryptFilterVersion verifies that a leading /Crypt
+// filter does not cause WriteAt to reject a pre-1.5 destination, since the
+// copier strips the crypt filter when the destination does not use crypt
+// filters.
+func TestStreamWriteAtCryptFilterVersion(t *testing.T) {
+	body := []byte("plaintext stream payload")
+
+	filters := []pdf.Filter{pdf.FilterCryptStandard{}, pdf.FilterCryptIdentity{}}
+	for i, filter := range filters {
+		src, srcFile := memfile.NewPDFWriter(t, pdf.V1_6, &pdf.WriterOptions{
+			UserPassword:  "u",
+			OwnerPassword: "o",
+		})
+		streamRef := src.Alloc()
+		w, err := src.OpenStream(streamRef, nil, filter)
+		if err != nil {
+			t.Fatalf("%d: OpenStream: %v", i, err)
+		}
+		if _, err := w.Write(body); err != nil {
+			t.Fatalf("%d: Write: %v", i, err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatalf("%d: close stream: %v", i, err)
+		}
+		src.GetMeta().Trailer["Quir:E"] = streamRef
+		if err := src.Close(); err != nil {
+			t.Fatalf("%d: src.Close: %v", i, err)
+		}
+
+		r, err := pdf.NewReader(bytes.NewReader(srcFile.Data), int64(len(srcFile.Data)),
+			&pdf.ReaderOptions{Password: "u"})
+		if err != nil {
+			t.Fatalf("%d: NewReader: %v", i, err)
+		}
+		srcX := pdf.NewExtractor(r)
+		srcStream, err := pdf.CursorAt(srcX, nil).Stream(r.GetMeta().Trailer["Quir:E"])
+		if err != nil {
+			t.Fatalf("%d: GetStream: %v", i, err)
+		}
+		if _, ok := srcStream.Dict["Filter"]; !ok {
+			t.Fatalf("%d: source stream has no /Filter entry", i)
+		}
+		s, err := ExtractStream(srcX, srcStream)
+		if err != nil {
+			t.Fatalf("%d: ExtractStream: %v", i, err)
+		}
+
+		dst, _ := memfile.NewPDFWriter(t, pdf.V1_4, nil)
+		rm := pdf.NewResourceManager(dst)
+		dstRef := dst.Alloc()
+		if _, err := rm.Embed(&streamCarrier{s: s, ref: dstRef}); err != nil {
+			t.Fatalf("%d: Embed: %v", i, err)
+		}
+		if err := rm.Close(); err != nil {
+			t.Fatalf("%d: rm.Close: %v", i, err)
+		}
+
+		dstStream, err := pdf.CursorAt(pdf.NewExtractor(dst), nil).Stream(dstRef)
+		if err != nil {
+			t.Fatalf("%d: dst GetStream: %v", i, err)
+		}
+		if f, ok := dstStream.Dict["Filter"]; ok {
+			t.Errorf("%d: unexpected /Filter %v in destination", i, f)
+		}
+		rc, err := pdf.DecodeStream(dst, nil, dstStream)
+		if err != nil {
+			t.Fatalf("%d: DecodeStream: %v", i, err)
+		}
+		got, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			t.Fatalf("%d: ReadAll: %v", i, err)
+		}
+		if !bytes.Equal(got, body) {
+			t.Errorf("%d: dst body = %q, want %q", i, got, body)
+		}
+	}
+}
+
+// TestStreamWriteAtAbbreviations verifies that WriteAt keeps the filter
+// parameters of a stream which uses the abbreviated key /DP, and writes
+// them under the full key.
+func TestStreamWriteAtAbbreviations(t *testing.T) {
+	parms := pdf.Dict{"Predictor": pdf.Integer(12), "Columns": pdf.Integer(4)}
+	srcX, stream := readTestStream(t, pdf.Dict{"Filter": pdf.Name("Fl"), "DP": parms}, []byte("data"))
+	s, err := ExtractStream(srcX, stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dst, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(dst)
+	dstRef := dst.Alloc()
+	if _, err := rm.Embed(&streamCarrier{s: s, ref: dstRef}); err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatalf("rm.Close: %v", err)
+	}
+
+	dstStream, err := pdf.CursorAt(pdf.NewExtractor(dst), nil).Stream(dstRef)
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	want := pdf.Dict{
+		"Filter":      pdf.Name("FlateDecode"),
+		"DecodeParms": parms,
+	}
+	if diff := cmp.Diff(want, dstStream.Dict); diff != "" {
+		t.Errorf("wrong stream dict (-want +got):\n%s", diff)
 	}
 }

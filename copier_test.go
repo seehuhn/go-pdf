@@ -18,6 +18,8 @@ package pdf
 
 import (
 	"bytes"
+	"compress/zlib"
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -471,5 +473,155 @@ func TestCopierInlinesFilterRefs(t *testing.T) {
 	}
 	if diff := cmp.Diff(Array{Name("ASCIIHexDecode")}, stm.Dict["Filter"]); diff != "" {
 		t.Errorf("wrong /Filter (-want +got):\n%s", diff)
+	}
+}
+
+// TestCopierIdentityCrypt checks copying a stream with a leading /Crypt
+// /Identity filter.  The filter is kept only if the destination uses crypt
+// filters; otherwise the copy is encrypted with the destination's default.
+func TestCopierIdentityCrypt(t *testing.T) {
+	const payload = "stream with an identity crypt filter"
+
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_6, &WriterOptions{UserPassword: "src"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srcRef := w.Alloc()
+	stm, err := w.OpenStream(srcRef, nil, FilterCryptIdentity{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(w); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	src, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()),
+		&ReaderOptions{Password: "src"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		v         Version
+		password  string
+		keepCrypt bool
+	}{
+		{V1_4, "", false},
+		{V1_4, "dst", false}, // RC4 without crypt filters
+		{V1_6, "", false},
+		{V1_6, "dst", true},
+	}
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%s-encrypted=%t", c.v, c.password != ""), func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w, err := NewWriter(buf, c.v, &WriterOptions{UserPassword: c.password})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ref, err := NewCopier(w, src).CopyReference(srcRef)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := addPage(w); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			dst, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()),
+				&ReaderOptions{Password: c.password})
+			if err != nil {
+				t.Fatal(err)
+			}
+			stm, err := NewCursor(dst).Stream(ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, hasFilter := stm.Dict["Filter"]
+			if hasFilter != c.keepCrypt {
+				t.Errorf("/Filter present=%t, want %t", hasFilter, c.keepCrypt)
+			}
+			if got := decodeAll(t, dst, stm); got != payload {
+				t.Errorf("got %q, want %q", got, payload)
+			}
+		})
+	}
+}
+
+// TestCopierExpandsAbbreviations checks that copying a stream replaces
+// abbreviated filter names and the abbreviated key /DP by their full
+// forms, which are the only ones valid outside inline images.
+func TestCopierExpandsAbbreviations(t *testing.T) {
+	const payload = "stream with abbreviated filter names"
+
+	var z bytes.Buffer
+	zw := zlib.NewWriter(&z)
+	if _, err := zw.Write([]byte(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	body := hex.EncodeToString(z.Bytes()) + ">"
+
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [] /Count 0 >>",
+		fmt.Sprintf("<< /Length %d /Filter [/AHx /Fl] /DP [null << /Predictor 1 >>] >>\nstream\n%s\nendstream",
+			len(body), body),
+	}
+	data := buildRawPDF(objs, 0)
+	src, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, err := NewCopier(w, src).CopyReference(NewReference(3, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := addPage(w); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	dst, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stm, err := NewCursor(dst).Stream(ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFilter := Array{Name("ASCIIHexDecode"), Name("FlateDecode")}
+	if diff := cmp.Diff(wantFilter, stm.Dict["Filter"]); diff != "" {
+		t.Errorf("wrong /Filter (-want +got):\n%s", diff)
+	}
+	wantParms := Array{nil, Dict{"Predictor": Integer(1)}}
+	if diff := cmp.Diff(wantParms, stm.Dict["DecodeParms"]); diff != "" {
+		t.Errorf("wrong /DecodeParms (-want +got):\n%s", diff)
+	}
+	if dp, ok := stm.Dict["DP"]; ok {
+		t.Errorf("unexpected /DP %v", dp)
+	}
+	if got := decodeAll(t, dst, stm); got != payload {
+		t.Errorf("got %q, want %q", got, payload)
 	}
 }

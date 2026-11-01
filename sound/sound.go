@@ -289,7 +289,11 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*Sound, error) {
 	if externalFile != nil {
 		res.Data = &ExternalFileSource{File: externalFile}
 	} else {
-		res.Data = &streamSource{inner: opaque.ExtractStream(c.Extractor(), stream)}
+		inner, err := opaque.ExtractStream(c.Extractor(), stream)
+		if err != nil {
+			return nil, err
+		}
+		res.Data = &streamSource{inner: inner}
 	}
 
 	return res, nil

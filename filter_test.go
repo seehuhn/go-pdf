@@ -838,3 +838,41 @@ func TestDecodeFlateLZWReleasesBuffer(t *testing.T) {
 type nopWriteCloser struct{ io.Writer }
 
 func (nopWriteCloser) Close() error { return nil }
+
+// TestMakeFilterAbbreviations verifies that the abbreviated filter names
+// for inline images are accepted in place of the full names.
+func TestMakeFilterAbbreviations(t *testing.T) {
+	parms := Dict{"Predictor": Integer(12), "Columns": Integer(4), "K": Integer(-1)}
+	for abbrev, full := range filterAbbreviations {
+		want, err := MakeFilter(full, parms)
+		if err != nil {
+			t.Fatalf("%s: %v", full, err)
+		}
+		got, err := MakeFilter(abbrev, parms)
+		if err != nil {
+			t.Fatalf("%s: %v", abbrev, err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%s: wrong filter (-want +got):\n%s", abbrev, diff)
+		}
+	}
+}
+
+// TestStripLeadingCryptDP verifies that rewriting a filter chain whose
+// parameters are given under the abbreviated key /DP leaves no stale /DP
+// entry behind.
+func TestStripLeadingCryptDP(t *testing.T) {
+	parms := Dict{"Predictor": Integer(12)}
+	dict := Dict{
+		"Filter": Array{Name("Crypt"), Name("FlateDecode")},
+		"DP":     Array{Dict{"Name": Name("StdCF")}, parms},
+	}
+	stripLeadingCrypt(dict)
+	want := Dict{
+		"Filter":      Name("FlateDecode"),
+		"DecodeParms": parms,
+	}
+	if diff := cmp.Diff(want, dict); diff != "" {
+		t.Errorf("wrong stream dict (-want +got):\n%s", diff)
+	}
+}

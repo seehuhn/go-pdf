@@ -22,7 +22,11 @@ import (
 	"testing"
 
 	"seehuhn.de/go/membudget"
+	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/bitmap"
+	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/image"
+	"seehuhn.de/go/pdf/internal/debug/memfile"
 	internaljbig2 "seehuhn.de/go/pdf/internal/filter/jbig2"
 )
 
@@ -962,6 +966,94 @@ func TestImageCheckGeometry(t *testing.T) {
 		err := im.CheckGeometry(c.width, c.height, c.channels, c.bits)
 		if (err == nil) != c.ok {
 			t.Errorf("%s: got error %v, want ok=%t", c.name, err, c.ok)
+		}
+	}
+}
+
+// newVersionTestImage returns a small JBIG2 image, with a globals stream
+// if withGlobals is set.
+func newVersionTestImage(t *testing.T, withGlobals bool) *Image {
+	t.Helper()
+	sym := bitmap.New(4, 4)
+	sym.SetPixel(1, 1, true)
+
+	if !withGlobals {
+		im := NewImage(8, 8, nil)
+		if err := im.AddGenericRegion(sym, 0, 0, nil); err != nil {
+			t.Fatalf("AddGenericRegion: %v", err)
+		}
+		return im
+	}
+
+	g := NewGlobals()
+	id, err := g.AddSymbol(sym)
+	if err != nil {
+		t.Fatalf("AddSymbol: %v", err)
+	}
+	im := NewImage(8, 8, g)
+	if err := im.AddTextRegion(&TextRegion{
+		Width:     8,
+		Height:    8,
+		Instances: []TextRegionInstance{{SymbolID: id, X: 0, Y: 4}},
+	}); err != nil {
+		t.Fatalf("AddTextRegion: %v", err)
+	}
+	return im
+}
+
+func TestImageVersionCheck(t *testing.T) {
+	for _, withGlobals := range []bool{false, true} {
+		for _, v := range []pdf.Version{pdf.V1_3, pdf.V1_4} {
+			t.Run(fmt.Sprintf("%s-globals=%t", v, withGlobals), func(t *testing.T) {
+				w, _ := memfile.NewPDFWriter(t, v, nil)
+				rm := pdf.NewResourceManager(w)
+				d := &image.Dict{
+					Width:            8,
+					Height:           8,
+					ColorSpace:       color.SpaceDeviceGray,
+					BitsPerComponent: 1,
+					Data:             newVersionTestImage(t, withGlobals),
+				}
+				obj, err := rm.Embed(d)
+				if v < pdf.V1_4 {
+					if err == nil {
+						t.Fatal("expected error, got nil")
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("Embed: %v", err)
+				}
+
+				native, err := pdf.Resolve(w, obj)
+				if err != nil {
+					t.Fatalf("Resolve: %v", err)
+				}
+				stm, ok := native.(*pdf.Stream)
+				if !ok {
+					t.Fatalf("expected stream, got %T", native)
+				}
+				if stm.Dict["Filter"] != pdf.Name("JBIG2Decode") {
+					t.Errorf("wrong /Filter %v", stm.Dict["Filter"])
+				}
+				parms, _ := stm.Dict["DecodeParms"].(pdf.Dict)
+				_, hasGlobals := parms["JBIG2Globals"].(pdf.Reference)
+				if hasGlobals != withGlobals {
+					t.Errorf("JBIG2Globals present=%t, want %t", hasGlobals, withGlobals)
+				}
+			})
+		}
+	}
+}
+
+func TestGlobalsVersionCheck(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_3, pdf.V1_4} {
+		w, _ := memfile.NewPDFWriter(t, v, nil)
+		rm := pdf.NewResourceManager(w)
+		g := newVersionTestImage(t, true).globals
+		_, err := rm.Embed(g)
+		if (err == nil) != (v >= pdf.V1_4) {
+			t.Errorf("%s: unexpected error state %v", v, err)
 		}
 	}
 }

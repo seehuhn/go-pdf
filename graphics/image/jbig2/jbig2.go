@@ -153,6 +153,10 @@ func (g *Globals) AddPatternDict(patterns []*bitmap.Bitmap, opts *PatternDictOpt
 // Users do not normally call it directly; instead, [Image] calls it
 // during its own Embed method.
 func (g *Globals) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := pdf.CheckVersion(rm.Out(), "JBIG2Decode filter", pdf.V1_4); err != nil {
+		return nil, err
+	}
+
 	data, err := g.encode()
 	if err != nil {
 		return nil, err
@@ -893,17 +897,21 @@ func (im *Image) CheckGeometry(width, height, channels, bitsPerComponent int) er
 // encoded data to the PDF stream and embeds any referenced globals
 // stream.
 func (im *Image) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Dict) error {
-	dict = maps.Clone(dict)
+	// The version is checked before anything is written, so that a
+	// rejected image leaves no orphaned globals stream behind.
+	if err := pdf.CheckVersion(rm.Out(), "JBIG2Decode filter", pdf.V1_4); err != nil {
+		return err
+	}
 
 	// embed globals first, if any, so that globals.encode() assigns
 	// segment numbers before we encode the image.
-	var decodeParms pdf.Dict
+	var filter pdf.FilterJBIG2
 	if im.globals != nil && im.globals.hasSegments() {
 		globalsRef, err := rm.Embed(im.globals)
 		if err != nil {
 			return err
 		}
-		decodeParms = pdf.Dict{"JBIG2Globals": globalsRef}
+		filter.GlobalsRef = globalsRef
 	}
 
 	data, err := im.encode()
@@ -911,13 +919,17 @@ func (im *Image) WriteStream(rm *pdf.EmbedHelper, ref pdf.Reference, dict pdf.Di
 		return err
 	}
 
-	// Pre-set Filter / DecodeParms in the dict and pass no filters to
-	// OpenStream, so that the data is written raw.  This is the same
-	// pattern used for pre-encoded JPEG data in
-	// feature-tests/image/funny-jpeg.
-	dict["Filter"] = pdf.Name("JBIG2Decode")
-	if decodeParms != nil {
-		dict["DecodeParms"] = decodeParms
+	// The filter is added to the dictionary since FilterJBIG2 cannot
+	// encode; no filters are passed to OpenStream, so that the data is
+	// written raw.
+	name, parms, err := filter.Info(pdf.GetVersion(rm.Out()))
+	if err != nil {
+		return err
+	}
+	dict = maps.Clone(dict)
+	dict["Filter"] = name
+	if parms != nil {
+		dict["DecodeParms"] = parms
 	}
 
 	w, err := rm.Out().OpenStream(ref, dict)

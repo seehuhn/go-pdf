@@ -29,21 +29,8 @@ import (
 	"seehuhn.de/go/pdf/internal/limits"
 )
 
-// inlineFilterAbbreviations maps abbreviated inline image filter names
-// (PDF 2.0, Table 90) to their full names.
-var inlineFilterAbbreviations = map[pdf.Name]pdf.Name{
-	"AHx": "ASCIIHexDecode",
-	"A85": "ASCII85Decode",
-	"LZW": "LZWDecode",
-	"Fl":  "FlateDecode",
-	"RL":  "RunLengthDecode",
-	"CCF": "CCITTFaxDecode",
-	"DCT": "DCTDecode",
-}
-
 // inlineFilterForbidden lists filters that PDF 2.0 §8.9.7 prohibits in inline
-// images.  Names are the full forms; abbreviated keys are mapped to their
-// full forms before the lookup.
+// images.  None of these filters has an abbreviated name.
 var inlineFilterForbidden = map[pdf.Name]bool{
 	"JBIG2Decode": true,
 	"JPXDecode":   true,
@@ -130,9 +117,6 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 	var filters []filterSpec
 	switch f := filterObj.(type) {
 	case pdf.Name:
-		if full, ok := inlineFilterAbbreviations[f]; ok {
-			f = full
-		}
 		var pDict pdf.Dict
 		if d, ok := parmsObj.(pdf.Dict); ok {
 			pDict = d
@@ -144,9 +128,6 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 			name, ok := elem.(pdf.Name)
 			if !ok {
 				return nil, fmt.Errorf("inline image: filter element %d: expected Name, got %T", i, elem)
-			}
-			if full, ok := inlineFilterAbbreviations[name]; ok {
-				name = full
 			}
 			var pDict pdf.Dict
 			if i < len(parmsArr) {
@@ -288,7 +269,7 @@ func checkInlineBPC(bpc int) error {
 
 // inlineImageSizeLimit computes the per-image decoded-size cap for an inline
 // image dict.  Keys may use abbreviated (W/H/BPC/CS/IM) or full
-// (Width/Height/BitsPerComponent/ColorSpace/ImageMask) names per Table 90.
+// (Width/Height/BitsPerComponent/ColorSpace/ImageMask) names per Table 91.
 func inlineImageSizeLimit(dict pdf.Dict, res *Resources) int64 {
 	width := getInlineImageInt(dict, "W", "Width")
 	height := getInlineImageInt(dict, "H", "Height")

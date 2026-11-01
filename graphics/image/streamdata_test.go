@@ -180,3 +180,24 @@ func TestWriteStreamDropsSourceEntries(t *testing.T) {
 		}
 	}
 }
+
+// TestJPXStreamAbbreviations verifies that jpxStream keeps the filter
+// parameters given under the abbreviated key /DP.
+func TestJPXStreamAbbreviations(t *testing.T) {
+	parms := pdf.Dict{"Predictor": pdf.Integer(12)}
+	stream := pdf.NewStream(pdf.Dict{
+		"Filter": pdf.Array{pdf.Name("Fl"), pdf.Name("JPXDecode")},
+		"DP":     pdf.Array{parms, nil},
+	}, nil)
+	res, err := jpxStream(nil, stream, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := pdf.Dict{
+		"Filter":      pdf.Array{pdf.Name("Fl")},
+		"DecodeParms": pdf.Array{parms},
+	}
+	if diff := cmp.Diff(want, res.Dict); diff != "" {
+		t.Errorf("wrong stream dict (-want +got):\n%s", diff)
+	}
+}

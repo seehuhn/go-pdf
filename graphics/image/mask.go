@@ -225,7 +225,7 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 		Height: int(height),
 	}
 
-	filters, err := pdf.Optional(c.Filters(dict))
+	filters, err := c.Filters(dict)
 	if err != nil {
 		return nil, err
 	}

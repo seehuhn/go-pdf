@@ -130,7 +130,7 @@ func ExtractThumbnail(c pdf.Cursor, obj pdf.Object, _ bool) (*Thumbnail, error) 
 
 	// bits per component (required); where the filter fixes the sample
 	// size, that size wins over the entry
-	filters, err := pdf.Optional(c.Filters(dict))
+	filters, err := c.Filters(dict)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +167,12 @@ func ExtractThumbnail(c pdf.Cursor, obj pdf.Object, _ bool) (*Thumbnail, error) 
 		thumb.Decode = decode
 	}
 
+	inner, err := opaque.ExtractStream(c.Extractor(), stm)
+	if err != nil {
+		return nil, err
+	}
 	thumb.Source = &thumbnailStreamData{
-		inner:    opaque.ExtractStream(c.Extractor(), stm),
+		inner:    inner,
 		maxBytes: limits.ImageDataLimit(thumb.Width, thumb.Height, thumb.ColorSpace.Channels(), thumb.BitsPerComponent),
 	}
 

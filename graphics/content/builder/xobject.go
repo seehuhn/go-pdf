@@ -42,7 +42,7 @@ func (b *Builder) DrawXObject(obj graphics.XObject) {
 // DrawInlineImageRaw embeds a small image directly in the content stream.
 //
 // The dict should contain the image parameters using the abbreviated
-// inline image keys (W, H, BPC, CS, etc.) as defined in PDF table 90.
+// inline image keys (W, H, BPC, CS, etc.) as defined in PDF 2.0, Table 91.
 // The data contains the (possibly compressed) image samples.
 //
 // Inline images are limited to small images; for larger images use

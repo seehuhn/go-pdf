@@ -318,3 +318,45 @@ func TestDecodeStreamChainExhaustsBudget(t *testing.T) {
 		t.Errorf("expected malformed error, got %v", err)
 	}
 }
+
+// TestGetFiltersAbbreviations verifies that abbreviated filter names and
+// the abbreviated key /DP are accepted in a stream dictionary, and that
+// /DecodeParms takes precedence over /DP.
+func TestGetFiltersAbbreviations(t *testing.T) {
+	withPred := Dict{"Predictor": Integer(12), "Columns": Integer(4)}
+	noPred := Dict{"Predictor": Integer(1)}
+	cases := []struct {
+		name      string
+		dict      Dict
+		predictor FlatePredictor
+	}{
+		{"name+DP", Dict{"Filter": Name("Fl"), "DP": withPred}, FlatePredictorPNGUp},
+		{"array+DP", Dict{
+			"Filter": Array{Name("AHx"), Name("Fl")},
+			"DP":     Array{nil, withPred},
+		}, FlatePredictorPNGUp},
+		{"both", Dict{
+			"Filter":      Name("FlateDecode"),
+			"DecodeParms": withPred,
+			"DP":          noPred,
+		}, FlatePredictorPNGUp},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			filters, err := GetFilters(nil, nil, c.dict)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(filters) == 0 {
+				t.Fatal("no filters")
+			}
+			ff, ok := filters[len(filters)-1].(FilterFlate)
+			if !ok {
+				t.Fatalf("last filter is %T, want FilterFlate", filters[len(filters)-1])
+			}
+			if ff.Predictor != c.predictor {
+				t.Errorf("predictor = %v, want %v", ff.Predictor, c.predictor)
+			}
+		})
+	}
+}

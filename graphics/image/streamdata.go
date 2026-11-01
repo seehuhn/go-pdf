@@ -96,8 +96,12 @@ func jpxFilterIndex(filters []pdf.Filter) int {
 // maxBytes caps the decoded samples of non-JPX data; the JPEG 2000 data
 // of a JPXDecode stream is capped at [limits.MaxImageBytes].
 func newStreamData(c pdf.Cursor, stream *pdf.Stream, jpxIndex int, maxBytes int64) (*streamData, error) {
+	inner, err := opaque.ExtractStream(c.Extractor(), stream)
+	if err != nil {
+		return nil, err
+	}
 	data := &streamData{
-		inner:    opaque.ExtractStream(c.Extractor(), stream),
+		inner:    inner,
 		maxBytes: maxBytes,
 	}
 	if jpxIndex >= 0 {
@@ -121,6 +125,7 @@ func jpxStream(r pdf.Getter, stream *pdf.Stream, jpxIndex int) (*pdf.Stream, err
 	res.Dict = maps.Clone(stream.Dict)
 	delete(res.Dict, "Filter")
 	delete(res.Dict, "DecodeParms")
+	delete(res.Dict, "DP")
 	if jpxIndex == 0 {
 		return &res, nil
 	}
@@ -130,7 +135,11 @@ func jpxStream(r pdf.Getter, stream *pdf.Stream, jpxIndex int) (*pdf.Stream, err
 	if err != nil {
 		return nil, err
 	}
-	parms, err := pdf.Resolve(r, stream.Dict["DecodeParms"])
+	parmsObj := stream.Dict["DecodeParms"]
+	if parmsObj == nil {
+		parmsObj = stream.Dict["DP"] // abbreviation used by some writers
+	}
+	parms, err := pdf.Resolve(r, parmsObj)
 	if err != nil {
 		return nil, err
 	}

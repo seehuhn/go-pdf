@@ -203,7 +203,7 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 		return nil, pdf.Error("use ExtractImageMask for image masks")
 	}
 
-	filters, err := pdf.Optional(c.Filters(dict))
+	filters, err := c.Filters(dict)
 	if err != nil {
 		return nil, err
 	}

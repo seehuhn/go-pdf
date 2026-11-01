@@ -722,6 +722,19 @@ func TestRawStreamReaderLeadingCrypt(t *testing.T) {
 	if _, err := RawStreamReader(r, stream); err != nil {
 		t.Errorf("unexpected error for /Crypt /Identity: %v", err)
 	}
+
+	// The raw data depends only on the leading /Crypt entry, so the rest
+	// of the chain need not be valid.  The parameters may be given under
+	// the abbreviated key /DP.
+	stream.Dict["Filter"] = Array{Name("Crypt"), Name("NoSuchDecode")}
+	stream.Dict["DP"] = Array{Dict{"Name": Name("StdCF")}, nil}
+	got, err = readRaw()
+	if err != nil {
+		t.Fatalf("unknown filter after /Crypt: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("unknown filter after /Crypt: got %x, want %x", got, want)
+	}
 }
 
 // TestFilterCryptRoundTrip tests that filterCrypt.decrypt reverses

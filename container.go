@@ -149,23 +149,11 @@ func streamCryptRecipe(r Getter, x *Stream) (cryptRecipe, Name, error) {
 		recipe = cryptNone
 	}
 
-	// cheap probe: most streams have no /Crypt at filter position 0
-	startsWithCrypt, err := filterChainStartsWithCrypt(r, x.Dict["Filter"])
+	cf, err := leadingCryptFilter(r, x.Dict)
 	if err != nil {
 		return 0, "", err
 	}
-	if !startsWithCrypt {
-		return recipe, "", nil
-	}
-	filters, err := GetFilters(r, nil, x.Dict)
-	if err != nil {
-		return 0, "", err
-	}
-	if len(filters) == 0 {
-		return recipe, "", nil
-	}
-	cf, ok := filters[0].(CryptFilter)
-	if !ok {
+	if cf == nil {
 		return recipe, "", nil
 	}
 	name := cryptFilterName(cf)
@@ -181,33 +169,44 @@ func streamCryptRecipe(r Getter, x *Stream) (cryptRecipe, Name, error) {
 	return recipe, name, nil
 }
 
-// filterChainStartsWithCrypt reports whether the resolved /Filter entry
-// names the Crypt filter at position 0.  This is a cheap probe used to
-// short-circuit document-level (de)encryption without paying the cost
-// of [GetFilters] (which resolves JBIG2Globals streams and rejects
-// malformed filter chains).  The filter object and, for arrays, its
-// first element are resolved through r so that an indirect /Filter or
-// indirect first entry is handled correctly.
-func filterChainStartsWithCrypt(r Getter, filter Object) (bool, error) {
-	resolved, err := Resolve(r, filter)
+// leadingCryptFilter returns the crypt filter selected by a /Crypt entry at
+// position 0 of the /Filter chain in dict, or nil if the chain does not
+// start with /Crypt.  Only the first entry of the chain is examined: the
+// raw stream data depends on nothing else, so the remaining entries need
+// not be valid.  This also keeps the common case cheap, since
+// /DecodeParms is resolved only for a leading /Crypt entry.
+func leadingCryptFilter(r Getter, dict Dict) (CryptFilter, error) {
+	filter, err := Resolve(r, dict["Filter"])
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	switch f := resolved.(type) {
+	var first Native
+	switch f := filter.(type) {
 	case Name:
-		return f == "Crypt", nil
+		first = f
 	case Array:
 		if len(f) == 0 {
-			return false, nil
+			return nil, nil
 		}
-		first, err := Resolve(r, f[0])
+		first, err = Resolve(r, f[0])
 		if err != nil {
-			return false, err
+			return nil, err
 		}
-		name, _ := first.(Name)
-		return name == "Crypt", nil
 	}
-	return false, nil
+	if first != Name("Crypt") {
+		return nil, nil
+	}
+
+	parms, err := Resolve(r, decodeParmsEntry(dict))
+	if err != nil {
+		return nil, err
+	}
+	p0, err := Resolve(r, alignDecodeParms(filter, parms)[0])
+	if err != nil {
+		return nil, err
+	}
+	pDict, _ := p0.(Dict)
+	return parseCrypt(pDict)
 }
 
 // DecodeStream returns a reader for the stream data with all filters of
@@ -362,9 +361,11 @@ func alignDecodeParms(filter, parms Object) Array {
 }
 
 // GetFilters extracts the information contained in the /Filter and
-// /DecodeParms entries of a stream dictionary.
+// /DecodeParms entries of a stream dictionary.  The abbreviated filter
+// names and the abbreviated key /DP, defined for inline images, are
+// accepted, too.
 func GetFilters(r Getter, path *CycleCheck, dict Dict) ([]Filter, error) {
-	decodeParams, err := resolve(r, dict["DecodeParms"], false)
+	decodeParams, err := resolve(r, decodeParmsEntry(dict), false)
 	if err != nil {
 		return nil, err
 	}

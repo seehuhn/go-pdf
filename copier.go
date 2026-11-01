@@ -189,12 +189,13 @@ func (c *Copier) copyStream(x *Stream, embeddedFile bool) (*Stream, error) {
 		res.start = 0
 		res.length = int64(len(raw))
 	}
-	// A named crypt filter is kept if the destination defines it.
+	// A named crypt filter is kept if the destination defines it, and
+	// /Identity is kept if the destination uses crypt filters at all.
 	// Otherwise the stream falls back to the destination's default.
-	if cfName != "" {
-		if enc := c.w.w.enc; enc == nil || enc.cf[cfName] == nil {
-			stripLeadingCrypt(res.Dict)
-		}
+	// An empty cfName means that the chain either starts with /Crypt
+	// /Identity or does not start with /Crypt.
+	if enc := c.w.w.enc; enc == nil || enc.cf == nil || cfName != "" && enc.cf[cfName] == nil {
+		stripLeadingCrypt(res.Dict)
 	}
 	return res, nil
 }
@@ -231,33 +232,61 @@ func (c *Copier) copyDict(obj Dict, role copyRole) (Dict, error) {
 // rather than references into the destination file.  This keeps the
 // filter chain self-describing for downstream consumers (notably the
 // cheap /Crypt probe in [Writer.OpenStream]) and matches the canonical
-// PDF form used by all writers in the library.
+// PDF form used by all writers in the library.  Abbreviated filter names
+// and an abbreviated /DP key, which are valid only in inline images, are
+// replaced by their full forms.
 func (c *Copier) copyStreamDict(src Dict) (Dict, error) {
 	// the filter entries are inlined below, so an indirect one must not
 	// be copied as an object of its own
 	rest := maps.Clone(src)
 	delete(rest, "Filter")
 	delete(rest, "DecodeParms")
+	delete(rest, "DP")
 	res, err := c.CopyDict(rest)
 	if err != nil {
 		return nil, err
 	}
-	for _, key := range []Name{"Filter", "DecodeParms"} {
-		val, ok := src[key]
-		if !ok {
+	entries := []struct {
+		key Name
+		val Object
+	}{
+		{"Filter", src["Filter"]},
+		{"DecodeParms", decodeParmsEntry(src)},
+	}
+	for _, e := range entries {
+		if e.val == nil {
 			continue
 		}
-		inlined, err := inlineFilterRefs(c.r, val)
+		inlined, err := inlineFilterRefs(c.r, e.val)
 		if err != nil {
 			return nil, err
+		}
+		if e.key == "Filter" {
+			inlined = expandFilterNames(inlined)
 		}
 		repl, err := c.Copy(inlined)
 		if err != nil {
 			return nil, err
 		}
-		res[key] = repl
+		res[e.key] = repl
 	}
 	return res, nil
+}
+
+// expandFilterNames replaces abbreviated filter names in a direct /Filter
+// entry with the full names.  Arrays are modified in place.
+func expandFilterNames(filter Native) Native {
+	switch f := filter.(type) {
+	case Name:
+		return fullFilterName(f)
+	case Array:
+		for i, elem := range f {
+			if name, ok := elem.(Name); ok {
+				f[i] = fullFilterName(name)
+			}
+		}
+	}
+	return filter
 }
 
 // inlineFilterRefs resolves indirect references in a /Filter or

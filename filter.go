@@ -96,9 +96,14 @@ type Filter interface {
 // values are silently replaced with PDF defaults so that malformed PDF input
 // remains readable.  Cases where there is no safe fix-up — for example, a
 // /Crypt filter whose /Name entry has the wrong PDF type — are reported as
-// a [*MalformedFileError].
+// a [*MalformedFileError], as are filter names not listed in Table 6 of
+// the PDF specification.
+//
+// The abbreviated filter names defined for inline images (PDF 2.0,
+// Table 92), such as /Fl for /FlateDecode, are accepted in place of the
+// full names.  Some PDF writers use them in stream dictionaries, too.
 func MakeFilter(filter Name, param Dict) (Filter, error) {
-	switch filter {
+	switch fullFilterName(filter) {
 	case "ASCII85Decode":
 		return FilterASCII85{}, nil
 	case "ASCIIHexDecode":
@@ -120,8 +125,40 @@ func MakeFilter(filter Name, param Dict) (Filter, error) {
 	case "Crypt":
 		return parseCrypt(param)
 	default:
-		return &filterNotImplemented{Name: filter, Param: param}, nil
+		return nil, Errorf("unknown filter %q", filter)
 	}
+}
+
+// filterAbbreviations maps the abbreviated filter names of PDF 2.0,
+// Table 92 to the full names.
+var filterAbbreviations = map[Name]Name{
+	"AHx": "ASCIIHexDecode",
+	"A85": "ASCII85Decode",
+	"LZW": "LZWDecode",
+	"Fl":  "FlateDecode",
+	"RL":  "RunLengthDecode",
+	"CCF": "CCITTFaxDecode",
+	"DCT": "DCTDecode",
+}
+
+// fullFilterName returns the full form of a possibly abbreviated filter
+// name.  Other names are returned unchanged.
+func fullFilterName(name Name) Name {
+	if full, ok := filterAbbreviations[name]; ok {
+		return full
+	}
+	return name
+}
+
+// decodeParmsEntry returns the /DecodeParms entry of a stream dictionary.
+// Where this is absent, the abbreviated key /DP is used instead: the
+// abbreviation is defined for inline images only (PDF 2.0, Table 91),
+// but some PDF writers use it in stream dictionaries, too.
+func decodeParmsEntry(dict Dict) Object {
+	if parms := dict["DecodeParms"]; parms != nil {
+		return parms
+	}
+	return dict["DP"]
 }
 
 // parseCrypt constructs the appropriate [CryptFilter] variant from a
@@ -150,23 +187,6 @@ func parseCrypt(param Dict) (CryptFilter, error) {
 	default:
 		return FilterCryptNamed{Name: name}, nil
 	}
-}
-
-type filterNotImplemented struct {
-	Name  Name
-	Param Dict
-}
-
-func (f *filterNotImplemented) Info(Version) (Name, Dict, error) {
-	return f.Name, f.Param, nil
-}
-
-func (f *filterNotImplemented) Encode(Version, io.WriteCloser) (io.WriteCloser, error) {
-	return nil, fmt.Errorf("filter %s not implemented", f.Name)
-}
-
-func (f *filterNotImplemented) Decode(_ Version, _ io.Reader, _ *membudget.Budget) (io.ReadCloser, error) {
-	return nil, Errorf("filter %s not implemented", f.Name)
 }
 
 // FilterASCII85 is the ASCII85Decode filter.
@@ -1353,7 +1373,7 @@ func filterChain(streamDict Dict) ([]Object, []Dict) {
 	}
 
 	var parms []Dict
-	for _, x := range alignDecodeParms(streamDict["Filter"], streamDict["DecodeParms"]) {
+	for _, x := range alignDecodeParms(streamDict["Filter"], decodeParmsEntry(streamDict)) {
 		d, _ := x.(Dict)
 		parms = append(parms, d)
 	}
@@ -1361,8 +1381,8 @@ func filterChain(streamDict Dict) ([]Object, []Dict) {
 }
 
 // setFilterChain sets the /Filter and /DecodeParms entries of streamDict,
-// in the most compact form.  The slices allNames and allParms must have
-// equal length.
+// in the most compact form, replacing an abbreviated /DP entry.  The
+// slices allNames and allParms must have equal length.
 func setFilterChain(streamDict Dict, allNames []Object, allParms []Dict) {
 	switch len(allNames) {
 	case 0:
@@ -1382,6 +1402,7 @@ func setFilterChain(streamDict Dict, allNames []Object, allParms []Dict) {
 	}
 
 	delete(streamDict, "DecodeParms")
+	delete(streamDict, "DP")
 	if !needsParms {
 		return
 	}

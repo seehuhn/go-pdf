@@ -313,7 +313,7 @@ func ExtractSoftMask(c pdf.Cursor, obj pdf.Object, _ bool) (*SoftMask, error) {
 		return nil, pdf.Errorf("invalid Subtype %q for soft mask XObject", subtypeName)
 	}
 
-	filters, err := pdf.Optional(c.Filters(dict))
+	filters, err := c.Filters(dict)
 	if err != nil {
 		return nil, err
 	}
