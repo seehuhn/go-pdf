@@ -26,7 +26,14 @@ import (
 // Format writes op's PDF representation to out (its args followed by the
 // operator name, with the appropriate separators).  The pseudo-operators
 // [OpRawContent] and [OpInlineImage] have dedicated handling.
-func (op Operator) Format(out io.Writer) error {
+//
+// The output options opt should be those of the PDF file the content is
+// written to (see [pdf.Writer.GetOptions]); they select version-dependent
+// syntax, such as whether names may use #xx escapes.  Zero gives PDF 1.2 and
+// later syntax.
+func (op Operator) Format(out io.Writer, opt pdf.OutputOptions) error {
+	opt = opt&^pdf.OptPretty | pdf.OptContentStream
+
 	// Handle special pseudo-operators
 	switch op.Name {
 	case OpRawContent:
@@ -57,14 +64,14 @@ func (op Operator) Format(out io.Writer) error {
 			slices.Sort(keys)
 			for _, key := range keys {
 				val := dict[key]
-				if err := pdf.Format(out, pdf.OptContentStream, key); err != nil {
+				if err := pdf.Format(out, opt, key); err != nil {
 					return err
 				}
 				if _, err := out.Write([]byte(" ")); err != nil {
 					return err
 				}
 				if natVal, ok := val.(pdf.Native); ok {
-					if err := pdf.Format(out, pdf.OptContentStream, natVal); err != nil {
+					if err := pdf.Format(out, opt, natVal); err != nil {
 						return err
 					}
 				}
@@ -87,7 +94,7 @@ func (op Operator) Format(out io.Writer) error {
 
 	// Write arguments
 	for _, arg := range op.Args {
-		if err := pdf.Format(out, pdf.OptContentStream, arg); err != nil {
+		if err := pdf.Format(out, opt, arg); err != nil {
 			return err
 		}
 		if _, err := out.Write([]byte(" ")); err != nil {

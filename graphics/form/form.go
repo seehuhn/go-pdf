@@ -19,7 +19,6 @@ package form
 import (
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"seehuhn.de/go/geom/matrix"
@@ -326,14 +325,7 @@ func (f *Form) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if f.Content != nil {
-		rc, err := f.Content.RawBytes()
-		if err != nil {
-			stm.Close()
-			return nil, err
-		}
-		_, err = io.Copy(stm, rc)
-		rc.Close()
-		if err != nil {
+		if err := content.WriteStream(stm, f.Content, e.Out().GetOptions()); err != nil {
 			stm.Close()
 			return nil, err
 		}

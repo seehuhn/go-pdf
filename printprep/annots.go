@@ -129,7 +129,7 @@ func (c *converter) flattenAnnots(annotsObj pdf.Object, reserved map[pdf.Name]bo
 			{Name: content.OpPopGraphicsState},
 		}
 		for _, op := range ops {
-			if err := op.Format(&buf); err != nil {
+			if err := op.Format(&buf, c.out.GetOptions()); err != nil {
 				return nil, nil, err
 			}
 			buf.WriteByte('\n')

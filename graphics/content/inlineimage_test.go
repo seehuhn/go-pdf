@@ -387,7 +387,7 @@ func TestInlineImageKeyEscaped(t *testing.T) {
 		Args: []pdf.Object{pdf.Dict{"a b": pdf.Integer(5)}, pdf.String("x")},
 	}
 	buf := &bytes.Buffer{}
-	if err := op.Format(buf); err != nil {
+	if err := op.Format(buf, 0); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Contains(buf.Bytes(), []byte("/a#20b 5")) {

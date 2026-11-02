@@ -17,8 +17,9 @@
 package fallback
 
 import (
-	"fmt"
+	"bytes"
 	"slices"
+	"strings"
 
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
@@ -26,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/text"
 )
@@ -230,9 +232,16 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	}
 
 	// set DA to match the font/size/color used in the appearance stream
-	fontName := b.FontName(g.freeTextFont(a))
-	a.DefaultAppearance = fmt.Sprintf("/%s %s Tf %s",
-		fontName, daNum(size), daColorOperator(textCol))
+	tf := content.Operator{
+		Name: content.OpTextSetFont,
+		Args: []pdf.Object{b.FontName(g.freeTextFont(a)), pdf.Number(size)},
+	}
+	da := &bytes.Buffer{}
+	// FreeText annotations need PDF 1.3, so PDF 1.2 syntax always applies
+	if err := tf.Format(da, 0); err != nil {
+		return nil, err
+	}
+	a.DefaultAppearance = strings.TrimSuffix(da.String(), "\n") + " " + daColorOperator(textCol)
 
 	return g.harvest(b, outer, a.GetCommon())
 }

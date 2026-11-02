@@ -261,10 +261,16 @@ const (
 
 	// optXRefStream allows to use an xref stream instead of an xref table.
 	optXRefStream
+
+	// optNoNameEscapes forbids #xx escapes in names (PDF 1.0 and 1.1).
+	optNoNameEscapes
 )
 
 func defaultOutputOptions(v Version) OutputOptions {
 	var opt OutputOptions
+	if v < V1_2 {
+		opt |= optNoNameEscapes
+	}
 	if v >= V1_5 {
 		opt |= optObjStm
 		opt |= optXRefStream
@@ -387,7 +393,7 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		return true, err
 
 	case Name:
-		return true, formatName(w, x)
+		return true, formatName(w, x, opt)
 
 	case Operator:
 		if !opt.HasAny(OptContentStream) {
@@ -473,15 +479,34 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 	}
 }
 
-func formatName(w io.Writer, name Name) error {
+// formatName writes name as a PDF name object.
+//
+// From PDF 1.2 onwards, every byte which is not a regular printable
+// character, and every '#', is written as a #xx escape.  The braces { and }
+// are escaped too, since PDF 1.x lists them as delimiters.  PDF 1.0 and 1.1
+// have no escapes, so there a name is written verbatim, including bytes
+// outside the printable ASCII range, and an error is returned if a byte is
+// whitespace or a delimiter, or if a '#' would be read as an escape.
+// Since the reader accepts braces in names in all versions, a name read
+// from a PDF 1.0 or 1.1 file cannot always be written back to such a file.
+func formatName(w io.Writer, name Name, opt OutputOptions) error {
 	l := []byte(name)
 	if bytes.IndexByte(l, 0) >= 0 {
 		return errors.New("name contains a null byte")
 	}
 
+	noEscapes := opt.HasAny(optNoNameEscapes)
 	var funny []int
 	for i, c := range l {
-		if class[c] != regular || c < 0x21 || c > 0x7e || c == '#' {
+		if noEscapes {
+			if class[c] != regular || c == '{' || c == '}' ||
+				c == '#' && isNameEscape(l[i+1:]) {
+				return &VersionError{
+					Operation: fmt.Sprintf("name %q", string(name)),
+					Earliest:  V1_2,
+				}
+			}
+		} else if !isNameByte(c) || c == '#' {
 			funny = append(funny, i)
 		}
 	}
@@ -514,6 +539,22 @@ func formatName(w io.Writer, name Name) error {
 	}
 
 	return nil
+}
+
+// isNameByte reports whether c is written unescaped in a name from PDF 1.2
+// onwards.
+func isNameByte(c byte) bool {
+	return class[c] == regular && c >= 0x21 && c <= 0x7e && c != '{' && c != '}'
+}
+
+// isNameEscape reports whether a '#' followed by the bytes in tail is read
+// as a #xx escape.  This matches the reader, which takes "#00" literally.
+func isNameEscape(tail []byte) bool {
+	if len(tail) < 2 {
+		return false
+	}
+	hi, lo := hexDigit(tail[0]), hexDigit(tail[1])
+	return hi != 255 && lo != 255 && (hi != 0 || lo != 0)
 }
 
 func formatString(w io.Writer, s String, opt OutputOptions) error {
@@ -690,7 +731,7 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 				continue
 			}
 
-			err := formatName(w, name)
+			err := formatName(w, name, opt)
 			if err != nil {
 				return err
 			}
@@ -715,7 +756,7 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 				continue
 			}
 
-			err := formatName(w, name)
+			err := formatName(w, name, opt)
 			if err != nil {
 				return err
 			}

@@ -76,7 +76,9 @@ func (mi *operatorsIter) All() iter.Seq2[OpName, []pdf.Object] {
 
 func (mi *operatorsIter) Err() error { return nil }
 
-// RawBytes returns a reader over the serialized operator sequence.
+// RawBytes returns a reader over the serialized operator sequence, in PDF 1.2
+// and later syntax.  Use [WriteStream] to write the operators for a specific
+// output file.
 //
 // The reader serialises operators lazily: peak transient memory is
 // bounded by the largest single operator's serialised size.
@@ -110,7 +112,7 @@ func (r *operatorsReader) Read(p []byte) (n int, err error) {
 			}
 			return 0, io.EOF
 		}
-		if err := r.ops[r.idx].Format(&r.pending); err != nil {
+		if err := r.ops[r.idx].Format(&r.pending, 0); err != nil {
 			return n, err
 		}
 		r.idx++
@@ -136,14 +138,44 @@ func (m *Operators) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, op := range m.Ops {
-		if err := op.Format(stm); err != nil {
-			stm.Close()
-			return nil, err
-		}
+	if err := WriteStream(stm, m, e.Out().GetOptions()); err != nil {
+		stm.Close()
+		return nil, err
 	}
 	if err := stm.Close(); err != nil {
 		return nil, err
 	}
 	return ref, nil
+}
+
+// WriteStream writes the bytes of the content stream s to w.
+//
+// Only an [Operators] stream is formatted for the output options opt, which
+// should be those of the PDF file the content is written to (see
+// [Operator.Format]).  Any other stream is copied unchanged from
+// [Stream.RawBytes].  For a stream read from a PDF file, this keeps the
+// bytes as found, including comments, but nothing checks that they are
+// valid for the version of the output file: names keep any #xx escapes,
+// and operators from later PDF versions are kept.  A stream composed of
+// several parts, such as a page with several content segments, is copied
+// unchanged as well, so any [Operators] part in it uses PDF 1.2 syntax.
+func WriteStream(w io.Writer, s Stream, opt pdf.OutputOptions) error {
+	if ops, ok := s.(*Operators); ok {
+		for _, op := range ops.Ops {
+			if err := op.Format(w, opt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	rc, err := s.RawBytes()
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, rc)
+	// Decoders repeat on Close the decoding errors which the permissive
+	// reader has already turned into a clean end of data.
+	rc.Close()
+	return err
 }

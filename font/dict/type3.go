@@ -18,7 +18,6 @@ package dict
 
 import (
 	"errors"
-	"io"
 	"iter"
 	"maps"
 	"slices"
@@ -183,14 +182,7 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, err
 		}
 
-		rc, err := cp.Content.RawBytes()
-		if err != nil {
-			stm.Close()
-			return nil, err
-		}
-		_, err = io.Copy(stm, rc)
-		rc.Close()
-		if err != nil {
+		if err := content.WriteStream(stm, cp.Content, w.GetOptions()); err != nil {
 			stm.Close()
 			return nil, err
 		}

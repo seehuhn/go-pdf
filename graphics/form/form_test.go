@@ -933,3 +933,22 @@ func mustEmbed(t *testing.T, version pdf.Version, f *form.Form) {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
+
+// TestEmbedNameVersion checks that the form content uses the output file's
+// name syntax: names which need #xx escapes cannot be written before PDF 1.2.
+func TestEmbedNameVersion(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_2} {
+		w, _ := memfile.NewPDFWriter(t, v, nil)
+		rm := pdf.NewResourceManager(w)
+		f := &form.Form{
+			Content: &content.Operators{Ops: []content.Operator{
+				{Name: content.OpXObject, Args: []pdf.Object{pdf.Name("X 1")}},
+			}},
+			BBox: pdf.Rectangle{URx: 100, URy: 100},
+		}
+		_, err := rm.Embed(f)
+		if hasErr := err != nil; hasErr != (v < pdf.V1_2) {
+			t.Errorf("PDF %s: unexpected result, err = %v", v, err)
+		}
+	}
+}

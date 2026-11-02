@@ -47,8 +47,9 @@ import (
 func formatObj(obj pdf.Object) string {
 	var buf bytes.Buffer
 	if err := pdf.Format(&buf, 0, obj); err != nil {
-		// Format does not fail writing to a bytes.Buffer; if the impossible
-		// happens, fall back to a unique-enough marker that blocks hoisting.
+		// obj has no PDF representation, e.g. a name containing a null
+		// byte.  No valid value formats as this marker; an invalid value
+		// still reaches the output, hoisted or not, and fails to write there.
 		return "\x00"
 	}
 	return buf.String()

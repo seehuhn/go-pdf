@@ -46,6 +46,8 @@ type Stream interface {
 	NewIter() Iter
 
 	// RawBytes returns a reader over the stream's content-stream bytes.
+	// The bytes do not depend on the PDF version of an output file;
+	// use [WriteStream] to write the stream into a PDF file.
 	// The caller is responsible for closing the returned reader.
 	RawBytes() (io.ReadCloser, error)
 }
@@ -1284,7 +1286,8 @@ var operatorTable = map[string]pdf.Operator{
 	"'": "'", "\"": "\"",
 }
 
-// class classifies each byte per PDF 7.2.3 (whitespace + delimiters).
+// class classifies each byte per PDF 2.0 section 7.2.3 (whitespace and
+// delimiters).
 // regular is the zero value, so unlisted bytes are regular by default.
 var class = [256]characterClass{
 	0:   space,
@@ -1299,8 +1302,6 @@ var class = [256]characterClass{
 	'>': delimiter,
 	'[': delimiter,
 	']': delimiter,
-	'{': delimiter,
-	'}': delimiter,
 	'/': delimiter,
 	'%': delimiter,
 }

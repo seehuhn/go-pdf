@@ -66,7 +66,7 @@ func TestMarkedContentInline(t *testing.T) {
 			if tc.out != "" {
 				buf := &bytes.Buffer{}
 				for _, op := range b.Stream {
-					op.Format(buf)
+					op.Format(buf, 0)
 				}
 				if !strings.Contains(buf.String(), tc.out) {
 					t.Errorf("expected %q, got %q", tc.out, buf.String())

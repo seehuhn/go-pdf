@@ -125,7 +125,7 @@ func (c *converter) rewriteContentBytes(contents pdf.Object, resources pdf.Dict,
 		}
 
 		op := content.Operator{Name: name, Args: args}
-		if err := op.Format(&buf); err != nil {
+		if err := op.Format(&buf, c.out.GetOptions()); err != nil {
 			return nil, 0, err
 		}
 		buf.WriteByte('\n')

@@ -38,6 +38,7 @@
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	// Use stream.RawBytes() to obtain the formatted content-stream bytes.
+//	// Use stream as the content of a form XObject, pattern or Type 3 glyph,
+//	// or use content.WriteStream to write it for a specific PDF file.
 //	// Use b.Resources for the associated resource dictionary.
 package builder

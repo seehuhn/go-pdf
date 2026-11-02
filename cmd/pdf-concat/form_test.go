@@ -58,7 +58,7 @@ func TestRewriteDA(t *testing.T) {
 		{"/DeviceRGB cs /CS0 CS", "/DeviceRGB cs /CS0_2 CS"}, // families are no resources
 	}
 	for _, tc := range cases {
-		da, _, err := rewriteDA(pdf.String(tc.in), outputName)
+		da, _, err := rewriteDA(pdf.String(tc.in), outputName, 0)
 		if err != nil {
 			t.Errorf("rewriteDA(%q): %v", tc.in, err)
 			continue
@@ -72,7 +72,7 @@ func TestRewriteDA(t *testing.T) {
 func TestRewriteDANoRename(t *testing.T) {
 	da := pdf.String("/Helv  12 Tf %comment\n0 g")
 	same := func(_, name pdf.Name) pdf.Name { return name }
-	if got, changed, err := rewriteDA(da, same); err != nil || changed || string(got) != string(da) {
+	if got, changed, err := rewriteDA(da, same, 0); err != nil || changed || string(got) != string(da) {
 		t.Errorf("rewriteDA with no renames = %q, %v, %v, want unchanged", got, changed, err)
 	}
 }
@@ -589,7 +589,7 @@ func TestDARenamerPatch(t *testing.T) {
 	if err := w.Put(daRef, pdf.String("/Helv 9 Tf")); err != nil {
 		t.Fatal(err)
 	}
-	g := newDARenamer(w, &Concat{})
+	g := newDARenamer(w, &Concat{w: w})
 	g.dr = map[pdf.Name]pdf.Dict{"Font": {"Helv": pdf.Reference(1)}}
 	g.rename = resRename{"Font": {"Helv": "Helv_2"}}
 
@@ -630,8 +630,9 @@ func TestDARenamerPatchOrder(t *testing.T) {
 		"DA":   pdf.String("/F 9 Tf"),
 		"Kids": pdf.Array{pdf.Dict{"DA": pdf.String("/F_2 9 Tf")}},
 	}
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	for range 20 {
-		c := &Concat{}
+		c := &Concat{w: w}
 		c.category("Font").taken["F"] = true // a resource of an earlier input
 		g := newDARenamer(nil, c)
 

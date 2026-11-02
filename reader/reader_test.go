@@ -290,7 +290,7 @@ func (noopGetter) GetMeta() *pdf.MetaInfo                      { return &pdf.Met
 // writeOps serialises ops into out via [content.Operator.Format].
 func writeOps(out io.Writer, ops []content.Operator) error {
 	for _, op := range ops {
-		if err := op.Format(out); err != nil {
+		if err := op.Format(out, 0); err != nil {
 			return err
 		}
 	}

@@ -96,7 +96,7 @@ func (c *Concat) prepareForm(r *pdf.Reader, g *daRenamer, cp *pdf.Copier, budget
 	if da, err := pdf.Optional(cur.String(acro["DA"])); err != nil {
 		return nil, nil, err
 	} else if da != nil {
-		form.da, _, err = rewriteDA(da, g.outputName)
+		form.da, _, err = rewriteDA(da, g.outputName, g.c.w.GetOptions())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -496,7 +496,7 @@ func (g *daRenamer) patchDict(d pdf.Dict) (pdf.Dict, bool, error) {
 			if !ok {
 				continue
 			}
-			newDA, changed, err := rewriteDA(da, g.outputName)
+			newDA, changed, err := rewriteDA(da, g.outputName, g.c.w.GetOptions())
 			if err != nil {
 				return nil, false, err
 			}
@@ -595,8 +595,8 @@ func daResourceArg(op content.Operator) (pdf.Name, int, bool) {
 // content-stream fragment, so that only the operands which name resources
 // are replaced.  The string is returned unchanged where no name changes;
 // otherwise it is written out again from its operators, without any
-// comments it had.
-func rewriteDA(da pdf.String, outputName func(category, name pdf.Name) pdf.Name) (pdf.String, bool, error) {
+// comments it had, using the output options opt.
+func rewriteDA(da pdf.String, outputName func(category, name pdf.Name) pdf.Name, opt pdf.OutputOptions) (pdf.String, bool, error) {
 	ops := daOperators(da)
 	changed := false
 	for _, op := range ops {
@@ -617,7 +617,7 @@ func rewriteDA(da pdf.String, outputName func(category, name pdf.Name) pdf.Name)
 	var out []byte
 	for _, op := range ops {
 		buf := &bytes.Buffer{}
-		if err := op.Format(buf); err != nil {
+		if err := op.Format(buf, opt); err != nil {
 			return nil, false, err
 		}
 		if len(out) > 0 {

@@ -1027,3 +1027,18 @@ func TestReadNameNullEscape(t *testing.T) {
 		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
 }
+
+// TestReadNameBraces checks that { and } are regular characters in content
+// streams, so that they do not split names or form operators.
+func TestReadNameBraces(t *testing.T) {
+	got, err := collectStream(NewScanner(bytesOpener([]byte("/F{1} 12 Tf\n"))))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	want := []Operator{
+		{Name: OpTextSetFont, Args: []pdf.Object{pdf.Name("F{1}"), pdf.Integer(12)}},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("read failed (-want +got):\n%s", diff)
+	}
+}

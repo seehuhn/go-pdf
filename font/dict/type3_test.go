@@ -127,3 +127,32 @@ func TestType3ResourcesVersion(t *testing.T) {
 		})
 	}
 }
+
+// Glyph content uses the output file's name syntax: names which need #xx
+// escapes cannot be written before PDF 1.2.
+func TestType3GlyphNameVersion(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_1, pdf.V1_2} {
+		w, _ := memfile.NewPDFWriter(t, v, nil)
+		rm := pdf.NewResourceManager(w)
+
+		cp := &CharProc{
+			Content: &content.Operators{Ops: []content.Operator{
+				{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Integer(500), pdf.Integer(0)}},
+				{Name: content.OpXObject, Args: []pdf.Object{pdf.Name("X 1")}},
+			}},
+		}
+		d := &Type3{
+			Name:       "F",
+			Descriptor: &font.Descriptor{},
+			Encoding:   encodeAt(0x41),
+			CharProcs:  map[pdf.Name]*CharProc{"A": cp},
+			FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+		}
+		d.Width[0x41] = 500
+
+		_, err := rm.Embed(d)
+		if hasErr := err != nil; hasErr != (v < pdf.V1_2) {
+			t.Errorf("PDF %s: unexpected result, err = %v", v, err)
+		}
+	}
+}

@@ -488,6 +488,61 @@ func TestFormatNameNull(t *testing.T) {
 	}
 }
 
+// TestFormatNameVersion checks the version-dependent syntax of names: #xx
+// escapes from PDF 1.2 onwards, verbatim names before.
+func TestFormatNameVersion(t *testing.T) {
+	cases := []struct {
+		name   Name
+		v      Version
+		want   string // "" if the name cannot be written
+		reread Name
+	}{
+		{"Lime Green", V1_2, "/Lime#20Green", "Lime Green"},
+		{"Lime Green", V1_1, "", ""},
+		{"F{1}", V1_7, "/F#7b1#7d", "F{1}"},
+		{"F{1}", V1_0, "", ""},
+		{"A#B", V1_7, "/A#23B", "A#B"},
+		{"A#B", V1_1, "/A#B", "A#B"},
+		{"A#", V1_1, "/A#", "A#"},
+		{"A#00", V1_1, "/A#00", "A#00"},
+		{"A#41", V1_1, "", ""},
+		{"A#41", V1_2, "/A#2341", "A#41"},
+		{"Plain", V1_0, "/Plain", "Plain"},
+		{"Caf\xe9", V1_1, "/Caf\xe9", "Caf\xe9"},
+		{"Caf\xe9", V1_2, "/Caf#e9", "Caf\xe9"},
+		{"A\x01B", V1_0, "/A\x01B", "A\x01B"},
+		{"A\x7fB", V1_1, "/A\x7fB", "A\x7fB"},
+		{"A\tB", V1_1, "", ""},
+		{"A/B", V1_1, "", ""},
+	}
+	for _, c := range cases {
+		opt := defaultOutputOptions(c.v)
+		buf := &bytes.Buffer{}
+		err := Format(buf, opt, c.name)
+		if c.want == "" {
+			if err == nil {
+				t.Errorf("%q in PDF %s: missing error, got %q", c.name, c.v, buf)
+			}
+			if err = Format(io.Discard, opt, Dict{c.name: Integer(1)}); err == nil {
+				t.Errorf("%q in PDF %s: missing error for dict key", c.name, c.v)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%q in PDF %s: %v", c.name, c.v, err)
+			continue
+		}
+		if got := buf.String(); got != c.want {
+			t.Errorf("%q in PDF %s: got %q, want %q", c.name, c.v, got, c.want)
+		}
+		s := testScanner(buf.String() + " ")
+		got, err := s.ReadObject()
+		if err != nil || got != c.reread {
+			t.Errorf("%q in PDF %s: read back %q, %v", c.name, c.v, got, err)
+		}
+	}
+}
+
 func TestStreamAsEmbeddedFile(t *testing.T) {
 	x := NewStream(Dict{"Subtype": Name("text/plain")}, []byte("abc"))
 	y := x.AsEmbeddedFile()

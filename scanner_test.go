@@ -1070,3 +1070,17 @@ func TestReadObjectRefZero(t *testing.T) {
 		}
 	}
 }
+
+// TestReadNameBraces checks that { and } are regular characters in names,
+// since they are delimiters only inside Type 4 functions.
+func TestReadNameBraces(t *testing.T) {
+	s := testScanner("<< /F{1} 5 /G} 6 >>")
+	got, err := s.ReadObject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Dict{"F{1}": Integer(5), "G}": Integer(6)}
+	if !Equal(got, want) {
+		t.Errorf("got %s, want %s", AsString(got), AsString(want))
+	}
+}
