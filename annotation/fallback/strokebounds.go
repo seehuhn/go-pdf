@@ -17,8 +17,6 @@
 package fallback
 
 import (
-	"math"
-
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 
@@ -39,10 +37,10 @@ const pathPrecision = 0.005
 // inside the rectangle it is derived from, and an inset may not be negative.
 func roundOut(r pdf.Rectangle) pdf.Rectangle {
 	return pdf.Rectangle{
-		LLx: roundDown(r.LLx),
-		LLy: roundDown(r.LLy),
-		URx: -roundDown(-r.URx),
-		URy: -roundDown(-r.URy),
+		LLx: pdf.Floor(r.LLx, 2),
+		LLy: pdf.Floor(r.LLy, 2),
+		URx: pdf.Ceil(r.URx, 2),
+		URy: pdf.Ceil(r.URy, 2),
 	}
 }
 
@@ -87,21 +85,6 @@ func roundPaths(subpaths [][]vec.Vec2) [][]vec.Vec2 {
 		out[i] = roundPoints(pts)
 	}
 	return out
-}
-
-// roundDown returns the largest two-decimal value which is not greater
-// than x.
-//
-// Scaling x by 100 is not exact, so taking the floor of x*100 can move a
-// value which already has two decimals, such as 0.29, down by 0.01.  The
-// value is therefore rounded to nearest first, which leaves such a value
-// alone, and stepped down only when that lands above x.
-func roundDown(x float64) float64 {
-	n := math.Round(x * 100)
-	if n/100 > x {
-		n--
-	}
-	return n / 100
 }
 
 // strokeBounds returns the rectangle covered by stroking the polylines in

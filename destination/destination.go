@@ -17,6 +17,8 @@
 package destination
 
 import (
+	"errors"
+	"fmt"
 	"math"
 
 	"seehuhn.de/go/pdf"
@@ -107,53 +109,60 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (Destination, error) {
 
 	switch Type(typeName) {
 	case TypeXYZ:
-		if len(arr) < 5 {
-			return nil, pdf.Error("XYZ destination requires 5 elements")
+		left, err := getOptionalNumber(c, arr, 2)
+		if err != nil {
+			return nil, err
 		}
-		left := getOptionalNumber(c, arr[2])
-		top := getOptionalNumber(c, arr[3])
-		zoom := getOptionalNumber(c, arr[4])
+		top, err := getOptionalNumber(c, arr, 3)
+		if err != nil {
+			return nil, err
+		}
+		zoom, err := getOptionalNumber(c, arr, 4)
+		if err != nil {
+			return nil, err
+		}
 		return &XYZ{Page: page, Left: left, Top: top, Zoom: zoom}, nil
 
 	case TypeFit:
 		return &Fit{Page: page}, nil
 
 	case TypeFitH:
-		if len(arr) < 3 {
-			return nil, pdf.Error("FitH destination requires 3 elements")
+		top, err := getOptionalNumber(c, arr, 2)
+		if err != nil {
+			return nil, err
 		}
-		top := getOptionalNumber(c, arr[2])
 		return &FitH{Page: page, Top: top}, nil
 
 	case TypeFitV:
-		if len(arr) < 3 {
-			return nil, pdf.Error("FitV destination requires 3 elements")
+		left, err := getOptionalNumber(c, arr, 2)
+		if err != nil {
+			return nil, err
 		}
-		left := getOptionalNumber(c, arr[2])
 		return &FitV{Page: page, Left: left}, nil
 
 	case TypeFitR:
-		if len(arr) < 6 {
-			return nil, pdf.Error("FitR destination requires 6 elements")
+		// all four coordinates are required; fall back to Fit if any is
+		// missing or unusable
+		var coords [4]float64
+		for i := range coords {
+			if 2+i >= len(arr) {
+				return &Fit{Page: page}, nil
+			}
+			v, err := c.Number(arr[2+i])
+			if pdf.IsMalformed(err) {
+				return &Fit{Page: page}, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				return &Fit{Page: page}, nil
+			}
+			coords[i] = v
 		}
-		left, err := pdf.Optional(c.Number(arr[2]))
-		if err != nil {
-			return nil, err
-		}
-		bottom, err := pdf.Optional(c.Number(arr[3]))
-		if err != nil {
-			return nil, err
-		}
-		right, err := pdf.Optional(c.Number(arr[4]))
-		if err != nil {
-			return nil, err
-		}
-		top, err := pdf.Optional(c.Number(arr[5]))
-		if err != nil {
-			return nil, err
-		}
+		left, bottom, right, top := coords[0], coords[1], coords[2], coords[3]
 		if left >= right || bottom >= top {
-			// Invalid rectangle, fall back to Fit
+			// invalid rectangle
 			return &Fit{Page: page}, nil
 		}
 		return &FitR{Page: page, Left: left, Bottom: bottom,
@@ -163,21 +172,21 @@ func Decode(c pdf.Cursor, obj pdf.Object, _ bool) (Destination, error) {
 		return &FitB{Page: page}, nil
 
 	case TypeFitBH:
-		if len(arr) < 3 {
-			return nil, pdf.Error("FitBH destination requires 3 elements")
+		top, err := getOptionalNumber(c, arr, 2)
+		if err != nil {
+			return nil, err
 		}
-		top := getOptionalNumber(c, arr[2])
 		return &FitBH{Page: page, Top: top}, nil
 
 	case TypeFitBV:
-		if len(arr) < 3 {
-			return nil, pdf.Error("FitBV destination requires 3 elements")
+		left, err := getOptionalNumber(c, arr, 2)
+		if err != nil {
+			return nil, err
 		}
-		left := getOptionalNumber(c, arr[2])
 		return &FitBV{Page: page, Left: left}, nil
 
 	default:
-		return nil, pdf.Error("unknown destination type: " + string(typeName))
+		return nil, pdf.Errorf("unknown destination type: %s", typeName)
 	}
 }
 
@@ -195,13 +204,13 @@ type XYZ struct {
 func (d *XYZ) DestinationType() Type { return TypeXYZ }
 
 func (d *XYZ) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	if err := validateFinite("Left", d.Left); err != nil {
+	if err := validateFinite(TypeXYZ, "Left", d.Left); err != nil {
 		return nil, err
 	}
-	if err := validateFinite("Top", d.Top); err != nil {
+	if err := validateFinite(TypeXYZ, "Top", d.Top); err != nil {
 		return nil, err
 	}
-	if err := validateFinite("Zoom", d.Zoom); err != nil {
+	if err := validateFinite(TypeXYZ, "Zoom", d.Zoom); err != nil {
 		return nil, err
 	}
 
@@ -247,7 +256,7 @@ type FitH struct {
 func (d *FitH) DestinationType() Type { return TypeFitH }
 
 func (d *FitH) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	if err := validateFinite("Top", d.Top); err != nil {
+	if err := validateFinite(TypeFitH, "Top", d.Top); err != nil {
 		return nil, err
 	}
 
@@ -272,7 +281,7 @@ type FitV struct {
 func (d *FitV) DestinationType() Type { return TypeFitV }
 
 func (d *FitV) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
-	if err := validateFinite("Left", d.Left); err != nil {
+	if err := validateFinite(TypeFitV, "Left", d.Left); err != nil {
 		return nil, err
 	}
 
@@ -298,23 +307,23 @@ func (d *FitR) DestinationType() Type { return TypeFitR }
 
 func (d *FitR) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if math.IsNaN(d.Left) || math.IsInf(d.Left, 0) {
-		return nil, pdf.Error("Left must be a finite number")
+		return nil, errors.New("FitR destination: Left must be a finite number")
 	}
 	if math.IsNaN(d.Bottom) || math.IsInf(d.Bottom, 0) {
-		return nil, pdf.Error("Bottom must be a finite number")
+		return nil, errors.New("FitR destination: Bottom must be a finite number")
 	}
 	if math.IsNaN(d.Right) || math.IsInf(d.Right, 0) {
-		return nil, pdf.Error("Right must be a finite number")
+		return nil, errors.New("FitR destination: Right must be a finite number")
 	}
 	if math.IsNaN(d.Top) || math.IsInf(d.Top, 0) {
-		return nil, pdf.Error("Top must be a finite number")
+		return nil, errors.New("FitR destination: Top must be a finite number")
 	}
 
 	if d.Left >= d.Right {
-		return nil, pdf.Error("Left must be less than Right")
+		return nil, errors.New("FitR destination: Left must be less than Right")
 	}
 	if d.Bottom >= d.Top {
-		return nil, pdf.Error("Bottom must be less than Top")
+		return nil, errors.New("FitR destination: Bottom must be less than Top")
 	}
 
 	return pdf.Array{
@@ -368,7 +377,7 @@ func (d *FitBH) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "FitBH destination", pdf.V1_1); err != nil {
 		return nil, err
 	}
-	if err := validateFinite("Top", d.Top); err != nil {
+	if err := validateFinite(TypeFitBH, "Top", d.Top); err != nil {
 		return nil, err
 	}
 
@@ -397,7 +406,7 @@ func (d *FitBV) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "FitBV destination", pdf.V1_1); err != nil {
 		return nil, err
 	}
-	if err := validateFinite("Left", d.Left); err != nil {
+	if err := validateFinite(TypeFitBV, "Left", d.Left); err != nil {
 		return nil, err
 	}
 
@@ -426,21 +435,29 @@ func (d *Named) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		return nil, err
 	}
 	if len(d.Name) == 0 {
-		return nil, pdf.Error("named destination must have a non-empty name")
+		return nil, errors.New("named destination must have a non-empty name")
 	}
 	return d.Name, nil
 }
 
-// getOptionalNumber reads a number from a PDF object, treating null as Unset
-func getOptionalNumber(c pdf.Cursor, obj pdf.Object) float64 {
-	if obj == nil {
-		return Unset
+// getOptionalNumber reads the number at index i of a destination array.
+// A missing trailing entry, null, a value which is not a number, and an
+// infinite value all read as Unset.
+func getOptionalNumber(c pdf.Cursor, arr pdf.Array, i int) (float64, error) {
+	if i >= len(arr) {
+		return Unset, nil
 	}
-	num, err := pdf.Optional(c.Number(obj))
+	num, err := c.Number(arr[i])
+	if pdf.IsMalformed(err) {
+		return Unset, nil
+	}
 	if err != nil {
-		return Unset
+		return 0, err
 	}
-	return num
+	if math.IsInf(num, 0) {
+		return Unset, nil
+	}
+	return num, nil
 }
 
 // encodeOptionalNumber converts a float64 to a PDF object, using null for Unset/NaN
@@ -452,12 +469,12 @@ func encodeOptionalNumber(v float64) pdf.Object {
 }
 
 // validateFinite checks that a value is either Unset (NaN) or a finite number
-func validateFinite(field string, v float64) error {
+func validateFinite(tp Type, field string, v float64) error {
 	if math.IsNaN(v) {
 		return nil // Unset is valid
 	}
 	if math.IsInf(v, 0) {
-		return pdf.Error(field + " must be either Unset or a finite number")
+		return fmt.Errorf("%s destination: %s must be either Unset or a finite number", tp, field)
 	}
 	return nil
 }

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -40,7 +41,7 @@ type decodeTestCase struct {
 }
 
 var decodeTestCases = []decodeTestCase{
-	// FitR with null coordinates - nulls decode as 0, creating invalid rectangle
+	// FitR with null coordinates decodes as Fit
 	{"FitR with nulls", pdf.Array{pdf.Reference(10), pdf.Name("FitR"), nil, nil, nil, nil}},
 }
 
@@ -358,6 +359,113 @@ func TestFitRInvalidRectangle(t *testing.T) {
 				t.Error("expected error, got nil")
 			}
 		})
+	}
+}
+
+func TestDecodeFitRMalformed(t *testing.T) {
+	page := pdf.Reference(10)
+	tests := []struct {
+		name   string
+		coords pdf.Array
+	}{
+		{"name", pdf.Array{pdf.Integer(100), pdf.Name("x"), pdf.Integer(400), pdf.Integer(500)}},
+		{"null", pdf.Array{pdf.Integer(100), pdf.Integer(200), nil, pdf.Integer(500)}},
+		{"NaN", pdf.Array{pdf.Real(math.NaN()), pdf.Integer(200), pdf.Integer(400), pdf.Integer(500)}},
+		{"Inf", pdf.Array{pdf.Integer(100), pdf.Integer(200), pdf.Integer(400), pdf.Real(math.Inf(1))}},
+		{"empty rectangle", pdf.Array{pdf.Integer(400), pdf.Integer(200), pdf.Integer(100), pdf.Integer(500)}},
+		{"three coordinates", pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(100)}},
+		{"no coordinates", pdf.Array{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			x := pdf.NewExtractor(w)
+			obj := append(pdf.Array{page, pdf.Name("FitR")}, tt.coords...)
+			dest, err := Decode(pdf.CursorAt(x, nil), obj, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := &Fit{Page: Target(page)}
+			if diff := cmp.Diff(want, dest); diff != "" {
+				t.Errorf("wrong destination (-want +got):\n%s", diff)
+			}
+			testRoundTrip(t, pdf.V1_7, dest)
+		})
+	}
+}
+
+// TestDecodeUnusableNumber checks that optional coordinates which are
+// infinite or not numbers at all read as Unset.
+func TestDecodeUnusableNumber(t *testing.T) {
+	page := pdf.Reference(10)
+	inf := pdf.Real(math.Inf(-1))
+	tests := []struct {
+		obj  pdf.Array
+		want Destination
+	}{
+		{pdf.Array{page, pdf.Name("XYZ"), inf, pdf.Integer(1), inf},
+			&XYZ{Page: Target(page), Left: Unset, Top: 1, Zoom: Unset}},
+		{pdf.Array{page, pdf.Name("XYZ"), pdf.Name("x"), pdf.String("y"), pdf.Integer(2)},
+			&XYZ{Page: Target(page), Left: Unset, Top: Unset, Zoom: 2}},
+		{pdf.Array{page, pdf.Name("FitH"), pdf.Boolean(true)}, &FitH{Page: Target(page), Top: Unset}},
+		{pdf.Array{page, pdf.Name("FitV"), pdf.Dict{}}, &FitV{Page: Target(page), Left: Unset}},
+		{pdf.Array{page, pdf.Name("FitH"), inf}, &FitH{Page: Target(page), Top: Unset}},
+		{pdf.Array{page, pdf.Name("FitV"), inf}, &FitV{Page: Target(page), Left: Unset}},
+		{pdf.Array{page, pdf.Name("FitBH"), inf}, &FitBH{Page: Target(page), Top: Unset}},
+		{pdf.Array{page, pdf.Name("FitBV"), inf}, &FitBV{Page: Target(page), Left: Unset}},
+	}
+	for _, tt := range tests {
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		dest, err := Decode(pdf.CursorAt(pdf.NewExtractor(w), nil), tt.obj, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(tt.want, dest, cmpopts.EquateNaNs()); diff != "" {
+			t.Errorf("%v: wrong destination (-want +got):\n%s", tt.obj[1], diff)
+		}
+		testRoundTrip(t, pdf.V1_7, dest)
+	}
+}
+
+// TestDecodeShortArray checks that missing trailing parameters which may be
+// null read as Unset, and that the destination is written back as an array
+// of full length.
+func TestDecodeShortArray(t *testing.T) {
+	page := pdf.Reference(10)
+	tests := []struct {
+		obj     pdf.Array
+		want    Destination
+		fullLen int
+	}{
+		{pdf.Array{page, pdf.Name("XYZ"), pdf.Integer(0), pdf.Integer(792)},
+			&XYZ{Page: Target(page), Left: 0, Top: 792, Zoom: Unset}, 5},
+		{pdf.Array{page, pdf.Name("XYZ"), pdf.Integer(0)},
+			&XYZ{Page: Target(page), Left: 0, Top: Unset, Zoom: Unset}, 5},
+		{pdf.Array{page, pdf.Name("XYZ")},
+			&XYZ{Page: Target(page), Left: Unset, Top: Unset, Zoom: Unset}, 5},
+		{pdf.Array{page, pdf.Name("FitH")}, &FitH{Page: Target(page), Top: Unset}, 3},
+		{pdf.Array{page, pdf.Name("FitV")}, &FitV{Page: Target(page), Left: Unset}, 3},
+		{pdf.Array{page, pdf.Name("FitBH")}, &FitBH{Page: Target(page), Top: Unset}, 3},
+		{pdf.Array{page, pdf.Name("FitBV")}, &FitBV{Page: Target(page), Left: Unset}, 3},
+	}
+	for _, tt := range tests {
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		dest, err := Decode(pdf.CursorAt(pdf.NewExtractor(w), nil), tt.obj, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(tt.want, dest, cmpopts.EquateNaNs()); diff != "" {
+			t.Errorf("%v: wrong destination (-want +got):\n%s", tt.obj, diff)
+		}
+
+		obj, err := dest.Encode(pdf.NewResourceManager(w))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if arr, _ := obj.(pdf.Array); len(arr) != tt.fullLen {
+			t.Errorf("%v: written as %v, want %d elements", tt.obj, obj, tt.fullLen)
+		}
+		testRoundTrip(t, pdf.V1_7, dest)
 	}
 }
 

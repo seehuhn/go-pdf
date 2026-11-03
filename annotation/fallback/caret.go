@@ -40,22 +40,46 @@ func (g *Generator) addCaretAppearance(a *annotation.Caret) (*form.Form, error) 
 
 	inner := applyMargins(a.Rect, a.Margin)
 
-	// when Sy=P, expand Rect and Margin downward and sideways to make room
-	// for the pilcrow, which is wider than a narrow caret box
+	// When Sy=P, the pilcrow is drawn below the caret box, and Rect grows
+	// where it does not yet take in the pilcrow, with Margin keeping the
+	// caret box where it is.  A rectangle which already has room, such as
+	// one this code grew before, stays as it is, so that generating the
+	// appearance again leaves the annotation unchanged.
 	if a.Symbol == "P" {
-		// the pilcrow's baseline sits 0.8 of its size below the caret and
-		// its stems reach a further 0.3 of its size down
-		extraY := pilcrowSize * 1.1
-		extraX := pilcrowSize * 0.4
-		a.Rect.LLy -= extraY
-		a.Rect.LLx -= extraX
-		a.Rect.URx += extraX
-		if len(a.Margin) == 4 {
+		// The pilcrow's baseline sits 0.8 of its size below the caret.
+		// The glyph starts 0.3 of its size left of the caret's centre.
+		// The bounds used here allow 0.3 of its size below the baseline
+		// and 0.7 of its size for its width, where the glyph needs about
+		// 0.19 and 0.52.  The resulting headroom of at least 1pt keeps
+		// the glyph inside Rect even where Rect falls short of the bounds
+		// by the slack allowed below.
+		cx := (inner.LLx + inner.URx) / 2
+		needLLx := pdf.Round(cx-pilcrowSize*0.4, 2)
+		needLLy := pdf.Round(inner.LLy-pilcrowSize*1.1, 2)
+		needURx := pdf.Round(cx+pilcrowSize*0.4, 2)
+
+		// Margin is rounded down, so that the caret box it gives can only
+		// grow; a rounded box could otherwise collapse, and the next run
+		// would then take all of Rect for the caret box.  The grown box can
+		// move the rounded pilcrow bounds by 0.01.  Rect therefore grows
+		// only where it falls short by more than that, and when it grows it
+		// takes in the pilcrow on every side, so that the next run finds no
+		// shortfall beyond the slack.
+		const slack = 0.015
+		r := a.Rect
+		if r.LLx > needLLx+slack || r.LLy > needLLy+slack || r.URx < needURx-slack {
+			r.LLx = min(r.LLx, needLLx)
+			r.LLy = min(r.LLy, needLLy)
+			r.URx = max(r.URx, needURx)
+			a.Rect = r
 			a.Margin = []float64{
-				a.Margin[0] + extraX, a.Margin[1] + extraY, a.Margin[2] + extraX, a.Margin[3],
+				pdf.Floor(inner.LLx-r.LLx, 2),
+				pdf.Floor(inner.LLy-r.LLy, 2),
+				pdf.Floor(r.URx-inner.URx, 2),
+				pdf.Floor(r.URy-inner.URy, 2),
 			}
-		} else {
-			a.Margin = []float64{extraX, extraY, extraX, 0}
+			// draw from the box the rounded Margin gives, as later runs do
+			inner = applyMargins(a.Rect, a.Margin)
 		}
 	}
 
