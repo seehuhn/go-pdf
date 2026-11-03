@@ -17,6 +17,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"log"
 
 	"seehuhn.de/go/pdf"
@@ -39,6 +40,10 @@ func main() {
 
 			opt := &pdf.WriterOptions{}
 			if enc != "plain" {
+				// a fixed file identifier, so that a password file can name
+				// the encrypted outputs
+				id := md5.Sum([]byte("seehuhn.de/go/pdf/feature-tests/versions/" + fname))
+				opt.ID = [][]byte{id[:]}
 				opt.OwnerPassword = "B"
 				opt.UserPermissions = pdf.PermCopy
 			}

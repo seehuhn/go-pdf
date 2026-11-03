@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestWriter(t *testing.T) {
@@ -287,6 +289,58 @@ func TestWriter_ID(t *testing.T) {
 	}
 	if !reflect.DeepEqual(r.meta.ID, w.meta.ID) {
 		t.Errorf("expected %v, got %v", w.meta.ID, r.meta.ID)
+	}
+}
+
+// TestWriterOptionsID checks how WriterOptions.ID becomes the /ID entry of
+// a new file.
+func TestWriterOptionsID(t *testing.T) {
+	a := []byte("0123456789abcdef")
+	b := []byte("0123456789ABCDEF")
+	for _, test := range []struct {
+		name string
+		id   [][]byte
+		want [][]byte
+	}{
+		{"one", [][]byte{a}, [][]byte{a, a}},
+		{"two", [][]byte{a, b}, [][]byte{a, b}},
+		{"three", [][]byte{a, b, a}, nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			w, err := NewWriter(buf, V1_7, &WriterOptions{ID: test.id})
+			if test.want == nil {
+				if err == nil {
+					t.Error("invalid ID accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+			r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(test.want, r.GetMeta().ID); diff != "" {
+				t.Errorf("ID mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+
+	// a non-nil empty slice requests a random identifier
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, &WriterOptions{ID: [][]byte{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := w.GetMeta().ID
+	if len(id) != 2 || len(id[0]) != 16 || !bytes.Equal(id[0], id[1]) {
+		t.Errorf("got ID %x, want two equal 16-byte strings", id)
 	}
 }
 
