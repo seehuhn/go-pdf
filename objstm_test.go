@@ -127,11 +127,50 @@ func TestObjStmOutOfOrderIndex(t *testing.T) {
 	b6 := "<< /K (six) >>"
 	b7 := "<< /K (seven) >>"
 	index := fmt.Sprintf("7 %d\n6 0\n", len(b6)+1)
-	first := len(index)
-	body := []byte(index + b6 + "\n" + b7)
+	path := writeObjStmFile(t, index, b6+"\n"+b7)
+	readObjStmKeys(t, path, []uint32{7, 6, 7, 6})
+}
 
-	// objects: 1 catalog, 2 pages, 4 ObjStm; 6 and 7 live inside object 4,
-	// with the index entry of 7 declared before that of 6
+// TestObjStmLeadingComment checks that white space and comments between an
+// index offset and the object it names are skipped.
+func TestObjStmLeadingComment(t *testing.T) {
+	b6 := "% 6 0 obj\n<< /K (six) >>"
+	b7 := " \r\n%comment\r% 7 0 obj\n<< /K (seven) >>"
+	index := fmt.Sprintf("6 0\n7 %d\n", len(b6)+1)
+	path := writeObjStmFile(t, index, b6+"\n"+b7)
+	readObjStmKeys(t, path, []uint32{6, 7})
+}
+
+// TestObjStmAdjacentObjects checks that each object in an object stream
+// ends where the next one starts, so that objects need no white space
+// between them.  The index is given out of order.
+func TestObjStmAdjacentObjects(t *testing.T) {
+	path := writeObjStmFile(t, "7 1 6 0 ", "12")
+	r, err := Open(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	for num, want := range map[uint32]Integer{6: 1, 7: 2} {
+		obj, err := r.Get(NewReference(num, 0), true)
+		if err != nil {
+			t.Fatalf("object %d: %v", num, err)
+		}
+		if obj != want {
+			t.Errorf("object %d: got %v, want %v", num, obj, want)
+		}
+	}
+}
+
+// writeObjStmFile writes a file whose objects 6 and 7 live in the object
+// stream 4, with the given stream index and body, and returns its path.
+func writeObjStmFile(t *testing.T, index, body string) string {
+	t.Helper()
+	first := len(index)
+	stmData := index + body
+
+	// objects: 1 catalog, 2 pages, 4 ObjStm; 6 and 7 live inside object 4
 	offsets := map[int]int{}
 	var buf bytes.Buffer
 	buf.WriteString("%PDF-1.7\n")
@@ -141,8 +180,8 @@ func TestObjStmOutOfOrderIndex(t *testing.T) {
 	}
 	emit(1, "<< /Type /Catalog /Pages 2 0 R >>")
 	emit(2, "<< /Type /Pages /Kids [] /Count 0 >>")
-	streamDict := fmt.Sprintf("<< /Type /ObjStm /N 2 /First %d /Length %d >>\nstream\n", first, len(body))
-	emit(4, streamDict+string(body)+"\nendstream")
+	streamDict := fmt.Sprintf("<< /Type /ObjStm /N 2 /First %d /Length %d >>\nstream\n", first, len(stmData))
+	emit(4, streamDict+stmData+"\nendstream")
 
 	// xref stream: /W [1 4 2]; objects 6 and 7 are type-2 entries pointing
 	// into object stream 4
@@ -173,11 +212,17 @@ func TestObjStmOutOfOrderIndex(t *testing.T) {
 	buf.WriteString("\nendstream\nendobj\n")
 	fmt.Fprintf(&buf, "startxref\n%d\n%%%%EOF\n", xrefPos)
 
-	path := t.TempDir() + "/outoforder.pdf"
+	path := t.TempDir() + "/objstm.pdf"
 	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return path
+}
 
+// readObjStmKeys opens path and checks the /K entries of objects 6 and 7,
+// reading them in the given order.
+func readObjStmKeys(t *testing.T, path string, order []uint32) {
+	t.Helper()
 	r, err := Open(path, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -185,7 +230,7 @@ func TestObjStmOutOfOrderIndex(t *testing.T) {
 	defer r.Close()
 
 	want := map[uint32]string{6: "six", 7: "seven"}
-	for _, num := range []uint32{7, 6, 7, 6} {
+	for _, num := range order {
 		obj, err := r.Get(NewReference(num, 0), true)
 		if err != nil {
 			t.Fatalf("object %d: %v", num, err)

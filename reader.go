@@ -439,7 +439,7 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, cac
 		return nil, Wrap(err, "object stream "+sRef.String())
 	}
 
-	offs, ok := lookupObjStm(idx, number)
+	offs, end, ok := lookupObjStm(idx, number, len(data))
 	if !ok {
 		return nil, &MalformedFileError{
 			Err: fmt.Errorf("object %d not found", number),
@@ -457,19 +457,35 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, cac
 	// section gives every lookup an independent view.  Strings inside object
 	// streams are never encrypted (PDF 32000-2, 7.5.7), so no encryptInfo is
 	// needed.
-	s := newScanner(bytes.NewReader(data[offs:]), getInt, nil)
+	s := newScanner(bytes.NewReader(data[offs:end]), getInt, nil)
+	// a comment counts as white space and may precede the object
+	if err := s.SkipWhiteSpace(); err != nil && err != io.EOF {
+		return nil, err
+	}
 	return s.ReadObject()
 }
 
-// lookupObjStm returns the byte offset of the given object in a decoded
-// object stream.
-func lookupObjStm(idx []stmObj, number uint32) (int, bool) {
+// lookupObjStm returns the byte range of the given object in a decoded
+// object stream of length n.  An object ends where the object with the
+// next larger offset starts, or at the end of the stream.  The index is
+// not required to be sorted.
+func lookupObjStm(idx []stmObj, number uint32, n int) (start, end int, ok bool) {
 	for _, info := range idx {
 		if info.number == number {
-			return info.offs, true
+			start, ok = info.offs, true
+			break
 		}
 	}
-	return 0, false
+	if !ok {
+		return 0, 0, false
+	}
+	end = n
+	for _, info := range idx {
+		if info.offs > start && info.offs < end {
+			end = info.offs
+		}
+	}
+	return start, end, true
 }
 
 // load decodes an object stream and parses its index.  Decoded streams are
