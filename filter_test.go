@@ -95,10 +95,7 @@ func TestFilterChaining(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			opt := &ReaderOptions{
-				ErrorHandling: ErrorHandlingReport,
-			}
-			r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), opt)
+			r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -207,8 +204,7 @@ func filterRoundTrip(t *testing.T, version Version, f Filter) Filter {
 		t.Fatal(err)
 	}
 
-	opt := &ReaderOptions{ErrorHandling: ErrorHandlingReport}
-	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), opt)
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

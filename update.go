@@ -67,7 +67,8 @@ type ReadWriteFile interface {
 // update and closes the file.
 //
 // The update uses the encryption of the original, which cannot be
-// changed.  Object numbers of freed objects are never reused.
+// changed.  Object numbers of freed objects are never reused.  A file
+// whose cross-reference table is damaged cannot be updated.
 func Update(name string, opt *UpdateOptions) (*Writer, error) {
 	fd, err := os.OpenFile(name, os.O_RDWR, 0)
 	if err != nil {
@@ -117,6 +118,10 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 	base, err := NewReader(src, size, &ReaderOptions{Password: opt.Password})
 	if err != nil {
 		return nil, err
+	}
+	if base.startXRef == 0 {
+		// The update's /Prev would have to name the damaged section.
+		return nil, &MalformedFileError{Err: errors.New("cannot update a file with a damaged cross-reference table")}
 	}
 
 	v := max(base.meta.Version, opt.MinimumVersion)

@@ -639,8 +639,7 @@ func TestAuthEmbed(t *testing.T) {
 
 	// opening with the user password should work
 	rOpt := &ReaderOptions{
-		Password:      "A",
-		ErrorHandling: ErrorHandlingReport,
+		Password: "A",
 	}
 	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), rOpt)
 	if err != nil {

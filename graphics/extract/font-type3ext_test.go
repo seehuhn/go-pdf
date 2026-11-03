@@ -142,10 +142,7 @@ func FuzzType3Dict(f *testing.F) {
 	f.Fuzz(func(t *testing.T, fileData []byte) {
 		// Get "random" Type3Dict from PDF.
 		// Make sure we don't panic on random input.
-		opt := &pdf.ReaderOptions{
-			ErrorHandling: pdf.ErrorHandlingReport,
-		}
-		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), opt)
+		r, err := pdf.NewReader(bytes.NewReader(fileData), int64(len(fileData)), nil)
 		if err != nil {
 			t.Skip("broken PDF: " + err.Error())
 		}
