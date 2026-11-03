@@ -168,7 +168,10 @@ type Catalog struct {
 // returned [Catalog.Metadata] field is populated with a typed
 // [*MetadataStream].
 func DecodeCatalog(c Cursor, obj Object, _ bool) (*Catalog, error) {
-	dict, err := c.DictTyped(obj, "Catalog")
+	// The /Type entry is not checked: the trailer's /Root entry already
+	// identifies the dictionary as the catalog, and the only valid value
+	// is written back on encode.
+	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
 	} else if dict == nil {
