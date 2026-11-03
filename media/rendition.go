@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -257,7 +259,7 @@ func (r *SelectorRendition) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	arr := make(pdf.Array, len(r.Renditions))
 	for i, child := range r.Renditions {
 		if child == nil {
-			return nil, pdf.Error("selector rendition: nil entry in Renditions")
+			return nil, errors.New("selector rendition: nil entry in Renditions")
 		}
 		obj, err := e.Embed(child)
 		if err != nil {

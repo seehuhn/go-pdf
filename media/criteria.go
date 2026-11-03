@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -214,7 +216,7 @@ func (c *MediaCriteria) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 	if len(c.Version) > 0 {
 		if len(c.Version) > 2 {
-			return nil, pdf.Error("media criteria: Version must have one or two elements")
+			return nil, errors.New("media criteria: Version must have one or two elements")
 		}
 		arr := make(pdf.Array, len(c.Version))
 		for i, name := range c.Version {
@@ -287,10 +289,10 @@ func (d *MinBitDepth) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if d.Depth <= 0 {
-		return nil, pdf.Error("minimum bit depth: Depth must be positive")
+		return nil, errors.New("minimum bit depth: Depth must be positive")
 	}
 	if !d.Monitor.isValid() {
-		return nil, pdf.Error("minimum bit depth: invalid Monitor")
+		return nil, errors.New("minimum bit depth: invalid Monitor")
 	}
 
 	dict := pdf.Dict{
@@ -373,10 +375,10 @@ func (s *MinScreenSize) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if s.Width < 0 || s.Height < 0 {
-		return nil, pdf.Error("minimum screen size: dimensions must not be negative")
+		return nil, errors.New("minimum screen size: dimensions must not be negative")
 	}
 	if !s.Monitor.isValid() {
-		return nil, pdf.Error("minimum screen size: invalid Monitor")
+		return nil, errors.New("minimum screen size: invalid Monitor")
 	}
 
 	dict := pdf.Dict{

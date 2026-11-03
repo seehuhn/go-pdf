@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -275,19 +277,19 @@ func (f *FloatingWindowParameters) Embed(e *pdf.EmbedHelper) (pdf.Native, error)
 		return nil, err
 	}
 	if f.Width < 0 || f.Height < 0 {
-		return nil, pdf.Error("floating window parameters: dimensions must not be negative")
+		return nil, errors.New("floating window parameters: dimensions must not be negative")
 	}
 	if !f.RelativeTo.isValid() {
-		return nil, pdf.Error("floating window parameters: invalid RelativeTo")
+		return nil, errors.New("floating window parameters: invalid RelativeTo")
 	}
 	if !f.Position.isValid() {
-		return nil, pdf.Error("floating window parameters: invalid Position")
+		return nil, errors.New("floating window parameters: invalid Position")
 	}
 	if !f.Offscreen.isValid() {
-		return nil, pdf.Error("floating window parameters: invalid Offscreen")
+		return nil, errors.New("floating window parameters: invalid Offscreen")
 	}
 	if !f.Resizable.isValid() {
-		return nil, pdf.Error("floating window parameters: invalid Resizable")
+		return nil, errors.New("floating window parameters: invalid Resizable")
 	}
 
 	dict := pdf.Dict{

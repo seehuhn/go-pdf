@@ -17,6 +17,7 @@
 package opi
 
 import (
+	"errors"
 	"reflect"
 
 	"seehuhn.de/go/pdf"
@@ -109,29 +110,29 @@ func (v *V20) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if v.F == nil {
-		return nil, pdf.Error("OPI dictionary requires F entry")
+		return nil, errors.New("OPI dictionary requires F entry")
 	}
 	if (v.Size == nil) != (v.CropRect == nil) {
-		return nil, pdf.Error("OPI 2.0 Size and CropRect must both be set or unset")
+		return nil, errors.New("OPI 2.0 Size and CropRect must both be set or unset")
 	}
 	if v.Size != nil && !validCrop(v.Size, v.CropRect) {
-		return nil, pdf.Error("OPI 2.0 CropRect must lie inside the image")
+		return nil, errors.New("OPI 2.0 CropRect must lie inside the image")
 	}
 	if v.Inks != nil {
 		if (v.Inks.Name == "") == (len(v.Inks.Monochrome) == 0) {
-			return nil, pdf.Error("OPI 2.0 Inks must have exactly one of Name and Monochrome")
+			return nil, errors.New("OPI 2.0 Inks must have exactly one of Name and Monochrome")
 		}
 		for _, comp := range v.Inks.Monochrome {
 			if !inUnitRange(comp.Tint) {
-				return nil, pdf.Error("OPI 2.0 ink tints must be in the range 0 to 1")
+				return nil, errors.New("OPI 2.0 ink tints must be in the range 0 to 1")
 			}
 		}
 	}
 	if v.Inks != nil && v.Inks.Name != "" && v.Inks.Name != "full_color" && v.Inks.Name != "registration" {
-		return nil, pdf.Error("OPI 2.0 Inks name must be full_color or registration")
+		return nil, errors.New("OPI 2.0 Inks name must be full_color or registration")
 	}
 	if q := v.IncludedImageQuality; q != 0 && q != 1 && q != 2 && q != 3 {
-		return nil, pdf.Error("OPI 2.0 IncludedImageQuality must be 1, 2, or 3")
+		return nil, errors.New("OPI 2.0 IncludedImageQuality must be 1, 2, or 3")
 	}
 
 	inner := pdf.Dict{"Version": pdf.Number(2.0)}

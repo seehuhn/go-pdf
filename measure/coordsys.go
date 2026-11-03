@@ -17,6 +17,9 @@
 package measure
 
 import (
+	"errors"
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -109,12 +112,12 @@ func (cs *CoordinateSystem) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	case CoordSysGeographic, CoordSysProjected:
 		// ok
 	default:
-		return nil, pdf.Errorf("invalid coordinate system type %q", cs.CSType)
+		return nil, fmt.Errorf("invalid coordinate system type %q", cs.CSType)
 	}
 
 	// at least one of EPSG or WKT must be set
 	if cs.EPSG == 0 && cs.WKT == "" {
-		return nil, pdf.Error("coordinate system must have EPSG or WKT")
+		return nil, errors.New("coordinate system must have EPSG or WKT")
 	}
 
 	dict := pdf.Dict{

@@ -22,6 +22,7 @@
 package reference
 
 import (
+	"errors"
 	"reflect"
 	"slices"
 
@@ -80,10 +81,10 @@ func (d *Dict) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if d.F == nil {
-		return nil, pdf.Error("reference dictionary requires F entry")
+		return nil, errors.New("reference dictionary requires F entry")
 	}
 	if len(d.ID) != 0 && len(d.ID) != 2 {
-		return nil, pdf.Error("reference dictionary ID must have two elements")
+		return nil, errors.New("reference dictionary ID must have two elements")
 	}
 
 	fObj, err := rm.Embed(d.F)

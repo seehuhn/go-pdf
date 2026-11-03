@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -221,18 +223,18 @@ func (s *MediaScreenParameters) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 func (s *MediaScreenEntries) toDict(e *pdf.EmbedHelper) (pdf.Dict, error) {
 	if !s.Window.isValid() {
-		return nil, pdf.Error("media screen parameters: invalid Window")
+		return nil, errors.New("media screen parameters: invalid Window")
 	}
 	if !s.Monitor.isValid() {
-		return nil, pdf.Error("media screen parameters: invalid Monitor")
+		return nil, errors.New("media screen parameters: invalid Monitor")
 	}
 	if s.Background != nil {
 		if len(s.Background) != 3 || !inUnitRange(s.Background) {
-			return nil, pdf.Error("media screen parameters: Background must be three values in 0.0..1.0")
+			return nil, errors.New("media screen parameters: Background must be three values in 0.0..1.0")
 		}
 	}
 	if s.Window == WindowFloating && s.FloatingWindow == nil {
-		return nil, pdf.Error("media screen parameters: FloatingWindow is required for a floating window")
+		return nil, errors.New("media screen parameters: FloatingWindow is required for a floating window")
 	}
 
 	dict := pdf.Dict{}
@@ -248,7 +250,7 @@ func (s *MediaScreenEntries) toDict(e *pdf.EmbedHelper) (pdf.Dict, error) {
 	}
 	if o, ok := s.Opacity.Get(); ok {
 		if o < 0 || o > 1 {
-			return nil, pdf.Error("media screen parameters: Opacity must be in 0.0..1.0")
+			return nil, errors.New("media screen parameters: Opacity must be in 0.0..1.0")
 		}
 		dict["O"] = pdf.Number(o)
 	}

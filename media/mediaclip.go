@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -177,10 +179,10 @@ func (c *MediaClipData) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if (c.DataFile == nil) == (c.DataForm == nil) {
-		return nil, pdf.Error("media clip data: exactly one of DataFile and DataForm must be set")
+		return nil, errors.New("media clip data: exactly one of DataFile and DataForm must be set")
 	}
 	if c.DataForm != nil && c.ContentType != "" {
-		return nil, pdf.Error("media clip data: ContentType must not be set for a form XObject")
+		return nil, errors.New("media clip data: ContentType must not be set for a form XObject")
 	}
 
 	dict := pdf.Dict{
@@ -324,7 +326,7 @@ func (c *MediaClipSection) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if c.Next == nil {
-		return nil, pdf.Error("media clip section: Next is required")
+		return nil, errors.New("media clip section: Next is required")
 	}
 
 	dict := pdf.Dict{

@@ -76,7 +76,7 @@ func Encode(rm *pdf.ResourceManager, nodes []*Node) (pdf.Native, error) {
 		if node.NA != nil {
 			na, err := node.NA.Encode(rm)
 			if err != nil {
-				return nil, pdf.Wrap(err, "NA")
+				return nil, err
 			}
 			dict["NA"] = na
 		}
@@ -84,7 +84,7 @@ func Encode(rm *pdf.ResourceManager, nodes []*Node) (pdf.Native, error) {
 		if node.PA != nil {
 			pa, err := node.PA.Encode(rm)
 			if err != nil {
-				return nil, pdf.Wrap(err, "PA")
+				return nil, err
 			}
 			dict["PA"] = pa
 		}

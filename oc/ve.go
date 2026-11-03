@@ -16,7 +16,11 @@
 
 package oc
 
-import "seehuhn.de/go/pdf"
+import (
+	"errors"
+
+	"seehuhn.de/go/pdf"
+)
 
 // VisibilityExpression represents a PDF visibility expression for optional content.
 // This must be one of:
@@ -123,7 +127,7 @@ func (g *VisibilityExpressionGroup) Embed(e *pdf.EmbedHelper) (pdf.Native, error
 		return nil, err
 	}
 	if g.Group == nil {
-		return nil, pdf.Error("VisibilityExpressionGroup.Group is nil")
+		return nil, errors.New("VisibilityExpressionGroup.Group is nil")
 	}
 
 	groupRef, err := e.Embed(g.Group)
@@ -166,7 +170,7 @@ func (a *VisibilityExpressionAnd) Embed(e *pdf.EmbedHelper) (pdf.Native, error) 
 		return nil, err
 	}
 	if len(a.Args) == 0 {
-		return nil, pdf.Error("VisibilityExpressionAnd requires at least one operand")
+		return nil, errors.New("VisibilityExpressionAnd requires at least one operand")
 	}
 
 	arr := make(pdf.Array, 1+len(a.Args))
@@ -216,7 +220,7 @@ func (o *VisibilityExpressionOr) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if len(o.Args) == 0 {
-		return nil, pdf.Error("VisibilityExpressionOr requires at least one operand")
+		return nil, errors.New("VisibilityExpressionOr requires at least one operand")
 	}
 
 	arr := make(pdf.Array, 1+len(o.Args))
@@ -256,7 +260,7 @@ func (n *VisibilityExpressionNot) Embed(e *pdf.EmbedHelper) (pdf.Native, error) 
 		return nil, err
 	}
 	if n.Arg == nil {
-		return nil, pdf.Error("VisibilityExpressionNot requires exactly one operand")
+		return nil, errors.New("VisibilityExpressionNot requires exactly one operand")
 	}
 
 	// embed the operand

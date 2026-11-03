@@ -17,6 +17,8 @@
 package measure
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -70,28 +72,28 @@ func (gm *GeospatialMeasure) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 	// validate required fields
 	if gm.GCS == nil {
-		return nil, pdf.Error("missing required GCS")
+		return nil, errors.New("geospatial measure: missing required GCS")
 	}
 	if len(gm.GPTS) == 0 {
-		return nil, pdf.Error("missing required GPTS")
+		return nil, errors.New("geospatial measure: missing required GPTS")
 	}
 	if len(gm.GPTS)%2 != 0 {
-		return nil, pdf.Error("GPTS must have even length")
+		return nil, errors.New("geospatial measure: GPTS must have even length")
 	}
 	if gm.LPTS != nil && len(gm.LPTS) != len(gm.GPTS) {
-		return nil, pdf.Error("LPTS length must match GPTS length")
+		return nil, errors.New("geospatial measure: LPTS length must match GPTS length")
 	}
 	if gm.Bounds != nil && len(gm.Bounds)%2 != 0 {
-		return nil, pdf.Error("Bounds must have even length")
+		return nil, errors.New("geospatial measure: Bounds must have even length")
 	}
 	if gm.PCSM != nil && len(gm.PCSM) != 12 {
-		return nil, pdf.Error("PCSM must have exactly 12 elements")
+		return nil, errors.New("geospatial measure: PCSM must have exactly 12 elements")
 	}
 
 	// validate PDU: if any is set, all three must be set
 	pduSet := gm.PDU[0] != "" || gm.PDU[1] != "" || gm.PDU[2] != ""
 	if pduSet && (gm.PDU[0] == "" || gm.PDU[1] == "" || gm.PDU[2] == "") {
-		return nil, pdf.Error("PDU must have all three units or none")
+		return nil, errors.New("geospatial measure: PDU must have all three units or none")
 	}
 
 	dict := pdf.Dict{}

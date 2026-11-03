@@ -17,6 +17,7 @@
 package opi
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -128,16 +129,16 @@ func (v *V13) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if v.F == nil {
-		return nil, pdf.Error("OPI dictionary requires F entry")
+		return nil, errors.New("OPI dictionary requires F entry")
 	}
 	if !validCrop13(&v.Size, &v.CropRect) {
-		return nil, pdf.Error("OPI 1.3 CropRect must lie inside the image")
+		return nil, errors.New("OPI 1.3 CropRect must lie inside the image")
 	}
 	if v.CropFixed != nil && !validCrop13(sizeFloat13(v.Size), v.CropFixed) {
-		return nil, pdf.Error("OPI 1.3 CropFixed must lie inside the image")
+		return nil, errors.New("OPI 1.3 CropFixed must lie inside the image")
 	}
 	if !validPosition(&v.Position) {
-		return nil, pdf.Error("OPI 1.3 Position must be finite and form a parallelogram")
+		return nil, errors.New("OPI 1.3 Position must be finite and form a parallelogram")
 	}
 	if !validColorType13(v.ColorType) {
 		return nil, fmt.Errorf("invalid OPI 1.3 ColorType %q", v.ColorType)
@@ -145,15 +146,15 @@ func (v *V13) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if v.Color != nil {
 		for _, x := range v.Color.CMYK {
 			if !inUnitRange(x) {
-				return nil, pdf.Error("OPI 1.3 Color values must be in the range 0 to 1")
+				return nil, errors.New("OPI 1.3 Color values must be in the range 0 to 1")
 			}
 		}
 	}
 	if v.Tint != nil && !inUnitRange(*v.Tint) {
-		return nil, pdf.Error("OPI 1.3 Tint must be in the range 0 to 1")
+		return nil, errors.New("OPI 1.3 Tint must be in the range 0 to 1")
 	}
 	if len(v.GrayMap) > 0 && !validGrayMap(v.GrayMap, v.ImageType) {
-		return nil, pdf.Error("invalid OPI 1.3 GrayMap")
+		return nil, errors.New("invalid OPI 1.3 GrayMap")
 	}
 
 	inner := pdf.Dict{"Version": pdf.Number(1.3)}

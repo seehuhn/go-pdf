@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -80,7 +82,7 @@ func (p *MediaPermissions) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if p.TempFile != "" && !p.TempFile.isValid() {
-		return nil, pdf.Error("media permissions: invalid TempFile value")
+		return nil, errors.New("media permissions: invalid TempFile value")
 	}
 
 	dict := pdf.Dict{}

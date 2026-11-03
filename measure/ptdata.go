@@ -17,6 +17,9 @@
 package measure
 
 import (
+	"errors"
+	"fmt"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -69,7 +72,7 @@ func ExtractPtData(c pdf.Cursor, obj pdf.Object, isDirect bool) (*PtData, error)
 
 	ptData := &PtData{}
 
-	// Extract Subtype (required, only "Cloud" is valid)
+	// Subtype (required, only "Cloud" is valid)
 	if subtype, err := pdf.Optional(c.Name(dict["Subtype"])); err != nil {
 		return nil, err
 	} else if subtype == "" || subtype == PtDataSubtypeCloud {
@@ -78,7 +81,7 @@ func ExtractPtData(c pdf.Cursor, obj pdf.Object, isDirect bool) (*PtData, error)
 		return nil, pdf.Errorf("invalid point data subtype: %q", subtype)
 	}
 
-	// Extract Names (required)
+	// Names (required)
 	if namesArray, err := pdf.Optional(c.Array(dict["Names"])); err != nil {
 		return nil, err
 	} else if namesArray != nil {
@@ -93,12 +96,12 @@ func ExtractPtData(c pdf.Cursor, obj pdf.Object, isDirect bool) (*PtData, error)
 		ptData.Names = names
 	}
 
-	// Validate Names is not empty
+	// Names must not be empty
 	if len(ptData.Names) == 0 {
 		return nil, pdf.Error("Names array cannot be empty")
 	}
 
-	// Extract XPTS (required)
+	// XPTS (required)
 	xptsArray, err := pdf.Optional(c.Array(dict["XPTS"]))
 	if err != nil {
 		return nil, err
@@ -109,7 +112,7 @@ func ExtractPtData(c pdf.Cursor, obj pdf.Object, isDirect bool) (*PtData, error)
 		if pointArray, err := pdf.Optional(c.Array(pointObj)); err != nil {
 			return nil, err
 		} else if pointArray != nil {
-			// Be permissive: truncate or pad to match Names length
+			// truncate or pad to the length of Names
 			point := make([]pdf.Object, expectedLen)
 			for i := 0; i < expectedLen && i < len(pointArray); i++ {
 				point[i] = pointArray[i]
@@ -130,38 +133,35 @@ func (pd *PtData) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 
-	// Validate Subtype
 	if pd.Subtype != PtDataSubtypeCloud {
-		return nil, pdf.Error("point data subtype must be \"Cloud\"")
+		return nil, errors.New("point data: Subtype must be \"Cloud\"")
 	}
 
-	// Validate Names not empty
 	if len(pd.Names) == 0 {
-		return nil, pdf.Error("Names array cannot be empty")
+		return nil, errors.New("point data: Names array cannot be empty")
 	}
 
-	// Build dictionary
 	dict := pdf.Dict{
 		"Type":    pdf.Name("PtData"),
 		"Subtype": pdf.Name(pd.Subtype),
 	}
 
-	// Encode Names
+	// Names (required)
 	namesArray := make(pdf.Array, len(pd.Names))
 	for i, name := range pd.Names {
 		namesArray[i] = pdf.Name(name)
 	}
 	dict["Names"] = namesArray
 
-	// Validate and encode XPTS (required)
+	// XPTS (required)
 	if pd.XPTS == nil {
-		return nil, pdf.Error("missing XPTS field")
+		return nil, errors.New("point data: missing XPTS field")
 	}
 	expectedLen := len(pd.Names)
 	xptsArray := make(pdf.Array, len(pd.XPTS))
 	for i, point := range pd.XPTS {
 		if len(point) != expectedLen {
-			return nil, pdf.Errorf("XPTS point %d has %d elements, expected %d", i, len(point), expectedLen)
+			return nil, fmt.Errorf("point data: XPTS point %d has %d elements, expected %d", i, len(point), expectedLen)
 		}
 
 		pointArray := make(pdf.Array, len(point))

@@ -65,21 +65,19 @@ func (err *AuthenticationError) Error() string {
 }
 
 // MalformedFileError indicates that a PDF file could not be parsed.
-//
-// TODO(voss): introduce a distinction between an invalid PDF container,
-// and invalid PDF content within a valid container?
 type MalformedFileError struct {
 	Err error
 	Loc []string
 }
 
 // Error creates a new [MalformedFileError] with the given message.
-// This is only for read errors, but not for write errors.
+// Use it only for problems found in data read from a PDF file.
 func Error(msg string) error {
 	return &MalformedFileError{Err: errors.New(msg)}
 }
 
 // Errorf creates a new [MalformedFileError] with the given message.
+// Use it only for problems found in data read from a PDF file.
 func Errorf(format string, args ...any) error {
 	return &MalformedFileError{Err: fmt.Errorf(format, args...)}
 }

@@ -18,6 +18,7 @@ package cff
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 
@@ -175,7 +176,7 @@ func (f *Simple) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 		return charcode.Code(c), true
 	}
 
-	// Allocate new code
+	// allocate a new code
 	width := math.Round(f.cffFont.GlyphWidthPDF(gid))
 	c, err := f.Simple.Encode(gid, f.cffFont.Glyphs[gid].Name, text, width)
 	return charcode.Code(c), err == nil
@@ -241,7 +242,7 @@ func (f *Simple) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 func (f *Simple) makeFontDict() (*dict.Type1, error) {
 	if err := f.Simple.Error(); err != nil {
-		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
+		return nil, fmt.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
 	outlines := f.cffFont.Outlines

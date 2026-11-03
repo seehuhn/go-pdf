@@ -17,6 +17,8 @@
 package measure
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -70,47 +72,42 @@ func (rm *RectilinearMeasure) MeasureType() pdf.Name {
 
 // Embed converts the RectilinearMeasure into a PDF object.
 func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
-
-	// Version check for PDF 1.6+
 	if err := pdf.CheckVersion(res.Out(), "measure dictionaries", pdf.V1_6); err != nil {
 		return nil, err
 	}
 
-	// Validate required fields
 	if rm.ScaleRatio.IsZero() {
-		return nil, pdf.Errorf("missing required ScaleRatio")
+		return nil, errors.New("missing required ScaleRatio")
 	}
 	if len(rm.XAxis) == 0 {
-		return nil, pdf.Errorf("missing required XAxis")
+		return nil, errors.New("missing required XAxis")
 	}
 	if len(rm.Distance) == 0 {
-		return nil, pdf.Errorf("missing required Distance")
+		return nil, errors.New("missing required Distance")
 	}
 	if len(rm.Area) == 0 {
-		return nil, pdf.Errorf("missing required Area")
+		return nil, errors.New("missing required Area")
 	}
 
 	dict := pdf.Dict{}
 
-	// Optional Type field
+	// Type (optional)
 	if res.Out().GetOptions().HasAny(pdf.OptDictTypes) {
 		dict["Type"] = pdf.Name("Measure")
 	}
 
-	// Subtype
 	dict["Subtype"] = pdf.Name("RL")
 
-	// Required fields
+	// R, X, D and A (required)
 	dict["R"] = rm.ScaleRatio
 
-	// X axis
 	xArray, err := embedNumberFormatArray(res, rm.XAxis)
 	if err != nil {
 		return nil, err
 	}
 	dict["X"] = xArray
 
-	// Y axis - omit if nil or pointer-equal to X
+	// Y (optional), omitted if equal to X
 	yAxisOmitted := rm.YAxis == nil || areNumberFormatArraysEqual(rm.YAxis, rm.XAxis)
 	if !yAxisOmitted {
 		yArray, err := embedNumberFormatArray(res, rm.YAxis)
@@ -120,21 +117,19 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["Y"] = yArray
 	}
 
-	// Distance
 	dArray, err := embedNumberFormatArray(res, rm.Distance)
 	if err != nil {
 		return nil, err
 	}
 	dict["D"] = dArray
 
-	// Area
 	aArray, err := embedNumberFormatArray(res, rm.Area)
 	if err != nil {
 		return nil, err
 	}
 	dict["A"] = aArray
 
-	// Optional fields
+	// T and S (optional)
 	if len(rm.Angle) > 0 {
 		tArray, err := embedNumberFormatArray(res, rm.Angle)
 		if err != nil {
@@ -151,12 +146,12 @@ func (rm *RectilinearMeasure) Embed(res *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["S"] = sArray
 	}
 
-	// Origin - only write if not [0,0]
+	// O (optional), omitted for the default [0 0]
 	if rm.Origin[0] != 0 || rm.Origin[1] != 0 {
 		dict["O"] = pdf.Array{pdf.Number(rm.Origin[0]), pdf.Number(rm.Origin[1])}
 	}
 
-	// CYX - only write if non-zero AND Y axis is present
+	// CYX (optional), meaningful only when Y is present
 	if rm.CYX != 0 && !yAxisOmitted {
 		dict["CYX"] = pdf.Number(rm.CYX)
 	}

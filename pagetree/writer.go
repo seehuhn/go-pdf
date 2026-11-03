@@ -353,7 +353,7 @@ func (w *Writer) NextPageNumber(cb func(int)) {
 // A wrapper /Pages object is created if necessary.
 // For single-page documents, this encodes the pending page.
 func (w *Writer) wrapIfLeaf(node *nodeInfo) *dictInfo {
-	// Handle pending page first - we know it will be a Page needing a wrapper
+	// a pending page is always a leaf and needs a wrapper
 	if node.pendingPage != nil {
 		wrapperRef := w.Out.Alloc()
 		node.pendingPage.Parent = wrapperRef
@@ -368,7 +368,7 @@ func (w *Writer) wrapIfLeaf(node *nodeInfo) *dictInfo {
 		node.dict = dict.(pdf.Dict)
 		node.pendingPage = nil
 
-		// Write the page and create wrapper
+		// write the page and create the wrapper
 		w.outRefs = append(w.outRefs, node.ref)
 		w.outObjects = append(w.outObjects, node.dict)
 
@@ -380,12 +380,12 @@ func (w *Writer) wrapIfLeaf(node *nodeInfo) *dictInfo {
 		return &dictInfo{dict: wrapper, ref: wrapperRef}
 	}
 
-	// Already-encoded dict that's a Pages node - no wrapper needed
+	// an encoded Pages node needs no wrapper
 	if node.dict["Type"] == pdf.Name("Pages") {
 		return node.dictInfo
 	}
 
-	// Already-encoded Page dict - needs wrapper
+	// an encoded Page dict needs a wrapper
 	wrapperRef := w.Out.Alloc()
 	node.dict["Parent"] = wrapperRef
 	w.outRefs = append(w.outRefs, node.ref)
@@ -418,7 +418,7 @@ func (w *Writer) flush() error {
 
 	err := w.Out.WriteCompressed(w.outRefs, w.outObjects...)
 	if err != nil {
-		return pdf.Wrap(err, "page tree nodes")
+		return err
 	}
 
 	w.outObjects = w.outObjects[:0]

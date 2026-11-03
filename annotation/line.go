@@ -158,17 +158,17 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"Subtype": pdf.Name("Line"),
 	}
 
-	// Add common annotation fields
+	// common annotation fields
 	if err := l.Common.fillDict(rm, dict, isMarkup(l), l.BorderStyle != nil); err != nil {
 		return nil, err
 	}
 
-	// Add markup annotation fields
+	// markup annotation fields
 	if err := l.Markup.fillDict(rm, dict); err != nil {
 		return nil, err
 	}
 
-	// Add line-specific fields
+	// line-specific fields
 	// L (required)
 	lArray := make(pdf.Array, 4)
 	for i, coord := range l.Coords {
@@ -236,7 +236,7 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 				return nil, err
 			}
 			if len(l.CaptionOffset) != 2 {
-				return nil, pdf.Error("invalid CaptionOffset")
+				return nil, errors.New("invalid CaptionOffset")
 			}
 			coArray := make(pdf.Array, 2)
 			for i, offset := range l.CaptionOffset {
@@ -246,10 +246,10 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		}
 	} else {
 		if l.CaptionAbove {
-			return nil, pdf.Error("unexpected CaptionAbove")
+			return nil, errors.New("unexpected CaptionAbove")
 		}
 		if l.CaptionOffset != nil {
-			return nil, pdf.Error("unexpected CaptionOffset")
+			return nil, errors.New("unexpected CaptionOffset")
 		}
 	}
 
@@ -267,7 +267,7 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		if l.LLE < 0 {
-			return nil, pdf.Error("negative LLE value")
+			return nil, errors.New("negative LLE value")
 		}
 		dict["LLE"] = pdf.Number(l.LLE)
 	}
@@ -278,7 +278,7 @@ func (l *Line) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, err
 		}
 		if l.LLO < 0 {
-			return nil, pdf.Error("negative LLO value")
+			return nil, errors.New("negative LLO value")
 		}
 		dict["LLO"] = pdf.Number(l.LLO)
 	}

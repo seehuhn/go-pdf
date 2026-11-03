@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -161,7 +163,7 @@ func (info *MediaPlayerInfo) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		return nil, err
 	}
 	if info.PID == nil {
-		return nil, pdf.Error("media player info: PID is required")
+		return nil, errors.New("media player info: PID is required")
 	}
 
 	pid, err := e.Embed(info.PID)

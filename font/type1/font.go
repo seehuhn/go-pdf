@@ -18,6 +18,7 @@ package type1
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"seehuhn.de/go/geom/path"
@@ -105,7 +106,7 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	extents := make([]rect.Rect, len(glyphNames))
 	var fontBBox rect.Rect
 	for i, name := range glyphNames {
-		// Use metrics for width if available, to match GlyphWidthPDF behavior
+		// prefer the metrics for widths, to match GlyphWidthPDF
 		if metrics != nil {
 			widths[i] = metrics.GlyphWidthPDF(name) / 1000
 		} else {
@@ -283,7 +284,7 @@ func (f *Instance) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 		return charcode.Code(c), true
 	}
 
-	// Allocate new code
+	// allocate a new code
 	glyphName := f.GlyphNames[gid]
 	width := math.Round(f.GlyphWidthPDF(glyphName))
 
@@ -357,7 +358,7 @@ func (f *Instance) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 
 func (f *Instance) makeFontDict() (*dict.Type1, error) {
 	if err := f.Simple.Error(); err != nil {
-		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
+		return nil, fmt.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
 	fontData := f.psFont

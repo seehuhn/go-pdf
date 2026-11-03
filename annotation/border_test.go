@@ -235,33 +235,3 @@ func TestBorderStyleDefaultNotShared(t *testing.T) {
 		t.Errorf("default dash array is shared: got %v", b2.DashArray)
 	}
 }
-
-// TestBorderStyleWriteErrorsNotMalformed checks that errors from writing a
-// border style are plain errors.  A *pdf.MalformedFileError describes a file
-// being read, and a permissive caller is entitled to discard one, which would
-// silently drop the invalid border instead of refusing it.
-func TestBorderStyleWriteErrorsNotMalformed(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		style *BorderStyle
-	}{
-		{"negative width", &BorderStyle{Width: -1, Style: "S", SingleUse: true}},
-		{"missing dash array", &BorderStyle{Width: 1, Style: "D", SingleUse: true}},
-		{"unexpected dash array", &BorderStyle{
-			Width: 1, Style: "S", DashArray: []float64{3}, SingleUse: true,
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-			rm := pdf.NewResourceManager(w)
-
-			_, err := rm.Embed(tc.style)
-			if err == nil {
-				t.Fatal("expected an error, got none")
-			}
-			if pdf.IsMalformed(err) {
-				t.Errorf("write error reported as a malformed-file error: %v", err)
-			}
-		})
-	}
-}

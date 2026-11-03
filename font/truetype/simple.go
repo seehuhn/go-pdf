@@ -18,6 +18,7 @@ package truetype
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 
@@ -262,7 +263,7 @@ func (f *Simple) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 func (f *Simple) makeDict() (*dict.TrueType, error) {
 	if err := f.Simple.Error(); err != nil {
-		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
+		return nil, fmt.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
 	// subset the font

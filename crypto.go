@@ -323,7 +323,7 @@ func (enc *encryptInfo) AsDict(version Version) (Dict, error) {
 		// V 1 and 2 have a single RC4 filter for all data
 		cf := enc.stmF
 		if cf == nil || cf.Cipher != cipherRC4 || enc.strF != cf || enc.efF != cf {
-			return nil, errors.New("V 1 and 2 need one RC4 filter for all data")
+			return nil, errors.New("encryption V 1 and 2 need one RC4 filter for all data")
 		}
 		switch {
 		case cf.Length == 40 && version >= V1_1:
@@ -800,9 +800,7 @@ func createStdSecHandler(id []byte, userPwd, ownerPwd string, perm Perm, length,
 	case V == 5:
 		R = 6
 	default:
-		return nil, &MalformedFileError{
-			Err: errors.New("invalid Encrypt.V"),
-		}
+		return nil, errors.New("invalid Encrypt.V")
 	}
 	keyBytes := length / 8
 

@@ -17,10 +17,10 @@
 package image
 
 import (
+	"errors"
 	"image"
 	gocolor "image/color"
 
-	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 )
 
@@ -32,19 +32,17 @@ import (
 // If colorSpace is nil, DeviceRGB will be used as the default color space.
 func PNG(img image.Image, colorSpace color.Space) (*Dict, error) {
 	if img == nil {
-		return nil, pdf.Errorf("image cannot be nil")
+		return nil, errors.New("image cannot be nil")
 	}
 
-	// Determine color space
 	cs := colorSpace
 	if cs == nil {
 		cs = color.SpaceDeviceRGB
 	}
 
-	// Create main image dict using existing Dict functionality
 	dict := FromImage(img, cs, 8)
 
-	// Add soft mask if alpha channel is needed
+	// soft mask for transparent pixels
 	if needsAlphaChannel(img) {
 		dict.SMask = FromImageAlpha(img, 8)
 	}

@@ -177,7 +177,7 @@ func (s *Stream) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 			return nil, err
 		}
 	default:
-		return nil, pdf.Errorf("unexpected font type %s", s.Type)
+		return nil, fmt.Errorf("unexpected font type %s", s.Type)
 	}
 
 	ref := rm.Alloc()

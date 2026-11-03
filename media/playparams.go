@@ -17,6 +17,8 @@
 package media
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/optional"
 )
@@ -278,7 +280,7 @@ func (p *MediaPlayEntries) toDict(e *pdf.EmbedHelper) (pdf.Dict, error) {
 	}
 	if rc, ok := p.RepeatCount.Get(); ok {
 		if rc < 0 {
-			return nil, pdf.Error("media play parameters: RepeatCount must not be negative")
+			return nil, errors.New("media play parameters: RepeatCount must not be negative")
 		}
 		dict["RC"] = pdf.Number(rc)
 	}
@@ -360,7 +362,7 @@ func (d *MediaDuration) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["S"] = pdf.Name(d.Kind)
 	case DurationExplicit:
 		if d.Time == nil {
-			return nil, pdf.Error("media duration: Time is required when Kind is explicit")
+			return nil, errors.New("media duration: Time is required when Kind is explicit")
 		}
 		t, err := e.Embed(d.Time)
 		if err != nil {
@@ -369,7 +371,7 @@ func (d *MediaDuration) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		dict["S"] = pdf.Name("T")
 		dict["T"] = t
 	default:
-		return nil, pdf.Error("media duration: invalid Kind")
+		return nil, errors.New("media duration: invalid Kind")
 	}
 
 	if d.SingleUse {

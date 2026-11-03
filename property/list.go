@@ -17,6 +17,8 @@
 package property
 
 import (
+	"errors"
+
 	"seehuhn.de/go/pdf"
 )
 
@@ -74,7 +76,7 @@ func ListGet[T any](l List, extract func(pdf.Cursor, pdf.Object, bool) (T, error
 	p, ok := l.(*proxyList)
 	if !ok {
 		var zero T
-		return zero, pdf.Error("ListGet only works for property lists extracted from PDF files")
+		return zero, errors.New("ListGet only works for property lists extracted from PDF files")
 	}
 	return p.inner.As(p.path, extract)
 }

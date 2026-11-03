@@ -18,6 +18,7 @@ package opentype
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 
@@ -210,7 +211,7 @@ func (f *SimpleGlyf) isSymbolic() bool {
 // makeDict creates the PDF font dictionary for this font.
 func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 	if err := f.Simple.Error(); err != nil {
-		return nil, pdf.Errorf("font %q: %w", f.PostScriptName(), err)
+		return nil, fmt.Errorf("font %q: %w", f.PostScriptName(), err)
 	}
 
 	// subset the font
