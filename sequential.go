@@ -138,14 +138,16 @@ func (fi *FileInfo) MakeReader(opt *ReaderOptions) (*Reader, error) {
 	r.xref = fi.makeXRef()
 	r.objstms = newObjstmCache()
 
-	trailer, err := fi.getTrailer()
+	raw, err := fi.getTrailer()
 	if err != nil {
 		return nil, err
 	}
+	trailer := documentTrailer(raw)
 
 	if err := r.decodeTrailerCore(trailer, opt); err != nil {
 		return nil, err
 	}
+	r.meta.Trailer = trailer
 
 	return r, nil
 }

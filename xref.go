@@ -81,13 +81,7 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 		mergeXRef(xref, sec)
 
 		if first {
-			for key, val := range dict {
-				if key == "Root" || key == "Encrypt" || key == "Info" || key == "ID" ||
-					key.isSecondClassName() ||
-					key.isThirdClassName() {
-					trailer[key] = val
-				}
-			}
+			trailer = documentTrailer(dict)
 			// The spec treats objects numbered above Size as missing.
 			// The reader deliberately deviates and keeps them, to be
 			// permissive; Size only seeds the next object number for
@@ -124,6 +118,21 @@ func (r *Reader) readXRef() (map[uint32]*xRefEntry, Dict, error) {
 
 	repairFreeList(xref)
 	return xref, trailer, nil
+}
+
+// documentTrailer returns the entries of a trailer or cross-reference
+// stream dictionary which describe the document, leaving out those which
+// describe one cross-reference section.
+func documentTrailer(dict Dict) Dict {
+	trailer := Dict{}
+	for key, val := range dict {
+		if key == "Root" || key == "Encrypt" || key == "Info" || key == "ID" ||
+			key.isSecondClassName() ||
+			key.isThirdClassName() {
+			trailer[key] = val
+		}
+	}
+	return trailer
 }
 
 // readXRefSection reads the cross-reference section at byte offset start,

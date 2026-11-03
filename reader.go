@@ -37,34 +37,7 @@ type ReaderOptions struct {
 	// If authentication fails, [Open] and [NewReader] return an
 	// [AuthenticationError].
 	Password string
-
-	ErrorHandling ReaderErrorHandling
 }
-
-// ReaderErrorHandling specifies how the reader should handle errors.
-type ReaderErrorHandling int
-
-const (
-	// ErrorHandlingRecover means that the reader will try to recover from
-	// errors and continue parsing the file.  This is the default.
-	//
-	// This guarantees that the reader will return a valid Catalog object,
-	// with a non-null Pages field.
-	ErrorHandlingRecover = iota
-
-	// ErrorHandlingReport means that the reader will try to recover from
-	// errors and continue parsing the file, but will report errors to the
-	// caller.
-	//
-	// This mode tolerates more errors than ErrorHandlingRecover does.
-	// In particular, it is not guaranteed that there are any pages in the
-	// document.
-	ErrorHandlingReport
-
-	// ErrorHandlingStop means that the reader will stop parsing the file as
-	// soon as an error is encountered.
-	ErrorHandlingStop
-)
 
 // Reader represents a pdf file opened for reading.  Use [Open] or
 // [NewReader] to create a Reader.
@@ -84,7 +57,8 @@ type Reader struct {
 
 	// startXRef is the header-relative offset of the newest cross-reference
 	// section, and trailerSize the /Size entry of its trailer (0 if absent).
-	// Both are needed to append an incremental update.
+	// Both are needed to append an incremental update.  Both are 0 when the
+	// cross-reference table was rebuilt by scanning the file.
 	startXRef   int64
 	trailerSize int64
 
@@ -101,11 +75,6 @@ type Reader struct {
 	// lookup.  Methods of the cache are safe for concurrent use, matching
 	// the concurrency guarantees of Get.
 	objstms *objstmCache
-
-	// Errors is a list of errors encountered while opening the file.
-	// This is only used if the ErrorHandling option is set to
-	// ErrorHandlingReport.
-	Errors []*MalformedFileError
 }
 
 // Open opens the named PDF file for reading.  After use, [Reader.Close] must
@@ -130,11 +99,39 @@ func Open(fname string, opt *ReaderOptions) (*Reader, error) {
 }
 
 // NewReader creates a new Reader object.
+//
+// Malformed parts of the file are repaired or ignored where possible.
+// If the file cannot be opened through its cross-reference information,
+// the reader rebuilds the cross-reference table by scanning the file for
+// objects.  A reader
+// obtained this way cannot be used as the base of an incremental update.
 func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error) {
 	if opt == nil {
 		opt = &ReaderOptions{}
 	}
 
+	r, err := newReaderFromXRef(data, size, opt)
+	if err == nil || !IsMalformed(err) {
+		return r, err
+	}
+
+	// A malformed-file error of the rebuilt reader is reported as the
+	// original one, which names the first damage found; any other error,
+	// for example a failed authentication, is reported as is.
+	fi, scanErr := SequentialScan(data, size)
+	if scanErr == nil {
+		r, scanErr = fi.MakeReader(opt)
+	}
+	if IsReadError(scanErr) {
+		return nil, scanErr
+	} else if scanErr != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// newReaderFromXRef opens a file using its cross-reference sections.
+func newReaderFromXRef(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error) {
 	r := &Reader{
 		r:           data,
 		size:        size,
@@ -163,12 +160,6 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 		return nil, err
 	}
 
-	// remove xref-related information from trailer dictionary
-	delete(trailer, "Type")
-	delete(trailer, "Size")
-	delete(trailer, "Index")
-	delete(trailer, "Prev")
-	delete(trailer, "W")
 	r.meta.Trailer = trailer
 
 	return r, nil
@@ -180,19 +171,7 @@ func NewReader(data io.ReaderAt, size int64, opt *ReaderOptions) (*Reader, error
 // NewReader and (*FileInfo).MakeReader; the two differ in how they obtain
 // the trailer and how they clean it up afterwards.
 func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
-	shouldExit := func(err error) bool {
-		if err == nil {
-			return false
-		}
-		if opt.ErrorHandling == ErrorHandlingReport {
-			if e, ok := errors.AsType[*MalformedFileError](err); ok {
-				r.Errors = append(r.Errors, e)
-				return false
-			}
-		}
-		return opt.ErrorHandling != ErrorHandlingRecover
-	}
-
+	// Malformed parts are dropped below; read errors are passed on.
 	IDObj := trailer["ID"]
 	r.meta.ID = getIDDirect(IDObj)
 	r.meta.Permissions = PermAll
@@ -213,15 +192,14 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 		} else {
 			// If the file is encrypted, ID is guaranteed to be a direct object.
 			if r.meta.ID == nil {
-				return errors.New("file is encrypted, but no ID found")
+				return &MalformedFileError{Err: errors.New("file is encrypted, but no ID found")}
 			}
 			var perm Perm
 			r.enc, perm, err = r.parseEncryptDict(encDict, opt.Password)
 			if err != nil {
 				// An /Encrypt entry we cannot parse means we cannot decrypt
 				// the file's streams, so the rest of the document would be
-				// unreadable.  Surface the error regardless of
-				// ErrorHandling — the file is unsalvageable in any mode.
+				// unreadable.
 				// AuthenticationError is returned unwrapped so callers can
 				// detect it cleanly via errors.As.
 				if _, ok := errors.AsType[*AuthenticationError](err); ok {
@@ -237,17 +215,13 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 		// If the file is not encrypted, ID may be an indirect object.
 		var err error
 		r.meta.ID, err = r.getID(IDObj)
-		if shouldExit(err) {
+		if IsReadError(err) {
 			return err
 		}
 	}
 	if r.meta.Version >= V2_0 {
 		for _, id := range r.meta.ID {
 			if len(id) < 16 {
-				err := &MalformedFileError{Err: errInvalidID}
-				if shouldExit(err) {
-					return err
-				}
 				r.meta.ID = nil
 				break
 			}
@@ -255,11 +229,8 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 	}
 
 	catalogDict, err := NewCursor(r).Dict(trailer["Root"])
-	if err != nil {
-		err = Wrap(err, "document catalog")
-		if shouldExit(err) {
-			return err
-		}
+	if IsReadError(err) {
+		return Wrap(err, "document catalog")
 	}
 
 	// mark the catalog metadata stream as exempt from document-level
@@ -274,19 +245,11 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 
 	x := NewExtractor(r)
 	r.meta.Catalog, err = CursorAt(x, nil).Decode(catalogDict, DecodeCatalog)
-	if shouldExit(err) {
+	if IsReadError(err) {
 		return err
 	} else if r.meta.Catalog == nil || r.meta.Catalog.Pages == 0 {
-		err := &MalformedFileError{
+		return &MalformedFileError{
 			Err: errors.New("no pages in PDF document catalog"),
-		}
-		if opt.ErrorHandling == ErrorHandlingReport {
-			r.Errors = append(r.Errors, err)
-			if r.meta.Catalog == nil {
-				r.meta.Catalog = &Catalog{}
-			}
-		} else {
-			return err
 		}
 	}
 	// A catalog Version takes effect only if later than the header
@@ -313,7 +276,7 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 	}
 
 	r.meta.Info, err = CursorAt(x, nil).Decode(trailer["Info"], ExtractInfo)
-	if shouldExit(err) {
+	if IsReadError(err) {
 		return err
 	}
 	return nil
@@ -439,7 +402,7 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, cac
 		return nil, Wrap(err, "object stream "+sRef.String())
 	}
 
-	offs, ok := lookupObjStm(idx, number)
+	offs, end, ok := lookupObjStm(idx, number, len(data))
 	if !ok {
 		return nil, &MalformedFileError{
 			Err: fmt.Errorf("object %d not found", number),
@@ -457,19 +420,35 @@ func getFromObjStm(r Getter, number uint32, sRef Reference, getInt getIntFn, cac
 	// section gives every lookup an independent view.  Strings inside object
 	// streams are never encrypted (PDF 32000-2, 7.5.7), so no encryptInfo is
 	// needed.
-	s := newScanner(bytes.NewReader(data[offs:]), getInt, nil)
+	s := newScanner(bytes.NewReader(data[offs:end]), getInt, nil)
+	// a comment counts as white space and may precede the object
+	if err := s.SkipWhiteSpace(); err != nil && err != io.EOF {
+		return nil, err
+	}
 	return s.ReadObject()
 }
 
-// lookupObjStm returns the byte offset of the given object in a decoded
-// object stream.
-func lookupObjStm(idx []stmObj, number uint32) (int, bool) {
+// lookupObjStm returns the byte range of the given object in a decoded
+// object stream of length n.  An object ends where the object with the
+// next larger offset starts, or at the end of the stream.  The index is
+// not required to be sorted.
+func lookupObjStm(idx []stmObj, number uint32, n int) (start, end int, ok bool) {
 	for _, info := range idx {
 		if info.number == number {
-			return info.offs, true
+			start, ok = info.offs, true
+			break
 		}
 	}
-	return 0, false
+	if !ok {
+		return 0, 0, false
+	}
+	end = n
+	for _, info := range idx {
+		if info.offs > start && info.offs < end {
+			end = info.offs
+		}
+	}
+	return start, end, true
 }
 
 // load decodes an object stream and parses its index.  Decoded streams are

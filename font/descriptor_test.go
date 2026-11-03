@@ -146,10 +146,7 @@ func FuzzFontDescriptor(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data1 []byte) {
-		opt := &pdf.ReaderOptions{
-			ErrorHandling: pdf.ErrorHandlingReport,
-		}
-		r, err := pdf.NewReader(bytes.NewReader(data1), int64(len(data1)), opt)
+		r, err := pdf.NewReader(bytes.NewReader(data1), int64(len(data1)), nil)
 		if err != nil {
 			t.Skip()
 		}

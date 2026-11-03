@@ -33,6 +33,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"log"
 	"time"
 
@@ -69,7 +70,10 @@ func run() error {
 		return err
 	}
 
+	// a fixed file identifier, so that a password file can name the output
+	id := md5.Sum([]byte("seehuhn.de/go/pdf/feature-tests/crypto/metadata"))
 	opt := &pdf.WriterOptions{
+		ID:            [][]byte{id[:]},
 		UserPassword:  "user",
 		OwnerPassword: "owner",
 		DocumentMetadata: &pdf.MetadataStream{

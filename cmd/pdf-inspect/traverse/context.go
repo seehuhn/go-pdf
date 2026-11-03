@@ -66,9 +66,7 @@ func Root(fileName string, passwords ...string) (Context, func(), error) {
 		fd.Close()
 		return nil, nil, err
 	}
-	opt := &pdf.ReaderOptions{
-		ErrorHandling: pdf.ErrorHandlingReport,
-	}
+	opt := &pdf.ReaderOptions{}
 
 	// try each password from the command line
 	var r *pdf.Reader

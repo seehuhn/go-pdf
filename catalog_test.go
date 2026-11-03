@@ -47,6 +47,36 @@ func TestDecodeCatalogLang(t *testing.T) {
 	}
 }
 
+// TestDecodeCatalogWrongType checks that a catalog with a missing or wrong
+// /Type entry is read, and that /Type /Catalog is written back.
+func TestDecodeCatalogWrongType(t *testing.T) {
+	for _, tp := range []Object{nil, Name("catalog"), Name("Pages"), Integer(1)} {
+		dict := Dict{"Pages": NewReference(1, 0)}
+		if tp != nil {
+			dict["Type"] = tp
+		}
+		cat, err := DecodeCatalog(NewCursor(mockGetter), dict, false)
+		if err != nil {
+			t.Fatalf("/Type %v: %v", tp, err)
+		}
+		if cat.Pages != NewReference(1, 0) {
+			t.Errorf("/Type %v: got Pages %v", tp, cat.Pages)
+		}
+
+		w, err := NewWriter(&bytes.Buffer{}, V1_7, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		obj, err := cat.Encode(NewResourceManager(w))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := obj.(Dict)["Type"]; got != Name("Catalog") {
+			t.Errorf("/Type %v: written as %v", tp, got)
+		}
+	}
+}
+
 // TestCatalogEncodeUnsupportedVersion verifies that a Version the library
 // cannot write itself is written through unchanged.
 func TestCatalogEncodeUnsupportedVersion(t *testing.T) {

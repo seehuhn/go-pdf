@@ -1511,7 +1511,7 @@ func TestFindXRefTruncatedIsMalformed(t *testing.T) {
 		t.Fatal("no startxref in the base file")
 	}
 	data := base[:idx+len("startxref\n")]
-	_, err := NewReader(bytes.NewReader(data), int64(len(data)), nil)
+	_, err := newReaderFromXRef(bytes.NewReader(data), int64(len(data)), &ReaderOptions{})
 	if !IsMalformed(err) {
 		t.Errorf("got %v, want a malformed-file error", err)
 	}

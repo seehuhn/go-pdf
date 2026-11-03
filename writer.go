@@ -32,6 +32,16 @@ import (
 
 // WriterOptions allows to influence the way a PDF file is generated.
 type WriterOptions struct {
+	// ID (optional) is the file identifier, written as the /ID entry of the
+	// trailer.  It has at most two elements, the permanent and the changing
+	// identifier.  A single element is used for both, as for a newly
+	// created file.  Two different elements suit a complete rewrite of an
+	// edited document, which keeps the permanent identifier.
+	//
+	// If ID is nil, a random identifier is generated where one is needed,
+	// namely for encrypted files and for PDF 2.0; a non-nil empty slice
+	// requests a random identifier in all cases.  In PDF 2.0, each
+	// identifier must be at least 16 bytes long.  ID must be nil for PDF 1.0.
 	ID [][]byte
 
 	UserPassword    string
@@ -252,14 +262,11 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 			}
 			ID = [][]byte{id, id}
 		case 1:
-			id := make([]byte, 16)
-			_, err := io.ReadFull(rand.Reader, id)
-			if err != nil {
-				return nil, err
-			}
-			ID = [][]byte{opt.ID[0], id}
+			ID = [][]byte{opt.ID[0], opt.ID[0]}
+		case 2:
+			ID = opt.ID
 		default:
-			ID = opt.ID[:2]
+			return nil, errors.New("file identifier has more than two elements")
 		}
 		trailer["ID"] = Array{String(ID[0]), String(ID[1])}
 	}

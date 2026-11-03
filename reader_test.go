@@ -18,8 +18,10 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -821,4 +823,134 @@ func buildSigContentsFile(tb testing.TB, v Version) []byte {
 		tb.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+// withStartXRef returns a copy of data whose last startxref value is
+// replaced by val.
+func withStartXRef(t *testing.T, data []byte, val string) []byte {
+	t.Helper()
+	i := bytes.LastIndex(data, []byte("startxref"))
+	if i < 0 {
+		t.Fatal("no startxref keyword")
+	}
+	j := bytes.Index(data[i:], []byte("%%EOF"))
+	if j < 0 {
+		t.Fatal("no end-of-file marker")
+	}
+	var out []byte
+	out = append(out, data[:i]...)
+	out = append(out, "startxref\n"+val+"\n"...)
+	return append(out, data[i+j:]...)
+}
+
+// TestNewReaderRebuildsXRef checks that a file whose startxref value does
+// not lead to a cross-reference section is opened by scanning for objects.
+func TestNewReaderRebuildsXRef(t *testing.T) {
+	data := writeBaseFile(t, nil, "rebuilt")
+	pos := lastStartXRef(t, data)
+	for _, val := range []string{
+		strconv.FormatInt(pos+1, 10),
+		strconv.FormatInt(pos-20, 10),
+		"-1",
+		"0",
+		strconv.Itoa(len(data) + 100),
+		"x",
+	} {
+		t.Run(val, func(t *testing.T) {
+			bad := withStartXRef(t, data, val)
+
+			r, err := NewReader(bytes.NewReader(bad), int64(len(bad)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			meta := r.GetMeta()
+			if meta.Catalog.Pages == 0 {
+				t.Fatal("no page tree")
+			}
+			if _, err := NewCursor(r).DictTyped(meta.Catalog.Pages, "Pages"); err != nil {
+				t.Error(err)
+			}
+			if got := meta.Info.Title.String(); got != "rebuilt" {
+				t.Errorf("title %q, want %q", got, "rebuilt")
+			}
+			if r.XRefOffsets() != nil {
+				t.Errorf("unexpected xref offsets %v", r.XRefOffsets())
+			}
+			for _, key := range []Name{"Size", "Prev", "Type", "W", "Index"} {
+				if _, ok := meta.Trailer[key]; ok {
+					t.Errorf("trailer has /%s", key)
+				}
+			}
+			if meta.Trailer["Root"] == nil {
+				t.Error("trailer has no /Root")
+			}
+
+			_, err = newReaderFromXRef(bytes.NewReader(bad), int64(len(bad)), &ReaderOptions{})
+			if !IsMalformed(err) {
+				t.Errorf("got %v, want a malformed-file error", err)
+			}
+		})
+	}
+}
+
+// TestNewReaderRebuildsCatalog checks that a file whose cross-reference
+// table reads, but leads to no usable document catalog, is opened by
+// scanning for objects.
+func TestNewReaderRebuildsCatalog(t *testing.T) {
+	data := writeBaseFile(t, nil, "")
+	pos := lastStartXRef(t, data)
+	// shift all objects, so that every table offset is wrong, and keep
+	// startxref pointing at the table
+	i := bytes.Index(data, []byte("\n1 0 obj")) + 1
+	bad := slices.Concat(data[:i], []byte("\n\n\n"), data[i:])
+	bad = withStartXRef(t, bad, strconv.FormatInt(pos+3, 10))
+
+	xr := &Reader{r: bytes.NewReader(bad), size: int64(len(bad))}
+	if _, _, err := xr.readXRef(); err != nil {
+		t.Fatalf("cross-reference table unreadable: %v", err)
+	}
+
+	r, err := NewReader(bytes.NewReader(bad), int64(len(bad)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.GetMeta().Catalog.Pages == 0 {
+		t.Error("no page tree")
+	}
+
+	if _, err := newReaderFromXRef(bytes.NewReader(bad), int64(len(bad)), &ReaderOptions{}); err == nil {
+		t.Error("table offsets unexpectedly usable")
+	}
+}
+
+// TestNewReaderRebuildEncrypted checks that authentication works for a
+// file whose cross-reference table is rebuilt, and that a failed
+// authentication is reported as such.
+func TestNewReaderRebuildEncrypted(t *testing.T) {
+	data := writeBaseFile(t, &WriterOptions{UserPassword: "u", OwnerPassword: "o"}, "secret")
+	bad := withStartXRef(t, data, "-1")
+
+	_, err := NewReader(bytes.NewReader(bad), int64(len(bad)), nil)
+	if _, ok := errors.AsType[*AuthenticationError](err); !ok {
+		t.Errorf("got %v, want an authentication error", err)
+	}
+
+	r, err := NewReader(bytes.NewReader(bad), int64(len(bad)), &ReaderOptions{Password: "u"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.GetMeta().Info.Title.String(); got != "secret" {
+		t.Errorf("title %q, want %q", got, "secret")
+	}
+}
+
+// TestUpdateRebuiltXRef checks that an incremental update of a file with a
+// damaged cross-reference table is refused, since its /Prev entry would
+// have to name the damaged section.
+func TestUpdateRebuiltXRef(t *testing.T) {
+	data := withStartXRef(t, writeBaseFile(t, nil, ""), "-1")
+	_, err := NewUpdaterTo(bytes.NewReader(data), int64(len(data)), io.Discard, nil)
+	if err == nil {
+		t.Error("update of a damaged file succeeded")
+	}
 }
