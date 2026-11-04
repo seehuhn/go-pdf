@@ -19,15 +19,14 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
-	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/text"
 	"seehuhn.de/go/pdf/oc"
 )
 
@@ -41,8 +40,16 @@ func main() {
 	}
 }
 
+const (
+	left      = 50.0
+	textWidth = 420.0
+	boxW      = 90.0
+	boxH      = 70.0
+	boxGap    = 20.0
+)
+
 func run() error {
-	paper := &pdf.Rectangle{URx: 500, URy: 560}
+	paper := &pdf.Rectangle{URx: 2*left + textWidth, URy: 465}
 	opt := &pdf.WriterOptions{HumanReadable: true}
 	page, err := document.CreateSinglePage("test.pdf", paper, pdf.V1_7, opt)
 	if err != nil {
@@ -54,13 +61,18 @@ func run() error {
 	groupA := &oc.Group{Name: pdf.Text("A")}
 	groupB := &oc.Group{Name: pdf.Text("B")}
 	groupC := &oc.Group{Name: pdf.Text("C")}
-	all := []*oc.Group{groupA, groupB, groupC}
+	groupX := &oc.Group{Name: pdf.Text("X")}
+	all := []*oc.Group{groupA, groupB, groupC, groupX}
 
+	// X is the only group which starts OFF, so that a viewer which resets
+	// to the default configuration before applying BaseState Unchanged
+	// can be told apart from one which treats Unchanged as ON.
 	props := &oc.Properties{
 		OCGs: all,
 		D: &oc.Configuration{
 			BaseState: oc.BaseStateON,
-			Order:     []oc.OrderItem{groupA, groupB, groupC},
+			OFF:       []*oc.Group{groupX},
+			Order:     []oc.OrderItem{groupA, groupB, groupC, groupX},
 		},
 		Configs: []*oc.Configuration{
 			{
@@ -85,14 +97,17 @@ func run() error {
 	}
 	page.Out.GetMeta().Catalog.OCProperties = ocRef
 
-	const (
-		left  = 50.0
-		lineH = 16.0
-	)
-	y := 525.0
+	black := color.DeviceGray(0)
+	title := text.F{Font: F, Size: 14, Color: black}
+	head := text.F{Font: F, Size: 12, Color: black}
+	body := text.F{Font: F, Size: 10, Color: black}
 
-	drawText(page, F, left, y, 14, "Alternate configurations and BaseState Unchanged")
-	y -= 1.8 * lineH
+	y := paper.URy - 35
+	text.Show(page.Builder,
+		text.M{X: left, Y: y},
+		title, "Alternate configurations and BaseState Unchanged",
+	)
+	y -= 25
 
 	// coloured boxes, each controlled by one group
 	boxes := []struct {
@@ -103,80 +118,87 @@ func run() error {
 		{"A", groupA, color.DeviceRGB{0.9, 0.1, 0.1}},
 		{"B", groupB, color.DeviceRGB{0.1, 0.7, 0.2}},
 		{"C", groupC, color.DeviceRGB{0.1, 0.2, 0.9}},
+		{"X", groupX, color.DeviceGray(0.5)},
 	}
+	label := text.F{Font: F, Size: 36, Color: color.DeviceGray(1)}
 	for i, b := range boxes {
-		x := left + float64(i)*110
+		x := left + float64(i)*(boxW+boxGap)
+		labelW := F.Layout(nil, label.Size, b.label).TotalWidth()
 		page.MarkedContentStart(&graphics.MarkedContent{
 			Tag:        "OC",
 			Properties: b.g,
 		})
 		page.SetFillColor(b.col)
-		page.Rectangle(x, y-70, 90, 70)
+		page.Rectangle(x, y-boxH, boxW, boxH)
 		page.Fill()
-		page.SetFillColor(color.DeviceGray(1))
-		page.TextBegin()
-		page.TextSetFont(F, 36)
-		page.TextFirstLine(x+34, y-50)
-		page.TextShow(b.label)
-		page.TextEnd()
+		text.Show(page.Builder,
+			label,
+			text.M{X: pdf.Round(x+(boxW-labelW)/2, 2), Y: y - 48},
+			b.label,
+		)
 		page.MarkedContentEnd()
 	}
-	y -= 70 + 2*lineH
+	y -= boxH + 30
 
-	lines := []string{
-		"Groups A (red), B (green) and C (blue) each control one box.",
-		"The default configuration has BaseState ON, so all three boxes",
-		"are visible initially.  The viewer should list three alternate",
-		"configurations: \u201cAll off\u201d, \u201cAll on\u201d and",
-		"\u201cUnchanged, B on, C off\u201d (BaseState Unchanged, ON [B], OFF [C]).",
-		"",
-		"Test 1",
-		"1. Switch group A off by hand in the layers panel.",
-		"2. Choose \u201cUnchanged, B on, C off\u201d.",
-		"Expected: A stays off (Unchanged keeps the user\u2019s state),",
-		"B is on, C is off.  Only the green box is visible.",
-		"",
-		"Test 2",
-		"1. Choose \u201cAll on\u201d.  All three boxes are visible.",
-		"2. Choose \u201cUnchanged, B on, C off\u201d.",
-		"Expected: A stays on, B stays on, C turns off.",
-		"The red and the green box are visible.",
-		"",
-		"A viewer which treats Unchanged as ON fails Test 1, one which",
-		"treats it as OFF fails Test 2.",
+	text.Show(page.Builder,
+		text.M{X: left, Y: y},
+		body,
+		text.Wrap(textWidth,
+			"Groups A (red), B (green), C (blue) and X (grey) each control",
+			"one box.  The default configuration turns all groups on except X,",
+			"so initially the red, green and blue boxes are visible.",
+		),
+		text.NL,
+		text.Wrap(textWidth,
+			"The viewer should offer three alternate configurations:",
+			"“All off”, “All on” and “Unchanged, B on, C off”",
+			"(BaseState Unchanged, ON [B], OFF [C]).  Choosing “All off”",
+			"should hide all four boxes and “All on” should show all four;",
+			"this checks that the viewer applies configurations at all.",
+			"If the viewer offers no way to choose a configuration,",
+			"record that: the test below cannot be run.",
+		),
+		text.NL,
+		head, "Test", text.NL,
+		body,
+		"1. Reopen the file, so that the default configuration applies.", text.NL,
+		"2. In the layers panel, switch A off and X on by hand.", text.NL,
+		"3. Choose “Unchanged, B on, C off”.", text.NL,
+		text.NL,
+		text.Wrap(textWidth,
+			"Unchanged leaves A and X as the user set them, then B is turned",
+			"on and C off.  The boxes visible after step 3 identify how the",
+			"viewer treats BaseState Unchanged:",
+		),
+		text.RecordPos{UserY: &y},
+	)
+	y -= 10
+
+	outcomes := []struct{ visible, meaning string }{
+		{"green, grey", "correct"},
+		{"red, green, grey", "Unchanged treated as ON, or not recognised (ON is the default)"},
+		{"green", "Unchanged treated as OFF"},
+		{"red, green", "viewer resets to the default configuration first"},
 	}
-	for _, s := range lines {
-		switch {
-		case s == "":
-			y -= lineH / 2
-			continue
-		case strings.HasPrefix(s, "Test "):
-			drawText(page, F, left, y, 12, s)
-		default:
-			drawText(page, F, left, y, 10, s)
-		}
-		y -= lineH
+	text.Show(page.Builder,
+		text.M{X: left + 10, Y: y},
+		head, "Visible boxes",
+	)
+	text.Show(page.Builder,
+		text.M{X: left + 120, Y: y},
+		head, "Meaning",
+	)
+	for _, o := range outcomes {
+		y -= 15
+		text.Show(page.Builder,
+			text.M{X: left + 10, Y: y},
+			body, o.visible,
+		)
+		text.Show(page.Builder,
+			text.M{X: left + 120, Y: y},
+			body, o.meaning,
+		)
 	}
 
 	return page.Close()
-}
-
-// drawText draws black text at the given position.
-func drawText(page *document.Page, F *type1.Instance, x, y, size float64, s string) {
-	page.SetFillColor(color.DeviceGray(0))
-	page.TextBegin()
-	page.TextSetFont(F, size)
-	page.TextFirstLine(x, y)
-	page.TextShow(s)
-	page.TextEnd()
-}
-
-// drawGray draws gray text at the given position.
-func drawGray(page *document.Page, F *type1.Instance, x, y, size float64, s string) {
-	page.SetFillColor(color.DeviceGray(0.5))
-	page.TextBegin()
-	page.TextSetFont(F, size)
-	page.TextFirstLine(x, y)
-	page.TextShow(s)
-	page.TextEnd()
 }
