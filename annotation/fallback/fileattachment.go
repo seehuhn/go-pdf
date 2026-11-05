@@ -24,11 +24,9 @@ import (
 
 // The icon is drawn in a fixed 24×24 local frame.  The annotation's Rect
 // is pinned to a 24×24 square anchored at the caller's upper-left corner
-// (the (LLx, URy) point of the supplied Rect), and NoZoom | NoRotate are
-// forced — matching the fixed-icon convention that §12.5.6.4 imposes on
-// text annotations implicitly, but which FileAttachment does not get for
-// free.  See §12.5.3: "the annotation's position is defined by the
-// coordinates of the upper-left corner of its annotation rectangle".
+// (the (LLx, URy) point of the supplied Rect), the point §12.5.3 fixes
+// for an annotation which does not zoom or rotate with the page.  The
+// NoZoom and NoRotate flags are left as the caller set them.
 func (g *Generator) addFileAttachmentAppearance(a *annotation.FileAttachment) (*form.Form, error) {
 	a.Rect = pdf.Rectangle{
 		LLx: a.Rect.LLx,
@@ -36,7 +34,6 @@ func (g *Generator) addFileAttachmentAppearance(a *annotation.FileAttachment) (*
 		URx: a.Rect.LLx + iconSize,
 		URy: a.Rect.URy,
 	}
-	a.Flags |= annotation.FlagNoZoom | annotation.FlagNoRotate
 
 	name := pdf.Name(a.Icon)
 	if name == "" {

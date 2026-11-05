@@ -24,9 +24,8 @@ import (
 
 // addSoundAppearance generates a fallback appearance for a sound
 // annotation, mirroring the layout used by file-attachment annotations:
-// a fixed 24×24 icon anchored at the upper-left of the supplied Rect,
-// with NoZoom and NoRotate forced so the icon stays icon-sized at any
-// zoom level.
+// a fixed 24×24 icon anchored at the upper-left of the supplied Rect.
+// The NoZoom and NoRotate flags are left as the caller set them.
 func (g *Generator) addSoundAppearance(a *annotation.Sound) (*form.Form, error) {
 	a.Rect = pdf.Rectangle{
 		LLx: a.Rect.LLx,
@@ -34,7 +33,6 @@ func (g *Generator) addSoundAppearance(a *annotation.Sound) (*form.Form, error) 
 		URx: a.Rect.LLx + iconSize,
 		URy: a.Rect.URy,
 	}
-	a.Flags |= annotation.FlagNoZoom | annotation.FlagNoRotate
 
 	name := pdf.Name(a.Icon)
 	if name == "" {

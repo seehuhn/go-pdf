@@ -167,13 +167,6 @@ func (w *writer) addRow(kind, icon string) error {
 		if err := w.style.AddAppearance(a); err != nil {
 			return err
 		}
-		// The file attachment and sound generators force NoZoom and
-		// NoRotate, so that an icon stays icon-sized however the page is
-		// magnified.  Here the flags are cleared again, so that both
-		// columns scale together and the icons can be looked at closely.
-		// A text annotation scales in no viewer whatever the flags say:
-		// §12.5.6.4 has it behave as if they were always set.
-		a.GetCommon().Flags &^= annotation.FlagNoZoom | annotation.FlagNoRotate
 		w.page.Page.AddAnnots(a)
 	}
 

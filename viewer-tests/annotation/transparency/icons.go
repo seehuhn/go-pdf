@@ -154,10 +154,6 @@ func (w *iconWriter) addRow(kind, icon string) error {
 		if err := w.style.AddAppearance(a); err != nil {
 			return err
 		}
-		// the file attachment and sound generators force NoZoom and NoRotate;
-		// clearing them again lets both sides scale together, so the icons
-		// can be looked at closely
-		a.GetCommon().Flags &^= annotation.FlagNoZoom | annotation.FlagNoRotate
 		w.page.Page.AddAnnots(a)
 	}
 
