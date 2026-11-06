@@ -73,19 +73,31 @@ func clip01(v float64) float64 {
 	return v
 }
 
+// srgbGamma converts a linear value to an sRGB gamma-encoded one.
+//
+// The power v^(1/2.4) is evaluated as the cube root of v^(5/4), since
+// 1/2.4 = 5/12.  Square and cube roots are several times faster than
+// [math.Pow], and the result agrees with it to about ten ulp.
 func srgbGamma(v float64) float64 {
 	if v <= 0.0031308 {
 		return 12.92 * v
 	}
-	return 1.055*math.Pow(v, 1/2.4) - 0.055
+	x := math.Cbrt(v * math.Sqrt(math.Sqrt(v)))
+	// 1.055*x - 0.055, arranged so that x = 1 maps to exactly 1
+	return x + 0.055*(x-1)
 }
 
-// srgbGammaInv converts sRGB gamma-encoded value to linear.
+// srgbGammaInv converts an sRGB gamma-encoded value to linear.
+//
+// The power u^2.4 is evaluated as u^2 * u^0.4, so that only the fractional
+// part of the exponent goes through [math.Exp] and [math.Log].  This is
+// faster than [math.Pow], and agrees with it to within a few ulp.
 func srgbGammaInv(v float64) float64 {
 	if v <= 0.04045 {
 		return v / 12.92
 	}
-	return math.Pow((v+0.055)/1.055, 2.4)
+	u := (v + 0.055) / 1.055
+	return u * u * math.Exp(0.4*math.Log(u))
 }
 
 // SRGBToXYZ converts sRGB [0,1] to PCS XYZ.
