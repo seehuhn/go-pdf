@@ -111,12 +111,7 @@ func (s *SpaceIndexed) SourceBlackPoint(ri icc.RenderingIntent) [3]float64 {
 // adapted to the Profile Connection Space white point.
 // An index outside [0, NumCol-1] is adjusted to the nearest valid value.
 func (s *SpaceIndexed) ToXYZ(values []float64, ri icc.RenderingIntent, ws *icc.Workspace) (X, Y, Z float64) {
-	index := int(math.Round(values[0]))
-	if index < 0 {
-		index = 0
-	} else if index >= s.NumCol {
-		index = s.NumCol - 1
-	}
+	index := s.Index(values[0])
 	baseVals := s.lookupValues(index, ws)
 	return s.Base.ToXYZ(baseVals, ri, ws)
 }
@@ -185,6 +180,19 @@ func (s *SpaceIndexed) New(idx int) Color {
 		return nil
 	}
 	return colorIndexed{Space: s, Index: idx}
+}
+
+// Index returns the palette index which the component value v selects: v
+// rounded to the nearest integer, with halves rounded away from zero, and
+// limited to [0, NumCol-1].  NaN selects index 0.
+func (s *SpaceIndexed) Index(v float64) int {
+	if !(v > 0) { // also catches NaN
+		return 0
+	}
+	if v >= float64(s.NumCol-1) {
+		return s.NumCol - 1
+	}
+	return int(math.Round(v))
 }
 
 // Lookup returns the colour values of palette entry idx in the base colour

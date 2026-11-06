@@ -19,7 +19,6 @@ package color
 import (
 	"fmt"
 	gocolor "image/color"
-	"math"
 )
 
 // Color represents a PDF color.
@@ -88,7 +87,7 @@ func FromValues(cs Space, values []float64, pat Pattern) Color {
 		return colorPatternUncolored{Col: col, Pat: pat}
 	case *SpaceIndexed:
 		if len(values) >= 1 {
-			return cs.New(int(math.Round(values[0])))
+			return cs.New(cs.Index(values[0]))
 		}
 		return cs.Default()
 	case *SpaceSeparation:

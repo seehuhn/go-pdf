@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/icc"
 	"seehuhn.de/go/pdf"
 )
 
@@ -76,6 +77,49 @@ func TestInitialTints(t *testing.T) {
 		got, _ := Values(c.space.Default())
 		if diff := cmp.Diff(c.want, got); diff != "" {
 			t.Errorf("%s default tints (-want +got):\n%s", c.space.Family(), diff)
+		}
+	}
+}
+
+// TestIndexedOutOfRange checks that out-of-range, infinite and NaN palette
+// indices are clamped to the palette in ToXYZ and FromValues.
+func TestIndexedOutOfRange(t *testing.T) {
+	cols := []Color{
+		DeviceRGB{1, 0, 0},
+		DeviceRGB{0, 1, 0},
+		DeviceRGB{0, 0, 1},
+	}
+	cs, err := Indexed(cols)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := float64(cs.NumCol - 1)
+
+	cases := []struct {
+		in   float64
+		want int
+	}{
+		{math.NaN(), 0},
+		{math.Inf(1), 2},
+		{math.Inf(-1), 0},
+		{1e300, 2},
+		{-1e300, 0},
+		{-0.4, 0},
+		{0.5, 1},
+		{1.49, 1},
+		{last + 0.6, 2},
+	}
+	for _, c := range cases {
+		ws := &icc.Workspace{}
+		wantX, wantY, wantZ := cs.ToXYZ([]float64{float64(c.want)}, icc.RelativeColorimetric, ws)
+		x, y, z := cs.ToXYZ([]float64{c.in}, icc.RelativeColorimetric, ws)
+		if x != wantX || y != wantY || z != wantZ {
+			t.Errorf("ToXYZ(%g): got (%g,%g,%g), want entry %d", c.in, x, y, z, c.want)
+		}
+
+		got := FromValues(cs, []float64{c.in}, nil)
+		if got != cs.New(c.want) { // colours are comparable
+			t.Errorf("FromValues(%g): got %v, want entry %d", c.in, got, c.want)
 		}
 	}
 }
