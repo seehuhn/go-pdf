@@ -114,10 +114,11 @@ func TestPageDecodeLinksWidgets(t *testing.T) {
 
 	// the merged field and its page widget must be one shared object: the field's
 	// single Kid is the very widget in the page's /Annots
-	form, err := pdf.CursorAt(x, nil).Decode(formRef, decode.Form)
+	idx, err := decode.DocumentForm(x)
 	if err != nil {
 		t.Fatal(err)
 	}
+	form := idx.Form
 	mergedField, ok := form.Fields[0].(acroform.Field)
 	if !ok {
 		t.Fatalf("form field 0 is %T, want a terminal field", form.Fields[0])

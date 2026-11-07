@@ -45,6 +45,7 @@
 // They ignore [FieldReadOnly]: a viewer which lets the user fill in a form
 // must refuse changes to read-only fields itself.
 //
-// Interactive forms are read using [seehuhn.de/go/pdf/annotation/decode.Form]
-// and written using [InteractiveForm.Encode].
+// Interactive forms are read using
+// [seehuhn.de/go/pdf/annotation/decode.DocumentForm] and written using
+// [InteractiveForm.Encode].
 package acroform

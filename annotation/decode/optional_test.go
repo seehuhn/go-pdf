@@ -83,7 +83,7 @@ func TestOptionalBooleanEntries(t *testing.T) {
 		{"Form NeedAppearances", "NeedAppearances", func(d pdf.Dict) (any, error) {
 			d = maps.Clone(d)
 			d["Fields"] = pdf.Array{}
-			return Form(pdf.NewCursor(mock.Getter), d, true)
+			return decodeForm(pdf.NewCursor(mock.Getter), d)
 		}},
 		{"Sig AddRevInfo", "AddRevInfo", func(d pdf.Dict) (any, error) {
 			return sigSeedValue(pdf.NewCursor(mock.Getter), d, true)

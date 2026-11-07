@@ -18,9 +18,12 @@ package decode
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"maps"
+	"runtime"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -202,12 +205,23 @@ func roundTripForm(t *testing.T, version pdf.Version, want *acroform.Interactive
 	}
 	t.Cleanup(func() { r.Close() })
 
-	x := pdf.NewExtractor(r)
-	got, err := pdf.CursorAt(x, nil).Decode(r.GetMeta().Catalog.AcroForm, Form)
+	idx, err := DocumentForm(pdf.NewExtractor(r))
 	if err != nil {
 		t.Fatalf("decode failed: %v", err)
+	} else if idx == nil {
+		t.Fatal("form not found")
 	}
-	return got
+	return idx.Form
+}
+
+// decodeForm reads a form dictionary through [readForm], for tests which build
+// the dictionary by hand.  It returns nil if obj is nil.
+func decodeForm(c pdf.Cursor, obj pdf.Object) (*acroform.InteractiveForm, error) {
+	idx, err := readForm(c, obj, true)
+	if err != nil || idx == nil {
+		return nil, err
+	}
+	return idx.Form, nil
 }
 
 // storeWidgets writes every widget annotation in the field tree, standing in for
@@ -322,10 +336,11 @@ func TestDecodeValues(t *testing.T) {
 		"Q":               pdf.Integer(99), // out of range, must be ignored
 	}
 
-	form, err := Form(pdf.CursorAt(x, nil), dict, true)
+	idx, err := readForm(pdf.CursorAt(x, nil), dict, true)
 	if err != nil {
 		t.Fatal(err)
 	}
+	form := idx.Form
 
 	if len(form.Fields) != 1 || form.Fields[0].PartialName() != "f0" {
 		t.Errorf("Fields = %v, want one field named f0", form.Fields)
@@ -342,7 +357,7 @@ func TestDecodeNil(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
-	form, err := Form(pdf.CursorAt(x, nil), nil, false)
+	form, err := decodeForm(pdf.CursorAt(x, nil), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -376,11 +391,11 @@ func FuzzFormRoundTrip(f *testing.F) {
 		}
 		defer r.Close()
 
-		x := pdf.NewExtractor(r)
-		form1, err := pdf.CursorAt(x, nil).Decode(r.GetMeta().Catalog.AcroForm, Form)
-		if err != nil || form1 == nil {
+		idx, err := DocumentForm(pdf.NewExtractor(r))
+		if err != nil || idx == nil {
 			t.Skip("no interactive form")
 		}
+		form1 := idx.Form
 
 		version := pdf.GetVersion(r)
 		if !version.IsSupported() {
@@ -463,11 +478,11 @@ func TestDecodeFormRepairs(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
-	form, err := Form(pdf.CursorAt(x, nil), pdf.Dict{
+	form, err := decodeForm(pdf.CursorAt(x, nil), pdf.Dict{
 		"Fields":   pdf.Array{},
 		"SigFlags": pdf.Integer(-1),
 		"XFA":      pdf.Integer(1),
-	}, true)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,10 +509,10 @@ func TestFormXFAStreamRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form, err := Form(pdf.CursorAt(pdf.NewExtractor(src), nil), pdf.Dict{
+	form, err := decodeForm(pdf.CursorAt(pdf.NewExtractor(src), nil), pdf.Dict{
 		"Fields": pdf.Array{},
 		"XFA":    ref,
-	}, true)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -542,7 +557,7 @@ func TestDecodeDuplicateNames(t *testing.T) {
 		fields = append(fields, ref)
 	}
 
-	form, err := Form(pdf.CursorAt(x, nil), pdf.Dict{"Fields": fields}, true)
+	form, err := decodeForm(pdf.CursorAt(x, nil), pdf.Dict{"Fields": fields})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -598,7 +613,7 @@ func TestDecodeDuplicateNamesPassword(t *testing.T) {
 				}
 				fields = append(fields, ref)
 			}
-			form, err := Form(pdf.CursorAt(x, nil), pdf.Dict{"Fields": fields}, true)
+			form, err := decodeForm(pdf.CursorAt(x, nil), pdf.Dict{"Fields": fields})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -717,7 +732,7 @@ func TestDecodeDuplicateNamesButton(t *testing.T) {
 
 			x := pdf.NewExtractor(pw)
 			c := pdf.CursorAt(x, nil)
-			idx, err := FormWithRefs(c, pdf.Dict{"Fields": pdf.Array{firstRef, secondRef}}, true)
+			idx, err := readForm(c, pdf.Dict{"Fields": pdf.Array{firstRef, secondRef}}, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -819,7 +834,9 @@ func rawWidget(extra pdf.Dict) pdf.Dict {
 	return d
 }
 
-func TestFormWithRefsSharesValues(t *testing.T) {
+// TestDocumentFormSharesValues checks that the widgets read from a page are
+// those of the form, linked to the fields the index names.
+func TestDocumentFormSharesValues(t *testing.T) {
 	objs := map[string]pdf.Dict{
 		"merged": rawWidget(pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("m")}),
 		"parent": {"FT": pdf.Name("Tx"), "T": pdf.String("p"), "Kids": pdf.Array{pdf.String("@kid")}},
@@ -831,16 +848,9 @@ func TestFormWithRefsSharesValues(t *testing.T) {
 
 	x := pdf.NewExtractor(r)
 	c := pdf.CursorAt(x, nil)
-	form, err := c.DecodeExclusive(refs["form"], Form)
+	idx, err := DocumentForm(x)
 	if err != nil {
 		t.Fatal(err)
-	}
-	idx, err := c.DecodeExclusive(refs["form"], FormWithRefs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if idx.Form != form {
-		t.Fatal("index form is not the cached form")
 	}
 	if len(idx.FieldRefs) != 2 {
 		t.Fatalf("got %d field refs, want 2", len(idx.FieldRefs))
@@ -861,7 +871,7 @@ func TestFormWithRefsSharesValues(t *testing.T) {
 	}
 }
 
-func TestFormWithRefsParentMismatch(t *testing.T) {
+func TestDocumentFormParentMismatch(t *testing.T) {
 	objs := map[string]pdf.Dict{
 		"holder": {"FT": pdf.Name("Tx"), "T": pdf.String("h"), "Kids": pdf.Array{pdf.String("@kid")}},
 		"other":  {"FT": pdf.Name("Tx"), "T": pdf.String("o")},
@@ -871,7 +881,7 @@ func TestFormWithRefsParentMismatch(t *testing.T) {
 		return pdf.Dict{"Fields": pdf.Array{refs["holder"]}}
 	})
 
-	idx, err := pdf.CursorAt(pdf.NewExtractor(r), nil).DecodeExclusive(refs["form"], FormWithRefs)
+	idx, err := DocumentForm(pdf.NewExtractor(r))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -885,15 +895,11 @@ func TestFormWithRefsParentMismatch(t *testing.T) {
 	}
 }
 
-func TestFormWithRefsDirect(t *testing.T) {
+func TestReadFormDirect(t *testing.T) {
 	r, _ := writeRawForm(t, nil, nil, func(map[string]pdf.Reference) pdf.Dict { return pdf.Dict{} })
 	dict := pdf.Dict{"Fields": pdf.Array{}}
 	c := pdf.CursorAt(pdf.NewExtractor(r), nil)
-	form, err := Form(c, dict, true)
-	if err != nil || form == nil {
-		t.Fatalf("direct form: %v, %v", form, err)
-	}
-	idx, err := FormWithRefs(c, dict, true)
+	idx, err := readForm(c, dict, true)
 	if err != nil || idx == nil || idx.Form == nil {
 		t.Fatalf("direct index: %v, %v", idx, err)
 	}
@@ -963,42 +969,9 @@ func TestDocumentFormInline(t *testing.T) {
 	}
 }
 
-// TestFormWithRefsRepeated checks that reading a direct form dictionary a
-// second time through the same extractor yields the same index, although the
-// field tree is then taken from the extractor's cache.
-func TestFormWithRefsRepeated(t *testing.T) {
-	r, _ := writeRawDoc(t, inlineFormObjects(), inlineFormOrder, inlineFormDict, true)
-	dict := r.GetMeta().Catalog.AcroForm
-
-	c := pdf.CursorAt(pdf.NewExtractor(r), nil)
-	first, err := FormWithRefs(c, dict, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := FormWithRefs(c, dict, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(first.FieldRefs) != 2 || len(first.WidgetRefs) != 3 {
-		t.Fatalf("first read: %d field refs, %d widget refs", len(first.FieldRefs), len(first.WidgetRefs))
-	}
-	if !maps.Equal(first.FieldRefs, second.FieldRefs) {
-		t.Error("field refs differ")
-	}
-	if !maps.Equal(first.WidgetRefs, second.WidgetRefs) {
-		t.Error("widget refs differ")
-	}
-	if !slices.Equal(first.Form.CalculationOrder, second.Form.CalculationOrder) {
-		t.Error("calculation orders differ")
-	}
-	if !slices.Equal(first.Form.Fields, second.Form.Fields) {
-		t.Error("field trees differ")
-	}
-}
-
-// TestFormWithRefsWidgetRefs checks that the index names every widget of the
+// TestDocumentFormWidgetRefs checks that the index names every widget of the
 // form, including one which is on no page.
-func TestFormWithRefsWidgetRefs(t *testing.T) {
+func TestDocumentFormWidgetRefs(t *testing.T) {
 	objs := inlineFormObjects()
 	objs["merged"] = rawWidget(pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("m")})
 	order := append(slices.Clone(inlineFormOrder), "merged")
@@ -1006,7 +979,7 @@ func TestFormWithRefsWidgetRefs(t *testing.T) {
 		return pdf.Dict{"Fields": pdf.Array{refs["f"], refs["cb"], refs["merged"]}}
 	})
 
-	idx, err := pdf.CursorAt(pdf.NewExtractor(r), nil).DecodeExclusive(refs["form"], FormWithRefs)
+	idx, err := DocumentForm(pdf.NewExtractor(r))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1023,5 +996,71 @@ func TestFormWithRefsWidgetRefs(t *testing.T) {
 	want := map[pdf.Reference]bool{refs["kid"]: true, refs["on"]: true, refs["off"]: true, refs["merged"]: true}
 	if !maps.Equal(got, want) || len(idx.WidgetRefs) != len(want) {
 		t.Errorf("widget refs %v, want %v", got, want)
+	}
+}
+
+// TestDocumentFormConcurrentWidget checks that a widget decoded while the
+// form is being read is returned linked to its field.  The form's walk must
+// not publish a widget before linking it, since a decoder which finds the
+// widget in the extractor's cache does not wait for the form.
+func TestDocumentFormConcurrentWidget(t *testing.T) {
+	objs := map[string]pdf.Dict{}
+	order := []string{"f"}
+	var kids pdf.Array
+	for i := range 100 {
+		name := fmt.Sprintf("kid%d", i)
+		objs[name] = rawWidget(pdf.Dict{"Parent": pdf.String("@f")})
+		order = append(order, name)
+		kids = append(kids, pdf.String("@"+name))
+	}
+	objs["f"] = pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("f"), "Kids": kids}
+	r, refs := writeRawForm(t, objs, order, func(refs map[string]pdf.Reference) pdf.Dict {
+		return pdf.Dict{"Fields": pdf.Array{refs["f"]}}
+	})
+
+	for i := range 100 {
+		x := pdf.NewExtractor(r)
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			if _, err := DocumentForm(x); err != nil {
+				t.Error(err)
+			}
+		})
+		wg.Go(func() {
+			// stagger the start, so that some runs meet the walk midway
+			for range i * 100 {
+				runtime.Gosched()
+			}
+			a, err := pdf.CursorAt(x, nil).Decode(refs["kid0"], Annotation)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			if a.(*annotation.Widget).Field == nil {
+				t.Error("widget returned without its field")
+			}
+		})
+		wg.Wait()
+	}
+}
+
+// TestDocumentFormKeepsFailure checks that a failed read of the form is not
+// repeated: later calls return the same error, even where a new read would
+// succeed.
+func TestDocumentFormKeepsFailure(t *testing.T) {
+	r, refs := writeRawForm(t, inlineFormObjects(), inlineFormOrder, inlineFormDict)
+	g := &failingGetter{Getter: r, bad: refs["f"]}
+	x := pdf.NewExtractor(g)
+
+	_, first := DocumentForm(x)
+	if !pdf.IsReadError(first) {
+		t.Fatalf("first read: got %v, want a read error", first)
+	}
+	g.bad = 0
+	if idx, err := DocumentForm(x); !errors.Is(err, first) || idx != nil {
+		t.Errorf("second read: got %v, %v, want the kept error", idx, err)
+	}
+	if idx, err := DocumentForm(pdf.NewExtractor(g)); err != nil || idx == nil {
+		t.Errorf("new extractor: got %v, %v, want the form", idx, err)
 	}
 }

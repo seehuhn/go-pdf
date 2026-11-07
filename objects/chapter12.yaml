@@ -6312,7 +6312,7 @@ types:
   specTable: Table 224
   fileDependent: true
   writeMethod: (*InteractiveForm).Encode
-  readFunc: decode.Form
+  readFunc: decode.DocumentForm
   fields:
   - goName: Fields
     pdfKey: Fields

@@ -216,11 +216,11 @@ func readFillForm(t *testing.T, w *pdf.Writer, refs ...pdf.Reference) *acroform.
 		fields = append(fields, r)
 	}
 	x := pdf.NewExtractor(w)
-	got, err := pdf.CursorAt(x, nil).Decode(pdf.Dict{"Fields": fields}, Form)
+	idx, err := readForm(pdf.CursorAt(x, nil), pdf.Dict{"Fields": fields}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return got
+	return idx.Form
 }
 
 func widgetDict(extra pdf.Dict) pdf.Dict {

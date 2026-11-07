@@ -208,14 +208,16 @@ func TestFieldRoundTrip(t *testing.T) {
 }
 
 // decodeRootField decodes a single field-tree root reference, threading an empty
-// inherited context, for tests that build a tree by hand.
+// inherited context, for tests that build a tree by hand.  Like [readForm], it
+// publishes the widgets it links.
 func decodeRootField(x *pdf.Extractor, ref pdf.Reference) (acroform.Node, error) {
 	d := newFieldTreeDecoder()
-	res, err := pdf.CursorAt(x, nil).DecodeOptional(ref, d.nodeFunc(inherited{}))
-	if err != nil || res == nil {
+	node, err := d.decodeOne(pdf.CursorAt(x, nil), ref, inherited{})
+	if err != nil {
 		return nil, err
 	}
-	return res.node, nil
+	d.publishWidgets(x)
+	return node, nil
 }
 
 func TestDecodeFieldNil(t *testing.T) {
@@ -223,7 +225,7 @@ func TestDecodeFieldNil(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	d := newFieldTreeDecoder()
-	node, err := d.decodeNode(pdf.CursorAt(x, nil), nil, inherited{}, &treeResult{})
+	node, err := d.decodeNode(pdf.CursorAt(x, nil), nil, inherited{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

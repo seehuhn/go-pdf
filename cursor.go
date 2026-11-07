@@ -362,15 +362,15 @@ func (c Cursor) DecodeOptional[T any](obj Object, decode func(Cursor, Object, bo
 	return Optional(c.Decode(obj, decode))
 }
 
-// DecodeExclusive is like [Cursor.Decode] but runs the decode function at most once
-// per reference: concurrent callers for the same reference wait for the first
-// to finish and share its result.
+// DecodeExclusive is like [Cursor.Decode] but runs the decode function at most
+// once per reference: concurrent callers for the same reference wait for the
+// first to finish and share its result.
 //
 // Use this ONLY for decodes that cannot participate in a cross-goroutine
-// reference cycle — that is, a document "sink" such as the interactive form,
-// whose decode never waits on an object that might be waiting on it. For
-// anything that can be mutually referential, use [Cursor.Decode], whose load-or-store
-// publishing never waits and so cannot deadlock.
+// reference cycle — that is, a document "sink" such as the annotation list of
+// a page, whose decode never waits on an object that might be waiting on it.
+// For anything that can be mutually referential, use [Cursor.Decode], whose
+// load-or-store publishing never waits and so cannot deadlock.
 func (c Cursor) DecodeExclusive[T any](obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
 	ref, ok := obj.(Reference)
 	if !ok {
@@ -387,10 +387,10 @@ func (c Cursor) DecodeExclusive[T any](obj Object, decode func(Cursor, Object, b
 // result.  A call which fails is not cached, so the next caller runs f again.
 //
 // Once holds a document-wide value which no object reference identifies, for
-// example an interactive form whose dictionary is stored directly in the
-// document catalog.  The result type is the key, so T should be a type
-// private to the caller.  As for [Cursor.DecodeExclusive], f must not wait on
-// a decode that might be waiting on it.
+// example the document's interactive form, whose dictionary may be stored
+// directly in the document catalog.  The result type is the key, so T should
+// be a type private to the caller.  As for [Cursor.DecodeExclusive], f must
+// not wait on a decode that might be waiting on it.
 func (x *Extractor) Once[T any](f func(Cursor) (T, error)) (T, error) {
 	// object number 0 never names an object, so no decode uses this key
 	key := extractorKey{tp: reflect.TypeFor[T]()}

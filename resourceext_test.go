@@ -305,3 +305,26 @@ func TestExtractorOnce(t *testing.T) {
 		t.Errorf("cached value: got %d, %v, want 1", v, err)
 	}
 }
+
+// TestStoreOrLoad checks that a published value is what a later decode of the
+// same reference returns, and that a second publication adopts the first.
+func TestStoreOrLoad(t *testing.T) {
+	x := pdf.NewExtractor(mock.Getter)
+	ref := pdf.NewReference(1, 0)
+	first, second := new(int), new(int)
+
+	if got := x.StoreOrLoad(ref, first); got != first {
+		t.Error("first publication not stored")
+	}
+	if got := x.StoreOrLoad(ref, second); got != first {
+		t.Error("second publication did not adopt the first")
+	}
+
+	got, err := pdf.CursorAt(x, nil).Decode(ref, func(pdf.Cursor, pdf.Object, bool) (*int, error) {
+		t.Error("decode function called for a published reference")
+		return nil, nil
+	})
+	if err != nil || got != first {
+		t.Errorf("decode returned %v, %v, want the published value", got, err)
+	}
+}

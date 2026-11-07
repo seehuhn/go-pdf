@@ -268,11 +268,11 @@ func TestAnnotationReadsFormFirst(t *testing.T) {
 		}
 	}
 
-	form, err := pdf.CursorAt(x, nil).DecodeExclusive(formRef, Form)
+	idx, err := DocumentForm(x)
 	if err != nil {
 		t.Fatal(err)
 	}
-	roundTripForm(t, pdf.V1_7, form)
+	roundTripForm(t, pdf.V1_7, idx.Form)
 }
 
 // A widget dictionary carrying field entries but no partial name is not a

@@ -38,8 +38,8 @@ import (
 // containing its fields are written; encoding it via
 // [seehuhn.de/go/pdf.ResourceManager.StoreDeferred] arranges this automatically.
 //
-// Use [seehuhn.de/go/pdf/annotation/decode.Form] to decode an interactive form
-// from a PDF file.
+// Use [seehuhn.de/go/pdf/annotation/decode.DocumentForm] to read the
+// interactive form of a PDF file.
 type InteractiveForm struct {
 	// Fields are the roots of the form's field trees.
 	// Entries are either of type [Group] or [Field].

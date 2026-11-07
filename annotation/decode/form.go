@@ -27,39 +27,15 @@ import (
 	"seehuhn.de/go/pdf/opaque"
 )
 
-// Form reads an interactive form dictionary from a PDF file. The obj argument
-// should be the value of the AcroForm entry in the document catalog. It returns
-// nil if obj is nil.
-//
-// Always invoke this via [pdf.Cursor.Decode] so that the form dictionary's
-// reference is resolved and cached.  [DocumentForm] reads the document's own
-// form once per extractor, also where its dictionary is not an indirect
-// object.
-func Form(c pdf.Cursor, obj pdf.Object, isDirect bool) (*acroform.InteractiveForm, error) {
-	// an indirect form shares its values with the cached [FormIndex]; the
-	// path is rewound by one step, since p.Ref is the object being decoded
-	if p := c.Path(); !isDirect && p != nil {
-		idx, err := pdf.CursorAt(c.Extractor(), p.Parent).DecodeExclusive(p.Ref, FormWithRefs)
-		if err != nil || idx == nil {
-			return nil, err
-		}
-		return idx.Form, nil
-	}
-
-	idx, err := FormWithRefs(c, obj, isDirect)
-	if err != nil || idx == nil {
-		return nil, err
-	}
-	return idx.Form, nil
-}
-
 // FormIndex is an interactive form together with the references of the
 // dictionaries its terminal fields and their widgets were read from.
 type FormIndex struct {
 	// Form is the decoded interactive form.
 	Form *acroform.InteractiveForm
 
-	// FieldRefs maps each terminal field of Form to its dictionary.
+	// FieldRefs maps each terminal field of Form to its dictionary.  For a
+	// field with widget kids this is the field dictionary, for a field merged
+	// with its widget it is the merged dictionary.
 	FieldRefs map[acroform.Field]pdf.Reference
 
 	// WidgetRefs maps each widget of these fields to its annotation
@@ -67,46 +43,43 @@ type FormIndex struct {
 	WidgetRefs map[acroform.Widget]pdf.Reference
 }
 
-// documentForm is the document's form index, as cached by [DocumentForm].
+// documentForm is the result of reading the document's form, as kept by
+// [DocumentForm].
 type documentForm struct {
 	idx *FormIndex
+	err error
 }
 
 // DocumentForm reads the interactive form named by the AcroForm entry of the
-// document catalog, as [FormWithRefs] does.  It returns nil if the document
-// has no form.
+// document catalog.  It returns nil if the document has no form.
 //
-// The form is read once per extractor, whether its dictionary is an indirect
-// object or stored directly in the catalog.  [Annotation] links widgets to
-// the fields of this form, and for an indirect form dictionary [Form] returns
-// the same form value.  The AcroForm entry must not change while x is in use.
+// A document has one interactive form, and this is the only way to read it.
+// The form is read once per extractor, and later calls return the same
+// result.  This includes a failure: once reading the form has failed, every
+// call through x returns the same error.  [Annotation] links widgets to the
+// fields of this form.  The AcroForm entry must not change while x is in use.
 func DocumentForm(x *pdf.Extractor) (*FormIndex, error) {
-	m := x.R.GetMeta()
-	if m == nil || m.Catalog == nil || m.Catalog.AcroForm == nil {
-		return nil, nil
-	}
-	if ref, ok := m.Catalog.AcroForm.(pdf.Reference); ok {
-		return pdf.CursorAt(x, nil).DecodeExclusive(ref, FormWithRefs)
-	}
-
-	// a direct dictionary has no reference to cache the form under
-	res, err := x.Once(func(c pdf.Cursor) (documentForm, error) {
-		idx, err := FormWithRefs(c, m.Catalog.AcroForm, true)
-		return documentForm{idx: idx}, err
+	res, _ := x.Once(func(c pdf.Cursor) (documentForm, error) {
+		m := x.R.GetMeta()
+		if m == nil || m.Catalog == nil || m.Catalog.AcroForm == nil {
+			return documentForm{}, nil
+		}
+		idx, err := c.Decode(m.Catalog.AcroForm, readForm)
+		return documentForm{idx: idx, err: err}, nil
 	})
-	return res.idx, err
+	return res.idx, res.err
 }
 
-// FormWithRefs reads an interactive form like [Form] and also records the
-// reference of the dictionary each terminal field and each of their widgets
-// was read from.  For a field with widget kids the field's reference is that
-// of the field dictionary, for a merged field/widget dictionary it is that
-// dictionary.  It returns nil if obj is nil.
+// readForm reads an interactive form dictionary together with the references
+// of its terminal fields and their widgets.  It returns nil if obj is nil.
 //
-// Always invoke this via [pdf.Cursor.Decode] or [pdf.Cursor.DecodeExclusive]:
-// the Form of the result is then the very value [Form] returns for the same
-// reference.  To read the document's own form, use [DocumentForm].
-func FormWithRefs(c pdf.Cursor, obj pdf.Object, _ bool) (*FormIndex, error) {
+// The widgets of the form are published in the extractor's cache only once
+// they are linked to their fields, so that [Annotation] never returns a
+// widget which is still being linked.  Only [DocumentForm] may call this
+// outside of tests, and at most once per extractor: a second reading takes
+// the field tree from the cache and so finds no field or widget references,
+// which leaves the index empty and /CO unresolved; see [fieldTreeDecoder].
+func readForm(c pdf.Cursor, obj pdf.Object, _ bool) (*FormIndex, error) {
 	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
@@ -183,6 +156,8 @@ func FormWithRefs(c pdf.Cursor, obj pdf.Object, _ bool) (*FormIndex, error) {
 			form.XFA = opaque.Extract(c.Extractor(), xfa)
 		}
 	}
+
+	d.publishWidgets(c.Extractor())
 
 	refs := make(map[acroform.Field]pdf.Reference, len(d.byRef))
 	for ref, f := range d.byRef {

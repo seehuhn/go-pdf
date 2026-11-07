@@ -542,6 +542,20 @@ func (x *Extractor) cacheStoreOrLoad(refs []Reference, tp reflect.Type, res any)
 	return res
 }
 
+// StoreOrLoad publishes v as the decoded value of the object at ref, cached
+// under the Go type T as [Cursor.Decode] would cache it.  If a value is
+// already cached there, it returns that value and stores nothing.
+//
+// This lets a decoder build a value out of the cache's sight and publish it
+// once it is complete, so that no other caller sees it half-built.
+func (x *Extractor) StoreOrLoad[T any](ref Reference, v T) T {
+	v, _ = x.cacheStoreOrLoad([]Reference{ref}, reflect.TypeFor[T](), v).(T)
+	if w, ok := x.R.(*Writer); ok {
+		w.recordOrigin(v, ref)
+	}
+	return v
+}
+
 // StoreOrLoadPair publishes two typed views of a single PDF object — for
 // example the field half and the widget half of a merged field/widget
 // dictionary — under one object reference, atomically. If the reference is

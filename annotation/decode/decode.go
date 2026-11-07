@@ -53,7 +53,7 @@ func Annotation(c pdf.Cursor, obj pdf.Object, isDirect bool) (annotation.Annotat
 		return annotationBody(c, dict, isDirect)
 	}
 
-	// The form's walk reads its widgets through annotationBody, never through
+	// The form's walk reads its widgets through decodeWidgetKid, never through
 	// this function, so decoding the form here cannot re-enter it.
 	// DocumentForm reads the form once per extractor, so concurrent decoders
 	// share one field tree.  A malformed form leaves the widget an orphan.
@@ -306,11 +306,23 @@ func decodeAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error
 			if err != nil {
 				return nil, err
 			}
-			_, w, err := decodeMergedField(c, p.Ref, dict, ctx, nil)
-			return w, err
+			f, w, err := decodeMergedField(c, dict, ctx, nil)
+			if err != nil {
+				return nil, err
+			} else if f == nil {
+				return w, nil
+			}
+			_, a := c.Extractor().StoreOrLoadPair[acroform.Field, annotation.Annotation](p.Ref, f, w)
+			return a, nil
 		}
 	}
+	return decodePlainAnnotation(c, dict)
+}
 
+// decodePlainAnnotation decodes an annotation which is not a merged field
+// according to its Subtype entry, and repairs a missing appearance or
+// appearance state.
+func decodePlainAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error) {
 	a, err := decodeBySubtype(c, dict)
 	if err != nil {
 		return nil, err
