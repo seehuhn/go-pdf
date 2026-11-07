@@ -19,6 +19,7 @@ package annotation
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"seehuhn.de/go/pdf"
@@ -107,6 +108,28 @@ func (w *Widget) borderStyleVersion() pdf.Version {
 //
 // This implements the acroform.Widget interface.
 func (w *Widget) ParentField() acroform.Field { return w.Field }
+
+// AppearanceStateNames returns the state names of the normal appearance, in
+// sorted order.  It returns nil if the widget has a single normal appearance
+// or none.
+//
+// This implements the acroform.Widget interface.
+func (w *Widget) AppearanceStateNames() []pdf.Name {
+	if w.Appearance == nil || len(w.Appearance.NormalMap) == 0 {
+		return nil
+	}
+	return slices.Sorted(maps.Keys(w.Appearance.NormalMap))
+}
+
+// CurrentAppearanceState returns [Common.AppearanceState].
+//
+// This implements the acroform.Widget interface.
+func (w *Widget) CurrentAppearanceState() pdf.Name { return w.AppearanceState }
+
+// SetAppearanceState sets [Common.AppearanceState].
+//
+// This implements the acroform.Widget interface.
+func (w *Widget) SetAppearanceState(name pdf.Name) { w.AppearanceState = name }
 
 // AddWidget adds a widget annotation for the terminal field f at the given
 // rectangle and returns it. A field may correspond to several widgets, one per

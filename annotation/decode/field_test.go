@@ -223,7 +223,7 @@ func TestDecodeFieldNil(t *testing.T) {
 	x := pdf.NewExtractor(w)
 
 	d := newFieldTreeDecoder()
-	node, err := d.decodeNode(pdf.CursorAt(x, nil), nil, inherited{})
+	node, err := d.decodeNode(pdf.CursorAt(x, nil), nil, inherited{}, &treeResult{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1187,5 +1187,76 @@ func TestApplyOwnContextDanglingOpt(t *testing.T) {
 	}
 	if diff := cmp.Diff(want.opt, got.opt); diff != "" {
 		t.Errorf("dangling reference read differently from absent entry (-absent +dangling):\n%s", diff)
+	}
+}
+
+func TestDecodeChoiceExplicitEmpty(t *testing.T) {
+	multi := pdf.Integer(acroform.FieldMultiSelect)
+	opt := pdf.Array{pdf.String("A"), pdf.String("B")}
+	cases := []struct {
+		name     string
+		ff       pdf.Integer
+		v, dv, i pdf.Object
+		wantV    []pdf.TextString
+		wantDV   []pdf.TextString
+		wantSel  []int
+	}{
+		{"multi empty V", multi, pdf.Array{}, nil, nil, []pdf.TextString{}, nil, nil},
+		{"multi empty DV", multi, nil, pdf.Array{}, nil, nil, []pdf.TextString{}, nil},
+		{"multi junk array", multi, pdf.Array{pdf.Integer(1)}, pdf.Array{pdf.Integer(1)}, nil, nil, nil, nil},
+		{"multi empty V drops I", multi, pdf.Array{}, nil, pdf.Array{pdf.Integer(1)}, []pdf.TextString{}, nil, nil},
+		{"multi absent V uses I", multi, nil, nil, pdf.Array{pdf.Integer(1)}, []pdf.TextString{pdf.Text("B")}, nil, []int{1}},
+		{"single empty V", 0, pdf.Array{}, pdf.Array{}, nil, nil, nil, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			x := pdf.NewExtractor(w)
+			ref := w.Alloc()
+			dict := pdf.Dict{
+				"FT": pdf.Name("Ch"), "T": pdf.String("c"), "DA": pdf.String(testDA),
+				"Ff": tc.ff, "Opt": opt,
+			}
+			for k, v := range map[pdf.Name]pdf.Object{"V": tc.v, "DV": tc.dv, "I": tc.i} {
+				if v != nil {
+					dict[k] = v
+				}
+			}
+			if err := w.Put(ref, dict); err != nil {
+				t.Fatal(err)
+			}
+			node, err := decodeRootField(x, ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ch := node.(*acroform.ChoiceField)
+			if diff := cmp.Diff(tc.wantV, ch.V); diff != "" {
+				t.Errorf("V differs (-want +got):\n%s", diff)
+			}
+			if (ch.V == nil) != (tc.wantV == nil) {
+				t.Errorf("V nil-ness: got %#v, want %#v", ch.V, tc.wantV)
+			}
+			if diff := cmp.Diff(tc.wantDV, ch.DV); diff != "" {
+				t.Errorf("DV differs (-want +got):\n%s", diff)
+			}
+			if (ch.DV == nil) != (tc.wantDV == nil) {
+				t.Errorf("DV nil-ness: got %#v, want %#v", ch.DV, tc.wantDV)
+			}
+			if diff := cmp.Diff(tc.wantSel, ch.Selected); diff != "" {
+				t.Errorf("Selected differs (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestChoiceExplicitEmptyDVRoundTrip(t *testing.T) {
+	f := newChoiceField("c")
+	f.Flags |= acroform.FieldMultiSelect
+	f.V = []pdf.TextString{}
+	f.DV = []pdf.TextString{}
+	first := roundTripForm(t, pdf.V1_7, &acroform.InteractiveForm{Fields: []acroform.Node{f}})
+	got := first.Fields[0].(*acroform.ChoiceField)
+	if got.V == nil || got.DV == nil {
+		t.Errorf("V, DV = %#v, %#v, want non-nil empty", got.V, got.DV)
 	}
 }

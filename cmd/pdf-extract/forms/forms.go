@@ -35,21 +35,15 @@ import (
 //
 // where the alternate name (/TU) and export name (/TM) are shown only when set.
 func List(doc pdf.Getter, w io.Writer) error {
-	acroFormObj := doc.GetMeta().Catalog.AcroForm
-	if acroFormObj == nil {
-		fmt.Fprintln(w, "No interactive form in document.")
-		return nil
-	}
-
-	x := pdf.NewExtractor(doc)
-	form, err := pdf.CursorAt(x, nil).Decode(acroFormObj, decode.Form)
+	idx, err := decode.DocumentForm(pdf.NewExtractor(doc))
 	if err != nil {
 		return err
 	}
-	if form == nil {
+	if idx == nil {
 		fmt.Fprintln(w, "No interactive form in document.")
 		return nil
 	}
+	form := idx.Form
 
 	count := 0
 	for name, field := range form.AllFields() {

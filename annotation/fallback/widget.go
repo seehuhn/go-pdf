@@ -130,20 +130,10 @@ func widgetIndex(w *annotation.Widget) int {
 // widgetOnState returns the on-state name of the index-th widget of a check box
 // or radio button field, or the empty string for other field types.
 func widgetOnState(f acroform.Field, index int) pdf.Name {
-	ff := f.GetCommon().Flags
-	if f.FieldType() != "Btn" || ff&acroform.FieldPushbutton != 0 {
-		return ""
+	if btn, ok := f.(*acroform.ButtonField); ok {
+		return btn.OnState(index)
 	}
-	if btn, ok := f.(*acroform.ButtonField); ok && index < len(btn.Opt) {
-		return pdf.Name(btn.Opt[index])
-	}
-	// a single check box may name its on-state via the field value
-	if ff&acroform.FieldRadio == 0 {
-		if v := buttonValue(f); v != "" && v != "Off" {
-			return v
-		}
-	}
-	return "On"
+	return ""
 }
 
 // buttonValue returns a check box or radio button field's value name.

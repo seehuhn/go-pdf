@@ -71,6 +71,16 @@ type Widget interface {
 
 	// ParentField returns the field this widget belongs to, or nil.
 	ParentField() Field
+
+	// AppearanceStateNames returns the state names of the widget's normal
+	// appearance, sorted; nil if it has a single appearance or none.
+	AppearanceStateNames() []pdf.Name
+
+	// CurrentAppearanceState returns the widget's /AS.
+	CurrentAppearanceState() pdf.Name
+
+	// SetAppearanceState sets the widget's /AS.
+	SetAppearanceState(pdf.Name)
 }
 
 // terminalEntries builds the dictionary entries of a terminal field — its

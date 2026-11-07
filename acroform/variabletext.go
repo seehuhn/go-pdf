@@ -97,16 +97,21 @@ func (v *VariableText) fillVarTextDict(rm *pdf.ResourceManager, dict pdf.Dict) e
 		dict["DS"] = pdf.Text(v.DefaultStyle)
 	}
 
-	if v.RichValue != nil {
-		if err := pdf.CheckVersion(w, "field RV entry", pdf.V1_5); err != nil {
-			return err
-		}
-		obj, err := rm.Embed(*v.RichValue)
-		if err != nil {
-			return err
-		}
-		dict["RV"] = obj
-	}
+	return v.fillRichValue(rm, dict)
+}
 
+// fillRichValue adds the /RV entry to dict.
+func (v *VariableText) fillRichValue(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if v.RichValue == nil {
+		return nil
+	}
+	if err := pdf.CheckVersion(rm.Out, "field RV entry", pdf.V1_5); err != nil {
+		return err
+	}
+	obj, err := rm.Embed(*v.RichValue)
+	if err != nil {
+		return err
+	}
+	dict["RV"] = obj
 	return nil
 }

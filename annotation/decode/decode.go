@@ -55,14 +55,10 @@ func Annotation(c pdf.Cursor, obj pdf.Object, isDirect bool) (annotation.Annotat
 
 	// The form's walk reads its widgets through annotationBody, never through
 	// this function, so decoding the form here cannot re-enter it.
-	// DecodeExclusive single-flights the form, so concurrent decoders share
-	// one field tree.
-	if m := c.Getter().GetMeta(); m != nil && m.Catalog != nil && m.Catalog.AcroForm != nil {
-		// a malformed form leaves the widget an orphan
-		_, err := pdf.Optional(pdf.CursorAt(c.Extractor(), nil).DecodeExclusive(m.Catalog.AcroForm, Form))
-		if err != nil {
-			return nil, err
-		}
+	// DocumentForm reads the form once per extractor, so concurrent decoders
+	// share one field tree.  A malformed form leaves the widget an orphan.
+	if _, err := pdf.Optional(DocumentForm(c.Extractor())); err != nil {
+		return nil, err
 	}
 
 	// If the form claimed this widget, this is a cache hit and returns the
@@ -141,6 +137,34 @@ func linkWidget(f acroform.Field, w *annotation.Widget) {
 	fc.Widgets = append(fc.Widgets, w)
 }
 
+// settleButtonValue makes a check box or radio button's value agree with the
+// appearance states of its widgets, once all of them are listed in the
+// field.  Where the field took its value from an earlier field of the same
+// name (shared is set), the value is fixed and sets the states; the function
+// returns false if the field cannot hold it, because the value is neither
+// "Off" nor an on-state of the field.  Otherwise the states decide, as
+// [reconcileButtonValue] describes.
+func settleButtonValue(f acroform.Field, shared bool) bool {
+	btn, ok := f.(*acroform.ButtonField)
+	if !ok || btn.Variant() == acroform.ButtonPush {
+		return true
+	}
+	if !shared {
+		reconcileButtonValue(btn)
+		return true
+	}
+	if btn.V == "" {
+		// an absent value shows every widget off
+		for _, w := range btn.Widgets {
+			if w != nil && w.CurrentAppearanceState() != "" {
+				w.SetAppearanceState("Off")
+			}
+		}
+		return true
+	}
+	return btn.SetValue(btn.V) == nil
+}
+
 // reconcileButtonValue makes a check box or radio button's value agree with
 // the appearance states of its widgets, once all of them are linked. Where
 // the two disagree the appearance state wins, as the specification directs:
@@ -155,12 +179,11 @@ func reconcileButtonValue(f acroform.Field) {
 	}
 	allNamed := true
 	var on pdf.Name
-	for _, wi := range btn.Widgets {
-		w, ok := wi.(*annotation.Widget)
-		if !ok {
+	for _, w := range btn.Widgets {
+		if w == nil {
 			continue
 		}
-		switch as := w.AppearanceState; as {
+		switch as := w.CurrentAppearanceState(); as {
 		case "":
 			allNamed = false
 		case "Off":
@@ -173,9 +196,12 @@ func reconcileButtonValue(f acroform.Field) {
 	switch {
 	case on != "":
 		btn.V = on
-		for _, wi := range btn.Widgets {
-			if w, ok := wi.(*annotation.Widget); ok && w.AppearanceState != "" && w.AppearanceState != on {
-				w.AppearanceState = "Off"
+		for _, w := range btn.Widgets {
+			if w == nil {
+				continue
+			}
+			if as := w.CurrentAppearanceState(); as != "" && as != on {
+				w.SetAppearanceState("Off")
 			}
 		}
 	case allNamed && btn.V != "" && btn.V != "Off":

@@ -37,6 +37,14 @@
 // the terminal fields, with their fully qualified names, using
 // [InteractiveForm.AllFields].
 //
+// To fill in a form, change field values with [ButtonField.Toggle] and
+// [ButtonField.SetValue] for buttons, [TextField.SetText] for text fields,
+// and [ChoiceField.Select] and [ChoiceField.SetEditText] for choice fields.
+// These keep the field value, the selection and the widgets' appearance
+// states consistent, and return an error for values the field cannot hold.
+// They ignore [FieldReadOnly]: a viewer which lets the user fill in a form
+// must refuse changes to read-only fields itself.
+//
 // Interactive forms are read using [seehuhn.de/go/pdf/annotation/decode.Form]
 // and written using [InteractiveForm.Encode].
 package acroform

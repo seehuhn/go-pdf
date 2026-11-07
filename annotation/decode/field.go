@@ -99,9 +99,18 @@ func applyOwnContext(ctx inherited, c pdf.Cursor, dict pdf.Dict) (inherited, err
 // its first position only, so the decoded tree can be written back) and records
 // each terminal field by reference so the form's /CO can be resolved against the
 // same field values.
+//
+// The nodes are cached by the extractor, so a second walk of the same tree
+// through the same extractor finds them decoded already.  Each node's result
+// therefore records what decoding it contributed to the walk's state, and a
+// walk replays the results it takes from the cache; see
+// [fieldTreeDecoder.replay].
 type fieldTreeDecoder struct {
 	seen  map[pdf.Reference]bool
 	byRef map[pdf.Reference]acroform.Field
+
+	// widgetRefs holds the reference of each widget linked to a field
+	widgetRefs map[acroform.Widget]pdf.Reference
 
 	// byName holds the first terminal field decoded under each fully
 	// qualified name
@@ -110,17 +119,96 @@ type fieldTreeDecoder struct {
 
 func newFieldTreeDecoder() *fieldTreeDecoder {
 	return &fieldTreeDecoder{
-		seen:   map[pdf.Reference]bool{},
-		byRef:  map[pdf.Reference]acroform.Field{},
-		byName: map[string]acroform.Field{},
+		seen:       map[pdf.Reference]bool{},
+		byRef:      map[pdf.Reference]acroform.Field{},
+		widgetRefs: map[acroform.Widget]pdf.Reference{},
+		byName:     map[string]acroform.Field{},
 	}
 }
 
 // treeResult wraps a decoded tree node. The wrapper lets the node itself be nil
 // (a dropped field) while keeping the value passed through [pdf.Cursor.Decode] a
 // non-nil concrete pointer, which its cache requires.
+//
+// The remaining fields record what decoding the node added to the state of the
+// walk, so that a later walk which takes the node from the cache can add the
+// same.
 type treeResult struct {
 	node acroform.Node
+
+	// walk is the decoder which produced the result
+	walk *fieldTreeDecoder
+
+	// claimed lists the references the node marked as seen: the field kids
+	// of a group, or the widget kids of a terminal field
+	claimed []pdf.Reference
+
+	// kids holds the results of a group's field kids
+	kids []*treeResult
+
+	// field, ref and name are a terminal field, the reference of its
+	// dictionary and its fully qualified name; field is nil for any other
+	// node
+	field acroform.Field
+	ref   pdf.Reference
+	name  string
+
+	// widgets lists the widgets linked to a terminal field, and widgetRefs
+	// their references
+	widgets    []acroform.Widget
+	widgetRefs []pdf.Reference
+}
+
+// claim marks a reference as seen by the node res.
+func (d *fieldTreeDecoder) claim(res *treeResult, ref pdf.Reference) {
+	d.seen[ref] = true
+	res.claimed = append(res.claimed, ref)
+}
+
+// addField records the terminal field of the node res.
+func (d *fieldTreeDecoder) addField(res *treeResult, f acroform.Field, ref pdf.Reference, name string) {
+	res.field, res.ref, res.name = f, ref, name
+	d.byRef[ref] = f
+}
+
+// addWidget records a widget linked to the terminal field of the node res.
+func (d *fieldTreeDecoder) addWidget(res *treeResult, w acroform.Widget, ref pdf.Reference) {
+	res.widgets = append(res.widgets, w)
+	res.widgetRefs = append(res.widgetRefs, ref)
+	d.widgetRefs[w] = ref
+}
+
+// replay adds to the walk what decoding the subtree of res added to the walk
+// which produced it.  It is called for results taken from the cache.
+func (d *fieldTreeDecoder) replay(res *treeResult) {
+	for _, ref := range res.claimed {
+		d.seen[ref] = true
+	}
+	if res.field != nil {
+		d.byRef[res.ref] = res.field
+		if _, ok := d.byName[res.name]; !ok {
+			d.byName[res.name] = res.field
+		}
+	}
+	for i, w := range res.widgets {
+		d.widgetRefs[w] = res.widgetRefs[i]
+	}
+	for _, kid := range res.kids {
+		d.replay(kid)
+	}
+}
+
+// decodeOne decodes the node at ref, replaying the result if it comes from
+// the cache.
+func (d *fieldTreeDecoder) decodeOne(c pdf.Cursor, ref pdf.Reference, ctx inherited) (*treeResult, error) {
+	res, err := c.DecodeOptional(ref, d.nodeFunc(ctx))
+	if err != nil {
+		return nil, err
+	}
+	if res != nil && res.walk != d {
+		d.replay(res)
+	}
+	return res, nil
 }
 
 // nodeFunc returns an extractor function that decodes a tree node with the given
@@ -128,11 +216,13 @@ type treeResult struct {
 // two contexts keeps the first (the matching duplicate is dropped by seen).
 func (d *fieldTreeDecoder) nodeFunc(ctx inherited) func(pdf.Cursor, pdf.Object, bool) (*treeResult, error) {
 	return func(c pdf.Cursor, obj pdf.Object, _ bool) (*treeResult, error) {
-		node, err := d.decodeNode(c, obj, ctx)
+		res := &treeResult{walk: d}
+		node, err := d.decodeNode(c, obj, ctx, res)
 		if err != nil {
 			return nil, err
 		}
-		return &treeResult{node: node}, nil
+		res.node = node
+		return res, nil
 	}
 }
 
@@ -150,7 +240,7 @@ func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherit
 			continue
 		}
 		d.seen[ref] = true
-		res, err := c.DecodeOptional(ref, d.nodeFunc(ctx))
+		res, err := d.decodeOne(c, ref, ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -167,8 +257,9 @@ func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherit
 //
 // Always invoke this through [fieldTreeDecoder.nodeFunc] and [pdf.Cursor.Decode]
 // so that indirect references are resolved, the depth is bounded, and cycle
-// detection covers the field hierarchy.
-func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherited) (acroform.Node, error) {
+// detection covers the field hierarchy.  What the node adds to the walk is
+// recorded in res.
+func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherited, res *treeResult) (acroform.Node, error) {
 	dict, err := c.Dict(obj)
 	if err != nil {
 		return nil, err
@@ -187,14 +278,15 @@ func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherite
 		}
 	}
 	if merged {
-		f, _, err := decodeMergedField(c, p.Ref, dict, ctx, d.byName)
+		f, w, err := decodeMergedField(c, p.Ref, dict, ctx, d.byName)
 		if err != nil {
 			return nil, err
 		}
 		if f == nil {
 			return nil, nil
 		}
-		d.byRef[p.Ref] = f
+		d.addField(res, f, p.Ref, joinName(ctx.name, f.PartialName()))
+		d.addWidget(res, w, p.Ref)
 		return f, nil
 	}
 
@@ -235,16 +327,16 @@ func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherite
 	if len(fieldKids) > 0 {
 		// a non-terminal field: a group of sub-fields. Any widget kids are
 		// dropped from the tree; they survive through the page's /Annots.
-		return d.decodeGroup(c, dict, ctx, fieldKids)
+		return d.decodeGroup(c, dict, ctx, fieldKids, res)
 	}
-	return d.decodeTerminal(c, dict, ctx, widgetKids)
+	return d.decodeTerminal(c, dict, ctx, widgetKids, res)
 }
 
 // decodeGroup decodes a non-terminal field into a [acroform.Group]. The group's
 // own inheritable entries extend the context for its descendants but are
 // otherwise dropped (its TU/TM/AA and value entries are not represented). A
 // group whose children all drop out is itself dropped.
-func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherited, fieldKids []pdf.Reference) (acroform.Node, error) {
+func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherited, fieldKids []pdf.Reference, res *treeResult) (acroform.Node, error) {
 	childCtx, err := applyOwnContext(ctx, c, dict)
 	if err != nil {
 		return nil, err
@@ -259,13 +351,17 @@ func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherite
 		if d.seen[ref] {
 			continue
 		}
-		d.seen[ref] = true
-		res, err := c.DecodeOptional(ref, d.nodeFunc(childCtx))
+		d.claim(res, ref)
+		kid, err := d.decodeOne(c, ref, childCtx)
 		if err != nil {
 			return nil, err
 		}
-		if res != nil && res.node != nil {
-			g.Children = append(g.Children, res.node)
+		if kid == nil {
+			continue
+		}
+		res.kids = append(res.kids, kid)
+		if kid.node != nil {
+			g.Children = append(g.Children, kid.node)
 		}
 	}
 	if len(g.Children) == 0 {
@@ -275,21 +371,25 @@ func (d *fieldTreeDecoder) decodeGroup(c pdf.Cursor, dict pdf.Dict, ctx inherite
 }
 
 // decodeTerminal decodes a terminal field and its widget annotations. It returns
-// nil if the field's effective type is unknown (the field is dropped; its widget
-// kids survive through the page's /Annots).
-func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, widgetKids []pdf.Reference) (acroform.Node, error) {
-	f, err := buildTerminal(c, dict, ctx, d.byName)
+// nil if the field's effective type is unknown, or if it cannot hold the value
+// of an earlier field of the same name (the field is dropped; its widget kids
+// survive through the page's /Annots).
+func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, widgetKids []pdf.Reference, res *treeResult) (acroform.Node, error) {
+	f, shared, err := buildTerminal(c, dict, ctx, d.byName)
 	if err != nil {
 		return nil, err
 	}
 	if f == nil {
 		return nil, nil
 	}
+	fc := f.GetCommon()
+	var widgets []*annotation.Widget
+	var widgetRefs []pdf.Reference
 	for _, ref := range widgetKids {
 		if d.seen[ref] {
 			continue
 		}
-		d.seen[ref] = true
+		d.claim(res, ref)
 		// annotationBody rather than Annotation: the latter reads the form,
 		// which is what is being decoded here
 		a, err := pdf.Optional(c.Decode(ref, annotationBody))
@@ -297,12 +397,23 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 			return nil, err
 		}
 		if w, ok := a.(*annotation.Widget); ok && w != nil {
-			linkWidget(f, w)
+			fc.Widgets = append(fc.Widgets, w)
+			widgets = append(widgets, w)
+			widgetRefs = append(widgetRefs, ref)
 		}
 	}
-	reconcileButtonValue(f)
+	// The widgets point to the field only once it is kept: they are shared
+	// through the extractor's cache, and those of a dropped field survive
+	// through the page's /Annots.
+	if !settleButtonValue(f, shared) {
+		return nil, nil
+	}
+	for i, w := range widgets {
+		w.Field = f
+		d.addWidget(res, w, widgetRefs[i])
+	}
 	if p := c.Path(); p != nil {
-		d.byRef[p.Ref] = f
+		d.addField(res, f, p.Ref, joinName(ctx.name, f.PartialName()))
 	}
 	return f, nil
 }
@@ -315,26 +426,31 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 // (12.7.4.2). byName holds the first field decoded under each name: a later
 // field of a different type is dropped (its widgets survive through the page's
 // /Annots), and one of the same type takes the value and default value of the
-// first, which is the value a viewer shows for all of them. A password field
-// cannot take a value, so one that follows a valued field is dropped too. The
-// repair is made before the field is linked to its widgets and published. A
-// nil byName skips the check; this is used on the page side, which does not
-// see the whole tree.
-func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]acroform.Field) (acroform.Field, error) {
+// first, which is the value a viewer shows for all of them. One which cannot
+// hold that value is dropped too; see [shareValue]. The repair is made before
+// the field is linked to its widgets and published. The second return value
+// reports that the field took its value from the first: a check box or radio
+// button then still has to be checked against its widgets, by
+// [settleButtonValue]. A nil byName skips the check; this is used on the page
+// side, which does not see the whole tree.
+func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]acroform.Field) (acroform.Field, bool, error) {
 	f, err := buildTerminalField(c, dict, ctx)
 	if f == nil || err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if byName == nil {
-		return f, nil
+		return f, false, nil
 	}
 	fqn := joinName(ctx.name, f.PartialName())
-	if first, ok := byName[fqn]; !ok {
+	first, ok := byName[fqn]
+	if !ok {
 		byName[fqn] = f
-	} else if !copyValue(f, first) {
-		return nil, nil
+		return f, false, nil
 	}
-	return f, nil
+	if !shareValue(f, first) {
+		return nil, false, nil
+	}
+	return f, true, nil
 }
 
 // buildTerminalField constructs a terminal field from its dictionary,
@@ -474,6 +590,13 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 		// several selections in a single-selection field leave the intended
 		// one unknown; a bad /V takes its /I along, which only restated it
 		if f.Flags&acroform.FieldMultiSelect == 0 {
+			// only a multi-select field has an explicit empty selection
+			if len(f.V) == 0 {
+				f.V = nil
+			}
+			if len(f.DV) == 0 {
+				f.DV = nil
+			}
 			if len(f.V) > 1 {
 				f.V, f.Selected = nil, nil
 			}
@@ -486,8 +609,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 		}
 		// where /V and /I disagree, /V is authoritative; without /V, /I is
 		// the only record of the selection
-		if len(f.V) == 0 {
-			f.V = nil
+		if f.V == nil {
 			for _, idx := range f.Selected {
 				f.V = append(f.V, f.Opt[idx].Display)
 			}
@@ -703,7 +825,8 @@ func remapOptIndex(idx, numOpt int, dropped []int) (int, bool) {
 // choiceFieldValue reads a choice field's /V or /DV entry, which is a bare text
 // string for a single selection or an array of text strings for multiple
 // selections. A malformed length-one array is accepted as a single selection;
-// non-string entries are skipped. The result is nil when nothing is selected.
+// non-string entries are skipped. The result is nil when the entry is absent
+// or unusable, and non-nil but empty for an empty array.
 func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]pdf.TextString, error) {
 	if obj == nil {
 		return nil, nil
@@ -713,6 +836,10 @@ func choiceFieldValue(c pdf.Cursor, obj pdf.Object) ([]pdf.TextString, error) {
 		return nil, err
 	}
 	if arr, ok := resolved.(pdf.Array); ok {
+		if len(arr) == 0 {
+			// an explicit empty selection
+			return []pdf.TextString{}, nil
+		}
 		var vals []pdf.TextString
 		for _, el := range arr {
 			s, err := c.Resolve(el)
@@ -832,7 +959,7 @@ func decodeMergedField(c pdf.Cursor, ref pdf.Reference, dict pdf.Dict, ctx inher
 		return nil, nil, err
 	}
 
-	f, err := buildTerminal(c, dict, ctx, byName)
+	f, shared, err := buildTerminal(c, dict, ctx, byName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -851,7 +978,11 @@ func decodeMergedField(c pdf.Cursor, ref pdf.Reference, dict pdf.Dict, ctx inher
 	// atomically, so the winner's already-linked f/w become the shared pair and
 	// a losing concurrent decoder adopts them without mutating shared state.
 	linkWidget(f, w)
-	reconcileButtonValue(f)
+	if !settleButtonValue(f, shared) {
+		// the field cannot hold the value of its namesake: keep the widget
+		w.Field = nil
+		return nil, w, nil
+	}
 	fc, ac := c.Extractor().StoreOrLoadPair[acroform.Field, annotation.Annotation](ref, f, w)
 	return fc, ac.(*annotation.Widget), nil
 }

@@ -6019,6 +6019,7 @@ types:
     introduced: '1.2'
     goType: '[]pdf.TextString'
     inheritable: true
+    notes: nil is absent; non-nil empty is an explicit empty array (MultiSelect only)
   - goName: DV
     pdfKey: DV
     pdfType: array;text-string
@@ -6026,6 +6027,7 @@ types:
     introduced: '1.2'
     goType: '[]pdf.TextString'
     inheritable: true
+    notes: nil is absent; non-nil empty is an explicit empty array (MultiSelect only)
 - name: FieldMDPTransformParameters
   purpose: transform parameters for MDP signature fields
   goType:

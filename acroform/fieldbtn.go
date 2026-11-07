@@ -104,9 +104,14 @@ func (f *ButtonField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		}
 		dict["Opt"] = arr
 	}
-	fillName(dict, "V", f.V)
+	f.fillValue(dict)
 	fillName(dict, "DV", f.DV)
 	return nil
+}
+
+// fillValue adds the /V entry to dict.
+func (f *ButtonField) fillValue(dict pdf.Dict) {
+	fillName(dict, "V", f.V)
 }
 
 // fillName writes a name entry, omitting it when the name is empty.

@@ -17,6 +17,7 @@
 package annotation
 
 import (
+	"slices"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -213,4 +214,23 @@ func TestWidgetMustBePlaced(t *testing.T) {
 			t.Error("expected an error for a widget on no page")
 		}
 	})
+}
+
+func TestWidgetStateMethods(t *testing.T) {
+	blank := &form.Form{}
+	w := &Widget{}
+	if got := w.AppearanceStateNames(); got != nil {
+		t.Errorf("no appearance: got %v, want nil", got)
+	}
+	w.Appearance = &appearance.Dict{
+		NormalMap: map[pdf.Name]*form.Form{"On": blank, "Off": blank},
+	}
+	got := w.AppearanceStateNames()
+	if want := []pdf.Name{"Off", "On"}; !slices.Equal(got, want) {
+		t.Errorf("AppearanceStateNames() = %v, want %v", got, want)
+	}
+	w.SetAppearanceState("On")
+	if w.AppearanceState != "On" || w.CurrentAppearanceState() != "On" {
+		t.Errorf("state not set: %q", w.AppearanceState)
+	}
 }

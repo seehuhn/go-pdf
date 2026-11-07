@@ -65,7 +65,9 @@ type ChoiceField struct {
 	// If both V and Selected are set, they must name the same options.
 	//
 	// On write, a nil V is treated as the display strings of the options
-	// listed in Selected.
+	// listed in Selected.  In a field with [FieldMultiSelect], a non-nil
+	// empty V is written as an empty array, an explicit empty selection; in
+	// other fields an empty V is not written.
 	V []pdf.TextString
 
 	// DV (optional) holds the default selection, used when the form is reset.
@@ -104,6 +106,21 @@ func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if f.TopIndex > 0 {
 		dict["TI"] = pdf.Integer(f.TopIndex)
 	}
+	if err := f.fillValue(rm, dict); err != nil {
+		return err
+	}
+	multi := f.Flags&FieldMultiSelect != 0
+	if !multi && len(f.DV) > 1 {
+		return errors.New("multiple selections require the MultiSelect flag")
+	}
+	if dv := choiceValueObject(f.DV, multi); dv != nil {
+		dict["DV"] = dv
+	}
+	return nil
+}
+
+// fillValue adds the /V and /I entries to dict.
+func (f *ChoiceField) fillValue(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	for i, idx := range f.Selected {
 		if idx < 0 || idx >= len(f.Opt) {
 			return errors.New("choice field selection index out of range")
@@ -112,7 +129,7 @@ func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 			return errors.New("choice field selection indices must be ascending")
 		}
 	}
-	if f.Flags&FieldMultiSelect == 0 && (len(f.V) > 1 || len(f.DV) > 1 || len(f.Selected) > 1) {
+	if f.Flags&FieldMultiSelect == 0 && (len(f.V) > 1 || len(f.Selected) > 1) {
 		return errors.New("multiple selections require the MultiSelect flag")
 	}
 	v := f.V
@@ -133,11 +150,8 @@ func (f *ChoiceField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 		}
 		dict["I"] = arr
 	}
-	if v := choiceValueObject(v); v != nil {
+	if v := choiceValueObject(v, f.Flags&FieldMultiSelect != 0); v != nil {
 		dict["V"] = v
-	}
-	if dv := choiceValueObject(f.DV); dv != nil {
-		dict["DV"] = dv
 	}
 	return nil
 }
@@ -164,11 +178,16 @@ func (f *ChoiceField) SelectionAgrees() bool {
 }
 
 // choiceValueObject converts a choice field's selection to its PDF
-// representation: nil when nothing is selected, a bare text string for a single
-// selection, and an array of text strings for multiple selections.
-func choiceValueObject(vals []pdf.TextString) pdf.Object {
+// representation: nil when nothing is selected, a bare text string for a
+// single selection, and an array of text strings for multiple selections.
+// Only a multi-select field can hold an explicit empty selection, which is
+// written as an empty array; for other fields an empty selection is nil.
+func choiceValueObject(vals []pdf.TextString, multi bool) pdf.Object {
 	switch len(vals) {
 	case 0:
+		if vals != nil && multi {
+			return pdf.Array{}
+		}
 		return nil
 	case 1:
 		return vals[0]

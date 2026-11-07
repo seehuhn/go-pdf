@@ -66,12 +66,8 @@ func (f *SignatureField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error 
 	if err := pdf.CheckVersion(rm.Out, "signature field", pdf.V1_3); err != nil {
 		return err
 	}
-	if f.V != nil {
-		v, err := rm.Embed(f.V)
-		if err != nil {
-			return err
-		}
-		dict["V"] = v
+	if err := f.fillValue(rm, dict); err != nil {
+		return err
 	}
 	if f.DV != nil {
 		dv, err := rm.Embed(f.DV)
@@ -94,5 +90,18 @@ func (f *SignatureField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error 
 		}
 		dict["SV"] = sv
 	}
+	return nil
+}
+
+// fillValue adds the /V entry to dict.
+func (f *SignatureField) fillValue(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if f.V == nil {
+		return nil
+	}
+	v, err := rm.Embed(f.V)
+	if err != nil {
+		return err
+	}
+	dict["V"] = v
 	return nil
 }

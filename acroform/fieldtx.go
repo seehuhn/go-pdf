@@ -69,16 +69,8 @@ func (f *TextField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if err := f.VariableText.fillVarTextDict(rm, dict); err != nil {
 		return err
 	}
-	// the value of a password field must never be stored in the file
-	if f.Flags&FieldPassword != 0 && (f.V != nil || f.RichValue != nil) {
-		return errors.New("password field must not have a value")
-	}
-	if f.V != nil {
-		obj, err := rm.Embed(*f.V)
-		if err != nil {
-			return err
-		}
-		dict["V"] = obj
+	if err := f.fillValue(rm, dict); err != nil {
+		return err
 	}
 	if f.DV != nil {
 		obj, err := rm.Embed(*f.DV)
@@ -99,6 +91,22 @@ func (f *TextField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	}
 	if f.MaxLen > 0 {
 		dict["MaxLen"] = pdf.Integer(f.MaxLen)
+	}
+	return nil
+}
+
+// fillValue adds the /V entry to dict.
+func (f *TextField) fillValue(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	// the value of a password field must never be stored in the file
+	if f.Flags&FieldPassword != 0 && (f.V != nil || f.RichValue != nil) {
+		return errors.New("password field must not have a value")
+	}
+	if f.V != nil {
+		obj, err := rm.Embed(*f.V)
+		if err != nil {
+			return err
+		}
+		dict["V"] = obj
 	}
 	return nil
 }

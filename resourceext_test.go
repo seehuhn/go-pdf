@@ -18,12 +18,15 @@ package pdf_test
 
 import (
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/pdf/pagetree"
 )
 
@@ -240,5 +243,65 @@ func TestDeferCopier(t *testing.T) {
 	}
 	if _, ok := got.(pdf.Reference); !ok {
 		t.Errorf("expected a reference, got %T", got)
+	}
+}
+
+// TestExtractorOnce checks that [pdf.Extractor.Once] runs its function once per
+// result type, shares the result between concurrent callers, and does not
+// cache a failure.
+func TestExtractorOnce(t *testing.T) {
+	type docValue struct{ n int }
+	type otherValue struct{ n int }
+
+	x := pdf.NewExtractor(mock.Getter)
+
+	var calls atomic.Int32
+	run := func(pdf.Cursor) (*docValue, error) {
+		n := calls.Add(1)
+		return &docValue{n: int(n)}, nil
+	}
+
+	var wg sync.WaitGroup
+	results := make([]*docValue, 8)
+	for i := range results {
+		wg.Go(func() {
+			v, err := x.Once(run)
+			if err != nil {
+				t.Error(err)
+			}
+			results[i] = v
+		})
+	}
+	wg.Wait()
+	if n := calls.Load(); n != 1 {
+		t.Errorf("function ran %d times, want 1", n)
+	}
+	for i, v := range results {
+		if v != results[0] {
+			t.Errorf("caller %d got a different value", i)
+		}
+	}
+
+	// another type is another value
+	other, err := x.Once(func(pdf.Cursor) (otherValue, error) {
+		return otherValue{n: 7}, nil
+	})
+	if err != nil || other.n != 7 {
+		t.Errorf("other type: %v, %v", other, err)
+	}
+
+	// a failure is not cached
+	if _, err := x.Once(func(pdf.Cursor) (int, error) {
+		return 0, errors.New("fail")
+	}); err == nil {
+		t.Fatal("missing error")
+	}
+	v, err := x.Once(func(pdf.Cursor) (int, error) { return 1, nil })
+	if err != nil || v != 1 {
+		t.Errorf("after a failure: got %d, %v, want 1", v, err)
+	}
+	v, err = x.Once(func(pdf.Cursor) (int, error) { return 2, nil })
+	if err != nil || v != 1 {
+		t.Errorf("cached value: got %d, %v, want 1", v, err)
 	}
 }

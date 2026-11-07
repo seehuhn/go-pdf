@@ -372,18 +372,51 @@ func (c Cursor) DecodeOptional[T any](obj Object, decode func(Cursor, Object, bo
 // anything that can be mutually referential, use [Cursor.Decode], whose load-or-store
 // publishing never waits and so cannot deadlock.
 func (c Cursor) DecodeExclusive[T any](obj Object, decode func(Cursor, Object, bool) (T, error)) (T, error) {
-	var zero T
-	x := c.x
 	ref, ok := obj.(Reference)
 	if !ok {
 		return decode(c, obj, true) // direct object: not shared
 	}
 	key := extractorKey{ref: ref, tp: reflect.TypeFor[T]()}
+	return exclusive(c.x, key, func() (T, error) {
+		return c.Decode(obj, decode)
+	})
+}
+
+// Once returns the result of f, running f at most once per extractor and
+// result type T.  Concurrent callers wait for the first and share its
+// result.  A call which fails is not cached, so the next caller runs f again.
+//
+// Once holds a document-wide value which no object reference identifies, for
+// example an interactive form whose dictionary is stored directly in the
+// document catalog.  The result type is the key, so T should be a type
+// private to the caller.  As for [Cursor.DecodeExclusive], f must not wait on
+// a decode that might be waiting on it.
+func (x *Extractor) Once[T any](f func(Cursor) (T, error)) (T, error) {
+	// object number 0 never names an object, so no decode uses this key
+	key := extractorKey{tp: reflect.TypeFor[T]()}
+	return exclusive(x, key, func() (T, error) {
+		res, err := f(CursorAt(x, nil))
+		if err == nil {
+			x.mu.Lock()
+			x.cache[key] = res
+			x.mu.Unlock()
+		}
+		return res, err
+	})
+}
+
+// exclusive returns the value cached under key, or runs decode to obtain it.
+// Concurrent callers for the same key wait for the first to finish and share
+// its result.  The decode function is responsible for caching its result.
+func exclusive[T any](x *Extractor, key extractorKey, decode func() (T, error)) (T, error) {
+	var zero T
 
 	x.mu.Lock()
 	if v, ok := x.cache[key]; ok {
 		x.mu.Unlock()
-		return v.(T), nil
+		// nil interface result
+		r, _ := v.(T)
+		return r, nil
 	}
 	if p, ok := x.wip[key]; ok {
 		x.mu.Unlock()
@@ -391,13 +424,15 @@ func (c Cursor) DecodeExclusive[T any](obj Object, decode func(Cursor, Object, b
 		if p.err != nil {
 			return zero, p.err
 		}
-		return p.val.(T), nil
+		// nil interface result
+		r, _ := p.val.(T)
+		return r, nil
 	}
 	p := &pending{done: make(chan struct{})}
 	x.wip[key] = p
 	x.mu.Unlock()
 
-	res, err := c.Decode(obj, decode)
+	res, err := decode()
 
 	x.mu.Lock()
 	p.val, p.err = res, err

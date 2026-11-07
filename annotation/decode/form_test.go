@@ -19,6 +19,8 @@ package decode
 import (
 	"bytes"
 	"fmt"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -520,15 +522,15 @@ func TestFormXFAStreamRoundTrip(t *testing.T) {
 }
 
 // Fields sharing a fully qualified name are made to agree: a later field of
-// the same type takes the value of the first, one of a different type is
-// dropped.
+// the same type takes the value of the first, with its rich text value, and
+// one of a different type is dropped.
 func TestDecodeDuplicateNames(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
 
 	dicts := []pdf.Dict{
-		{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("first")},
-		{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("second")},
+		{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("first"), "RV": pdf.String("<p>first</p>")},
+		{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "V": pdf.String("second"), "RV": pdf.String("<p>second</p>")},
 		{"FT": pdf.Name("Ch"), "T": pdf.String("a")},
 	}
 	var fields pdf.Array
@@ -554,6 +556,9 @@ func TestDecodeDuplicateNames(t *testing.T) {
 		}
 		if f.V == nil || f.V.Value.String() != "first" {
 			t.Errorf("field %d: V = %v, want \"first\"", i, f.V)
+		}
+		if f.RichValue == nil || f.RichValue.Value.String() != "<p>first</p>" {
+			t.Errorf("field %d: RichValue = %v, want the first field's", i, f.RichValue)
 		}
 	}
 
@@ -611,5 +616,412 @@ func TestDecodeDuplicateNamesPassword(t *testing.T) {
 			}
 			roundTripForm(t, pdf.V1_7, form)
 		})
+	}
+}
+
+// A single-selection choice field cannot hold an explicit empty or a
+// multiple selection of a same-named multi-select field, and is dropped; one
+// which can hold the value takes it, and its own /I goes unless it restates
+// the value.
+func TestDecodeDuplicateNamesChoice(t *testing.T) {
+	multi := pdf.Integer(acroform.FieldMultiSelect)
+	opt := pdf.Array{pdf.String("a"), pdf.String("b"), pdf.String("c")}
+	cases := []struct {
+		name   string
+		first  pdf.Dict
+		second pdf.Dict
+		want   int
+	}{
+		{"multiple", pdf.Dict{"Ff": multi, "V": pdf.Array{pdf.String("a"), pdf.String("b")}},
+			pdf.Dict{}, 1},
+		{"explicit empty", pdf.Dict{"Ff": multi, "V": pdf.Array{}}, pdf.Dict{}, 1},
+		{"multiple DV", pdf.Dict{"Ff": multi, "DV": pdf.Array{pdf.String("a"), pdf.String("b")}},
+			pdf.Dict{}, 1},
+		{"single", pdf.Dict{"V": pdf.String("b")}, pdf.Dict{"I": pdf.Array{pdf.Integer(0)}}, 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			objs := map[string]pdf.Dict{}
+			for name, extra := range map[string]pdf.Dict{"first": tc.first, "second": tc.second} {
+				d := pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("a"), "Opt": opt}
+				maps.Copy(d, extra)
+				objs[name] = d
+			}
+			r, _ := writeRawForm(t, objs, []string{"first", "second"}, func(refs map[string]pdf.Reference) pdf.Dict {
+				return pdf.Dict{"Fields": pdf.Array{refs["first"], refs["second"]}}
+			})
+			idx, err := DocumentForm(pdf.NewExtractor(r))
+			if err != nil {
+				t.Fatal(err)
+			}
+			form := idx.Form
+			if n := len(form.Fields); n != tc.want {
+				t.Fatalf("got %d fields, want %d", n, tc.want)
+			}
+			first := form.Fields[0].(*acroform.ChoiceField)
+			for i, node := range form.Fields[1:] {
+				f := node.(*acroform.ChoiceField)
+				if diff := cmp.Diff(first.V, f.V); diff != "" {
+					t.Errorf("field %d: V differs (-want +got):\n%s", i+1, diff)
+				}
+				if !f.SelectionAgrees() && f.Selected != nil {
+					t.Errorf("field %d: Selected %v disagrees with V %v", i+1, f.Selected, f.V)
+				}
+			}
+			roundTripForm(t, pdf.V1_7, form)
+		})
+	}
+}
+
+// A check box takes the value of a same-named one and shows it in its
+// widgets, rather than letting their states override it; one whose widgets
+// have no such on-state is dropped, together with the link from its widget.
+func TestDecodeDuplicateNamesButton(t *testing.T) {
+	cases := []struct {
+		name string
+		on   pdf.Name
+		want int
+	}{
+		{"same on-state", "Yes", 2},
+		{"other on-state", "On", 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pw, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rect := pdf.Rectangle{URx: 10, URy: 10}
+			ap := func(on pdf.Name) pdf.Dict {
+				return pdf.Dict{"N": pdf.Dict{
+					on:    appearanceStream(t, pw, rect),
+					"Off": appearanceStream(t, pw, rect),
+				}}
+			}
+			firstRef, secondRef, kidRef := pw.Alloc(), pw.Alloc(), pw.Alloc()
+			objs := map[pdf.Reference]pdf.Dict{
+				firstRef: rawWidget(pdf.Dict{
+					"FT": pdf.Name("Btn"), "T": pdf.String("a"),
+					"V": pdf.Name("Yes"), "AS": pdf.Name("Yes"), "AP": ap("Yes"),
+				}),
+				secondRef: {
+					"FT": pdf.Name("Btn"), "T": pdf.String("a"),
+					"V": pdf.Name("Off"), "Kids": pdf.Array{kidRef},
+				},
+				kidRef: rawWidget(pdf.Dict{
+					"Parent": secondRef, "AS": pdf.Name("Off"), "AP": ap(tc.on),
+				}),
+			}
+			for ref, d := range objs {
+				if err := pw.Put(ref, d); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			x := pdf.NewExtractor(pw)
+			c := pdf.CursorAt(x, nil)
+			idx, err := FormWithRefs(c, pdf.Dict{"Fields": pdf.Array{firstRef, secondRef}}, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			form := idx.Form
+			if n := len(form.Fields); n != tc.want {
+				t.Fatalf("got %d fields, want %d", n, tc.want)
+			}
+
+			kid, err := c.Decode(kidRef, annotationBody)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w := kid.(*annotation.Widget)
+			_, listed := idx.WidgetRefs[w]
+			if tc.want == 1 {
+				if w.Field != nil || listed {
+					t.Errorf("widget of dropped field: Field=%v listed=%v", w.Field, listed)
+				}
+				return
+			}
+			f := form.Fields[1].(*acroform.ButtonField)
+			if f.V != "Yes" || w.AppearanceState != "Yes" {
+				t.Errorf("V=%q AS=%q, want Yes", f.V, w.AppearanceState)
+			}
+			if w.Field != f || !listed {
+				t.Errorf("widget not linked: Field=%v listed=%v", w.Field, listed)
+			}
+			roundTripForm(t, pdf.V1_7, form)
+		})
+	}
+}
+
+// writeRawForm writes the objects of a small form by hand and returns a
+// reader together with the reference of each named object.  A string value
+// "@name" in a dictionary, or in an array within one, is replaced by the
+// reference of the object called name.  The form dictionary is written as
+// the object called "form".
+func writeRawForm(t *testing.T, objs map[string]pdf.Dict, order []string, form func(refs map[string]pdf.Reference) pdf.Dict) (*pdf.Reader, map[string]pdf.Reference) {
+	t.Helper()
+	return writeRawDoc(t, objs, order, form, false)
+}
+
+// writeRawDoc is like [writeRawForm], but if inline is set it stores the form
+// dictionary directly in the document catalog.
+func writeRawDoc(t *testing.T, objs map[string]pdf.Dict, order []string, form func(refs map[string]pdf.Reference) pdf.Dict, inline bool) (*pdf.Reader, map[string]pdf.Reference) {
+	t.Helper()
+	w, buf := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	refs := map[string]pdf.Reference{}
+	for _, name := range order {
+		refs[name] = w.Alloc()
+	}
+	if !inline {
+		refs["form"] = w.Alloc()
+	}
+	for _, name := range order {
+		d := objs[name]
+		for k, v := range d {
+			if s, ok := v.(pdf.String); ok && len(s) > 0 && s[0] == '@' {
+				d[k] = refs[string(s[1:])]
+			}
+			if a, ok := v.(pdf.Array); ok {
+				for i, el := range a {
+					if s, ok := el.(pdf.String); ok && len(s) > 0 && s[0] == '@' {
+						a[i] = refs[string(s[1:])]
+					}
+				}
+			}
+		}
+		if err := w.Put(refs[name], d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if inline {
+		w.GetMeta().Catalog.AcroForm = form(refs)
+	} else {
+		if err := w.Put(refs["form"], form(refs)); err != nil {
+			t.Fatal(err)
+		}
+		w.GetMeta().Catalog.AcroForm = refs["form"]
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r, err := pdf.NewReader(bytes.NewReader(buf.Data), int64(len(buf.Data)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.Close() })
+	return r, refs
+}
+
+func rawWidget(extra pdf.Dict) pdf.Dict {
+	d := pdf.Dict{
+		"Type":    pdf.Name("Annot"),
+		"Subtype": pdf.Name("Widget"),
+		"Rect":    pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(10), pdf.Integer(10)},
+	}
+	maps.Copy(d, extra)
+	return d
+}
+
+func TestFormWithRefsSharesValues(t *testing.T) {
+	objs := map[string]pdf.Dict{
+		"merged": rawWidget(pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("m")}),
+		"parent": {"FT": pdf.Name("Tx"), "T": pdf.String("p"), "Kids": pdf.Array{pdf.String("@kid")}},
+		"kid":    rawWidget(pdf.Dict{"Parent": pdf.String("@parent")}),
+	}
+	r, refs := writeRawForm(t, objs, []string{"merged", "parent", "kid"}, func(refs map[string]pdf.Reference) pdf.Dict {
+		return pdf.Dict{"Fields": pdf.Array{refs["merged"], refs["parent"]}}
+	})
+
+	x := pdf.NewExtractor(r)
+	c := pdf.CursorAt(x, nil)
+	form, err := c.DecodeExclusive(refs["form"], Form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx, err := c.DecodeExclusive(refs["form"], FormWithRefs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idx.Form != form {
+		t.Fatal("index form is not the cached form")
+	}
+	if len(idx.FieldRefs) != 2 {
+		t.Fatalf("got %d field refs, want 2", len(idx.FieldRefs))
+	}
+
+	_, annots, err := PageAnnotations(c, pdf.Array{refs["merged"], refs["kid"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, wantRef := range []pdf.Reference{refs["merged"], refs["parent"]} {
+		w, ok := annots[i].(*annotation.Widget)
+		if !ok {
+			t.Fatalf("annotation %d is %T", i, annots[i])
+		}
+		if got := idx.FieldRefs[w.Field]; got != wantRef {
+			t.Errorf("field %d: ref %v, want %v", i, got, wantRef)
+		}
+	}
+}
+
+func TestFormWithRefsParentMismatch(t *testing.T) {
+	objs := map[string]pdf.Dict{
+		"holder": {"FT": pdf.Name("Tx"), "T": pdf.String("h"), "Kids": pdf.Array{pdf.String("@kid")}},
+		"other":  {"FT": pdf.Name("Tx"), "T": pdf.String("o")},
+		"kid":    rawWidget(pdf.Dict{"Parent": pdf.String("@other")}),
+	}
+	r, refs := writeRawForm(t, objs, []string{"holder", "other", "kid"}, func(refs map[string]pdf.Reference) pdf.Dict {
+		return pdf.Dict{"Fields": pdf.Array{refs["holder"]}}
+	})
+
+	idx, err := pdf.CursorAt(pdf.NewExtractor(r), nil).DecodeExclusive(refs["form"], FormWithRefs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(idx.FieldRefs) != 1 {
+		t.Fatalf("got %d field refs, want 1", len(idx.FieldRefs))
+	}
+	for _, ref := range idx.FieldRefs {
+		if ref != refs["holder"] {
+			t.Errorf("ref %v, want %v", ref, refs["holder"])
+		}
+	}
+}
+
+func TestFormWithRefsDirect(t *testing.T) {
+	r, _ := writeRawForm(t, nil, nil, func(map[string]pdf.Reference) pdf.Dict { return pdf.Dict{} })
+	dict := pdf.Dict{"Fields": pdf.Array{}}
+	c := pdf.CursorAt(pdf.NewExtractor(r), nil)
+	form, err := Form(c, dict, true)
+	if err != nil || form == nil {
+		t.Fatalf("direct form: %v, %v", form, err)
+	}
+	idx, err := FormWithRefs(c, dict, true)
+	if err != nil || idx == nil || idx.Form == nil {
+		t.Fatalf("direct index: %v, %v", idx, err)
+	}
+}
+
+// inlineFormOrder names the objects of [inlineFormObjects], in the order they
+// are written.
+var inlineFormOrder = []string{"f", "kid", "orphan1", "orphan2", "cb", "on", "off"}
+
+// inlineFormObjects returns the objects of a form with a field "f", whose
+// widget "kid" is meant for a page, two orphan widgets, and a check box "cb"
+// with a widget "on" meant for a page and a widget "off" for none.
+func inlineFormObjects() map[string]pdf.Dict {
+	return map[string]pdf.Dict{
+		"f":       {"FT": pdf.Name("Tx"), "T": pdf.String("f"), "Kids": pdf.Array{pdf.String("@kid")}},
+		"kid":     rawWidget(pdf.Dict{"Parent": pdf.String("@f")}),
+		"orphan1": rawWidget(nil),
+		"orphan2": rawWidget(nil),
+		"cb":      {"FT": pdf.Name("Btn"), "T": pdf.String("cb"), "Kids": pdf.Array{pdf.String("@on"), pdf.String("@off")}},
+		"on":      rawWidget(pdf.Dict{"Parent": pdf.String("@cb")}),
+		"off":     rawWidget(pdf.Dict{"Parent": pdf.String("@cb")}),
+	}
+}
+
+// inlineFormDict returns the form dictionary for [inlineFormObjects].
+func inlineFormDict(refs map[string]pdf.Reference) pdf.Dict {
+	return pdf.Dict{
+		"Fields": pdf.Array{refs["f"], refs["cb"]},
+		"CO":     pdf.Array{refs["f"]},
+	}
+}
+
+// TestDocumentFormInline checks that a form dictionary stored directly in the
+// catalog is read once per extractor, and that the widgets decoded from the
+// page share their fields with it.
+func TestDocumentFormInline(t *testing.T) {
+	r, refs := writeRawDoc(t, inlineFormObjects(), inlineFormOrder, inlineFormDict, true)
+
+	x := pdf.NewExtractor(r)
+	c := pdf.CursorAt(x, nil)
+	annots := pdf.Array{refs["kid"], refs["orphan1"], refs["orphan2"], refs["on"]}
+	_, page, err := PageAnnotations(c, annots)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err := DocumentForm(x)
+	if err != nil || idx == nil {
+		t.Fatalf("document form: %v, %v", idx, err)
+	}
+	again, err := DocumentForm(x)
+	if err != nil || again != idx {
+		t.Fatalf("second read gave a different form: %v", err)
+	}
+
+	kid := page[0].(*annotation.Widget)
+	if kid.Field == nil || idx.FieldRefs[kid.Field] != refs["f"] {
+		t.Error("the page widget's field is not the form's")
+	}
+	if len(idx.Form.CalculationOrder) != 1 || idx.Form.CalculationOrder[0] != kid.Field {
+		t.Error("calculation order lost")
+	}
+	for i := 1; i <= 2; i++ {
+		if w := page[i].(*annotation.Widget); w.Field != nil {
+			t.Errorf("orphan %d has a field", i)
+		}
+	}
+}
+
+// TestFormWithRefsRepeated checks that reading a direct form dictionary a
+// second time through the same extractor yields the same index, although the
+// field tree is then taken from the extractor's cache.
+func TestFormWithRefsRepeated(t *testing.T) {
+	r, _ := writeRawDoc(t, inlineFormObjects(), inlineFormOrder, inlineFormDict, true)
+	dict := r.GetMeta().Catalog.AcroForm
+
+	c := pdf.CursorAt(pdf.NewExtractor(r), nil)
+	first, err := FormWithRefs(c, dict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := FormWithRefs(c, dict, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.FieldRefs) != 2 || len(first.WidgetRefs) != 3 {
+		t.Fatalf("first read: %d field refs, %d widget refs", len(first.FieldRefs), len(first.WidgetRefs))
+	}
+	if !maps.Equal(first.FieldRefs, second.FieldRefs) {
+		t.Error("field refs differ")
+	}
+	if !maps.Equal(first.WidgetRefs, second.WidgetRefs) {
+		t.Error("widget refs differ")
+	}
+	if !slices.Equal(first.Form.CalculationOrder, second.Form.CalculationOrder) {
+		t.Error("calculation orders differ")
+	}
+	if !slices.Equal(first.Form.Fields, second.Form.Fields) {
+		t.Error("field trees differ")
+	}
+}
+
+// TestFormWithRefsWidgetRefs checks that the index names every widget of the
+// form, including one which is on no page.
+func TestFormWithRefsWidgetRefs(t *testing.T) {
+	objs := inlineFormObjects()
+	objs["merged"] = rawWidget(pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("m")})
+	order := append(slices.Clone(inlineFormOrder), "merged")
+	r, refs := writeRawForm(t, objs, order, func(refs map[string]pdf.Reference) pdf.Dict {
+		return pdf.Dict{"Fields": pdf.Array{refs["f"], refs["cb"], refs["merged"]}}
+	})
+
+	idx, err := pdf.CursorAt(pdf.NewExtractor(r), nil).DecodeExclusive(refs["form"], FormWithRefs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[pdf.Reference]bool{}
+	for f := range idx.FieldRefs {
+		for _, w := range f.GetCommon().Widgets {
+			ref, ok := idx.WidgetRefs[w]
+			if !ok {
+				t.Errorf("widget of %s has no reference", f.PartialName())
+			}
+			got[ref] = true
+		}
+	}
+	want := map[pdf.Reference]bool{refs["kid"]: true, refs["on"]: true, refs["off"]: true, refs["merged"]: true}
+	if !maps.Equal(got, want) || len(idx.WidgetRefs) != len(want) {
+		t.Errorf("widget refs %v, want %v", got, want)
 	}
 }
