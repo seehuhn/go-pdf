@@ -144,14 +144,13 @@ type widgetKid struct {
 	w *annotation.Widget
 }
 
-// decodeWidgetKid decodes a widget kid of a terminal field.  The kid is never
-// read as a merged field: the walk has established that it is a widget.
+// decodeWidgetKid decodes a widget kid of a terminal field.
 func decodeWidgetKid(c pdf.Cursor, obj pdf.Object, _ bool) (*widgetKid, error) {
 	dict, err := c.DictTyped(obj, "Annot")
 	if err != nil {
 		return nil, err
 	}
-	a, err := decodePlainAnnotation(c, dict)
+	a, err := decodeAnnotation(c, dict)
 	if err != nil {
 		return nil, err
 	}
@@ -161,8 +160,7 @@ func decodeWidgetKid(c pdf.Cursor, obj pdf.Object, _ bool) (*widgetKid, error) {
 
 // publishWidgets publishes the widgets linked by the walk under their
 // references, as [Annotation] returns them.  A widget merged with its field is
-// published together with the field, as [decodeAnnotation] does for a merged
-// dictionary read from a page.
+// published together with the field.
 func (d *fieldTreeDecoder) publishWidgets(x *pdf.Extractor) {
 	for w, ref := range d.widgetRefs {
 		// a merged dictionary is the only one which is both field and widget
@@ -393,15 +391,11 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 // the field is linked to its widgets and published. The second return value
 // reports that the field took its value from the first: a check box or radio
 // button then still has to be checked against its widgets, by
-// [settleButtonValue]. A nil byName skips the check; this is used on the page
-// side, which does not see the whole tree.
+// [settleButtonValue].
 func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]acroform.Field) (acroform.Field, bool, error) {
 	f, err := buildTerminalField(c, dict, ctx)
 	if f == nil || err != nil {
 		return nil, false, err
-	}
-	if byName == nil {
-		return f, false, nil
 	}
 	fqn := joinName(ctx.name, f.PartialName())
 	first, ok := byName[fqn]
@@ -836,8 +830,9 @@ func choiceOptionString(c pdf.Cursor, obj pdf.Object) (pdf.TextString, bool, err
 }
 
 // acroFormDefaults returns the interactive form dictionary's document-wide /DA
-// and /Q defaults, the root of field-attribute inheritance. It is used on the
-// page side, where the field tree's top-down context is not available.
+// and /Q defaults, the root of field-attribute inheritance. It is used for a
+// widget read without its field, where the field tree's top-down context is
+// not available.
 func acroFormDefaults(c pdf.Cursor) (da string, q pdf.TextAlign, err error) {
 	meta := c.Getter().GetMeta()
 	if meta == nil || meta.Catalog == nil {
@@ -862,10 +857,9 @@ func acroFormDefaults(c pdf.Cursor) (da string, q pdf.TextAlign, err error) {
 
 // inheritedFromChain reconstructs a field's inherited context from its
 // /Parent chain, seeded with the interactive form dictionary's /DA and /Q
-// defaults. It is used on the page side to flatten a merged field/widget
-// reached from a page's /Annots, where the tree's top-down context is
-// unavailable. It computes the same values as the top-down walk, so both
-// directions produce identical flattened fields.
+// defaults. It is used for a widget read without its field, where the tree's
+// top-down context is unavailable, to find the value a check box or radio
+// button shows.  It computes the same values as the top-down walk.
 //
 // Each ancestor's context is decoded through [pdf.Cursor.Decode], so it is computed
 // once per ancestor and shared by every widget below it, the chain is bounded
@@ -916,23 +910,18 @@ func ancestorContext(c pdf.Cursor, obj pdf.Object, _ bool) (*inherited, error) {
 // (but a decoded widget) when the effective field type is unknown, or when
 // the field cannot hold the value of its namesake.
 //
-// The pair is not published in the extractor's cache: the caller publishes it
-// with [pdf.Extractor.StoreOrLoadPair] once nothing will change it, so that
-// the page's /Annots entry and the field tree share one widget object.
+// The pair is not published in the extractor's cache:
+// [fieldTreeDecoder.publishWidgets] publishes it once the walk is done, so
+// that the page's /Annots entry and the field tree share one widget object.
 func decodeMergedField(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]acroform.Field) (acroform.Field, *annotation.Widget, error) {
-	w, err := decodeWidgetBody(c, dict)
+	a, err := decodeAnnotation(c, dict)
 	if err != nil {
 		return nil, nil, err
 	}
+	w := a.(*annotation.Widget)
 
 	f, shared, err := buildTerminal(c, dict, ctx, byName)
 	if err != nil {
-		return nil, nil, err
-	}
-	// the merged path returns before decodeAnnotation's own repairs, so the
-	// widget half is repaired here
-	repairMissingAppearance(w, pdf.GetVersion(c.Getter()))
-	if err := repairMissingAppearanceState(c, w, dict); err != nil {
 		return nil, nil, err
 	}
 	if f == nil {

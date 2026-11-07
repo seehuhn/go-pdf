@@ -1063,9 +1063,9 @@ func (g *countingGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, err
 	return g.Getter.Get(ref, canObjStm)
 }
 
-// parentChain writes a chain of depth field dictionaries linked by /Parent and
-// returns their references, the root first. Every node carries the entries
-// needed to recognise a field, so that a truncated chain still yields one.
+// parentChain writes a chain of depth check box field dictionaries linked by
+// /Parent and returns their references, the root first.  The root holds the
+// value /Yes, which the widgets below the chain inherit.
 func parentChain(t *testing.T, w *pdf.Writer, depth int) []pdf.Reference {
 	t.Helper()
 	refs := make([]pdf.Reference, depth)
@@ -1073,8 +1073,10 @@ func parentChain(t *testing.T, w *pdf.Writer, depth int) []pdf.Reference {
 		refs[i] = w.Alloc()
 	}
 	for i, ref := range refs {
-		d := pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String(fmt.Sprintf("p%d", i)), "DA": pdf.String(testDA)}
-		if i > 0 {
+		d := pdf.Dict{"FT": pdf.Name("Btn"), "T": pdf.String(fmt.Sprintf("p%d", i))}
+		if i == 0 {
+			d["V"] = pdf.Name("Yes")
+		} else {
 			d["Parent"] = refs[i-1]
 		}
 		if err := w.Put(ref, d); err != nil {
@@ -1084,24 +1086,44 @@ func parentChain(t *testing.T, w *pdf.Writer, depth int) []pdf.Reference {
 	return refs
 }
 
-func mergedWidget(parent pdf.Reference, name string) pdf.Dict {
+// checkBoxAppearance writes an appearance dictionary with the states /Yes
+// and /Off.
+func checkBoxAppearance(t *testing.T, w *pdf.Writer) pdf.Reference {
+	t.Helper()
+	rect := pdf.Rectangle{URx: 10, URy: 10}
+	ref := w.Alloc()
+	err := w.Put(ref, pdf.Dict{"N": pdf.Dict{
+		"Yes": appearanceStream(t, w, rect),
+		"Off": appearanceStream(t, w, rect),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ref
+}
+
+// mergedWidget returns a check box widget merged with a field below parent,
+// which names no appearance state, so that decoding it takes the state from
+// the inherited value.
+func mergedWidget(parent, ap pdf.Reference, name string) pdf.Dict {
 	return pdf.Dict{
 		"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"),
 		"Rect": &pdf.Rectangle{URx: 10, URy: 10},
-		"T":    pdf.String(name), "Parent": parent,
+		"T":    pdf.String(name), "Parent": parent, "AP": ap,
 	}
 }
 
-// Many page-side widgets sharing one /Parent chain load each ancestor once,
-// not once per widget.
+// Many widgets read without their field and sharing one /Parent chain load
+// each ancestor once, not once per widget.
 func TestDecodeParentChainShared(t *testing.T) {
 	const depth, numWidgets = 50, 50
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	chain := parentChain(t, w, depth)
+	ap := checkBoxAppearance(t, w)
 	widgets := make([]pdf.Reference, numWidgets)
 	for i := range widgets {
 		widgets[i] = w.Alloc()
-		if err := w.Put(widgets[i], mergedWidget(chain[depth-1], fmt.Sprintf("w%d", i))); err != nil {
+		if err := w.Put(widgets[i], mergedWidget(chain[depth-1], ap, fmt.Sprintf("w%d", i))); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1113,12 +1135,8 @@ func TestDecodeParentChainShared(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		tx, ok := a.(*annotation.Widget).Field.(*acroform.TextField)
-		if !ok {
-			t.Fatalf("widget field = %T, want *acroform.TextField", a.(*annotation.Widget).Field)
-		}
-		if tx.DefaultAppearance != testDA {
-			t.Errorf("DefaultAppearance = %q, want %q", tx.DefaultAppearance, testDA)
+		if as := a.GetCommon().AppearanceState; as != "Yes" {
+			t.Errorf("appearance state = %q, want %q", as, "Yes")
 		}
 	}
 	// a few loads per widget and per ancestor, far below the product
@@ -1128,13 +1146,13 @@ func TestDecodeParentChainShared(t *testing.T) {
 }
 
 // A /Parent chain deeper than the extract limit is cut off rather than
-// followed to the end; the widget still decodes to a field.
+// followed to the end, so the value at its root is not seen.
 func TestDecodeParentChainDeepBounded(t *testing.T) {
 	depth := limits.MaxExtractDepth + 10
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	chain := parentChain(t, w, depth)
 	ref := w.Alloc()
-	if err := w.Put(ref, mergedWidget(chain[depth-1], "w")); err != nil {
+	if err := w.Put(ref, mergedWidget(chain[depth-1], checkBoxAppearance(t, w), "w")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1143,23 +1161,23 @@ func TestDecodeParentChainDeepBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a.(*annotation.Widget).Field == nil {
-		t.Error("widget has no field")
+	if as := a.GetCommon().AppearanceState; as != "Off" {
+		t.Errorf("appearance state = %q, want %q", as, "Off")
 	}
 }
 
-// A /Parent cycle terminates and still yields a field.
+// A /Parent cycle terminates, and the value of the field below it is seen.
 func TestDecodeParentChainCycle(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	a, b := w.Alloc(), w.Alloc()
-	if err := w.Put(a, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("a"), "DA": pdf.String(testDA), "Parent": b}); err != nil {
+	if err := w.Put(a, pdf.Dict{"FT": pdf.Name("Btn"), "T": pdf.String("a"), "V": pdf.Name("Yes"), "Parent": b}); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.Put(b, pdf.Dict{"T": pdf.String("b"), "Parent": a}); err != nil {
 		t.Fatal(err)
 	}
 	ref := w.Alloc()
-	if err := w.Put(ref, mergedWidget(a, "w")); err != nil {
+	if err := w.Put(ref, mergedWidget(a, checkBoxAppearance(t, w), "w")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1168,8 +1186,8 @@ func TestDecodeParentChainCycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := an.(*annotation.Widget).Field.(*acroform.TextField); !ok {
-		t.Errorf("widget field = %T, want *acroform.TextField", an.(*annotation.Widget).Field)
+	if as := an.GetCommon().AppearanceState; as != "Yes" {
+		t.Errorf("appearance state = %q, want %q", as, "Yes")
 	}
 }
 

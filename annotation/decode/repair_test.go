@@ -271,11 +271,11 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 			t.Fatal(err)
 		}
 		x := pdf.NewExtractor(w)
-		a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
+		node, err := decodeRootField(x, ref)
 		if err != nil {
 			t.Fatal(err)
 		}
-		btn := a.(*annotation.Widget).Field.(*acroform.ButtonField)
+		btn := node.(*acroform.ButtonField)
 		if btn.V != "Off" {
 			t.Errorf("V = %q, want %q", btn.V, "Off")
 		}
@@ -357,16 +357,16 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 				t.Fatal(err)
 			}
 			x := pdf.NewExtractor(w)
-			a, err := pdf.CursorAt(x, nil).Decode(ref, Annotation)
+			node, err := decodeRootField(x, ref)
 			if err != nil {
 				t.Fatal(err)
 			}
-			wd := a.(*annotation.Widget)
-			if wd.AppearanceState != "Off" {
-				t.Errorf("appearance state = %q, want %q", wd.AppearanceState, "Off")
-			}
-			if btn := wd.Field.(*acroform.ButtonField); btn.V != "Off" {
+			btn := node.(*acroform.ButtonField)
+			if btn.V != "Off" {
 				t.Errorf("V = %q, want %q", btn.V, "Off")
+			}
+			if as := btn.Widgets[0].CurrentAppearanceState(); as != "Off" {
+				t.Errorf("appearance state = %q, want %q", as, "Off")
 			}
 		})
 	}

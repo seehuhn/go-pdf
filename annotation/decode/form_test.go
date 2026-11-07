@@ -1064,3 +1064,39 @@ func TestDocumentFormKeepsFailure(t *testing.T) {
 		t.Errorf("new extractor: got %v, %v, want the form", idx, err)
 	}
 }
+
+// TestUnclaimedMergedWidget checks that a widget merged with a field which
+// the form does not keep is read without a field and can be written back.
+// The form drops a field of the same name but another type as an earlier
+// one, and does not see a field outside /Fields.
+func TestUnclaimedMergedWidget(t *testing.T) {
+	objs := map[string]pdf.Dict{
+		"first":    rawWidget(pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("a")}),
+		"namesake": rawWidget(pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("a")}),
+		"outside":  rawWidget(pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("o")}),
+	}
+	r, refs := writeRawForm(t, objs, []string{"first", "namesake", "outside"}, func(refs map[string]pdf.Reference) pdf.Dict {
+		return pdf.Dict{"Fields": pdf.Array{refs["first"], refs["namesake"]}}
+	})
+	x := pdf.NewExtractor(r)
+
+	for _, name := range []string{"namesake", "outside"} {
+		a, err := pdf.CursorAt(x, nil).Decode(refs[name], Annotation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w := a.(*annotation.Widget)
+		if w.Field != nil {
+			t.Errorf("%s: widget has field %T, want none", name, w.Field)
+		}
+
+		out, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		rm := pdf.NewResourceManager(out)
+		if _, err := rm.Store(w); err != nil {
+			t.Errorf("%s: store failed: %v", name, err)
+		}
+		if err := rm.Close(); err != nil {
+			t.Errorf("%s: close failed: %v", name, err)
+		}
+	}
+}

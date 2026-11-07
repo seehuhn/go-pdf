@@ -31,7 +31,9 @@ import (
 // A widget annotation belongs to a form field.  Before a widget is decoded,
 // the document's interactive form is read, which links the widget to its
 // field ([annotation.Widget.Field]) and makes the form's view of a field
-// merged with its widget the one every reader sees.  Errors in the form are
+// merged with its widget the one every reader sees.  A widget the form does
+// not claim has no field, even if its dictionary carries field entries: a
+// field outside the form could not be written back.  Errors in the form are
 // not reported; a malformed form must not break annotation decoding.
 //
 // Always invoke this via [pdf.Cursor.Decode] so that indirect references are
@@ -220,7 +222,7 @@ func reconcileButtonValue(f acroform.Field) {
 // widget the value does not name is off, which is also where a radio button
 // other than the selected one ends up.
 //
-// The field of a widget read on its own is not known yet, so the value is
+// A widget is repaired before it is linked to its field, so the value is
 // reconstructed from the /Parent chain the way the field tree does it.  The
 // answer therefore does not depend on whether the form was read as well.
 func buttonAppearanceState(c pdf.Cursor, w *annotation.Widget, dict pdf.Dict) (pdf.Name, bool, error) {
@@ -229,31 +231,20 @@ func buttonAppearanceState(c pdf.Cursor, w *annotation.Widget, dict pdf.Dict) (p
 		return "", false, nil
 	}
 
-	var value pdf.Name
-	switch f := w.Field.(type) {
-	case *acroform.ButtonField:
-		if f.Variant() == acroform.ButtonPush {
-			return "", false, nil
-		}
-		value = f.V
-	case nil:
-		parent, err := inheritedFromChain(c, dict)
-		if err != nil {
-			return "", false, err
-		}
-		ctx, err := applyOwnContext(parent, c, dict)
-		if err != nil {
-			return "", false, err
-		}
-		if ctx.ft != "Btn" || ctx.ff&acroform.FieldPushbutton != 0 {
-			return "", false, nil
-		}
-		value, err = pdf.Optional(c.Name(ctx.v))
-		if err != nil {
-			return "", false, err
-		}
-	default:
+	parent, err := inheritedFromChain(c, dict)
+	if err != nil {
+		return "", false, err
+	}
+	ctx, err := applyOwnContext(parent, c, dict)
+	if err != nil {
+		return "", false, err
+	}
+	if ctx.ft != "Btn" || ctx.ff&acroform.FieldPushbutton != 0 {
 		return "", false, nil
+	}
+	value, err := pdf.Optional(c.Name(ctx.v))
+	if err != nil {
+		return "", false, err
 	}
 
 	if value != "" && value != "Off" {
@@ -290,39 +281,11 @@ func emptyAppearance(rect pdf.Rectangle) *appearance.Dict {
 	}
 }
 
+// decodeAnnotation decodes an annotation according to its Subtype entry, and
+// repairs a missing appearance or appearance state.  Field entries of a widget
+// dictionary are ignored: only the form's walk reads a field merged with its
+// widget as a field.
 func decodeAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error) {
-	// a field merged with its single widget is one object that is both a Widget
-	// annotation and a form field; decode it as a linked field+widget pair and
-	// return the widget half, so the page's /Annots and the field tree's /Kids
-	// share one object. The field's inheritable attributes are flattened against
-	// the context reconstructed from its /Parent chain, matching the field tree.
-	if p := c.Path(); p != nil {
-		merged, err := isMergedFieldDict(c, dict)
-		if err != nil {
-			return nil, err
-		}
-		if merged {
-			ctx, err := inheritedFromChain(c, dict)
-			if err != nil {
-				return nil, err
-			}
-			f, w, err := decodeMergedField(c, dict, ctx, nil)
-			if err != nil {
-				return nil, err
-			} else if f == nil {
-				return w, nil
-			}
-			_, a := c.Extractor().StoreOrLoadPair[acroform.Field, annotation.Annotation](p.Ref, f, w)
-			return a, nil
-		}
-	}
-	return decodePlainAnnotation(c, dict)
-}
-
-// decodePlainAnnotation decodes an annotation which is not a merged field
-// according to its Subtype entry, and repairs a missing appearance or
-// appearance state.
-func decodePlainAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error) {
 	a, err := decodeBySubtype(c, dict)
 	if err != nil {
 		return nil, err
@@ -334,8 +297,7 @@ func decodePlainAnnotation(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, 
 	return a, nil
 }
 
-// decodeBySubtype decodes an annotation which is not a merged field according
-// to its Subtype entry.
+// decodeBySubtype decodes an annotation according to its Subtype entry.
 func decodeBySubtype(c pdf.Cursor, dict pdf.Dict) (annotation.Annotation, error) {
 	subtype, err := c.Name(dict["Subtype"])
 	if err != nil {
