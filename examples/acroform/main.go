@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
@@ -178,7 +179,7 @@ func (b *formBuilder) addText(name, value string, flags acroform.FieldFlags, rec
 	f.Flags = flags
 	f.DefaultAppearance = textAppearance
 	if value != "" {
-		f.V = &pdf.StringOrStream{Value: pdf.Text(value)}
+		f.Text = &pdf.StringOrStream{Value: pdf.Text(value)}
 	}
 	b.form.Fields = append(b.form.Fields, f)
 	b.attach(f, rect, b.style)
@@ -189,19 +190,19 @@ func (b *formBuilder) addCombo(name string, options []string, value string, rect
 	f.Flags = acroform.FieldCombo
 	f.DefaultAppearance = textAppearance
 	for _, option := range options {
-		f.Opt = append(f.Opt, acroform.ChoiceOption{Display: pdf.Text(option), Export: pdf.Text(option)})
+		f.Options = append(f.Options, acroform.ChoiceOption{Display: pdf.Text(option), Export: option})
 	}
 	if value != "" {
-		f.V = []pdf.TextString{pdf.Text(value)}
+		f.Value = []pdf.TextString{pdf.Text(value)}
 	}
 	b.form.Fields = append(b.form.Fields, f)
 	b.attach(f, rect, b.style)
 }
 
 func (b *formBuilder) addCheckBox(name, label string, checked bool, x, top float64) {
-	f := acroform.NewButtonField(name)
+	f := acroform.NewButtonField(name, acroform.ButtonCheckbox)
 	if checked {
-		f.V = "Yes"
+		f.State = "Yes"
 	}
 	b.form.Fields = append(b.form.Fields, f)
 
@@ -211,11 +212,9 @@ func (b *formBuilder) addCheckBox(name, label string, checked bool, x, top float
 	b.inlineLabel(label, x+boxSize+7, top-boxSize+4)
 }
 
-func (b *formBuilder) addRadio(name string, options []string, selected pdf.Name, top, slot float64) {
-	f := acroform.NewButtonField(name)
-	f.Flags = acroform.FieldRadio
-	f.Opt = options
-	f.V = selected
+func (b *formBuilder) addRadio(name string, options []string, selected string, top, slot float64) {
+	f := acroform.NewButtonField(name, acroform.ButtonRadio)
+	f.ExportValues = options
 	b.form.Fields = append(b.form.Fields, f)
 
 	for i, option := range options {
@@ -224,6 +223,11 @@ func (b *formBuilder) addRadio(name string, options []string, selected pdf.Name,
 		mk.Caption = pdf.Text("l")
 		b.attach(f, box(x, top, boxSize, boxSize), mk)
 		b.inlineLabel(option, x+boxSize+7, top-boxSize+4)
+	}
+
+	// the buttons' on-state names are known once the widgets exist
+	if b.err == nil {
+		b.err = b.form.LogicalField(name).SetState(f.OnState(slices.Index(options, selected)))
 	}
 }
 
@@ -235,8 +239,7 @@ func (b *formBuilder) buttons() {
 }
 
 func (b *formBuilder) addButton(name, caption string, border color.Color, act pdf.Action, rect pdf.Rectangle) {
-	f := acroform.NewButtonField(name)
-	f.Flags = acroform.FieldPushbutton
+	f := acroform.NewPushButtonField(name)
 	b.form.Fields = append(b.form.Fields, f)
 
 	mk := &appearance.Characteristics{BackgroundColor: fieldColor, BorderColor: border, Caption: pdf.Text(caption)}

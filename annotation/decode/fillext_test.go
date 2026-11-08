@@ -34,8 +34,7 @@ import (
 
 func buttonFillForm(t *testing.T) *acroform.InteractiveForm {
 	blank := &form.Form{BBox: pdf.Rectangle{URx: 10, URy: 10}, Res: &content.Resources{}}
-	radio := acroform.NewButtonField("r")
-	radio.Flags |= acroform.FieldRadio
+	radio := acroform.NewButtonField("r", acroform.ButtonRadio)
 	for i, on := range []pdf.Name{"A", "A", "B"} {
 		w := annotation.AddWidget(radio, pdf.Rectangle{LLx: float64(20 * i), URx: float64(20*i + 10), URy: 10})
 		w.Appearance = &appearance.Dict{
@@ -43,7 +42,7 @@ func buttonFillForm(t *testing.T) *acroform.InteractiveForm {
 		}
 		w.AppearanceState = "Off"
 	}
-	radio.V = "Off"
+	radio.State = "Off"
 	return roundTripForm(t, pdf.V1_7, &acroform.InteractiveForm{Fields: []acroform.Node{radio}})
 }
 
@@ -54,8 +53,8 @@ func TestButtonFillRoundTrip(t *testing.T) {
 		wantV pdf.Name
 		want  []pdf.Name
 	}{
-		{"toggle", func(f *acroform.ButtonField) error { return f.Toggle(1) }, "A", []pdf.Name{"Off", "A", "Off"}},
-		{"set value", func(f *acroform.ButtonField) error { return f.SetValue("B") }, "B", []pdf.Name{"Off", "Off", "B"}},
+		{"toggle", func(f *acroform.ButtonField) error { return acroform.NewLogicalField("", f).Toggle(f.Widgets[1]) }, "A", []pdf.Name{"Off", "A", "Off"}},
+		{"set value", func(f *acroform.ButtonField) error { return acroform.NewLogicalField("", f).SetState("B") }, "B", []pdf.Name{"Off", "Off", "B"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -70,8 +69,8 @@ func TestButtonFillRoundTrip(t *testing.T) {
 
 			second := roundTripForm(t, pdf.V1_7, first)
 			got := second.Fields[0].(*acroform.ButtonField)
-			if got.V != tc.wantV {
-				t.Errorf("V = %q, want %q", got.V, tc.wantV)
+			if got.State != tc.wantV {
+				t.Errorf("V = %q, want %q", got.State, tc.wantV)
 			}
 			if diff := cmp.Diff(tc.want, appearanceStates(got)); diff != "" {
 				t.Errorf("appearance states differ (-want +got):\n%s", diff)
@@ -90,13 +89,13 @@ func appearanceStates(f *acroform.ButtonField) []pdf.Name {
 
 func TestTextChoiceFillRoundTrip(t *testing.T) {
 	text := func(s string) func(*acroform.TextField) error {
-		return func(f *acroform.TextField) error { return f.SetText(s) }
+		return func(f *acroform.TextField) error { return acroform.NewLogicalField("", f).SetText(s) }
 	}
 	for _, s := range []string{"Zoë 日本語", ""} {
 		t.Run("text "+s, func(t *testing.T) {
 			f := newTextField("t")
 			f.Flags |= acroform.FieldMultiline
-			f.V = &pdf.StringOrStream{Value: pdf.Text("old")}
+			f.Text = &pdf.StringOrStream{Value: pdf.Text("old")}
 			first := roundTripForm(t, pdf.V1_7, &acroform.InteractiveForm{Fields: []acroform.Node{f}})
 			field := first.Fields[0].(*acroform.TextField)
 			if err := text(s)(field); err != nil {
@@ -104,10 +103,10 @@ func TestTextChoiceFillRoundTrip(t *testing.T) {
 			}
 			second := roundTripForm(t, pdf.V1_7, first)
 			got := second.Fields[0].(*acroform.TextField)
-			if got.V == nil {
+			if got.Text == nil {
 				t.Fatal("V lost")
 			}
-			if diff := cmp.Diff(field.V, got.V); diff != "" {
+			if diff := cmp.Diff(field.Text, got.Text); diff != "" {
 				t.Errorf("V differs (-want +got):\n%s", diff)
 			}
 		})
@@ -118,19 +117,19 @@ func TestTextChoiceFillRoundTrip(t *testing.T) {
 		flags acroform.FieldFlags
 		apply func(*acroform.ChoiceField) error
 	}{
-		{"selection", acroform.FieldMultiSelect, func(f *acroform.ChoiceField) error { return f.Select([]int{2, 0}) }},
-		{"no selection", acroform.FieldMultiSelect, func(f *acroform.ChoiceField) error { return f.Select(nil) }},
-		{"no selection single", 0, func(f *acroform.ChoiceField) error { return f.Select(nil) }},
-		{"edit text", acroform.FieldCombo | acroform.FieldEdit, func(f *acroform.ChoiceField) error { return f.SetEditText("free") }},
+		{"selection", acroform.FieldMultiSelect, func(f *acroform.ChoiceField) error { return acroform.NewLogicalField("", f).Select(f, []int{2, 0}) }},
+		{"no selection", acroform.FieldMultiSelect, func(f *acroform.ChoiceField) error { return acroform.NewLogicalField("", f).Select(f, nil) }},
+		{"no selection single", 0, func(f *acroform.ChoiceField) error { return acroform.NewLogicalField("", f).Select(f, nil) }},
+		{"edit text", acroform.FieldCombo | acroform.FieldEdit, func(f *acroform.ChoiceField) error { return acroform.NewLogicalField("", f).SetEditText("free") }},
 	}
 	for _, tc := range choices {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newChoiceField("c")
 			f.Flags |= tc.flags
 			for _, s := range []string{"A", "B", "C"} {
-				f.Opt = append(f.Opt, acroform.ChoiceOption{Export: pdf.Text(s), Display: pdf.Text(s)})
+				f.Options = append(f.Options, acroform.ChoiceOption{Export: s, Display: pdf.Text(s)})
 			}
-			f.V = []pdf.TextString{pdf.Text("B")}
+			f.Value = []pdf.TextString{pdf.Text("B")}
 			f.Selected = []int{1}
 			first := roundTripForm(t, pdf.V1_7, &acroform.InteractiveForm{Fields: []acroform.Node{f}})
 			field := first.Fields[0].(*acroform.ChoiceField)
@@ -139,10 +138,10 @@ func TestTextChoiceFillRoundTrip(t *testing.T) {
 			}
 			second := roundTripForm(t, pdf.V1_7, first)
 			got := second.Fields[0].(*acroform.ChoiceField)
-			if (got.V == nil) != (field.V == nil) {
-				t.Errorf("V nil-ness lost: got %#v, want %#v", got.V, field.V)
+			if (got.Value == nil) != (field.Value == nil) {
+				t.Errorf("V nil-ness lost: got %#v, want %#v", got.Value, field.Value)
 			}
-			if diff := cmp.Diff(field.V, got.V); diff != "" {
+			if diff := cmp.Diff(field.Value, got.Value); diff != "" {
 				t.Errorf("V differs (-want +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(field.Selected, got.Selected); diff != "" {
@@ -242,13 +241,13 @@ func TestValueEntriesPatchText(t *testing.T) {
 	}
 	w, ref := writeRaw(t, build, nil)
 	field := readFillForm(t, w, ref("t")).Fields[0].(*acroform.TextField)
-	if err := field.SetText("Zoë new"); err != nil {
+	if err := acroform.NewLogicalField("", field).SetText("Zoë new"); err != nil {
 		t.Fatal(err)
 	}
 
 	w2, ref2 := writeRaw(t, build, patchValues(t, "t", field, nil))
 	got := readFillForm(t, w2, ref2("t")).Fields[0].(*acroform.TextField)
-	if diff := cmp.Diff(field.V, got.V); diff != "" {
+	if diff := cmp.Diff(field.Text, got.Text); diff != "" {
 		t.Errorf("V differs (-want +got):\n%s", diff)
 	}
 }
@@ -273,10 +272,10 @@ func TestValueEntriesPatchInheritedV(t *testing.T) {
 	w, ref := writeRaw(t, build, nil)
 	group := readFillForm(t, w, ref("g")).Fields[0].(*acroform.Group)
 	a := group.Children[0].(*acroform.TextField)
-	if a.V == nil || a.V.Value != pdf.Text("old") {
-		t.Fatalf("a does not inherit V: %#v", a.V)
+	if a.Text == nil || a.Text.Value != pdf.Text("old") {
+		t.Fatalf("a does not inherit V: %#v", a.Text)
 	}
-	if err := a.SetText(""); err != nil {
+	if err := acroform.NewLogicalField("", a).SetText(""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -284,11 +283,11 @@ func TestValueEntriesPatchInheritedV(t *testing.T) {
 	got := readFillForm(t, w2, ref2("g")).Fields[0].(*acroform.Group)
 	ga := got.Children[0].(*acroform.TextField)
 	gb := got.Children[1].(*acroform.TextField)
-	if ga.V == nil || ga.V.Value != pdf.Text("") {
-		t.Errorf("a: V = %#v, want empty value", ga.V)
+	if ga.Text == nil || ga.Text.Value != pdf.Text("") {
+		t.Errorf("a: V = %#v, want empty value", ga.Text)
 	}
-	if gb.V == nil || gb.V.Value != pdf.Text("old") {
-		t.Errorf("b: V = %#v, want old", gb.V)
+	if gb.Text == nil || gb.Text.Value != pdf.Text("old") {
+		t.Errorf("b: V = %#v, want old", gb.Text)
 	}
 }
 
@@ -311,18 +310,18 @@ func TestValueEntriesPatchChoiceNone(t *testing.T) {
 	w, ref := writeRaw(t, build, nil)
 	group := readFillForm(t, w, ref("g")).Fields[0].(*acroform.Group)
 	c := group.Children[0].(*acroform.ChoiceField)
-	if len(c.V) != 1 {
-		t.Fatalf("c does not inherit V: %#v", c.V)
+	if len(c.Value) != 1 {
+		t.Fatalf("c does not inherit V: %#v", c.Value)
 	}
-	if err := c.Select(nil); err != nil {
+	if err := acroform.NewLogicalField("", c).Select(c, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	w2, ref2 := writeRaw(t, build, patchValues(t, "c", c, nil))
 	got := readFillForm(t, w2, ref2("g")).Fields[0].(*acroform.Group)
 	gc := got.Children[0].(*acroform.ChoiceField)
-	if len(gc.V) != 0 || len(gc.Selected) != 0 {
-		t.Errorf("selection not cleared: V=%#v Selected=%#v", gc.V, gc.Selected)
+	if len(gc.Value) != 0 || len(gc.Selected) != 0 {
+		t.Errorf("selection not cleared: Value=%#v Selected=%#v", gc.Value, gc.Selected)
 	}
 }
 
@@ -348,10 +347,10 @@ func TestValueEntriesPatchButton(t *testing.T) {
 	}
 	w, ref := writeRaw(t, build, nil)
 	field := readFillForm(t, w, ref("f")).Fields[0].(*acroform.ButtonField)
-	if field.V != "A" {
-		t.Fatalf("V = %q, want A", field.V)
+	if field.State != "A" {
+		t.Fatalf("V = %q, want A", field.State)
 	}
-	if err := field.SetValue("Off"); err != nil {
+	if err := acroform.NewLogicalField("", field).SetState("Off"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -375,8 +374,8 @@ func TestValueEntriesPatchButton(t *testing.T) {
 	}
 
 	got := readFillForm(t, w2, ref2("f")).Fields[0].(*acroform.ButtonField)
-	if got.V != "Off" {
-		t.Errorf("V = %q, want Off", got.V)
+	if got.State != "Off" {
+		t.Errorf("V = %q, want Off", got.State)
 	}
 	if diff := cmp.Diff([]pdf.Name{"Off", "Off"}, appearanceStates(got)); diff != "" {
 		t.Errorf("appearance states differ (-want +got):\n%s", diff)
@@ -399,7 +398,7 @@ func TestValueEntriesPatchChoiceStaleI(t *testing.T) {
 	if !slices.Equal(field.Selected, []int{0}) {
 		t.Fatalf("Selected = %v, want [0]", field.Selected)
 	}
-	if err := field.SetEditText("custom"); err != nil {
+	if err := acroform.NewLogicalField("", field).SetEditText("custom"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -412,12 +411,12 @@ func TestValueEntriesPatchChoiceStaleI(t *testing.T) {
 		t.Errorf("stale /I %v kept", i)
 	}
 	got := readFillForm(t, w2, ref2("c")).Fields[0].(*acroform.ChoiceField)
-	if len(got.V) != 1 || got.V[0] != pdf.Text("custom") || got.Selected != nil {
-		t.Errorf("V = %v, Selected = %v, want [custom] and none", got.V, got.Selected)
+	if len(got.Value) != 1 || got.Value[0] != pdf.Text("custom") || got.Selected != nil {
+		t.Errorf("Value = %v, Selected = %v, want [custom] and none", got.Value, got.Selected)
 	}
 }
 
-func TestValueEntriesRichValueDeleted(t *testing.T) {
+func TestValueEntriesRichTextDeleted(t *testing.T) {
 	build := func(ref func(string) pdf.Reference) map[string]pdf.Dict {
 		return map[string]pdf.Dict{"t": widgetDict(pdf.Dict{
 			"FT": pdf.Name("Tx"), "T": pdf.Text("t"), "DA": pdf.String("/Helv 0 Tf"),
@@ -427,19 +426,19 @@ func TestValueEntriesRichValueDeleted(t *testing.T) {
 	}
 	w, ref := writeRaw(t, build, nil)
 	field := readFillForm(t, w, ref("t")).Fields[0].(*acroform.TextField)
-	if field.RichValue == nil {
-		t.Fatal("RichValue not read")
+	if field.RichText == nil {
+		t.Fatal("RichText not read")
 	}
-	if err := field.SetText("new"); err != nil {
+	if err := acroform.NewLogicalField("", field).SetText("new"); err != nil {
 		t.Fatal(err)
 	}
 
 	w2, ref2 := writeRaw(t, build, patchValues(t, "t", field, nil))
 	got := readFillForm(t, w2, ref2("t")).Fields[0].(*acroform.TextField)
-	if got.RichValue != nil {
-		t.Errorf("RichValue = %#v, want nil", got.RichValue)
+	if got.RichText != nil {
+		t.Errorf("RichText = %#v, want nil", got.RichText)
 	}
-	if got.V == nil || got.V.Value != pdf.Text("new") {
-		t.Errorf("V = %#v, want new", got.V)
+	if got.Text == nil || got.Text.Value != pdf.Text("new") {
+		t.Errorf("V = %#v, want new", got.Text)
 	}
 }

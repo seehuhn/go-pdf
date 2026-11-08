@@ -101,6 +101,10 @@ func Write(w io.Writer, r *pdf.Reader, opts *Options) error {
 			return err
 		}
 	}
+	// one batch serves the whole run, since the form is read and never changed
+	if b, ok := c.gen.(annotation.AppearanceBatcher); ok {
+		c.gen = b.NewBatch()
+	}
 	if err := c.buildOCState(opts.HiddenLayers); err != nil {
 		return err
 	}

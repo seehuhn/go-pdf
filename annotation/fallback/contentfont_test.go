@@ -18,6 +18,7 @@ package fallback
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -59,7 +60,7 @@ func textFieldWidget(t *testing.T, value string) *annotation.Widget {
 	t.Helper()
 	f := acroform.NewTextField("t")
 	f.DefaultAppearance = "/Helv 0 Tf 0 g"
-	f.V = &pdf.StringOrStream{Value: pdf.Text(value)}
+	f.Text = &pdf.StringOrStream{Value: pdf.Text(value)}
 	return annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 120, URy: 20})
 }
 
@@ -195,5 +196,19 @@ func TestContentFontError(t *testing.T) {
 	}
 	if gen != nil {
 		t.Error("a generator was returned along with the error")
+	}
+}
+
+// A password field shows one asterisk per character of its value, and never
+// the value itself.
+func TestPasswordFieldMasked(t *testing.T) {
+	w := textFieldWidget(t, "hünter2")
+	w.Field.GetCommon().Flags = acroform.FieldPassword
+	if err := newGen(t, pdf.V2_0).AddAppearance(w); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(shownText(t, w.Appearance.Normal), "")
+	if got != "*******" {
+		t.Errorf("password field shows %q, want 7 asterisks", got)
 	}
 }

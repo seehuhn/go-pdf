@@ -247,7 +247,7 @@ func (w *Widget) encodeOwnEntries(rm *pdf.ResourceManager) (pdf.Dict, error) {
 // no appearance stream, or on with the state the value names.
 func (w *Widget) checkButtonState() error {
 	btn, ok := w.Field.(*acroform.ButtonField)
-	if !ok || btn.Variant() == acroform.ButtonPush || w.AppearanceState == "" {
+	if !ok || w.AppearanceState == "" {
 		return nil
 	}
 	as := w.AppearanceState
@@ -259,8 +259,8 @@ func (w *Widget) checkButtonState() error {
 			return fmt.Errorf("appearance state %q has no normal appearance", as)
 		}
 	}
-	if as != btn.V {
-		return fmt.Errorf("appearance state %q disagrees with field value %q", as, btn.V)
+	if as != btn.State {
+		return fmt.Errorf("appearance state %q disagrees with field value %q", as, btn.State)
 	}
 	return nil
 }

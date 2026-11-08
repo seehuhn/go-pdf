@@ -121,18 +121,18 @@ func snapNode(t testing.TB, n acroform.Node) nodeSnap {
 	case *acroform.TextField:
 		s.Kind = "Tx"
 		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
-		s.VT, s.V, s.DV, s.MaxLen = f.VariableText, f.V, f.DV, f.MaxLen
+		s.VT, s.V, s.DV, s.MaxLen = f.VariableText, f.Text, f.DefaultText, f.MaxLen
 		s.Widgets = widgetsOf(t, f)
 	case *acroform.ButtonField:
 		s.Kind = "Btn"
 		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
-		s.VT, s.BtnV, s.BtnDV, s.BtnOpt = f.VariableText, f.V, f.DV, f.Opt
+		s.VT, s.BtnV, s.BtnDV, s.BtnOpt = f.VariableText, f.State, f.DefaultState, f.ExportValues
 		s.Widgets = widgetsOf(t, f)
 	case *acroform.ChoiceField:
 		s.Kind = "Ch"
 		s.TU, s.TM, s.Flags, s.AA = f.AltName, f.ExportName, f.Flags, f.AA
-		s.VT, s.ChV, s.ChDV = f.VariableText, f.V, f.DV
-		s.ChOpt, s.TopIndex, s.Selected = f.Opt, f.TopIndex, f.Selected
+		s.VT, s.ChV, s.ChDV = f.VariableText, f.Value, f.DefaultValue
+		s.ChOpt, s.TopIndex, s.Selected = f.Options, f.TopIndex, f.Selected
 		s.Widgets = widgetsOf(t, f)
 	case *acroform.SignatureField:
 		s.Kind = "Sig"
@@ -569,11 +569,11 @@ func TestDecodeDuplicateNames(t *testing.T) {
 		if !ok {
 			t.Fatalf("field %d is %T, want *acroform.TextField", i, node)
 		}
-		if f.V == nil || f.V.Value.String() != "first" {
-			t.Errorf("field %d: V = %v, want \"first\"", i, f.V)
+		if f.Text == nil || f.Text.Value.String() != "first" {
+			t.Errorf("field %d: V = %v, want \"first\"", i, f.Text)
 		}
-		if f.RichValue == nil || f.RichValue.Value.String() != "<p>first</p>" {
-			t.Errorf("field %d: RichValue = %v, want the first field's", i, f.RichValue)
+		if f.RichText == nil || f.RichText.Value.String() != "<p>first</p>" {
+			t.Errorf("field %d: RichText = %v, want the first field's", i, f.RichText)
 		}
 	}
 
@@ -625,8 +625,8 @@ func TestDecodeDuplicateNamesPassword(t *testing.T) {
 				if !ok {
 					t.Fatalf("field %d is %T, want *acroform.TextField", i, node)
 				}
-				if f.Flags&acroform.FieldPassword != 0 && f.V != nil {
-					t.Errorf("field %d: password field has value %v", i, f.V)
+				if f.Flags&acroform.FieldPassword != 0 && f.Text != nil {
+					t.Errorf("field %d: password field has value %v", i, f.Text)
 				}
 			}
 			roundTripForm(t, pdf.V1_7, form)
@@ -653,6 +653,8 @@ func TestDecodeDuplicateNamesChoice(t *testing.T) {
 		{"multiple DV", pdf.Dict{"Ff": multi, "DV": pdf.Array{pdf.String("a"), pdf.String("b")}},
 			pdf.Dict{}, 1},
 		{"single", pdf.Dict{"V": pdf.String("b")}, pdf.Dict{"I": pdf.Array{pdf.Integer(0)}}, 2},
+		{"option missing", pdf.Dict{"V": pdf.String("c")},
+			pdf.Dict{"Opt": pdf.Array{pdf.String("a"), pdf.String("b")}}, 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -676,11 +678,11 @@ func TestDecodeDuplicateNamesChoice(t *testing.T) {
 			first := form.Fields[0].(*acroform.ChoiceField)
 			for i, node := range form.Fields[1:] {
 				f := node.(*acroform.ChoiceField)
-				if diff := cmp.Diff(first.V, f.V); diff != "" {
+				if diff := cmp.Diff(first.Value, f.Value); diff != "" {
 					t.Errorf("field %d: V differs (-want +got):\n%s", i+1, diff)
 				}
 				if !f.SelectionAgrees() && f.Selected != nil {
-					t.Errorf("field %d: Selected %v disagrees with V %v", i+1, f.Selected, f.V)
+					t.Errorf("field %d: Selected %v disagrees with Value %v", i+1, f.Selected, f.Value)
 				}
 			}
 			roundTripForm(t, pdf.V1_7, form)
@@ -690,15 +692,15 @@ func TestDecodeDuplicateNamesChoice(t *testing.T) {
 
 // A check box takes the value of a same-named one and shows it in its
 // widgets, rather than letting their states override it; one whose widgets
-// have no such on-state is dropped, together with the link from its widget.
+// have no such on-state keeps the value with all its widgets off.
 func TestDecodeDuplicateNamesButton(t *testing.T) {
 	cases := []struct {
-		name string
-		on   pdf.Name
-		want int
+		name   string
+		on     pdf.Name
+		wantAS pdf.Name
 	}{
-		{"same on-state", "Yes", 2},
-		{"other on-state", "On", 1},
+		{"same on-state", "Yes", "Yes"},
+		{"other on-state", "On", "Off"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -737,8 +739,8 @@ func TestDecodeDuplicateNamesButton(t *testing.T) {
 				t.Fatal(err)
 			}
 			form := idx.Form
-			if n := len(form.Fields); n != tc.want {
-				t.Fatalf("got %d fields, want %d", n, tc.want)
+			if n := len(form.Fields); n != 2 {
+				t.Fatalf("got %d fields, want 2", n)
 			}
 
 			kid, err := c.Decode(kidRef, annotationBody)
@@ -747,15 +749,9 @@ func TestDecodeDuplicateNamesButton(t *testing.T) {
 			}
 			w := kid.(*annotation.Widget)
 			_, listed := idx.WidgetRefs[w]
-			if tc.want == 1 {
-				if w.Field != nil || listed {
-					t.Errorf("widget of dropped field: Field=%v listed=%v", w.Field, listed)
-				}
-				return
-			}
 			f := form.Fields[1].(*acroform.ButtonField)
-			if f.V != "Yes" || w.AppearanceState != "Yes" {
-				t.Errorf("V=%q AS=%q, want Yes", f.V, w.AppearanceState)
+			if f.State != "Yes" || w.AppearanceState != tc.wantAS {
+				t.Errorf("V=%q AS=%q, want Yes, %s", f.State, w.AppearanceState, tc.wantAS)
 			}
 			if w.Field != f || !listed {
 				t.Errorf("widget not linked: Field=%v listed=%v", w.Field, listed)
@@ -1099,4 +1095,259 @@ func TestUnclaimedMergedWidget(t *testing.T) {
 			t.Errorf("%s: close failed: %v", name, err)
 		}
 	}
+}
+
+// encodeRawForm writes form, with its widgets, to an in-memory file and
+// returns the writer together with the dictionaries named by /Fields.
+func encodeRawForm(t *testing.T, form *acroform.InteractiveForm) (*pdf.Writer, []pdf.Dict) {
+	t.Helper()
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	if err := storeWidgets(rm, form.Fields); err != nil {
+		t.Fatalf("store widgets: %v", err)
+	}
+	native, err := form.Encode(rm)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatalf("resource manager close: %v", err)
+	}
+	return w, rawDicts(t, w, native.(pdf.Dict)["Fields"])
+}
+
+// rawDicts reads the dictionaries named by an array of references.
+func rawDicts(t *testing.T, w *pdf.Writer, obj pdf.Object) []pdf.Dict {
+	t.Helper()
+	arr, ok := obj.(pdf.Array)
+	if !ok {
+		t.Fatalf("not an array: %v", obj)
+	}
+	dicts := make([]pdf.Dict, len(arr))
+	for i, ref := range arr {
+		d, err := pdf.NewCursor(w).Dict(ref)
+		if err != nil {
+			t.Fatalf("read dict %d: %v", i, err)
+		}
+		dicts[i] = d
+	}
+	return dicts
+}
+
+// radioWithExports returns a radio button field with one widget per export
+// value.
+func radioWithExports(name string, exports ...string) *acroform.ButtonField {
+	f := acroform.NewButtonField(name, acroform.ButtonRadio)
+	f.ExportValues = exports
+	for i := range exports {
+		x := float64(30 * i)
+		addWidget(f, x, 0, x+20, 20)
+	}
+	return f
+}
+
+// export values shared by all children are hoisted into their group
+func TestEncodeHoistButtonExportValues(t *testing.T) {
+	form := &acroform.InteractiveForm{Fields: []acroform.Node{
+		&acroform.Group{Name: "g", Children: []acroform.Node{
+			radioWithExports("a", "Yes", "No"),
+			radioWithExports("b", "Yes", "No"),
+		}},
+	}}
+	w, roots := encodeRawForm(t, form)
+	group := roots[0]
+
+	if _, ok := group["Opt"].(pdf.Array); !ok {
+		t.Errorf("group /Opt = %v, want hoisted array", group["Opt"])
+	}
+	for i, kid := range rawDicts(t, w, group["Kids"]) {
+		if _, ok := kid["Opt"]; ok {
+			t.Errorf("kid %d still carries /Opt", i)
+		}
+	}
+}
+
+// a choice field's /Opt is not inheritable, so a choice field among the
+// children prevents hoisting, even when its /Opt array is identical
+func TestEncodeChoiceOptNotHoisted(t *testing.T) {
+	ch := newChoiceField("b")
+	ch.Options = []acroform.ChoiceOption{
+		{Export: "Yes", Display: pdf.Text("Yes")},
+		{Export: "No", Display: pdf.Text("No")},
+	}
+	form := &acroform.InteractiveForm{Fields: []acroform.Node{
+		&acroform.Group{Name: "g", Children: []acroform.Node{
+			radioWithExports("a", "Yes", "No"), ch,
+		}},
+	}}
+	w, roots := encodeRawForm(t, form)
+	group := roots[0]
+
+	if _, ok := group["Opt"]; ok {
+		t.Error("/Opt was hoisted into the group")
+	}
+	for i, kid := range rawDicts(t, w, group["Kids"]) {
+		if _, ok := kid["Opt"]; !ok {
+			t.Errorf("kid %d lost its /Opt", i)
+		}
+	}
+}
+
+// a button field whose export values do not match its widgets cannot be
+// written
+func TestEncodeExportValuesLength(t *testing.T) {
+	f := radioWithExports("r", "Yes", "No")
+	f.ExportValues = f.ExportValues[:1]
+	form := &acroform.InteractiveForm{Fields: []acroform.Node{f}}
+
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+	if err := storeWidgets(rm, form.Fields); err != nil {
+		t.Fatalf("store widgets: %v", err)
+	}
+	if _, err := form.Encode(rm); err == nil {
+		t.Error("expected an error for mismatched export values")
+	}
+}
+
+// an explicitly empty ExportValues is valid only for a field without widgets
+func TestEncodeEmptyExportValues(t *testing.T) {
+	withWidget := radioWithExports("r", "Yes")
+	withWidget.ExportValues = []string{}
+
+	noWidgets := acroform.NewButtonField("n", acroform.ButtonRadio)
+	noWidgets.ExportValues = []string{}
+
+	tests := []struct {
+		name    string
+		field   *acroform.ButtonField
+		wantErr bool
+	}{
+		{"with widget", withWidget, true},
+		{"no widgets", noWidgets, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			form := &acroform.InteractiveForm{Fields: []acroform.Node{tc.field}}
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rm := pdf.NewResourceManager(w)
+			if err := storeWidgets(rm, form.Fields); err != nil {
+				t.Fatalf("store widgets: %v", err)
+			}
+			native, err := form.Encode(rm)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("got error %v, want error %t", err, tc.wantErr)
+			}
+			if err != nil {
+				return
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatalf("resource manager close: %v", err)
+			}
+			for _, d := range rawDicts(t, w, native.(pdf.Dict)["Fields"]) {
+				if _, ok := d["Opt"]; ok {
+					t.Error("empty export values were written as /Opt")
+				}
+			}
+		})
+	}
+}
+
+// a button field which is off is written without /V and /DV, and one which
+// is on with them
+func TestEncodeButtonStateOff(t *testing.T) {
+	tests := []struct {
+		state pdf.Name
+		want  pdf.Object
+	}{
+		{"", nil},
+		{"Off", nil},
+		{"Yes", pdf.Name("Yes")},
+	}
+	for _, tc := range tests {
+		t.Run(string(tc.state), func(t *testing.T) {
+			f := acroform.NewButtonField("c", acroform.ButtonCheckbox)
+			f.State, f.DefaultState = tc.state, tc.state
+			_, roots := encodeRawForm(t, &acroform.InteractiveForm{Fields: []acroform.Node{f}})
+			if got := roots[0]["V"]; got != tc.want {
+				t.Errorf("/V = %v, want %v", got, tc.want)
+			}
+			if got := roots[0]["DV"]; got != tc.want {
+				t.Errorf("/DV = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// a push button and a check box of the same name cannot share a value
+func TestShareValuePushButton(t *testing.T) {
+	push := acroform.NewPushButtonField("b")
+	check := acroform.NewButtonField("b", acroform.ButtonCheckbox)
+	check.State = "Yes"
+
+	if shareValue(push, check) {
+		t.Error("push button took the value of a check box")
+	}
+	if shareValue(check, push) {
+		t.Error("check box took the value of a push button")
+	}
+	if !shareValue(push, acroform.NewPushButtonField("b")) {
+		t.Error("push buttons of the same name were not shared")
+	}
+}
+
+// A single-line text field holds no line breaks: each is read as a space,
+// in the value and the default value.  A value shared with a single-line
+// field loses its line breaks in all fields of the name.
+func TestDecodeSingleLineText(t *testing.T) {
+	multiline := pdf.Integer(acroform.FieldMultiline)
+	objs := map[string]pdf.Dict{
+		"one": {"FT": pdf.Name("Tx"), "T": pdf.String("one"),
+			"V": pdf.String("a\r\nb\nc\rd"), "DV": pdf.String("x\ny")},
+		"multi": {"FT": pdf.Name("Tx"), "T": pdf.String("multi"), "Ff": multiline,
+			"V": pdf.String("a\nb")},
+		"s1": {"FT": pdf.Name("Tx"), "T": pdf.String("s"), "Ff": multiline,
+			"V": pdf.String("p\nq")},
+		"s2": {"FT": pdf.Name("Tx"), "T": pdf.String("s")},
+		"s3": {"FT": pdf.Name("Tx"), "T": pdf.String("s"), "Ff": multiline},
+		"s4": {"FT": pdf.Name("Tx"), "T": pdf.String("s")},
+	}
+	order := []string{"one", "multi", "s1", "s2", "s3", "s4"}
+	r, _ := writeRawForm(t, objs, order, func(refs map[string]pdf.Reference) pdf.Dict {
+		var fields pdf.Array
+		for _, name := range order {
+			fields = append(fields, refs[name])
+		}
+		return pdf.Dict{"Fields": fields}
+	})
+	idx, err := DocumentForm(pdf.NewExtractor(r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := idx.Form
+
+	text := func(v *pdf.StringOrStream) string {
+		if v == nil {
+			return "<nil>"
+		}
+		return v.Value.String()
+	}
+	want := [][2]string{
+		{"a b c d", "x y"},
+		{"a\nb", "<nil>"},
+		{"p q", "<nil>"},
+		{"p q", "<nil>"},
+		{"p q", "<nil>"},
+		{"p q", "<nil>"},
+	}
+	if len(form.Fields) != len(want) {
+		t.Fatalf("got %d fields, want %d", len(form.Fields), len(want))
+	}
+	for i, node := range form.Fields {
+		f := node.(*acroform.TextField)
+		if got := [2]string{text(f.Text), text(f.DefaultText)}; got != want[i] {
+			t.Errorf("field %d: got %q, want %q", i, got, want[i])
+		}
+	}
+	roundTripForm(t, pdf.V1_7, form)
 }

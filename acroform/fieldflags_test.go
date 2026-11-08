@@ -59,7 +59,12 @@ func TestFieldFlagsNormalize(t *testing.T) {
 func TestEncodeFlagValidation(t *testing.T) {
 	const reserved FieldFlags = 1 << 31
 	button := func(ff FieldFlags) *ButtonField {
-		f := NewButtonField("b")
+		f := NewButtonField("b", ButtonCheckbox)
+		f.Flags = ff
+		return f
+	}
+	push := func(ff FieldFlags) *PushButtonField {
+		f := NewPushButtonField("p")
 		f.Flags = ff
 		return f
 	}
@@ -86,8 +91,8 @@ func TestEncodeFlagValidation(t *testing.T) {
 	}{
 		{"check box", button(0), false},
 		{"radio", button(FieldRadio | FieldNoToggleToOff | FieldRadiosInUnison), false},
-		{"push button", button(FieldPushbutton | FieldReadOnly), false},
-		{"radio and push button", button(FieldRadio | FieldPushbutton), true},
+		{"push button", push(FieldPushbutton | FieldReadOnly), false},
+		{"radio and push button", push(FieldRadio | FieldPushbutton), true},
 		{"no toggle without radio", button(FieldNoToggleToOff), true},
 		{"unison without radio", button(FieldRadiosInUnison), true},
 		{"text flag on button", button(FieldMultiline), true},

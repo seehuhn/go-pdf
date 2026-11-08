@@ -34,33 +34,41 @@ type SignatureField struct {
 
 	// V (optional) is the field's signature dictionary. The library treats this
 	// value as opaque.
-	//
-	// This corresponds to the /V entry in the PDF field dictionary.
 	V *opaque.Object
 
 	// DV (optional) is the field's default value. The library treats this value
 	// as opaque.
-	//
-	// This corresponds to the /DV entry in the PDF field dictionary.
 	DV *opaque.Object
 
 	// Lock (optional) specifies the form fields that are locked when this
 	// signature field is signed.
-	//
-	// This corresponds to the /Lock entry in the PDF field dictionary.
 	Lock *SigFieldLock
 
 	// SV (optional) constrains the properties of a signature applied to this
 	// field.
-	//
-	// This corresponds to the /SV entry in the PDF field dictionary.
 	SV *SigSeedValue
 }
 
 var _ Field = (*SignatureField)(nil)
 
+// NewSignatureField returns a new signature field (field type "Sig") with the
+// given partial name.
+func NewSignatureField(name string) *SignatureField {
+	f := &SignatureField{}
+	f.Name = name
+	return f
+}
+
 // FieldType implements the [Field] interface.
 func (f *SignatureField) FieldType() pdf.Name { return "Sig" }
+
+// ExportData always returns nil, since the value of a signature field is a
+// signature dictionary, not a string.
+//
+// This implements the [Field] interface.
+func (f *SignatureField) ExportData() []string {
+	return nil
+}
 
 func (f *SignatureField) fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	if err := pdf.CheckVersion(rm.Out, "signature field", pdf.V1_3); err != nil {

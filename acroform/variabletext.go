@@ -52,11 +52,11 @@ type VariableText struct {
 	// This corresponds to the /DS entry.
 	DefaultStyle string
 
-	// RichValue (optional) is a rich-text value. The library treats its
+	// RichText (optional) is a rich-text value. The library treats its
 	// content as opaque.
 	//
 	// This corresponds to the /RV entry.
-	RichValue *pdf.StringOrStream
+	RichText *pdf.StringOrStream
 }
 
 // GetVariableText returns the variable-text attributes.
@@ -75,7 +75,8 @@ type VariableTextField interface {
 	GetVariableText() *VariableText
 }
 
-// fillVarTextDict adds the VariableText entries to the given PDF dictionary.
+// fillVarTextDict adds the VariableText entries to the given PDF dictionary,
+// except for /RV, which belongs to the field value.
 func (v *VariableText) fillVarTextDict(rm *pdf.ResourceManager, dict pdf.Dict) error {
 	w := rm.Out
 
@@ -97,18 +98,18 @@ func (v *VariableText) fillVarTextDict(rm *pdf.ResourceManager, dict pdf.Dict) e
 		dict["DS"] = pdf.Text(v.DefaultStyle)
 	}
 
-	return v.fillRichValue(rm, dict)
+	return nil
 }
 
-// fillRichValue adds the /RV entry to dict.
-func (v *VariableText) fillRichValue(rm *pdf.ResourceManager, dict pdf.Dict) error {
-	if v.RichValue == nil {
+// fillRichText adds the /RV entry to dict.
+func (v *VariableText) fillRichText(rm *pdf.ResourceManager, dict pdf.Dict) error {
+	if v.RichText == nil {
 		return nil
 	}
 	if err := pdf.CheckVersion(rm.Out, "field RV entry", pdf.V1_5); err != nil {
 		return err
 	}
-	obj, err := rm.Embed(*v.RichValue)
+	obj, err := rm.Embed(*v.RichText)
 	if err != nil {
 		return err
 	}

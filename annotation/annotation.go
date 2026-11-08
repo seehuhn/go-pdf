@@ -43,6 +43,19 @@ type AppearanceGenerator interface {
 	AddAppearance(Annotation) error
 }
 
+// AppearanceBatcher is an [AppearanceGenerator] which can share work between
+// the annotations it gives appearances to, such as the widgets of one form
+// field.  Callers which generate appearances for many annotations, such as
+// all annotations of a page, use a batch to keep the total work linear.
+type AppearanceBatcher interface {
+	AppearanceGenerator
+
+	// NewBatch returns a generator for one batch of annotations.  The form
+	// fields of the annotations, and the widgets in them, must not change
+	// while the batch is in use, except through the batch itself.
+	NewBatch() AppearanceGenerator
+}
+
 var (
 	_ Annotation = (*Text)(nil)
 	_ Annotation = (*Link)(nil)

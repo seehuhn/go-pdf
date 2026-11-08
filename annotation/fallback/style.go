@@ -224,7 +224,7 @@ func (g *Generator) reset(b *builder.Builder) {
 	}
 }
 
-var _ annotation.AppearanceGenerator = (*Generator)(nil)
+var _ annotation.AppearanceBatcher = (*Generator)(nil)
 
 // paint returns the colour an annotation entry asks to be painted with, or
 // nil where the entry is absent or asks for no colour at all.
@@ -297,6 +297,12 @@ var ErrNoFallback = errors.New("no fallback appearance for this annotation type"
 // simply not implemented yet; a caller decides which types it offers here,
 // see [seehuhn.de/go/pdf/annotation.ShouldSynthesizeFallback].
 func (g *Generator) AddAppearance(a annotation.Annotation) error {
+	return g.addAppearance(a, widgetOnState)
+}
+
+// addAppearance implements [Generator.AddAppearance], using onState to find
+// the on-state name of a check box or radio button widget.
+func (g *Generator) addAppearance(a annotation.Annotation, onState onStateFunc) error {
 	// TODO(voss): cache appearances where possible
 
 	var normal *form.Form
@@ -337,7 +343,7 @@ func (g *Generator) AddAppearance(a annotation.Annotation) error {
 	case *annotation.Widget:
 		// widgets build their own appearance dictionary (check boxes and radio
 		// buttons need an on/off map, not a single normal stream)
-		return g.addWidgetAppearance(a)
+		return g.addWidgetAppearance(a, onState)
 	default:
 		return ErrNoFallback
 	}

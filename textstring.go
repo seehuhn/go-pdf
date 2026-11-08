@@ -75,20 +75,10 @@ func Text(parts ...any) TextString {
 			p = strings.ReplaceAll(p, "\x1b", "")
 			b.write(p)
 		case TextString:
-			rest := p.s
-			for {
-				i := strings.IndexByte(rest, textEsc)
-				if i < 0 {
-					b.write(rest)
-					break
-				}
-				b.write(rest[:i])
-				rest = rest[i+1:]
-				j := strings.IndexByte(rest, textEsc)
-				b.pending = rest[:j]
-				rest = rest[j+1:]
+			p.walk(b.write, func(code string) {
+				b.pending = code
 				tagged = true
-			}
+			})
 		case language.Tag:
 			code := langCode(p)
 			if code == "" {
@@ -190,24 +180,48 @@ func parseLangCode(content string) string {
 	return code
 }
 
+// walk calls text for each run of text in s and marker for each language
+// marker, in order.
+func (s TextString) walk(text func(string), marker func(code string)) {
+	rest := s.s
+	for {
+		i := strings.IndexByte(rest, textEsc)
+		if i < 0 {
+			text(rest)
+			return
+		}
+		text(rest[:i])
+		rest = rest[i+1:]
+		j := strings.IndexByte(rest, textEsc)
+		marker(rest[:j])
+		rest = rest[j+1:]
+	}
+}
+
 // String returns the plain text, without language markers.
 func (s TextString) String() string {
 	if strings.IndexByte(s.s, textEsc) < 0 {
 		return s.s
 	}
 	var buf strings.Builder
-	rest := s.s
-	for {
-		i := strings.IndexByte(rest, textEsc)
-		if i < 0 {
-			buf.WriteString(rest)
-			return buf.String()
-		}
-		buf.WriteString(rest[:i])
-		rest = rest[i+1:]
-		j := strings.IndexByte(rest, textEsc)
-		rest = rest[j+1:]
-	}
+	s.walk(func(t string) { buf.WriteString(t) }, func(string) {})
+	return buf.String()
+}
+
+// ReplaceAll returns a copy of s in which every non-overlapping instance of
+// old is replaced by new, keeping the language tags.  Each run of text in one
+// language is searched separately, so an instance of old which spans a change
+// of language is not replaced.  In new, invalid UTF-8 is replaced by U+FFFD
+// and U+001B characters are removed, as in [Text].
+func (s TextString) ReplaceAll(old, new string) TextString {
+	new = strings.ReplaceAll(strings.ToValidUTF8(new, "�"), "\x1b", "")
+	var b textBuilder
+	s.walk(func(t string) {
+		b.write(strings.ReplaceAll(t, old, new))
+	}, func(code string) {
+		b.pending = code
+	})
+	return b.result()
 }
 
 // IsZero reports whether s is the empty string.

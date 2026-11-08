@@ -135,7 +135,7 @@ func TestFactorHoistFormDA(t *testing.T) {
 func TestFactorNeverHoistValue(t *testing.T) {
 	mk := func(name string) *TextField {
 		f := textField(name)
-		f.V = &pdf.StringOrStream{Value: pdf.Text("same")}
+		f.Text = &pdf.StringOrStream{Value: pdf.Text("same")}
 		return f
 	}
 	form := &InteractiveForm{

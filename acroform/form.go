@@ -142,6 +142,9 @@ func (f *InteractiveForm) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 			return nil, fmt.Errorf("fields named %q differ in type or value", name)
 		}
 	}
+	if err := f.checkButtonStates(); err != nil {
+		return nil, err
+	}
 
 	// phase 2: hoist inheritable entries into group nodes
 	for _, n := range roots {
@@ -301,8 +304,18 @@ func factorNode(n *encNode) {
 	hoistUnanimous("FT", n.dict, children)
 	hoistUnanimous("DA", n.dict, children)
 	hoistUnanimous("MaxLen", n.dict, children)
+	// a choice field's /Opt is not inheritable, so only button values move up
+	if !slices.ContainsFunc(n.kids, isChoiceNode) {
+		hoistUnanimous("Opt", n.dict, children)
+	}
 	hoistWithDefault("Ff", pdf.Integer(0), n.dict, children)
 	hoistWithDefault("Q", pdf.Integer(pdf.TextAlignLeft), n.dict, children)
+}
+
+// isChoiceNode reports whether n is a terminal choice field.
+func isChoiceNode(n *encNode) bool {
+	_, ok := n.field.(*ChoiceField)
+	return ok
 }
 
 // factorForm hoists the document-wide default appearance and quadding into the
@@ -468,13 +481,18 @@ func sameTypeAndValue(a, b Field) bool {
 	switch a := a.(type) {
 	case *TextField:
 		b, ok := b.(*TextField)
-		return ok && sameText(a.V, b.V) && sameText(a.DV, b.DV)
+		return ok && sameText(a.storedText(), b.storedText()) && sameText(a.DefaultText, b.DefaultText)
 	case *ButtonField:
 		b, ok := b.(*ButtonField)
-		return ok && a.V == b.V && a.DV == b.DV
+		return ok && offState(a.State) == offState(b.State) &&
+			offState(a.DefaultState) == offState(b.DefaultState)
+	case *PushButtonField:
+		// a push button has no value
+		_, ok := b.(*PushButtonField)
+		return ok
 	case *ChoiceField:
 		b, ok := b.(*ChoiceField)
-		return ok && slices.Equal(a.V, b.V) && slices.Equal(a.DV, b.DV)
+		return ok && slices.Equal(a.Value, b.Value) && slices.Equal(a.DefaultValue, b.DefaultValue)
 	case *SignatureField:
 		b, ok := b.(*SignatureField)
 		return ok && a.V.Equal(b.V) && a.DV.Equal(b.DV)
@@ -490,4 +508,45 @@ func sameText(a, b *pdf.StringOrStream) bool {
 		return a == b
 	}
 	return a.Value == b.Value
+}
+
+// checkButtonStates checks that the state and default state of every check box
+// and radio button are "Off", empty, or an on-state of a field of the same
+// name.  Fields sharing a fully qualified name are one field, so a value may
+// name a button which only one of them has.
+func (f *InteractiveForm) checkButtonStates() error {
+	onStates := map[string]map[pdf.Name]bool{}
+	for name, fld := range f.AllFields() {
+		btn, ok := fld.(*ButtonField)
+		if !ok {
+			continue
+		}
+		if onStates[name] == nil {
+			onStates[name] = map[pdf.Name]bool{}
+		}
+		for _, on := range btn.OnStates() {
+			onStates[name][on] = true
+		}
+	}
+	for name, fld := range f.AllFields() {
+		btn, ok := fld.(*ButtonField)
+		if !ok {
+			continue
+		}
+		for _, v := range []pdf.Name{btn.State, btn.DefaultState} {
+			if v != "" && v != "Off" && !onStates[name][v] {
+				return fmt.Errorf("field %q: state %q matches no on-state", name, v)
+			}
+		}
+	}
+	return nil
+}
+
+// offState returns v, with the empty name, which a button field writes as
+// "Off", replaced by "Off".
+func offState(v pdf.Name) pdf.Name {
+	if v == "" {
+		return "Off"
+	}
+	return v
 }

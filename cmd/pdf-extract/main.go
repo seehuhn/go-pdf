@@ -396,7 +396,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nQueries (no output file needed):\n")
 		fmt.Fprintf(os.Stderr, "  sections     list all sections in document\n")
 		fmt.Fprintf(os.Stderr, "  pages        show total page count\n")
-		fmt.Fprintf(os.Stderr, "  form         list interactive form fields and values\n")
+		fmt.Fprintf(os.Stderr, "  form         list the export data of the interactive form\n")
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf page 1 to page1.pdf\n")
 		fmt.Fprintf(os.Stderr, "  pdf-extract doc.pdf section \"Intro\" to intro.txt\n")

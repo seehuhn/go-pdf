@@ -115,9 +115,19 @@ type fieldTreeDecoder struct {
 	// widgetRefs holds the reference of each widget linked to a field
 	widgetRefs map[acroform.Widget]pdf.Reference
 
-	// byName holds the first terminal field decoded under each fully
-	// qualified name
-	byName map[string]acroform.Field
+	// byName holds the terminal fields decoded under each fully qualified
+	// name
+	byName map[string]*nameGroup
+}
+
+// nameGroup holds the terminal fields decoded under one fully qualified name,
+// in order.
+type nameGroup struct {
+	fields []acroform.Field
+
+	// flat records that the text fields of the group hold no line breaks,
+	// because one of them is a single-line field
+	flat bool
 }
 
 func newFieldTreeDecoder() *fieldTreeDecoder {
@@ -125,7 +135,7 @@ func newFieldTreeDecoder() *fieldTreeDecoder {
 		seen:       map[pdf.Reference]bool{},
 		byRef:      map[pdf.Reference]acroform.Field{},
 		widgetRefs: map[acroform.Widget]pdf.Reference{},
-		byName:     map[string]acroform.Field{},
+		byName:     map[string]*nameGroup{},
 	}
 }
 
@@ -363,11 +373,7 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 			widgetRefs = append(widgetRefs, ref)
 		}
 	}
-	// the widgets of a dropped field are left unlinked, to be read from the
-	// page's /Annots as widgets without a field
-	if !settleButtonValue(f, shared) {
-		return nil, nil
-	}
+	settleButtonValue(f, shared)
 	for i, w := range widgets {
 		w.Field = f
 		d.widgetRefs[w] = widgetRefs[i]
@@ -383,30 +389,55 @@ func (d *fieldTreeDecoder) decodeTerminal(c pdf.Cursor, dict pdf.Dict, ctx inher
 // field of one of the four defined types.
 //
 // Fields which share a fully qualified name must agree on type and value
-// (12.7.4.2). byName holds the first field decoded under each name: a later
-// field of a different type is dropped (its widgets survive through the page's
-// /Annots), and one of the same type takes the value and default value of the
-// first, which is the value a viewer shows for all of them. One which cannot
-// hold that value is dropped too; see [shareValue]. The repair is made before
-// the field is linked to its widgets and published. The second return value
+// (12.7.4.2). byName holds the fields decoded under each name: a later field
+// of a different type than the first is dropped (its widgets survive through
+// the page's /Annots), and one of the same type takes the value and default
+// value of the first, which is the value a viewer shows for all of them. One
+// which cannot hold that value is dropped too; see [shareValue].  A text value
+// shared with a single-line field loses its line breaks in all fields of the
+// name, so that they keep one value.  The repair is made before the field is
+// linked to its widgets and published.  The second return value
 // reports that the field took its value from the first: a check box or radio
-// button then still has to be checked against its widgets, by
-// [settleButtonValue].
-func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]acroform.Field) (acroform.Field, bool, error) {
+// button then still has to set its widgets from it, by [settleButtonValue].
+func buildTerminal(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]*nameGroup) (acroform.Field, bool, error) {
 	f, err := buildTerminalField(c, dict, ctx)
 	if f == nil || err != nil {
 		return nil, false, err
 	}
 	fqn := joinName(ctx.name, f.PartialName())
-	first, ok := byName[fqn]
-	if !ok {
-		byName[fqn] = f
+	group := byName[fqn]
+	if group == nil {
+		byName[fqn] = &nameGroup{fields: []acroform.Field{f}, flat: isSingleLine(f)}
 		return f, false, nil
 	}
-	if !shareValue(f, first) {
+	if !shareValue(f, group.fields[0]) {
 		return nil, false, nil
 	}
+	group.fields = append(group.fields, f)
+	// the fields of a flat group already hold the flattened value
+	if !group.flat && isSingleLine(f) {
+		for _, g := range group.fields {
+			flattenText(g.(*acroform.TextField))
+		}
+		group.flat = true
+	}
 	return f, true, nil
+}
+
+// isSingleLine reports whether f is a text field without the Multiline flag.
+func isSingleLine(f acroform.Field) bool {
+	tf, ok := f.(*acroform.TextField)
+	return ok && tf.Flags&acroform.FieldMultiline == 0
+}
+
+// flattenText replaces each line break in the text and default text of f by
+// a space: CR LF, CR and LF each count as one line break.
+func flattenText(f *acroform.TextField) {
+	for _, v := range []*pdf.StringOrStream{f.Text, f.DefaultText} {
+		if v != nil {
+			v.Value = v.Value.ReplaceAll("\r\n", " ").ReplaceAll("\r", " ").ReplaceAll("\n", " ")
+		}
+	}
 }
 
 // buildTerminalField constructs a terminal field from its dictionary,
@@ -450,16 +481,21 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 			return nil, err
 		}
 		requireDefaultAppearance(&f.VariableText)
-		if f.V, err = stringOrStreamPtr(c, eff.v); err != nil {
+		if f.Text, err = stringOrStreamPtr(c, eff.v); err != nil {
 			return nil, err
 		}
-		if f.DV, err = stringOrStreamPtr(c, eff.dv); err != nil {
+		if f.DefaultText, err = stringOrStreamPtr(c, eff.dv); err != nil {
 			return nil, err
 		}
 		f.MaxLen = eff.maxLen
-		// the value of a password field must never be stored in the file
+		// the value of a password field must never be stored in the file,
+		// nor a default value
 		if f.Flags&acroform.FieldPassword != 0 {
-			f.V, f.RichValue = nil, nil
+			f.Text, f.RichText, f.DefaultText = nil, nil, nil
+		}
+		// a single-line field holds no line breaks
+		if f.Flags&acroform.FieldMultiline == 0 {
+			flattenText(f)
 		}
 		// the Comb flag is valid only with a MaxLen and with Multiline, Password
 		// and FileSelect all clear; drop an invalid one so the field stays
@@ -473,22 +509,34 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 		return f, nil
 
 	case "Btn":
-		f := acroform.NewButtonField(name)
-		f.AltName, f.ExportName, f.Flags, f.AA = tu, tm.String(), eff.ff.Normalize(eff.ft), aa
+		ff := eff.ff.Normalize(eff.ft)
+		// a push button has no value, so /V, /DV and /Opt do not apply
+		if ff&acroform.FieldPushbutton != 0 {
+			f := &acroform.PushButtonField{}
+			f.Name = name
+			f.AltName, f.ExportName, f.Flags, f.AA = tu, tm.String(), ff, aa
+			if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
+				return nil, err
+			}
+			return f, nil
+		}
+		f := &acroform.ButtonField{}
+		f.Name = name
+		f.AltName, f.ExportName, f.Flags, f.AA = tu, tm.String(), ff, aa
 		if err := fillVariableText(c, dict, eff, &f.VariableText); err != nil {
 			return nil, err
 		}
 		if v, err := pdf.Optional(c.Name(eff.v)); err != nil {
 			return nil, err
 		} else {
-			f.V = v
+			f.State = v
 		}
 		if dv, err := pdf.Optional(c.Name(eff.dv)); err != nil {
 			return nil, err
 		} else {
-			f.DV = dv
+			f.DefaultState = dv
 		}
-		if err := decodeExportValues(c, eff.opt, &f.Opt); err != nil {
+		if err := decodeExportValues(c, eff.opt, &f.ExportValues); err != nil {
 			return nil, err
 		}
 		return f, nil
@@ -500,10 +548,10 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 			return nil, err
 		}
 		requireDefaultAppearance(&f.VariableText)
-		if f.V, err = choiceFieldValue(c, eff.v); err != nil {
+		if f.Value, err = choiceFieldValue(c, eff.v); err != nil {
 			return nil, err
 		}
-		if f.DV, err = choiceFieldValue(c, eff.dv); err != nil {
+		if f.DefaultValue, err = choiceFieldValue(c, eff.dv); err != nil {
 			return nil, err
 		}
 		// the choice /Opt is not inheritable; read it from the field itself
@@ -517,7 +565,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 					return nil, err
 				}
 				if ok {
-					f.Opt = append(f.Opt, opt)
+					f.Options = append(f.Options, opt)
 				} else {
 					dropped = append(dropped, i)
 				}
@@ -527,7 +575,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 		// options that remain and drop those left without a target
 		if ti, err := pdf.Optional(c.Integer(dict["TI"])); err != nil {
 			return nil, err
-		} else if idx, ok := remapOptIndex(int(ti), len(f.Opt), dropped); ok {
+		} else if idx, ok := remapOptIndex(int(ti), len(f.Options), dropped); ok {
 			f.TopIndex = idx
 		}
 		if arr, err := pdf.Optional(c.Array(dict["I"])); err != nil {
@@ -536,38 +584,41 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 			for _, el := range arr {
 				if idx, err := pdf.Optional(c.Integer(el)); err != nil {
 					return nil, err
-				} else if idx, ok := remapOptIndex(int(idx), len(f.Opt), dropped); ok {
+				} else if idx, ok := remapOptIndex(int(idx), len(f.Options), dropped); ok {
 					f.Selected = append(f.Selected, idx)
 				}
 			}
 			slices.Sort(f.Selected)
 			f.Selected = slices.Compact(f.Selected)
 		}
+		// a value must name options, except in an editable combo box
+		f.Value = keepOptions(f, f.Value)
+		f.DefaultValue = keepOptions(f, f.DefaultValue)
 		// several selections in a single-selection field leave the intended
 		// one unknown; a bad /V takes its /I along, which only restated it
 		if f.Flags&acroform.FieldMultiSelect == 0 {
 			// only a multi-select field has an explicit empty selection
-			if len(f.V) == 0 {
-				f.V = nil
+			if len(f.Value) == 0 {
+				f.Value = nil
 			}
-			if len(f.DV) == 0 {
-				f.DV = nil
+			if len(f.DefaultValue) == 0 {
+				f.DefaultValue = nil
 			}
-			if len(f.V) > 1 {
-				f.V, f.Selected = nil, nil
+			if len(f.Value) > 1 {
+				f.Value, f.Selected = nil, nil
 			}
 			if len(f.Selected) > 1 {
 				f.Selected = nil
 			}
-			if len(f.DV) > 1 {
-				f.DV = nil
+			if len(f.DefaultValue) > 1 {
+				f.DefaultValue = nil
 			}
 		}
 		// where /V and /I disagree, /V is authoritative; without /V, /I is
 		// the only record of the selection
-		if f.V == nil {
+		if f.Value == nil {
 			for _, idx := range f.Selected {
-				f.V = append(f.V, f.Opt[idx].Display)
+				f.Value = append(f.Value, f.Options[idx].Display)
 			}
 		} else if !f.SelectionAgrees() {
 			f.Selected = nil
@@ -663,7 +714,7 @@ func fillVariableText(c pdf.Cursor, dict pdf.Dict, eff inherited, v *acroform.Va
 	if err != nil {
 		return err
 	}
-	v.RichValue = rv
+	v.RichText = rv
 	return nil
 }
 
@@ -711,7 +762,7 @@ func isValidFieldType(name pdf.Name) bool {
 	}
 }
 
-// decodeExportValues reads a button field's Opt array of export values from the
+// decodeExportValues reads a button field's /Opt array of export values from the
 // given object into out.
 func decodeExportValues(c pdf.Cursor, obj pdf.Object, out *[]string) error {
 	arr, err := pdf.Optional(c.Array(obj))
@@ -751,7 +802,7 @@ func decodeChoiceOption(c pdf.Cursor, el pdf.Object) (acroform.ChoiceOption, boo
 			return acroform.ChoiceOption{}, false, err
 		}
 		if ok1 && ok2 {
-			return acroform.ChoiceOption{Export: export, Display: display}, true, nil
+			return acroform.ChoiceOption{Export: export.String(), Display: display}, true, nil
 		}
 		return acroform.ChoiceOption{}, false, nil
 	}
@@ -759,7 +810,7 @@ func decodeChoiceOption(c pdf.Cursor, el pdf.Object) (acroform.ChoiceOption, boo
 	if err != nil || !ok {
 		return acroform.ChoiceOption{}, false, err
 	}
-	return acroform.ChoiceOption{Export: s, Display: s}, true, nil
+	return acroform.ChoiceOption{Export: s.String(), Display: s}, true, nil
 }
 
 // remapOptIndex translates an index into the original /Opt array to an index
@@ -776,6 +827,34 @@ func remapOptIndex(idx, numOpt int, dropped []int) (int, bool) {
 		return 0, false
 	}
 	return idx, true
+}
+
+// keepOptions returns the entries of a choice value which are display
+// strings of options of f.  A multiple-selection field keeps the entries
+// which name an option; in other fields, or if no entry names an option, an
+// entry naming none drops the whole value.  An editable combo box keeps any
+// value.
+func keepOptions(f *acroform.ChoiceField, v []pdf.TextString) []pdf.TextString {
+	if f.IsEditable() || len(v) == 0 {
+		return v
+	}
+	kept := slices.DeleteFunc(slices.Clone(v), func(s pdf.TextString) bool {
+		return !namesOption(f, s)
+	})
+	if len(kept) == len(v) {
+		return v
+	}
+	if f.Flags&acroform.FieldMultiSelect == 0 || len(kept) == 0 {
+		return nil
+	}
+	return kept
+}
+
+// namesOption reports whether s is the display string of an option of f.
+func namesOption(f *acroform.ChoiceField, s pdf.TextString) bool {
+	return slices.ContainsFunc(f.Options, func(o acroform.ChoiceOption) bool {
+		return o.Display == s
+	})
 }
 
 // choiceFieldValue reads a choice field's /V or /DV entry, which is a bare text
@@ -913,7 +992,7 @@ func ancestorContext(c pdf.Cursor, obj pdf.Object, _ bool) (*inherited, error) {
 // The pair is not published in the extractor's cache:
 // [fieldTreeDecoder.publishWidgets] publishes it once the walk is done, so
 // that the page's /Annots entry and the field tree share one widget object.
-func decodeMergedField(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]acroform.Field) (acroform.Field, *annotation.Widget, error) {
+func decodeMergedField(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[string]*nameGroup) (acroform.Field, *annotation.Widget, error) {
 	a, err := decodeAnnotation(c, dict)
 	if err != nil {
 		return nil, nil, err
@@ -930,11 +1009,7 @@ func decodeMergedField(c pdf.Cursor, dict pdf.Dict, ctx inherited, byName map[st
 	}
 
 	linkWidget(f, w)
-	if !settleButtonValue(f, shared) {
-		// the field cannot hold the value of its namesake: keep the widget
-		w.Field = nil
-		return nil, w, nil
-	}
+	settleButtonValue(f, shared)
 	return f, w, nil
 }
 

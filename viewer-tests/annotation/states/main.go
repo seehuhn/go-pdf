@@ -154,8 +154,7 @@ func run() error {
 	// row 3: push button widget
 	rect = rowRect(y)
 	writeRowLabel(doc, F, B, y, "Push button", "The usual consumer of /D.")
-	button := acroform.NewButtonField("states")
-	button.Flags = acroform.FieldPushbutton
+	button := acroform.NewPushButtonField("states")
 	acro.Fields = append(acro.Fields, button)
 	widget := annotation.AddWidget(button, rect)
 	widget.Common.Appearance = states(rect, F)

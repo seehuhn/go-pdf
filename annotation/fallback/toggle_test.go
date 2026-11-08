@@ -31,18 +31,24 @@ import (
 )
 
 // toggleWidget returns a check box widget for a field whose value is value,
-// with the on-state named by on.  Setting radio makes it a radio button.
+// with the on-state named by on.  Setting radio makes it a radio button,
+// whose widget without appearances has the made-up on-state "0" in place of
+// on.
 func toggleWidget(t *testing.T, value, on pdf.Name, radio bool) *annotation.Widget {
 	t.Helper()
-	f := acroform.NewButtonField("b")
-	f.V = value
+	tp := acroform.ButtonCheckbox
 	if radio {
-		f.Flags = acroform.FieldRadio
-		f.Opt = []string{string(on)}
-	} else if on != "" {
-		// a lone check box names its on-state through the field value
-		f.Opt = []string{string(on)}
+		tp = acroform.ButtonRadio
 	}
+	f := acroform.NewButtonField("b", tp)
+	if radio {
+		if value == on {
+			value = "0"
+		}
+	} else if on != "" {
+		f.ExportValues = []string{string(on)}
+	}
+	f.State = value
 	return annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 16, URy: 16})
 }
 

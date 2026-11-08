@@ -191,35 +191,44 @@ func decodeCalculationOrder(c pdf.Cursor, obj pdf.Object, d *fieldTreeDecoder) (
 // decoded under the same fully qualified name, which must agree with it
 // (12.7.4.2).  A rich text value travels with the value it formats.  It
 // returns false, leaving dst unchanged, if dst cannot hold the values: if the
-// fields differ in type, if dst is a password field and src has a value, or
-// if dst is a single-selection choice field and src holds an explicit empty
-// or a multiple selection.  A check box or radio button value is checked
-// against the field's widgets once they are linked, by [settleButtonValue].
+// fields differ in type, if dst is a password field and src has a value or a
+// default value, if dst is a single-selection choice field and src holds an
+// explicit empty or a multiple selection, or if a choice value of src names
+// an option which dst lacks.  A check box or radio button sets the field's
+// widgets from the value once they are linked, by [settleButtonValue].
 func shareValue(dst, src acroform.Field) bool {
 	switch dst := dst.(type) {
 	case *acroform.TextField:
 		src, ok := src.(*acroform.TextField)
-		if !ok || dst.Flags&acroform.FieldPassword != 0 && (src.V != nil || src.RichValue != nil) {
+		if !ok || dst.Flags&acroform.FieldPassword != 0 && (src.Text != nil || src.RichText != nil || src.DefaultText != nil) {
 			return false
 		}
-		dst.V, dst.DV = cloneText(src.V), cloneText(src.DV)
-		dst.RichValue = cloneText(src.RichValue)
+		dst.Text, dst.DefaultText = cloneText(src.Text), cloneText(src.DefaultText)
+		dst.RichText = cloneText(src.RichText)
 	case *acroform.ButtonField:
 		src, ok := src.(*acroform.ButtonField)
 		if !ok {
 			return false
 		}
-		dst.V, dst.DV = src.V, src.DV
+		dst.State, dst.DefaultState = src.State, src.DefaultState
+	case *acroform.PushButtonField:
+		// a push button has no value to share
+		_, ok := src.(*acroform.PushButtonField)
+		return ok
 	case *acroform.ChoiceField:
 		src, ok := src.(*acroform.ChoiceField)
 		if !ok {
 			return false
 		}
-		if dst.Flags&acroform.FieldMultiSelect == 0 && (!isSingleSelection(src.V) || !isSingleSelection(src.DV)) {
+		if dst.Flags&acroform.FieldMultiSelect == 0 && (!isSingleSelection(src.Value) || !isSingleSelection(src.DefaultValue)) {
 			return false
 		}
-		dst.V, dst.DV = slices.Clone(src.V), slices.Clone(src.DV)
-		dst.RichValue = cloneText(src.RichValue)
+		// dst must have the options the values name
+		if !dst.IsEditable() && (!allOptions(dst, src.Value) || !allOptions(dst, src.DefaultValue)) {
+			return false
+		}
+		dst.Value, dst.DefaultValue = slices.Clone(src.Value), slices.Clone(src.DefaultValue)
+		dst.RichText = cloneText(src.RichText)
 		// /I indexes dst's own options; keep it only where it restates /V
 		if !dst.SelectionAgrees() {
 			dst.Selected = nil
@@ -232,6 +241,16 @@ func shareValue(dst, src acroform.Field) bool {
 		dst.V, dst.DV = src.V, src.DV
 	default:
 		return false
+	}
+	return true
+}
+
+// allOptions reports whether every entry of v names an option of f.
+func allOptions(f *acroform.ChoiceField, v []pdf.TextString) bool {
+	for _, s := range v {
+		if !namesOption(f, s) {
+			return false
+		}
 	}
 	return true
 }

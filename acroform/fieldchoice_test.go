@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -28,15 +29,15 @@ func choiceWith(flags FieldFlags, v []pdf.TextString, selected []int, topIndex i
 	f := NewChoiceField("c")
 	f.DefaultAppearance = testDA
 	f.Flags = flags
-	f.Opt = []ChoiceOption{{Export: pdf.Text("a"), Display: pdf.Text("A")}, {Export: pdf.Text("b"), Display: pdf.Text("B")}, {Export: pdf.Text("c"), Display: pdf.Text("C")}}
-	f.V = v
+	f.Options = []ChoiceOption{{Export: "a", Display: pdf.Text("A")}, {Export: "b", Display: pdf.Text("B")}, {Export: "c", Display: pdf.Text("C")}}
+	f.Value = v
 	f.Selected = selected
 	f.TopIndex = topIndex
 	return f
 }
 
 func withDV(f *ChoiceField, dv ...pdf.TextString) *ChoiceField {
-	f.DV = dv
+	f.DefaultValue = dv
 	return f
 }
 
@@ -47,7 +48,7 @@ func TestEncodeChoiceValidation(t *testing.T) {
 		wantErr bool
 	}{
 		{"nothing selected", choiceWith(0, nil, nil, 0), false},
-		{"consistent V and I", choiceWith(0, []pdf.TextString{pdf.Text("B")}, []int{1}, 0), false},
+		{"consistent Value and I", choiceWith(0, []pdf.TextString{pdf.Text("B")}, []int{1}, 0), false},
 		{"multi-select consistent", choiceWith(FieldMultiSelect, []pdf.TextString{pdf.Text("A"), pdf.Text("C")}, []int{0, 2}, 0), false},
 		{"index out of range", choiceWith(0, nil, []int{3}, 0), true},
 		{"negative index", choiceWith(0, nil, []int{-1}, 0), true},
@@ -60,10 +61,14 @@ func TestEncodeChoiceValidation(t *testing.T) {
 		{"two indices without MultiSelect", choiceWith(0, nil, []int{0, 1}, 0), true},
 		{"two defaults without MultiSelect", withDV(choiceWith(0, nil, nil, 0), pdf.Text("A"), pdf.Text("B")), true},
 		{"two defaults with MultiSelect", withDV(choiceWith(FieldMultiSelect, nil, nil, 0), pdf.Text("A"), pdf.Text("B")), false},
-		{"V disagrees with I", choiceWith(0, []pdf.TextString{pdf.Text("A")}, []int{1}, 0), true},
-		{"V in another order than I", choiceWith(FieldMultiSelect, []pdf.TextString{pdf.Text("C"), pdf.Text("A")}, []int{0, 2}, 0), false},
-		{"V repeats one option of I", choiceWith(FieldMultiSelect, []pdf.TextString{pdf.Text("A"), pdf.Text("A")}, []int{0, 2}, 0), true},
-		{"V not an option", choiceWith(0, []pdf.TextString{pdf.Text("Z")}, nil, 0), false},
+		{"Value disagrees with I", choiceWith(0, []pdf.TextString{pdf.Text("A")}, []int{1}, 0), true},
+		{"Value in another order than I", choiceWith(FieldMultiSelect, []pdf.TextString{pdf.Text("C"), pdf.Text("A")}, []int{0, 2}, 0), false},
+		{"Value repeats one option of I", choiceWith(FieldMultiSelect, []pdf.TextString{pdf.Text("A"), pdf.Text("A")}, []int{0, 2}, 0), true},
+		{"Value not an option", choiceWith(0, []pdf.TextString{pdf.Text("Z")}, nil, 0), true},
+		{"one of several values not an option", choiceWith(FieldMultiSelect, []pdf.TextString{pdf.Text("A"), pdf.Text("Z")}, nil, 0), true},
+		{"default not an option", withDV(choiceWith(0, nil, nil, 0), pdf.Text("Z")), true},
+		{"combo value not an option", choiceWith(FieldCombo, []pdf.TextString{pdf.Text("Z")}, nil, 0), true},
+		{"editable combo free text", withDV(choiceWith(FieldCombo|FieldEdit, []pdf.TextString{pdf.Text("Z")}, nil, 0), pdf.Text("Y")), false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -80,7 +85,7 @@ func TestEncodeChoiceValidation(t *testing.T) {
 	}
 }
 
-// a nil V is derived from Selected on write
+// a nil Value is derived from Selected on write
 func TestEncodeChoiceDerivedValue(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -100,8 +105,31 @@ func TestEncodeChoiceDerivedValue(t *testing.T) {
 				t.Fatal(err)
 			}
 			if diff := cmp.Diff(tc.want, dict["V"]); diff != "" {
-				t.Errorf("V mismatch (-want +got):\n%s", diff)
+				t.Errorf("Value mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+// an option whose display string carries a language tag is written as an
+// [export display] pair, so that the export value stays untagged
+func TestChoiceOptionTaggedDisplay(t *testing.T) {
+	f := NewChoiceField("c")
+	f.DefaultAppearance = testDA
+	f.Options = []ChoiceOption{
+		{Export: "x", Display: pdf.Text("x")},
+		{Export: "y", Display: pdf.Text(language.German, "y")},
+	}
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	dict, err := terminalEntries(pdf.NewResourceManager(w), f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	opt := dict["Opt"].(pdf.Array)
+	if _, ok := opt[0].(pdf.Array); ok {
+		t.Error("untagged option written as a pair")
+	}
+	if _, ok := opt[1].(pdf.Array); !ok {
+		t.Error("tagged option not written as a pair")
 	}
 }

@@ -24,6 +24,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
@@ -253,10 +254,12 @@ func (wr *writer) addField(d demo, x, y float64, genAP bool) error {
 		wr.page.Page.AddAnnots(widget)
 	}
 
-	// a password field's value must not be stored in the file; the generated
-	// appearance above still shows it masked
-	if tx, ok := f.(*acroform.TextField); ok && tx.Flags&acroform.FieldPassword != 0 {
-		tx.V = nil
+	// select the radio button whose export value is d.value
+	if btn, ok := f.(*acroform.ButtonField); ok && btn.Variant() == acroform.ButtonRadio {
+		lf := wr.form.LogicalField(btn.PartialName())
+		if err := lf.SetState(btn.OnState(slices.Index(d.opts, d.value))); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -271,13 +274,19 @@ func (wr *writer) makeField(d demo) acroform.Field {
 	case "Btn":
 		// a push button retains no value; check boxes and radio buttons carry
 		// the on-state name in V, and radio buttons name their widgets in Opt
-		btn := acroform.NewButtonField(name)
+		if d.ff&acroform.FieldPushbutton != 0 {
+			push := acroform.NewPushButtonField(name)
+			push.Flags = d.ff
+			f = push
+			break
+		}
+		btn := acroform.NewButtonField(name, acroform.ButtonCheckbox)
 		btn.Flags = d.ff
-		if d.ff&acroform.FieldPushbutton == 0 {
-			btn.V = pdf.Name(d.value)
-			if d.ff&acroform.FieldRadio != 0 {
-				btn.Opt = d.opts
-			}
+		if d.ff&acroform.FieldRadio != 0 {
+			// the on-states are known once the widgets exist; see addField
+			btn.ExportValues = d.opts
+		} else {
+			btn.State = pdf.Name(d.value)
 		}
 		f = btn
 
@@ -287,10 +296,10 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		tx.DefaultAppearance = defaultDA
 		tx.Align = d.align
 		tx.MaxLen = d.maxLen
-		// for a password field the value feeds the appearance only and is
-		// cleared below, after the widgets are made
+		// for a password field the value feeds the masked appearance only;
+		// it is never written
 		if d.value != "" {
-			tx.V = &pdf.StringOrStream{Value: pdf.Text(d.value)}
+			tx.Text = &pdf.StringOrStream{Value: pdf.Text(d.value)}
 		}
 		f = tx
 
@@ -301,10 +310,10 @@ func (wr *writer) makeField(d demo) acroform.Field {
 		ch.Align = d.align
 		ch.Selected = d.sel
 		for _, o := range d.opts {
-			ch.Opt = append(ch.Opt, acroform.ChoiceOption{Display: pdf.Text(o), Export: pdf.Text(o)})
+			ch.Options = append(ch.Options, acroform.ChoiceOption{Display: pdf.Text(o), Export: o})
 		}
 		if d.value != "" {
-			ch.V = []pdf.TextString{pdf.Text(d.value)}
+			ch.Value = []pdf.TextString{pdf.Text(d.value)}
 		}
 		f = ch
 

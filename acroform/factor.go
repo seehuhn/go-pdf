@@ -23,11 +23,12 @@ import (
 	"seehuhn.de/go/pdf"
 )
 
-// Field attributes (FT, Ff, V, DV, DA, Q, MaxLen) are inheritable in a PDF file
-// (12.7.4.1, 12.7.4.3): a field without its own value takes its nearest
-// ancestor's. The decoder flattens this away, so every terminal field carries
-// its effective values. The encoder restores it: where moving a value from a
-// set of children up into their common parent shrinks the file, it does so.
+// Field attributes (FT, Ff, V, DV, DA, Q, MaxLen, and Opt for buttons) are
+// inheritable in a PDF file (12.7.4.1, 12.7.4.3, 12.7.5.2.4): a field without
+// its own value takes its nearest ancestor's. The decoder flattens this away,
+// so every terminal field carries its effective values. The encoder restores
+// it: where moving a value from a set of children up into their common parent
+// shrinks the file, it does so.
 //
 // The cost model mirrors the one used for inherited page attributes (see the
 // pagetree package): a value is hoisted only when the resulting per-entry byte
@@ -38,9 +39,10 @@ import (
 //     So an attribute may be hoisted only when every child has an explicit value
 //     for it (hoistUnanimous), unless the attribute has a writable default that
 //     a child can use to opt back out (hoistWithDefault).
-//   - V, DV and Opt are never hoisted: V/DV are rarely shared and their format
-//     depends on the field type, and Opt is positionally tied to one field's
-//     widget list.
+//   - V and DV are never hoisted: they are rarely shared and their format
+//     depends on the field type.
+//   - Opt is inheritable only for button fields, so it is hoisted only from
+//     groups without a choice field among their children.
 
 // formatObj returns the textual PDF representation of obj, used to compare and
 // size candidate values when factoring.

@@ -5298,6 +5298,7 @@ types:
     refTypes:
     - TextField
     - ButtonField
+    - PushButtonField
     - ChoiceField
     - type: SignatureField
       since: '1.3'
@@ -5917,7 +5918,7 @@ types:
     required: false
     introduced: '1.5'
     goType: string
-  - goName: RichValue
+  - goName: RichText
     pdfKey: RV
     pdfType: stream;text-string
     required: false
@@ -5926,7 +5927,7 @@ types:
     refTypes:
     - Stream
 - name: ButtonField
-  purpose: button form field (check box, radio button, or push button)
+  purpose: button form field (check box or radio buttons)
   goType: acroform.ButtonField
   goPackage: acroform
   goRepr: struct
@@ -5948,27 +5949,50 @@ types:
     - Btn
     inheritable: true
     discriminator: true
-  - goName: Opt
+  - goName: ExportValues
     pdfKey: Opt
     pdfType: array
     required: false
     introduced: '1.4'
     goType: '[]string'
     inheritable: true
-  - goName: V
+  - goName: State
     pdfKey: V
     pdfType: name
     required: false
     introduced: '1.2'
     goType: pdf.Name
     inheritable: true
-  - goName: DV
+  - goName: DefaultState
     pdfKey: DV
     pdfType: name
     required: false
     introduced: '1.2'
     goType: pdf.Name
     inheritable: true
+- name: PushButtonField
+  purpose: push button form field, which retains no value
+  goType: acroform.PushButtonField
+  goPackage: acroform
+  goRepr: struct
+  pdfRepr: dict
+  introduced: '1.2'
+  specSection: 12.7.5.2.2
+  specTable: Table 226 and Table 229
+  fileDependent: true
+  embeds:
+  - Field
+  - VariableText
+  fields:
+  - goName:
+    pdfKey: FT
+    pdfType: name
+    required: true
+    introduced: '1.2'
+    possibleValues:
+    - Btn
+    inheritable: true
+    discriminator: true
 - name: ChoiceField
   purpose: choice (list or combo box) form field
   goType: acroform.ChoiceField
@@ -5992,7 +6016,7 @@ types:
     - Ch
     inheritable: true
     discriminator: true
-  - goName: Opt
+  - goName: Options
     pdfKey: Opt
     pdfType: array
     required: false
@@ -6012,7 +6036,7 @@ types:
     required: false
     introduced: '1.4'
     goType: '[]int'
-  - goName: V
+  - goName: Value
     pdfKey: V
     pdfType: array;text-string
     required: false
@@ -6020,7 +6044,7 @@ types:
     goType: '[]pdf.TextString'
     inheritable: true
     notes: nil is absent; non-nil empty is an explicit empty array (MultiSelect only)
-  - goName: DV
+  - goName: DefaultValue
     pdfKey: DV
     pdfType: array;text-string
     required: false
@@ -6147,7 +6171,7 @@ types:
     - Tx
     inheritable: true
     discriminator: true
-  - goName: V
+  - goName: Text
     pdfKey: V
     pdfType: fn:SinceVersion(1.5,stream);text-string
     required: false
@@ -6156,7 +6180,7 @@ types:
     inheritable: true
     refTypes:
     - Stream
-  - goName: DV
+  - goName: DefaultText
     pdfKey: DV
     pdfType: fn:SinceVersion(1.5,stream);text-string
     required: false

@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
+	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/cmd/pdf-extract/forms"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
@@ -35,6 +36,14 @@ func dump(t *testing.T, form *acroform.InteractiveForm) string {
 
 	rm := pdf.NewResourceManager(w)
 	if form != nil {
+		// writing the widgets first reserves the references the form fills in
+		for _, field := range form.AllFields() {
+			for _, wg := range field.GetCommon().Widgets {
+				if _, err := rm.Store(wg); err != nil {
+					t.Fatalf("store widget: %v", err)
+				}
+			}
+		}
 		ref, err := rm.Store(form)
 		if err != nil {
 			t.Fatalf("encode form: %v", err)
@@ -64,7 +73,7 @@ func dump(t *testing.T, form *acroform.InteractiveForm) string {
 func textField(name, value string) *acroform.TextField {
 	f := acroform.NewTextField(name)
 	f.DefaultAppearance = "/Helv 0 Tf 0 g"
-	f.V = &pdf.StringOrStream{Value: pdf.Text(value)}
+	f.Text = &pdf.StringOrStream{Value: pdf.Text(value)}
 	return f
 }
 
@@ -73,20 +82,32 @@ func formWith(roots ...acroform.Node) *acroform.InteractiveForm {
 }
 
 func TestListValues(t *testing.T) {
-	checkbox := acroform.NewButtonField("agree")
-	checkbox.V = "Yes"
+	checkbox := acroform.NewButtonField("agree", acroform.ButtonCheckbox)
+	checkbox.State = "Yes"
 
-	unchecked := acroform.NewButtonField("optin")
-
-	push := acroform.NewButtonField("submit")
-	push.Flags = acroform.FieldPushbutton
+	radio := acroform.NewButtonField("size", acroform.ButtonRadio)
+	radio.ExportValues = []string{"small", "large"}
+	radio.State = "1"
+	// single-point widgets need no appearance
+	for i := range radio.ExportValues {
+		x := float64(20 * i)
+		annotation.AddWidget(radio, pdf.Rectangle{LLx: x, URx: x})
+	}
 
 	choice := acroform.NewChoiceField("colors")
 	choice.DefaultAppearance = "/Helv 0 Tf 0 g"
 	choice.Flags = acroform.FieldMultiSelect
-	choice.V = []pdf.TextString{pdf.Text("Red"), pdf.Text("Green")}
+	choice.Options = []acroform.ChoiceOption{
+		{Export: "r", Display: pdf.Text("Red")},
+		{Export: "g", Display: pdf.Text("Green")},
+	}
+	choice.Value = []pdf.TextString{pdf.Text("Red"), pdf.Text("Green")}
 
-	sig := acroform.NewSignatureField("signature1")
+	notes := textField("notes", "a\nb")
+	notes.Flags = acroform.FieldMultiline
+
+	mapped := textField("given_name", "Ada")
+	mapped.ExportName = "fname"
 
 	tests := []struct {
 		name string
@@ -94,42 +115,11 @@ func TestListValues(t *testing.T) {
 		want string
 	}{
 		{"text", formWith(textField("given_name", "Ada")), "given_name: Ada\n"},
-		{"checkbox on", formWith(checkbox), "agree: Yes\n"},
-		{"checkbox off", formWith(unchecked), "optin: Off\n"},
-		{"push button", formWith(push), "submit: \n"},
-		{"choice multi", formWith(choice), "colors: Red, Green\n"},
-		{"signature", formWith(sig), "signature1: <unsigned>\n"},
-		{"multiline", formWith(textField("notes", "a\nb")), "notes: a b\n"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := dump(t, tt.form); got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestListNames(t *testing.T) {
-	both := textField("given_name", "Ada")
-	both.AltName = pdf.Text("Given name")
-	both.ExportName = "fname"
-
-	altOnly := textField("given_name", "Ada")
-	altOnly.AltName = pdf.Text("Given name")
-
-	exportOnly := textField("given_name", "Ada")
-	exportOnly.ExportName = "fname"
-
-	tests := []struct {
-		name string
-		form *acroform.InteractiveForm
-		want string
-	}{
-		{"both names", formWith(both), "given_name \"Given name\" [fname]: Ada\n"},
-		{"alt only", formWith(altOnly), "given_name \"Given name\": Ada\n"},
-		{"export only", formWith(exportOnly), "given_name [fname]: Ada\n"},
+		{"export name", formWith(mapped), "fname: Ada\n"},
+		{"checkbox", formWith(checkbox), "agree: Yes\n"},
+		{"radio", formWith(radio), "size: large\n"},
+		{"choice multi", formWith(choice), "colors: r\ncolors: g\n"},
+		{"multiline", formWith(notes), "notes: a b\n"},
 	}
 
 	for _, tt := range tests {
@@ -157,8 +147,12 @@ func TestListNoForm(t *testing.T) {
 	}
 }
 
-func TestListEmptyForm(t *testing.T) {
-	if got, want := dump(t, formWith()), "Interactive form contains no fields.\n"; got != want {
+func TestListNoData(t *testing.T) {
+	unchecked := acroform.NewButtonField("optin", acroform.ButtonCheckbox)
+	push := acroform.NewPushButtonField("submit")
+	sig := acroform.NewSignatureField("signature1")
+	form := formWith(unchecked, push, sig)
+	if got, want := dump(t, form), "Interactive form exports no data.\n"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }

@@ -222,8 +222,8 @@ func TestPageAnnotationsLinksWidgets(t *testing.T) {
 	if !ok {
 		t.Fatalf("widget field is %T, want *acroform.TextField", wa.Field)
 	}
-	if f.V == nil || f.V.Value.String() != "hello" {
-		t.Errorf("field value = %v, want %q", f.V, "hello")
+	if f.Text == nil || f.Text.Value.String() != "hello" {
+		t.Errorf("field value = %v, want %q", f.Text, "hello")
 	}
 }
 
@@ -263,8 +263,8 @@ func TestAnnotationReadsFormFirst(t *testing.T) {
 		if !ok {
 			t.Fatalf("widget field is %T, want *acroform.TextField", wa.Field)
 		}
-		if f.V == nil || f.V.Value.String() != "first" {
-			t.Errorf("field value = %v, want %q", f.V, "first")
+		if f.Text == nil || f.Text.Value.String() != "first" {
+			t.Errorf("field value = %v, want %q", f.Text, "first")
 		}
 	}
 

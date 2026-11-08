@@ -17,6 +17,8 @@
 package decode
 
 import (
+	"slices"
+
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/acroform"
@@ -141,30 +143,78 @@ func linkWidget(f acroform.Field, w *annotation.Widget) {
 
 // settleButtonValue makes a check box or radio button's value agree with the
 // appearance states of its widgets, once all of them are listed in the
-// field.  Where the field took its value from an earlier field of the same
-// name (shared is set), the value is fixed and sets the states; the function
-// returns false if the field cannot hold it, because the value is neither
-// "Off" nor an on-state of the field.  Otherwise the states decide, as
-// [reconcileButtonValue] describes.
-func settleButtonValue(f acroform.Field, shared bool) bool {
+// field.
+//
+// Where the field took its value from an earlier field of the same name
+// (shared is set), the value is fixed and sets the states.  Fields of the
+// same name are one field, and the earlier field has been settled already,
+// so the value and default are "Off" or an on-state of that name.  A value
+// which none of this field's buttons has leaves all of them off.  Otherwise
+// the states decide, as [reconcileButtonValue] describes.
+func settleButtonValue(f acroform.Field, shared bool) {
 	btn, ok := f.(*acroform.ButtonField)
-	if !ok || btn.Variant() == acroform.ButtonPush {
-		return true
+	if !ok {
+		return
 	}
-	if !shared {
-		reconcileButtonValue(btn)
-		return true
-	}
-	if btn.V == "" {
-		// an absent value shows every widget off
-		for _, w := range btn.Widgets {
-			if w != nil && w.CurrentAppearanceState() != "" {
-				w.SetAppearanceState("Off")
-			}
+	fitExportValues(btn)
+	if shared {
+		if btn.State == "Off" || acroform.NewLogicalField("", btn).SetState(btn.State) != nil {
+			widgetsOff(btn)
 		}
-		return true
+		return
 	}
-	return btn.SetValue(btn.V) == nil
+
+	// an absent /DV resets the field to "Off"; one naming no on-state is
+	// treated as absent
+	if btn.DefaultState == "" || !isButtonState(btn, btn.DefaultState) {
+		btn.DefaultState = "Off"
+	}
+	reconcileButtonValue(btn)
+	// an absent /V, or one naming no on-state, means that no button is on
+	if btn.State == "" || !isButtonState(btn, btn.State) {
+		btn.State = "Off"
+		widgetsOff(btn)
+	}
+}
+
+// isButtonState reports whether v is empty, "Off", or the on-state of one of
+// the field's buttons.
+func isButtonState(btn *acroform.ButtonField, v pdf.Name) bool {
+	return v == "" || v == "Off" || slices.Contains(btn.OnStates(), v)
+}
+
+// widgetsOff turns off every widget of a button field which names an
+// appearance state.
+func widgetsOff(btn *acroform.ButtonField) {
+	for _, w := range btn.Widgets {
+		if w != nil && w.CurrentAppearanceState() != "" {
+			w.SetAppearanceState("Off")
+		}
+	}
+}
+
+// fitExportValues gives a button field one export value per widget, as the
+// /Opt array requires: surplus entries are dropped, and a widget without an
+// entry exports its on-state name, as it would without /Opt.
+func fitExportValues(btn *acroform.ButtonField) {
+	ev := btn.ExportValues
+	n := len(btn.Widgets)
+	switch {
+	case len(ev) == 0 || len(ev) == n:
+		return
+	case n == 0:
+		btn.ExportValues = nil
+	case len(ev) > n:
+		btn.ExportValues = ev[:n:n]
+	default:
+		// the on-states of buttons beyond ev do not depend on it
+		states := btn.OnStates()
+		fitted := slices.Clip(ev)
+		for i := len(ev); i < n; i++ {
+			fitted = append(fitted, string(states[i]))
+		}
+		btn.ExportValues = fitted
+	}
 }
 
 // reconcileButtonValue makes a check box or radio button's value agree with
@@ -176,7 +226,7 @@ func settleButtonValue(f acroform.Field, shared bool) bool {
 // switched off, since a field holds one value.
 func reconcileButtonValue(f acroform.Field) {
 	btn, ok := f.(*acroform.ButtonField)
-	if !ok || btn.Variant() == acroform.ButtonPush || len(btn.Widgets) == 0 {
+	if !ok || len(btn.Widgets) == 0 {
 		return
 	}
 	allNamed := true
@@ -190,14 +240,14 @@ func reconcileButtonValue(f acroform.Field) {
 			allNamed = false
 		case "Off":
 		default:
-			if on == "" || as == btn.V {
+			if on == "" || as == btn.State {
 				on = as
 			}
 		}
 	}
 	switch {
 	case on != "":
-		btn.V = on
+		btn.State = on
 		for _, w := range btn.Widgets {
 			if w == nil {
 				continue
@@ -206,8 +256,8 @@ func reconcileButtonValue(f acroform.Field) {
 				w.SetAppearanceState("Off")
 			}
 		}
-	case allNamed && btn.V != "" && btn.V != "Off":
-		btn.V = "Off"
+	case allNamed && btn.State != "" && btn.State != "Off":
+		btn.State = "Off"
 	}
 }
 

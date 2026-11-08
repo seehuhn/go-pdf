@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package forms implements the "form" query of pdf-extract, listing the
-// terminal fields of a document's interactive form and their values.
+// Package forms implements the "form" query of pdf-extract, listing the data
+// a document's interactive form exports.
 package forms
 
 import (
@@ -24,16 +24,16 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/acroform"
 	"seehuhn.de/go/pdf/annotation/decode"
 )
 
-// List writes every terminal field of doc's interactive form to w, one field
-// per line, in depth-first tree order. Each line has the form
+// List writes the export data of doc's interactive form to w, one name and
+// value pair per line, in the form
 //
-//	name ["alt"] [export]: value
+//	name: value
 //
-// where the alternate name (/TU) and export name (/TM) are shown only when set.
+// See [seehuhn.de/go/pdf/acroform.InteractiveForm.ExportData] for the names
+// and values included.  Line breaks in a value are replaced by spaces.
 func List(doc pdf.Getter, w io.Writer) error {
 	idx, err := decode.DocumentForm(pdf.NewExtractor(doc))
 	if err != nil {
@@ -43,66 +43,16 @@ func List(doc pdf.Getter, w io.Writer) error {
 		fmt.Fprintln(w, "No interactive form in document.")
 		return nil
 	}
-	form := idx.Form
 
 	count := 0
-	for name, field := range form.AllFields() {
-		fmt.Fprintln(w, render(name, field))
+	for name, value := range idx.Form.ExportData() {
+		fmt.Fprintf(w, "%s: %s\n", name, collapse(value))
 		count++
 	}
 	if count == 0 {
-		fmt.Fprintln(w, "Interactive form contains no fields.")
+		fmt.Fprintln(w, "Interactive form exports no data.")
 	}
 	return nil
-}
-
-// render formats a single terminal field as a display line.
-func render(name string, field acroform.Field) string {
-	var b strings.Builder
-	b.WriteString(name)
-	if c := field.GetCommon(); c != nil {
-		if !c.AltName.IsZero() {
-			fmt.Fprintf(&b, " %q", c.AltName)
-		}
-		if c.ExportName != "" {
-			fmt.Fprintf(&b, " [%s]", c.ExportName)
-		}
-	}
-	b.WriteString(": ")
-	b.WriteString(collapse(fieldValue(field)))
-	return b.String()
-}
-
-// fieldValue returns the displayable value of a terminal field.
-func fieldValue(field acroform.Field) string {
-	switch f := field.(type) {
-	case *acroform.TextField:
-		if f.V != nil {
-			return f.V.Value.String()
-		}
-		return ""
-	case *acroform.ChoiceField:
-		vals := make([]string, len(f.V))
-		for i, v := range f.V {
-			vals[i] = v.String()
-		}
-		return strings.Join(vals, ", ")
-	case *acroform.ButtonField:
-		if f.Variant() == acroform.ButtonPush {
-			return ""
-		}
-		if f.V == "" {
-			return "Off"
-		}
-		return string(f.V)
-	case *acroform.SignatureField:
-		if f.V != nil {
-			return "<signed>"
-		}
-		return "<unsigned>"
-	default:
-		return ""
-	}
 }
 
 // collapse replaces line breaks with spaces so a value stays on one line.

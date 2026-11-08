@@ -338,6 +338,31 @@ func TestTextString_String(t *testing.T) {
 	}
 }
 
+func TestTextString_ReplaceAll(t *testing.T) {
+	tests := []struct {
+		name     string
+		in       TextString
+		old, new string
+		want     TextString
+	}{
+		{"untagged", Text("a\nb\nc"), "\n", " ", Text("a b c")},
+		{"tags kept", Text("a\n", language.German, "b\nc"), "\n", " ",
+			Text("a ", language.German, "b c")},
+		{"run emptied", Text("x", language.German, "\n", language.English, "y"), "\n", "",
+			Text("x", language.English, "y")},
+		{"no match across tags", Text("a\r", language.German, "\nb"), "\r\n", " ",
+			Text("a\r", language.German, "\nb")},
+		{"escape removed", Text("a-b"), "-", "\x1b", Text("ab")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.in.ReplaceAll(tt.old, tt.new); got != tt.want {
+				t.Errorf("ReplaceAll = %q, want %q", got.s, tt.want.s)
+			}
+		})
+	}
+}
+
 func TestText_Panics(t *testing.T) {
 	tests := []struct {
 		name  string

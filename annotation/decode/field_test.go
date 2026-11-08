@@ -18,6 +18,7 @@ package decode
 
 import (
 	"fmt"
+	"maps"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -69,7 +70,7 @@ func fieldTestCases() []struct {
 		return f
 	}
 	btn := func(name string, setup ...func(*acroform.ButtonField)) *acroform.ButtonField {
-		f := acroform.NewButtonField(name)
+		f := acroform.NewButtonField(name, acroform.ButtonCheckbox)
 		for _, s := range setup {
 			s(f)
 		}
@@ -99,11 +100,11 @@ func fieldTestCases() []struct {
 			f.Flags = acroform.FieldReadOnly | acroform.FieldRequired | acroform.FieldNoExport
 		})},
 		{"direct values", tx("v", func(f *acroform.TextField) {
-			f.V = &pdf.StringOrStream{Value: pdf.Text("hello")}
-			f.DV = &pdf.StringOrStream{Value: pdf.Text("world")}
+			f.Text = &pdf.StringOrStream{Value: pdf.Text("hello")}
+			f.DefaultText = &pdf.StringOrStream{Value: pdf.Text("world")}
 		})},
 		{"stream value", tx("vs", func(f *acroform.TextField) {
-			f.V = &pdf.StringOrStream{Value: pdf.Text("streamed value"), IsStream: true}
+			f.Text = &pdf.StringOrStream{Value: pdf.Text("streamed value"), IsStream: true}
 		})},
 		{"text variable text", tx("vt", func(f *acroform.TextField) {
 			f.DefaultAppearance = "/Helv 12 Tf 0 g"
@@ -114,28 +115,30 @@ func fieldTestCases() []struct {
 		{"alternate names", ch("choice", func(f *acroform.ChoiceField) { f.AltName = pdf.Text("Choose one"); f.ExportName = "choice_map" })},
 		{"choice options", ch("fonts", func(f *acroform.ChoiceField) {
 			f.Flags = acroform.FieldCombo
-			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("h"), Display: pdf.Text("Helvetica")}, {Export: pdf.Text("Times"), Display: pdf.Text("Times")}}
+			f.Options = []acroform.ChoiceOption{{Export: "h", Display: pdf.Text("Helvetica")}, {Export: "Times", Display: pdf.Text("Times")}}
 			f.Selected = []int{1}
-			f.V = []pdf.TextString{pdf.Text("Times")}
+			f.Value = []pdf.TextString{pdf.Text("Times")}
 		})},
 		{"multi-select", ch("colors", func(f *acroform.ChoiceField) {
 			f.Flags = acroform.FieldMultiSelect
-			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("r"), Display: pdf.Text("Red")}, {Export: pdf.Text("g"), Display: pdf.Text("Green")}, {Export: pdf.Text("b"), Display: pdf.Text("Blue")}}
+			f.Options = []acroform.ChoiceOption{{Export: "r", Display: pdf.Text("Red")}, {Export: "g", Display: pdf.Text("Green")}, {Export: "b", Display: pdf.Text("Blue")}}
 			f.Selected = []int{0, 2}
-			f.V = []pdf.TextString{pdf.Text("Red"), pdf.Text("Blue")}
+			f.Value = []pdf.TextString{pdf.Text("Red"), pdf.Text("Blue")}
 		})},
 		{"list box selection", ch("sizes", func(f *acroform.ChoiceField) {
-			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("S"), Display: pdf.Text("Small")}, {Export: pdf.Text("L"), Display: pdf.Text("Large")}}
+			f.Options = []acroform.ChoiceOption{{Export: "S", Display: pdf.Text("Small")}, {Export: "L", Display: pdf.Text("Large")}}
 			f.Selected = []int{1}
-			f.V = []pdf.TextString{pdf.Text("Large")}
+			f.Value = []pdf.TextString{pdf.Text("Large")}
 		})},
-		{"checkbox", btn("agree", func(f *acroform.ButtonField) { f.V = "Yes"; f.DV = "Off" })},
+		{"checkbox", btn("agree", func(f *acroform.ButtonField) { f.State = "Yes"; f.DefaultState = "Off" })},
 		{"radio with export values", btn("size", func(f *acroform.ButtonField) {
 			f.Flags = acroform.FieldRadio
-			f.Opt = []string{"small", "large"}
-			f.V = "small"
+			f.ExportValues = []string{"small", "large"}
+			f.State, f.DefaultState = "0", "Off"
+			addWidget(f, 0, 0, 20, 20)
+			addWidget(f, 30, 0, 50, 20)
 		})},
-		{"push button", btn("submit", func(f *acroform.ButtonField) { f.Flags = acroform.FieldPushbutton })},
+		{"push button", acroform.NewPushButtonField("submit")},
 		{"signature", sig("sig")},
 		{"signature with lock all", sig("siglockall", func(f *acroform.SignatureField) {
 			f.Lock = &acroform.SigFieldLock{Action: acroform.SigFieldLockAll}
@@ -164,11 +167,13 @@ func fieldTestCases() []struct {
 		}}},
 		{"merged widget", func() acroform.Node {
 			f := btn("submitW")
+			f.State, f.DefaultState = "Off", "Off"
 			addWidget(f, 0, 0, 72, 24)
 			return f
 		}()},
 		{"merged widget with mixed AA", func() acroform.Node {
 			f := btn("submitAA", func(f *acroform.ButtonField) {
+				f.State, f.DefaultState = "Off", "Off"
 				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("calc();")}}}
 			})
 			withAnnotAA(addWidget(f, 0, 0, 72, 24),
@@ -177,6 +182,7 @@ func fieldTestCases() []struct {
 		}()},
 		{"merged widget field-only AA", func() acroform.Node {
 			f := btn("calcOnly", func(f *acroform.ButtonField) {
+				f.State, f.DefaultState = "Off", "Off"
 				f.AA = &triggers.Form{Calculate: &action.JavaScript{JS: &pdf.StringOrStream{Value: pdf.Text("calc();")}}}
 			})
 			addWidget(f, 0, 0, 72, 24)
@@ -185,7 +191,8 @@ func fieldTestCases() []struct {
 		{"multiple widgets", func() acroform.Node {
 			f := btn("color", func(f *acroform.ButtonField) {
 				f.Flags = acroform.FieldRadio
-				f.Opt = []string{"red", "green"}
+				f.ExportValues = []string{"red", "green"}
+				f.State, f.DefaultState = "Off", "Off"
 			})
 			addWidget(f, 0, 0, 20, 20)
 			addWidget(f, 30, 0, 50, 20)
@@ -371,8 +378,52 @@ func TestDecodeFieldInheritedType(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a *acroform.TextField kid, got %T", g.Children[0])
 	}
-	if kid.V == nil || kid.V.Value.String() != "hello" {
-		t.Errorf("kid V = %v, want \"hello\"", kid.V)
+	if kid.Text == nil || kid.Text.Value.String() != "hello" {
+		t.Errorf("kid V = %v, want \"hello\"", kid.Text)
+	}
+}
+
+// /V, /DV and /Opt do not apply to push buttons: a push button reads as a
+// PushButtonField, whatever own or inherited entries of this kind it has
+func TestDecodePushButtonDropsOpt(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	x := pdf.NewExtractor(w)
+
+	opt := pdf.Array{pdf.String("Yes")}
+	push := pdf.Integer(acroform.FieldPushbutton)
+	parentRef := w.Alloc()
+	inheritRef := w.Alloc()
+	ownRef := w.Alloc()
+	if err := w.Put(parentRef, pdf.Dict{
+		"FT": pdf.Name("Btn"), "T": pdf.String("p"), "Opt": opt,
+		"V": pdf.Name("Yes"), "DV": pdf.Name("Yes"),
+		"Kids": pdf.Array{inheritRef, ownRef},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(inheritRef, pdf.Dict{"T": pdf.String("a"), "Ff": push, "Parent": parentRef}); err != nil {
+		t.Fatal(err)
+	}
+	own := pdf.Dict{
+		"T": pdf.String("b"), "Ff": push, "Opt": opt, "Parent": parentRef,
+		"V": pdf.Name("On"), "DV": pdf.Name("On"),
+	}
+	if err := w.Put(ownRef, own); err != nil {
+		t.Fatal(err)
+	}
+
+	node, err := decodeRootField(x, parentRef)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	g, ok := node.(*acroform.Group)
+	if !ok {
+		t.Fatalf("expected a *acroform.Group, got %T", node)
+	}
+	for i, child := range g.Children {
+		if _, ok := child.(*acroform.PushButtonField); !ok {
+			t.Errorf("kid %d: expected a *acroform.PushButtonField, got %T", i, child)
+		}
 	}
 }
 
@@ -611,11 +662,11 @@ func TestDecodeChoiceOptSkipsNonStrings(t *testing.T) {
 		t.Fatalf("expected *acroform.ChoiceField, got %T", node)
 	}
 	want := []acroform.ChoiceOption{
-		{Export: pdf.Text("plain"), Display: pdf.Text("plain")},
-		{Export: pdf.Text("exp"), Display: pdf.Text("disp")},
-		{Export: pdf.Text(""), Display: pdf.Text("")},
+		{Export: "plain", Display: pdf.Text("plain")},
+		{Export: "exp", Display: pdf.Text("disp")},
+		{Export: "", Display: pdf.Text("")},
 	}
-	if diff := cmp.Diff(want, ch.Opt); diff != "" {
+	if diff := cmp.Diff(want, ch.Options); diff != "" {
 		t.Errorf("Opt mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -639,7 +690,12 @@ func TestDecodeChoiceValueNormalises(t *testing.T) {
 			x := pdf.NewExtractor(w)
 
 			ref := w.Alloc()
-			dict := pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("choice"), "Ff": pdf.Integer(acroform.FieldMultiSelect)}
+			dict := pdf.Dict{
+				"FT":  pdf.Name("Ch"),
+				"T":   pdf.String("choice"),
+				"Ff":  pdf.Integer(acroform.FieldMultiSelect),
+				"Opt": pdf.Array{pdf.String("one"), pdf.String("a"), pdf.String("b")},
+			}
 			if tc.v != nil {
 				dict["V"] = tc.v
 			}
@@ -655,8 +711,8 @@ func TestDecodeChoiceValueNormalises(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected *acroform.ChoiceField, got %T", node)
 			}
-			if diff := cmp.Diff(tc.want, ch.V); diff != "" {
-				t.Errorf("V mismatch (-want +got):\n%s", diff)
+			if diff := cmp.Diff(tc.want, ch.Value); diff != "" {
+				t.Errorf("Value mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -706,8 +762,8 @@ func TestDecodeFieldInheritanceIgnoresInvalid(t *testing.T) {
 	if f.DefaultAppearance != "/Helv 12 Tf 0 g" {
 		t.Errorf("DA = %q, want the inherited value", f.DefaultAppearance)
 	}
-	if f.V == nil || f.V.Value.String() != "inherited" {
-		t.Errorf("V = %v, want \"inherited\"", f.V)
+	if f.Text == nil || f.Text.Value.String() != "inherited" {
+		t.Errorf("V = %v, want \"inherited\"", f.Text)
 	}
 	if f.Align != pdf.TextAlignRight {
 		t.Errorf("Align = %v, want the inherited value", f.Align)
@@ -738,8 +794,8 @@ func TestDecodeTextValueInvalid(t *testing.T) {
 		t.Fatalf("decode failed: %v", err)
 	}
 	f := node.(*acroform.TextField)
-	if f.V != nil || f.DV != nil || f.RichValue != nil {
-		t.Errorf("V, DV, RV = %v, %v, %v, want nil", f.V, f.DV, f.RichValue)
+	if f.Text != nil || f.DefaultText != nil || f.RichText != nil {
+		t.Errorf("V, DV, RV = %v, %v, %v, want nil", f.Text, f.DefaultText, f.RichText)
 	}
 }
 
@@ -834,8 +890,8 @@ func TestDecodeUnnamedField(t *testing.T) {
 	}
 }
 
-// A text or choice field without a default appearance gets one, and the value
-// of a password field is dropped.
+// A text or choice field without a default appearance gets one, and the value,
+// rich text value and default value of a password field are dropped.
 func TestDecodeFieldRepairs(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	x := pdf.NewExtractor(w)
@@ -847,6 +903,7 @@ func TestDecodeFieldRepairs(t *testing.T) {
 		"Ff": pdf.Integer(acroform.FieldPassword),
 		"V":  pdf.String("secret"),
 		"DV": pdf.String("default"),
+		"RV": pdf.String("<p>secret</p>"),
 	}
 	chRef := w.Alloc()
 	ch := pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("ch")}
@@ -862,11 +919,14 @@ func TestDecodeFieldRepairs(t *testing.T) {
 		t.Fatalf("decode failed: %v", err)
 	}
 	f := node.(*acroform.TextField)
-	if f.V != nil {
-		t.Errorf("password V = %v, want nil", f.V)
+	if f.Text != nil {
+		t.Errorf("password V = %v, want nil", f.Text)
 	}
-	if f.DV == nil || f.DV.Value.String() != "default" {
-		t.Errorf("password DV = %v, want \"default\"", f.DV)
+	if f.DefaultText != nil {
+		t.Errorf("password DV = %v, want nil", f.DefaultText)
+	}
+	if f.RichText != nil {
+		t.Errorf("password RV = %v, want nil", f.RichText)
 	}
 	if f.DefaultAppearance == "" {
 		t.Error("text field without DA was not repaired")
@@ -1014,11 +1074,11 @@ func TestDecodeChoiceSingleSelectValue(t *testing.T) {
 		t.Fatalf("decode failed: %v", err)
 	}
 	ch := node.(*acroform.ChoiceField)
-	if ch.V != nil || ch.Selected != nil {
-		t.Errorf("V, Selected = %q, %v, want nil, nil", ch.V, ch.Selected)
+	if ch.Value != nil || ch.Selected != nil {
+		t.Errorf("V, Selected = %q, %v, want nil, nil", ch.Value, ch.Selected)
 	}
-	if ch.DV != nil {
-		t.Errorf("DV = %q, want nil", ch.DV)
+	if ch.DefaultValue != nil {
+		t.Errorf("DV = %q, want nil", ch.DefaultValue)
 	}
 }
 
@@ -1044,7 +1104,7 @@ func TestDecodeChoiceValueOrder(t *testing.T) {
 		t.Fatalf("decode failed: %v", err)
 	}
 	ch := node.(*acroform.ChoiceField)
-	if diff := cmp.Diff([]pdf.TextString{pdf.Text("B"), pdf.Text("A")}, ch.V); diff != "" {
+	if diff := cmp.Diff([]pdf.TextString{pdf.Text("B"), pdf.Text("A")}, ch.Value); diff != "" {
 		t.Errorf("V mismatch (-want +got):\n%s", diff)
 	}
 	if diff := cmp.Diff([]int{0, 1}, ch.Selected); diff != "" {
@@ -1250,17 +1310,17 @@ func TestDecodeChoiceExplicitEmpty(t *testing.T) {
 				t.Fatal(err)
 			}
 			ch := node.(*acroform.ChoiceField)
-			if diff := cmp.Diff(tc.wantV, ch.V); diff != "" {
+			if diff := cmp.Diff(tc.wantV, ch.Value); diff != "" {
 				t.Errorf("V differs (-want +got):\n%s", diff)
 			}
-			if (ch.V == nil) != (tc.wantV == nil) {
-				t.Errorf("V nil-ness: got %#v, want %#v", ch.V, tc.wantV)
+			if (ch.Value == nil) != (tc.wantV == nil) {
+				t.Errorf("V nil-ness: got %#v, want %#v", ch.Value, tc.wantV)
 			}
-			if diff := cmp.Diff(tc.wantDV, ch.DV); diff != "" {
+			if diff := cmp.Diff(tc.wantDV, ch.DefaultValue); diff != "" {
 				t.Errorf("DV differs (-want +got):\n%s", diff)
 			}
-			if (ch.DV == nil) != (tc.wantDV == nil) {
-				t.Errorf("DV nil-ness: got %#v, want %#v", ch.DV, tc.wantDV)
+			if (ch.DefaultValue == nil) != (tc.wantDV == nil) {
+				t.Errorf("DV nil-ness: got %#v, want %#v", ch.DefaultValue, tc.wantDV)
 			}
 			if diff := cmp.Diff(tc.wantSel, ch.Selected); diff != "" {
 				t.Errorf("Selected differs (-want +got):\n%s", diff)
@@ -1272,11 +1332,69 @@ func TestDecodeChoiceExplicitEmpty(t *testing.T) {
 func TestChoiceExplicitEmptyDVRoundTrip(t *testing.T) {
 	f := newChoiceField("c")
 	f.Flags |= acroform.FieldMultiSelect
-	f.V = []pdf.TextString{}
-	f.DV = []pdf.TextString{}
+	f.Value = []pdf.TextString{}
+	f.DefaultValue = []pdf.TextString{}
 	first := roundTripForm(t, pdf.V1_7, &acroform.InteractiveForm{Fields: []acroform.Node{f}})
 	got := first.Fields[0].(*acroform.ChoiceField)
-	if got.V == nil || got.DV == nil {
-		t.Errorf("V, DV = %#v, %#v, want non-nil empty", got.V, got.DV)
+	if got.Value == nil || got.DefaultValue == nil {
+		t.Errorf("V, DV = %#v, %#v, want non-nil empty", got.Value, got.DefaultValue)
+	}
+}
+
+// A choice value must name options, except in an editable combo box.  A
+// multiple selection keeps the entries which do; otherwise the value is
+// dropped, and /I, if present, takes its place.
+func TestDecodeChoiceValueNamesOptions(t *testing.T) {
+	str := func(ss ...string) pdf.Array {
+		a := pdf.Array{}
+		for _, s := range ss {
+			a = append(a, pdf.String(s))
+		}
+		return a
+	}
+	text := func(ss ...string) []pdf.TextString {
+		var v []pdf.TextString
+		for _, s := range ss {
+			v = append(v, pdf.Text(s))
+		}
+		return v
+	}
+	multi := pdf.Integer(acroform.FieldMultiSelect)
+	editable := pdf.Integer(acroform.FieldCombo | acroform.FieldEdit)
+	cases := []struct {
+		name          string
+		extra         pdf.Dict
+		value, defVal []pdf.TextString
+	}{
+		{"single, no option", pdf.Dict{"V": pdf.String("Z"), "DV": pdf.String("Y")}, nil, nil},
+		{"single, /I restores", pdf.Dict{"V": pdf.String("Z"), "I": pdf.Array{pdf.Integer(1)}}, text("B"), nil},
+		{"multi, keeps options", pdf.Dict{"Ff": multi, "V": str("A", "Z", "C"), "DV": str("Y", "B")},
+			text("A", "C"), text("B")},
+		{"multi, none left", pdf.Dict{"Ff": multi, "V": str("Z", "Y")}, nil, nil},
+		{"multi, explicit empty", pdf.Dict{"Ff": multi, "V": pdf.Array{}}, []pdf.TextString{}, nil},
+		{"editable combo", pdf.Dict{"Ff": editable, "V": pdf.String("Z"), "DV": pdf.String("Y")},
+			text("Z"), text("Y")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			ref := w.Alloc()
+			dict := pdf.Dict{"FT": pdf.Name("Ch"), "T": pdf.String("c"), "Opt": str("A", "B", "C")}
+			maps.Copy(dict, tc.extra)
+			if err := w.Put(ref, dict); err != nil {
+				t.Fatal(err)
+			}
+			node, err := decodeRootField(pdf.NewExtractor(w), ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ch := node.(*acroform.ChoiceField)
+			if diff := cmp.Diff(tc.value, ch.Value); diff != "" {
+				t.Errorf("Value mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.defVal, ch.DefaultValue); diff != "" {
+				t.Errorf("DefaultValue mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

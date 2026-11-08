@@ -35,10 +35,11 @@ type Node interface {
 	PartialName() string
 }
 
-// Field is a field in a PDF interactive form. This is implemented by four
+// Field is a field in a PDF interactive form. This is implemented by five
 // concrete types:
 //   - [TextField] (text),
-//   - [ButtonField] (button),
+//   - [ButtonField] (check box or radio buttons),
+//   - [PushButtonField] (push button),
 //   - [ChoiceField] (choice) and
 //   - [SignatureField] (signature).
 //
@@ -59,6 +60,17 @@ type Field interface {
 
 	// GetCommon returns the entries common to all field types.
 	GetCommon() *Common
+
+	// ExportData returns the values the field contributes when the form's
+	// data is exported, for example by a submit-form action.  The result is
+	// empty if the field has no value or exports none.  Neither the
+	// [FieldNoExport] flag nor other fields with the same fully qualified
+	// name are taken into account; [InteractiveForm.ExportData] does both.
+	//
+	// The values depend on the field type; see the ExportData methods of
+	// [TextField], [ButtonField], [PushButtonField], [ChoiceField] and
+	// [SignatureField].
+	ExportData() []string
 
 	fillDict(rm *pdf.ResourceManager, dict pdf.Dict) error
 }

@@ -34,7 +34,6 @@ func TestButtonFieldVariant(t *testing.T) {
 	}{
 		{"checkbox", 0, ButtonCheckbox},
 		{"radio", FieldRadio, ButtonRadio},
-		{"push", FieldPushbutton, ButtonPush},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &ButtonField{}
@@ -100,8 +99,9 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		})},
 		{"signature field requires 1.3", pdf.V1_2, NewSignatureField("x")},
 		{"button Opt requires 1.4", pdf.V1_3, func() Field {
-			f := NewButtonField("x")
-			f.Opt = []string{"A"}
+			f := NewButtonField("x", ButtonCheckbox)
+			f.ExportValues = []string{"A"}
+			f.Widgets = []Widget{&fakeWidget{f: f}}
 			return f
 		}()},
 		{"FileSelect flag requires 1.4", pdf.V1_3, tx(func(f *TextField) { f.Flags = FieldFileSelect })},
@@ -115,8 +115,8 @@ func TestEncodeFieldVersionGating(t *testing.T) {
 		{"Comb flag requires 1.5", pdf.V1_4, tx(func(f *TextField) { f.Flags = FieldComb; f.MaxLen = 6 })},
 		{"RichText flag requires 1.5", pdf.V1_4, tx(func(f *TextField) { f.Flags = FieldRichText })},
 		{"RadiosInUnison flag requires 1.5", pdf.V1_4, func() Field {
-			f := NewButtonField("x")
-			f.Flags = FieldRadio | FieldRadiosInUnison
+			f := NewButtonField("x", ButtonRadio)
+			f.Flags |= FieldRadiosInUnison
 			return f
 		}()},
 		{"CommitOnSelChange flag requires 1.5", pdf.V1_4, func() Field {
@@ -197,12 +197,23 @@ func TestEncodeFieldValidation(t *testing.T) {
 	password := func(v, dv *pdf.StringOrStream) *TextField {
 		f := textField("pw")
 		f.Flags = FieldPassword
-		f.V, f.DV = v, dv
+		f.Text, f.DefaultText = v, dv
 		return f
 	}
 	value := &pdf.StringOrStream{Value: pdf.Text("secret")}
 	richPassword := password(nil, nil)
-	richPassword.RichValue = value
+	richPassword.RichText = value
+	lines := func(flags FieldFlags, v, dv string) *TextField {
+		f := textField("t")
+		f.Flags = flags
+		if v != "" {
+			f.Text = &pdf.StringOrStream{Value: pdf.Text(v)}
+		}
+		if dv != "" {
+			f.DefaultText = &pdf.StringOrStream{Value: pdf.Text(dv)}
+		}
+		return f
+	}
 	tests := []struct {
 		name    string
 		field   Field
@@ -212,11 +223,15 @@ func TestEncodeFieldValidation(t *testing.T) {
 		{"unnamed field", textField(""), true},
 		{"text field without DA", NewTextField("x"), true},
 		{"choice field without DA", NewChoiceField("x"), true},
-		{"button field without DA", NewButtonField("x"), false},
+		{"button field without DA", NewButtonField("x", ButtonCheckbox), false},
 		{"password without value", password(nil, nil), false},
-		{"password with default value", password(nil, value), false},
-		{"password with value", password(value, nil), true},
-		{"password with rich value", richPassword, true},
+		{"password with default value", password(nil, value), true},
+		{"password with value", password(value, nil), false},
+		{"password with rich value", richPassword, false},
+		{"single-line text with LF", lines(0, "a\nb", ""), true},
+		{"single-line text with CR", lines(0, "a\rb", ""), true},
+		{"single-line default with LF", lines(0, "", "a\nb"), true},
+		{"multiline text with LF", lines(FieldMultiline, "a\nb", "c\r\nd"), false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -237,7 +252,7 @@ func TestEncodeFieldValidation(t *testing.T) {
 func TestEncodeDuplicateNames(t *testing.T) {
 	text := func(v string) *TextField {
 		f := textField("b")
-		f.V = &pdf.StringOrStream{Value: pdf.Text(v)}
+		f.Text = &pdf.StringOrStream{Value: pdf.Text(v)}
 		return f
 	}
 	tests := []struct {
@@ -266,5 +281,116 @@ func TestEncodeDuplicateNames(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+// the field constructors set the partial name and the field type
+func TestConstructors(t *testing.T) {
+	tests := []struct {
+		field Field
+		want  pdf.Name
+	}{
+		{NewTextField("a"), "Tx"},
+		{NewButtonField("b", ButtonCheckbox), "Btn"},
+		{NewChoiceField("c"), "Ch"},
+		{NewSignatureField("d"), "Sig"},
+	}
+	for _, tc := range tests {
+		if got := tc.field.FieldType(); got != tc.want {
+			t.Errorf("FieldType = %q, want %q", got, tc.want)
+		}
+		if got := tc.field.PartialName(); got == "" {
+			t.Errorf("%s field has no partial name", tc.want)
+		}
+	}
+}
+
+// the Pushbutton flag must agree with the field type
+func TestEncodePushButtonFlag(t *testing.T) {
+	check := NewButtonField("b", ButtonCheckbox)
+	check.Flags = FieldPushbutton
+	unflagged := NewPushButtonField("p")
+	unflagged.Flags = 0
+	tests := []struct {
+		name    string
+		field   Field
+		wantErr bool
+	}{
+		{"push button", NewPushButtonField("p"), false},
+		{"push button without flag", unflagged, true},
+		{"check box with flag", check, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			dict, err := terminalEntries(pdf.NewResourceManager(w), tc.field)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("error = %v, want error %t", err, tc.wantErr)
+			}
+			if err == nil && dict["Ff"] != pdf.Integer(FieldPushbutton) {
+				t.Errorf("/Ff = %v, want %d", dict["Ff"], FieldPushbutton)
+			}
+		})
+	}
+}
+
+// a state or default state naming no on-state of any field of the same name
+// cannot be written
+func TestEncodeButtonStateUnknown(t *testing.T) {
+	for _, set := range []func(*ButtonField){
+		func(f *ButtonField) { f.State = "C" },
+		func(f *ButtonField) { f.DefaultState = "C" },
+	} {
+		f, _ := radioWith(0, "A", "B")
+		set(f)
+		form := &InteractiveForm{Fields: []Node{f}}
+		if err := form.checkButtonStates(); err == nil {
+			t.Errorf("expected an error for State %q, DefaultState %q", f.State, f.DefaultState)
+		}
+	}
+}
+
+// fields of the same name are one field: a value may name an on-state which
+// only one of them has
+func TestCheckButtonStatesSameName(t *testing.T) {
+	first, _ := radioWith(0, "Card", "Cash")
+	second, _ := radioWith(0, "Card", "Cheque")
+	first.Name, second.Name = "pay", "pay"
+	first.State, second.State = "Cash", "Cash"
+	form := &InteractiveForm{Fields: []Node{first, second}}
+	if err := form.checkButtonStates(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	second.Name = "other"
+	if err := form.checkButtonStates(); err == nil {
+		t.Error("expected an error for a state of another field")
+	}
+}
+
+// an empty state is written as "Off", so same-named fields with "" and "Off"
+// agree
+func TestSameTypeAndValueOff(t *testing.T) {
+	a := NewButtonField("c", ButtonCheckbox)
+	b := NewButtonField("c", ButtonCheckbox)
+	b.State, b.DefaultState = "Off", "Off"
+	if !sameTypeAndValue(a, b) {
+		t.Error("empty and Off states differ")
+	}
+	b.State = "Yes"
+	if sameTypeAndValue(a, b) {
+		t.Error("empty and Yes states agree")
+	}
+}
+
+// a push button and a check box of the same name are not one field
+func TestSameTypeAndValuePushButton(t *testing.T) {
+	push := NewPushButtonField("b")
+	check := NewButtonField("b", ButtonCheckbox)
+	if sameTypeAndValue(push, check) || sameTypeAndValue(check, push) {
+		t.Error("push button and check box agree")
+	}
+	if !sameTypeAndValue(push, NewPushButtonField("b")) {
+		t.Error("two push buttons differ")
 	}
 }

@@ -102,16 +102,15 @@ func TestWidgetAppearanceStateConsistency(t *testing.T) {
 		{"on while unselected", 0, "Off", "Yes", true},
 		{"on with no value", 0, "", "Yes", true},
 		{"radio on other value", acroform.FieldRadio, "A", "Yes", true},
-		{"push button unchecked", acroform.FieldPushbutton, "", "Yes", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
-			f := acroform.NewButtonField("b")
+			f := acroform.NewButtonField("b", acroform.ButtonCheckbox)
 			f.Flags = tc.flags
-			f.V = tc.value
+			f.State = tc.value
 			wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})
 			wid.Appearance = &appearance.Dict{
 				NormalMap: map[pdf.Name]*form.Form{"Yes": blank, "Off": blank},
@@ -144,8 +143,8 @@ func TestWidgetOffStateWithoutAppearance(t *testing.T) {
 			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 			rm := pdf.NewResourceManager(w)
 
-			f := acroform.NewButtonField("b")
-			f.V = "Off"
+			f := acroform.NewButtonField("b", acroform.ButtonCheckbox)
+			f.State = "Off"
 			wid := AddWidget(f, pdf.Rectangle{URx: 10, URy: 10})
 			wid.Appearance = &appearance.Dict{
 				NormalMap: map[pdf.Name]*form.Form{"Yes": blank},
@@ -170,8 +169,8 @@ func TestWidgetParentConsistency(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	a := acroform.NewButtonField("a")
-	b := acroform.NewButtonField("b")
+	a := acroform.NewButtonField("a", acroform.ButtonCheckbox)
+	b := acroform.NewButtonField("b", acroform.ButtonCheckbox)
 	wid := AddWidget(b, pdf.Rectangle{URx: 10, URy: 10})
 	// move the widget into a's list while it still points at b
 	b.Widgets = nil

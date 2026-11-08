@@ -18,213 +18,246 @@ package acroform
 import (
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"seehuhn.de/go/pdf"
 )
 
-// OnState returns the on-state name of the i-th widget of a check box or
-// radio button field, or the empty string for a push button or if i is out
-// of range.
+// OnState returns the on-state name of the i-th button of a check box or
+// radio button field, or the empty string if i is out of range.  See
+// [ButtonField.OnStates] for how the name is found.
 //
-// The name is taken from the widget's normal appearance, if that has a state
-// other than "Off".  Otherwise the field's Opt entry is used, then (for a
-// check box) the field value or the default value, and finally "On".
+// For a radio button whose widget names no on-state, OnState takes time
+// linear in the number of buttons.  Use [ButtonField.OnStates] to obtain the
+// names of all buttons.
 func (f *ButtonField) OnState(i int) pdf.Name {
-	if f.Flags&FieldPushbutton != 0 || i < 0 || i >= f.numOnStates() {
+	if i < 0 || i >= f.numOnStates() {
 		return ""
 	}
-	if i < len(f.Widgets) && f.Widgets[i] != nil {
-		for _, name := range f.Widgets[i].AppearanceStateNames() {
-			if name != "Off" {
-				return name
+	if name := f.widgetOnState(i); name != "" {
+		return name
+	}
+	if f.Flags&FieldRadio != 0 {
+		return f.OnStates()[i]
+	}
+	return f.checkBoxOnState(i)
+}
+
+// OnStates returns the on-state names of the buttons of a check box or radio
+// button field, in the order of the Widgets slice.  The result has one entry
+// per widget or ExportValues entry, and at least one.
+//
+// A widget names its own on-state through the first state of its normal
+// appearance other than "Off", or else through its current appearance
+// state, if that is not "Off".  For a widget which names none, or a button
+// without a widget:
+//   - A radio button gets a decimal number.  These buttons take, in order,
+//     the smallest numbers which no widget uses as its own name, so that the
+//     on-states of all buttons are distinct.
+//   - A check box uses its ExportValues entry, if any.  Otherwise it uses
+//     State, or else DefaultState, if that is not "Off", and finally "Yes".
+func (f *ButtonField) OnStates() []pdf.Name {
+	n := f.numOnStates()
+	names := make([]pdf.Name, n)
+	for i := range n {
+		names[i] = f.widgetOnState(i)
+	}
+
+	if f.Flags&FieldRadio == 0 {
+		for i, name := range names {
+			if name == "" {
+				names[i] = f.checkBoxOnState(i)
 			}
 		}
+		return names
 	}
-	if i < len(f.Opt) {
-		return pdf.Name(f.Opt[i])
+
+	taken := make(map[pdf.Name]bool, n)
+	for _, name := range names {
+		if name != "" {
+			taken[name] = true
+		}
+	}
+	// k only increases, so the search takes linear time overall
+	k := 0
+	for i, name := range names {
+		if name != "" {
+			continue
+		}
+		for taken[pdf.Name(strconv.Itoa(k))] {
+			k++
+		}
+		names[i] = pdf.Name(strconv.Itoa(k))
+		k++
+	}
+	return names
+}
+
+// widgetOnState returns the on-state name which the i-th widget names
+// itself, through its normal appearance or its current appearance state, or
+// the empty string if it names none.
+func (f *ButtonField) widgetOnState(i int) pdf.Name {
+	if i >= len(f.Widgets) || f.Widgets[i] == nil {
+		return ""
+	}
+	w := f.Widgets[i]
+	for _, name := range w.AppearanceStateNames() {
+		if name != "Off" {
+			return name
+		}
+	}
+	if as := w.CurrentAppearanceState(); as != "" && as != "Off" {
+		return as
+	}
+	return ""
+}
+
+// checkBoxOnState returns the on-state name of the i-th button of a check box
+// whose widget names none.
+func (f *ButtonField) checkBoxOnState(i int) pdf.Name {
+	// "" and "Off" are valid export values, but no on-state names
+	if i < len(f.ExportValues) && f.ExportValues[i] != "" && f.ExportValues[i] != "Off" {
+		return pdf.Name(f.ExportValues[i])
 	}
 	// a single check box may name its on-state via the field value, or via
 	// the default value once the field is off
-	if f.Flags&FieldRadio == 0 {
-		for _, n := range []pdf.Name{f.V, f.DV} {
-			if n != "" && n != "Off" {
-				return n
-			}
+	for _, n := range []pdf.Name{f.State, f.DefaultState} {
+		if n != "" && n != "Off" {
+			return n
 		}
 	}
-	return "On"
+	return "Yes"
 }
 
 // numOnStates returns the number of indices [ButtonField.OnState] accepts:
-// one per widget or Opt entry, and at least one.
+// one per widget or ExportValues entry, and at least one.
 func (f *ButtonField) numOnStates() int {
-	return max(len(f.Widgets), len(f.Opt), 1)
+	return max(len(f.Widgets), len(f.ExportValues), 1)
 }
 
-// Toggle performs a click on widget i of a check box or radio button field.
-//
-// For a check box, the field switches between the widget's on-state and
-// "Off".  For a radio button, the click selects widget i, or clears the
-// field if widget i is already on, unless [FieldNoToggleToOff] is set.
-// Where [FieldRadiosInUnison] is set, all widgets sharing the on-state of
-// widget i are selected together.
-func (f *ButtonField) Toggle(i int) error {
-	if f.Flags&FieldPushbutton != 0 {
-		return errors.New("push button has no value")
-	}
-	if i < 0 || i >= f.numOnStates() {
-		return errors.New("widget index out of range")
-	}
-	on := f.OnState(i)
-	isOn := f.V == on
-	if i < len(f.Widgets) && f.Widgets[i] != nil {
-		isOn = f.Widgets[i].CurrentAppearanceState() == on
-	}
+// toggle performs a click on widget i of a check box or radio button field.
+// f.Widgets[i] must be a non-nil widget.
+func (f *ButtonField) toggle(i int) {
+	states := f.OnStates()
+	on := states[i]
+	isOn := f.Widgets[i].CurrentAppearanceState() == on
 
 	if f.Flags&FieldRadio == 0 {
 		if isOn {
-			return f.SetValue("Off")
+			f.setValue("Off")
+		} else {
+			f.setValue(on)
 		}
-		return f.SetValue(on)
+		return
 	}
 
 	if isOn {
-		if f.Flags&FieldNoToggleToOff != 0 {
-			return nil
+		if f.Flags&FieldNoToggleToOff == 0 {
+			f.setValue("Off")
 		}
-		return f.SetValue("Off")
+		return
 	}
-	f.V = on
+	f.State = on
 	unison := f.Flags&FieldRadiosInUnison != 0
 	for j, w := range f.Widgets {
 		if w == nil {
 			continue
 		}
-		if j == i || (unison && f.OnState(j) == on) {
+		if j == i || (unison && states[j] == on) {
 			w.SetAppearanceState(on)
 		} else {
 			w.SetAppearanceState("Off")
 		}
 	}
-	return nil
 }
 
-// SetValue sets the field value to v and updates the appearance state of
-// every widget: a widget is on if its on-state equals v, and off otherwise.
-// Use "Off" to clear the field.
-//
-// If the field has widgets or an Opt entry, v must be "Off" or one of the
-// on-states [ButtonField.OnState] returns for them; otherwise SetValue
-// returns an error and changes nothing.
-func (f *ButtonField) SetValue(v pdf.Name) error {
-	if f.Flags&FieldPushbutton != 0 {
-		return errors.New("push button has no value")
-	}
-	if v == "" {
-		return errors.New("empty button value")
-	}
-	if v != "Off" && (len(f.Widgets) > 0 || len(f.Opt) > 0) {
-		known := false
-		for j := range f.numOnStates() {
-			if f.OnState(j) == v {
-				known = true
-				break
-			}
-		}
-		if !known {
-			return errors.New("value matches no on-state")
-		}
-	}
-	f.V = v
+// accepts reports whether the field accepts the non-empty value v.
+func (f *ButtonField) accepts(v pdf.Name) bool {
+	unnamed := f.Flags&FieldRadio == 0 && len(f.Widgets) == 0 && len(f.ExportValues) == 0
+	return v == "Off" || unnamed || slices.Contains(f.OnStates(), v)
+}
+
+// setValue sets the field value to v and turns on the widgets whose on-state
+// is v, without checking v.
+func (f *ButtonField) setValue(v pdf.Name) {
+	// the names are taken before any widget changes state, since a widget
+	// may name its on-state only through its current state
+	states := f.OnStates()
+	f.State = v
 	for j, w := range f.Widgets {
 		if w == nil {
 			continue
 		}
-		if v != "Off" && f.OnState(j) == v {
+		if v != "Off" && states[j] == v {
 			w.SetAppearanceState(v)
 		} else {
 			w.SetAppearanceState("Off")
 		}
 	}
-	return nil
 }
 
-// SetText sets the text value of the field.  The stored value keeps the
-// string or stream form of the previous value, and any rich text value is
-// cleared.  An empty s gives an explicit empty value, not an absent one.
-//
-// SetText returns an error and changes nothing if the field is a password
-// field, if s has more than MaxLen characters, or if s contains a line break
-// and the field does not have the [FieldMultiline] flag.
-func (f *TextField) SetText(s string) error {
-	if f.Flags&FieldPassword != 0 {
-		return errors.New("password field value must not be stored")
-	}
+// checkText returns an error if s is not a valid value for the field.
+func (f *TextField) checkText(s string) error {
 	if f.MaxLen > 0 && utf8.RuneCountInString(s) > f.MaxLen {
 		return errors.New("text exceeds MaxLen")
 	}
 	if f.Flags&FieldMultiline == 0 && strings.ContainsAny(s, "\r\n") {
 		return errors.New("line break in single-line field")
 	}
-	f.V = &pdf.StringOrStream{
-		Value:    pdf.Text(s),
-		IsStream: f.V != nil && f.V.IsStream,
-	}
-	f.RichValue = nil
 	return nil
 }
 
-// Select selects the options with the given indices into Opt, sets V to
-// their display strings, and clears any rich text value.  The order of the
-// indices and duplicates are ignored.
-//
-// An empty list of indices clears the selection.  With [FieldMultiSelect],
-// V is then an explicit empty value; without it, V is absent.
-//
-// Selected is set only where V alone does not identify the options: if
-// several options are selected, or if a selected option shares its display
-// string with another.  Otherwise Selected is nil, so that the field can be
-// written in PDF versions before 1.4, which have no /I entry.
-//
-// Select returns an error and changes nothing if an index is out of range,
-// or if several options are selected in a field without the
-// [FieldMultiSelect] flag.
-func (f *ChoiceField) Select(indices []int) error {
-	sel := slices.Clone(indices)
-	slices.Sort(sel)
-	sel = slices.Compact(sel)
+// applyText sets the text value without checking s.  The stored value keeps
+// the string or stream form of the previous value, and any rich text value is
+// cleared.
+func (f *TextField) applyText(s string) {
+	f.Text = &pdf.StringOrStream{
+		Value:    pdf.Text(s),
+		IsStream: f.Text != nil && f.Text.IsStream,
+	}
+	f.RichText = nil
+}
+
+// checkSelection returns an error if sel, a sorted list of option indices
+// without duplicates, is not a valid selection for the field.
+func (f *ChoiceField) checkSelection(sel []int) error {
 	for _, idx := range sel {
-		if idx < 0 || idx >= len(f.Opt) {
+		if idx < 0 || idx >= len(f.Options) {
 			return errors.New("option index out of range")
 		}
 	}
 	if len(sel) > 1 && f.Flags&FieldMultiSelect == 0 {
 		return errors.New("multiple selections require the MultiSelect flag")
 	}
-	v := make([]pdf.TextString, len(sel))
-	for i, idx := range sel {
-		v[i] = f.Opt[idx].Display
-	}
-	f.V = v
-	if len(sel) == 0 && f.Flags&FieldMultiSelect == 0 {
-		f.V = nil
-	}
-	f.recordSelection(sel)
-	f.RichValue = nil
 	return nil
 }
 
-// recordSelection sets Selected to the ascending indices sel where V alone
+// applySelection selects the options sel, a checked sorted list of option
+// indices without duplicates.
+func (f *ChoiceField) applySelection(sel []int) {
+	v := make([]pdf.TextString, len(sel))
+	for i, idx := range sel {
+		v[i] = f.Options[idx].Display
+	}
+	f.Value = v
+	if len(sel) == 0 && f.Flags&FieldMultiSelect == 0 {
+		f.Value = nil
+	}
+	f.recordSelection(sel)
+	f.RichText = nil
+}
+
+// recordSelection sets Selected to the ascending indices sel where Value alone
 // does not identify the selected options, and to nil otherwise; see
-// [ChoiceField.Select].
+// [LogicalField.Select].
 func (f *ChoiceField) recordSelection(sel []int) {
 	f.Selected = nil
 	need := len(sel) > 1
 	for _, idx := range sel {
-		for j, o := range f.Opt {
-			if j != idx && o.Display == f.Opt[idx].Display {
+		for j, o := range f.Options {
+			if j != idx && o.Display == f.Options[idx].Display {
 				need = true
 			}
 		}
@@ -234,30 +267,28 @@ func (f *ChoiceField) recordSelection(sel []int) {
 	}
 }
 
-// SetEditText sets the text of an editable combo box and clears any rich
-// text value.  If s is the display string of an option, the first such
-// option becomes the selection; otherwise nothing is selected and V holds s
-// alone.  Selected is set as for [ChoiceField.Select].
-//
-// SetEditText returns an error if the field does not have both the
-// [FieldCombo] and [FieldEdit] flags.
-func (f *ChoiceField) SetEditText(s string) error {
-	const both = FieldCombo | FieldEdit
-	if f.Flags&both != both {
+// checkEditText returns an error if the field is not an editable combo box.
+func (f *ChoiceField) checkEditText() error {
+	if !f.IsEditable() {
 		return errors.New("not an editable combo box")
 	}
+	return nil
+}
+
+// applyEditText sets the text of an editable combo box without checking the
+// field.
+func (f *ChoiceField) applyEditText(s string) {
 	text := pdf.Text(s)
-	f.V = []pdf.TextString{text}
+	f.Value = []pdf.TextString{text}
 	var sel []int
-	for i, o := range f.Opt {
+	for i, o := range f.Options {
 		if o.Display == text {
 			sel = []int{i}
 			break
 		}
 	}
 	f.recordSelection(sel)
-	f.RichValue = nil
-	return nil
+	f.RichText = nil
 }
 
 // ValueEntries returns the value entries of f's field dictionary as
@@ -274,7 +305,9 @@ func ValueEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 	case *TextField:
 		err = f.fillValue(rm, dict)
 	case *ButtonField:
-		f.fillValue(dict)
+		err = f.fillValue(rm, dict)
+	case *PushButtonField:
+		err = f.fillValue(rm, dict)
 	case *ChoiceField:
 		err = f.fillValue(rm, dict)
 	case *SignatureField:
@@ -282,11 +315,6 @@ func ValueEntries(rm *pdf.ResourceManager, f Field) (pdf.Dict, error) {
 	}
 	if err != nil {
 		return nil, err
-	}
-	if vt, ok := f.(VariableTextField); ok {
-		if err := vt.GetVariableText().fillRichValue(rm, dict); err != nil {
-			return nil, err
-		}
 	}
 	return dict, nil
 }

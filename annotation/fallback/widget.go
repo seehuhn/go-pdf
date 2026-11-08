@@ -53,7 +53,7 @@ type widgetField struct {
 
 	// OnState is the on-state name of a check box or radio button widget (the
 	// key under which its "on" appearance is stored). An empty value defaults
-	// to "On".
+	// to "Yes".
 	OnState pdf.Name
 
 	// DefaultAppearance is the field's effective /DA string. It sets the font
@@ -79,8 +79,9 @@ type widgetField struct {
 }
 
 // resolveWidgetField gathers the form-field context for w from its form field
-// (w.Field), or returns nil if the widget has no associated field.
-func resolveWidgetField(w *annotation.Widget) *widgetField {
+// (w.Field), or returns nil if the widget has no associated field.  onState
+// finds the on-state name of a check box or radio button widget.
+func resolveWidgetField(w *annotation.Widget, onState onStateFunc) *widgetField {
 	f := w.Field
 	if f == nil {
 		return nil
@@ -88,7 +89,9 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	p := &widgetField{
 		FieldType: f.FieldType(),
 		Flags:     f.GetCommon().Flags,
-		OnState:   widgetOnState(f, widgetIndex(w)),
+	}
+	if btn, ok := f.(*acroform.ButtonField); ok {
+		p.OnState = onState(btn, w)
 	}
 	if vt, ok := f.(acroform.VariableTextField); ok {
 		v := vt.GetVariableText()
@@ -97,13 +100,13 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	}
 	switch x := f.(type) {
 	case *acroform.TextField:
-		if x.V != nil {
-			p.Value = x.V.Value.String()
+		if x.Text != nil {
+			p.Value = x.Text.Value.String()
 		}
 		p.MaxLen = x.MaxLen
 	case *acroform.ChoiceField:
-		p.Options = make([]string, len(x.Opt))
-		for i, o := range x.Opt {
+		p.Options = make([]string, len(x.Options))
+		for i, o := range x.Options {
 			p.Options[i] = o.Display.String()
 		}
 		p.Selected = x.Selected
@@ -113,33 +116,27 @@ func resolveWidgetField(w *annotation.Widget) *widgetField {
 	return p
 }
 
-// widgetIndex returns the position of w among the widgets of its field. Radio
-// buttons name each widget's on-state by this index.
-func widgetIndex(w *annotation.Widget) int {
-	if w.Field == nil {
-		return 0
-	}
-	for i, kw := range w.Field.GetCommon().Widgets {
+// onStateFunc returns the on-state name of w, a widget of the check box or
+// radio button field btn.
+type onStateFunc func(btn *acroform.ButtonField, w *annotation.Widget) pdf.Name
+
+// widgetOnState returns the on-state name of w, a widget of the check box or
+// radio button field btn.  A widget missing from the field's widget list is
+// treated as its first.  This takes time linear in the number of the field's
+// buttons; see [Batch] for a way to share this work.
+func widgetOnState(btn *acroform.ButtonField, w *annotation.Widget) pdf.Name {
+	for i, kw := range btn.Widgets {
 		if kw == acroform.Widget(w) {
-			return i
+			return btn.OnState(i)
 		}
 	}
-	return 0
-}
-
-// widgetOnState returns the on-state name of the index-th widget of a check box
-// or radio button field, or the empty string for other field types.
-func widgetOnState(f acroform.Field, index int) pdf.Name {
-	if btn, ok := f.(*acroform.ButtonField); ok {
-		return btn.OnState(index)
-	}
-	return ""
+	return btn.OnState(0)
 }
 
 // buttonValue returns a check box or radio button field's value name.
 func buttonValue(f acroform.Field) pdf.Name {
 	if b, ok := f.(*acroform.ButtonField); ok {
-		return b.V
+		return b.State
 	}
 	return ""
 }
@@ -148,13 +145,13 @@ func buttonValue(f acroform.Field) pdf.Name {
 // The field value names the selection; the selection indices are consulted
 // only when the value is empty.
 func choiceValue(x *acroform.ChoiceField) string {
-	if len(x.V) > 0 {
-		return x.V[0].String()
+	if len(x.Value) > 0 {
+		return x.Value[0].String()
 	}
 	if len(x.Selected) > 0 {
 		i := x.Selected[0]
-		if i >= 0 && i < len(x.Opt) {
-			return x.Opt[i].Display.String()
+		if i >= 0 && i < len(x.Options) {
+			return x.Options[i].Display.String()
 		}
 	}
 	return ""
@@ -168,8 +165,8 @@ func choiceValue(x *acroform.ChoiceField) string {
 //
 // Check boxes and radio buttons receive two appearances, keyed by the on-state
 // name and "Off"; all other field types receive a single normal appearance.
-func (g *Generator) addWidgetAppearance(w *annotation.Widget) error {
-	fld := resolveWidgetField(w)
+func (g *Generator) addWidgetAppearance(w *annotation.Widget, onState onStateFunc) error {
+	fld := resolveWidgetField(w, onState)
 	if fld == nil {
 		chrome, err := g.drawChromeField(w)
 		if err != nil {
@@ -191,9 +188,6 @@ func (g *Generator) addWidgetAppearance(w *annotation.Widget) error {
 			return err
 		}
 		onState := fld.OnState
-		if onState == "" {
-			onState = "On"
-		}
 		setNormalAppearance(w, nil,
 			map[pdf.Name]*form.Form{onState: on, "Off": off})
 		// select the current appearance from the field value
@@ -470,7 +464,7 @@ func (g *Generator) drawTextField(w *annotation.Widget, fld *widgetField) (*form
 
 	switch {
 	case fld.Flags&acroform.FieldPassword != 0:
-		// the value is masked: one bullet per character
+		// the value is masked: one asterisk per character
 		g.drawSingleLine(b, width, height, lw, pad, fld, strings.Repeat("*", utf8.RuneCountInString(fld.Value)))
 	case fld.Flags&acroform.FieldComb != 0 && fld.MaxLen > 0:
 		g.drawComb(b, width, height, lw, fld)

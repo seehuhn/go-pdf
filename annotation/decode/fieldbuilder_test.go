@@ -29,7 +29,7 @@ import (
 // and value attributes flattened back onto each terminal
 func TestTreeRoundTrip(t *testing.T) {
 	text := newTextField("text")
-	text.V = &pdf.StringOrStream{Value: pdf.Text("hello")}
+	text.Text = &pdf.StringOrStream{Value: pdf.Text("hello")}
 	text.DefaultAppearance = "/Helv 12 Tf 0 g"
 	other := newTextField("note")
 	other.DefaultAppearance = "/Helv 12 Tf 0 g"

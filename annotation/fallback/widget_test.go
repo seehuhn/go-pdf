@@ -49,7 +49,7 @@ func borderlessCombWidget(value string, maxLen int, align pdf.TextAlign) *annota
 	f.Flags = acroform.FieldComb
 	f.MaxLen = maxLen
 	f.Align = align
-	f.V = &pdf.StringOrStream{Value: pdf.Text(value)}
+	f.Text = &pdf.StringOrStream{Value: pdf.Text(value)}
 
 	return annotation.AddWidget(f, pdf.Rectangle{LLx: 0, LLy: 0, URx: 62, URy: 20})
 }
@@ -57,7 +57,7 @@ func borderlessCombWidget(value string, maxLen int, align pdf.TextAlign) *annota
 // the widget's field context reflects the field's MaxLen and flags
 func TestResolveWidgetFieldMaxLen(t *testing.T) {
 	w := combWidget("AB", 6, pdf.TextAlignLeft)
-	fld := resolveWidgetField(w)
+	fld := resolveWidgetField(w, widgetOnState)
 	if fld == nil {
 		t.Fatal("expected a field context")
 	}
@@ -238,7 +238,7 @@ func TestWidgetTransparentChrome(t *testing.T) {
 	}
 }
 
-// the field value V names the selection; Selected is consulted only when V is
+// Value names the selection; Selected is consulted only when Value is
 // empty.
 func TestResolveWidgetFieldChoiceValue(t *testing.T) {
 	tests := []struct {
@@ -247,18 +247,18 @@ func TestResolveWidgetFieldChoiceValue(t *testing.T) {
 		selected []int
 		want     string
 	}{
-		{"V wins over Selected", []pdf.TextString{pdf.Text("A")}, []int{1}, "A"},
+		{"Value wins over Selected", []pdf.TextString{pdf.Text("A")}, []int{1}, "A"},
 		{"Selected alone", nil, []int{1}, "B"},
 		{"nothing selected", nil, nil, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			f := acroform.NewChoiceField("c")
-			f.Opt = []acroform.ChoiceOption{{Export: pdf.Text("a"), Display: pdf.Text("A")}, {Export: pdf.Text("b"), Display: pdf.Text("B")}}
-			f.V = tc.v
+			f.Options = []acroform.ChoiceOption{{Export: "a", Display: pdf.Text("A")}, {Export: "b", Display: pdf.Text("B")}}
+			f.Value = tc.v
 			f.Selected = tc.selected
 			w := annotation.AddWidget(f, pdf.Rectangle{URx: 100, URy: 20})
-			fld := resolveWidgetField(w)
+			fld := resolveWidgetField(w, widgetOnState)
 			if fld == nil {
 				t.Fatal("expected a field context")
 			}

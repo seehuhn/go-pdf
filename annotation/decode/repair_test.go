@@ -276,8 +276,8 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 			t.Fatal(err)
 		}
 		btn := node.(*acroform.ButtonField)
-		if btn.V != "Off" {
-			t.Errorf("V = %q, want %q", btn.V, "Off")
+		if btn.State != "Off" {
+			t.Errorf("V = %q, want %q", btn.State, "Off")
 		}
 	})
 
@@ -323,8 +323,8 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 			t.Fatal(err)
 		}
 		btn := node.(*acroform.ButtonField)
-		if btn.V != "Yes" {
-			t.Errorf("V = %q, want %q", btn.V, "Yes")
+		if btn.State != "Yes" {
+			t.Errorf("V = %q, want %q", btn.State, "Yes")
 		}
 	})
 
@@ -362,8 +362,8 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 				t.Fatal(err)
 			}
 			btn := node.(*acroform.ButtonField)
-			if btn.V != "Off" {
-				t.Errorf("V = %q, want %q", btn.V, "Off")
+			if btn.State != "Off" {
+				t.Errorf("V = %q, want %q", btn.State, "Off")
 			}
 			if as := btn.Widgets[0].CurrentAppearanceState(); as != "Off" {
 				t.Errorf("appearance state = %q, want %q", as, "Off")
@@ -412,8 +412,8 @@ func TestButtonValueFollowsAppearanceState(t *testing.T) {
 			t.Fatal(err)
 		}
 		btn := node.(*acroform.ButtonField)
-		if btn.V != "B" {
-			t.Errorf("V = %q, want %q", btn.V, "B")
+		if btn.State != "B" {
+			t.Errorf("V = %q, want %q", btn.State, "B")
 		}
 		var states []pdf.Name
 		for _, wi := range btn.Widgets {
