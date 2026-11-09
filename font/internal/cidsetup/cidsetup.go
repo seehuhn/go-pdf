@@ -32,7 +32,7 @@ import (
 )
 
 // FromCMap chooses the GID-to-CID mapping and the encoder for a composite
-// font written with the CMap f.  A nil f selects Identity-H.
+// font written with the CMap f, which must be non-nil.
 //
 // A CMap with mappings fixes the codes; its character collection decides
 // the CIDs, or, for Identity-H and Identity-V, leaves them free.  A CMap
@@ -43,14 +43,6 @@ import (
 // Its character collection must be the CMap's, unless the CMap leaves the
 // CIDs free.
 func FromCMap(f *cmap.File, gidToCID cmap.GIDToCID, info *sfnt.Font, notdefWidth float64) (cmap.GIDToCID, cidenc.CIDEncoder, error) {
-	if f == nil {
-		var err error
-		f, err = cmap.Predefined("Identity-H")
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
 	hasMappings := len(f.CIDSingles)+len(f.CIDRanges) > 0 || f.Parent != nil
 	if !hasMappings {
 		if !f.CodeSpaceRange.Equivalent(charcode.UTF8) {

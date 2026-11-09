@@ -30,6 +30,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/font/type1"
@@ -52,19 +53,19 @@ func outlinerWriters(t *testing.T) map[string]font.Layouter {
 	must("type1", l, err)
 	s, err := truetype.NewSimple(makefont.TrueType(), nil)
 	must("truetype simple", s, err)
-	c, err := truetype.NewComposite(makefont.TrueType(), nil)
+	c, err := truetype.NewComposite(makefont.TrueType(), &truetype.OptionsComposite{CMap: cmap.IdentityH})
 	must("truetype composite", c, err)
 	cs, err := cff.NewSimple(makefont.OpenType(), nil)
 	must("cff simple", cs, err)
-	cc, err := cff.NewComposite(makefont.OpenTypeCID(), nil)
+	cc, err := cff.NewComposite(makefont.OpenTypeCID(), &cff.OptionsComposite{CMap: cmap.IdentityH})
 	must("cff composite", cc, err)
 	og, err := opentype.NewSimple(makefont.TrueType(), nil)
 	must("opentype simple glyf", og, err)
 	oc, err := opentype.NewSimple(makefont.OpenType(), nil)
 	must("opentype simple cff", oc, err)
-	ogc, err := opentype.NewComposite(makefont.TrueType(), nil)
+	ogc, err := opentype.NewComposite(makefont.TrueType(), &opentype.OptionsComposite{CMap: cmap.IdentityH})
 	must("opentype composite glyf", ogc, err)
-	occ, err := opentype.NewComposite(makefont.OpenTypeCID(), nil)
+	occ, err := opentype.NewComposite(makefont.OpenTypeCID(), &opentype.OptionsComposite{CMap: cmap.IdentityH})
 	must("opentype composite cff", occ, err)
 	return ww
 }

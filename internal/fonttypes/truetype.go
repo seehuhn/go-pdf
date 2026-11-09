@@ -18,6 +18,7 @@ package fonttypes
 
 import (
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
@@ -36,7 +37,7 @@ func (t trueTypeEmbedder) font() font.Layouter {
 	info := makefont.TrueType()
 
 	if t.composite {
-		return font.Must(truetype.NewComposite(info, nil))
+		return font.Must(truetype.NewComposite(info, &truetype.OptionsComposite{CMap: cmap.IdentityH}))
 	}
 	return font.Must(truetype.NewSimple(info, nil))
 }

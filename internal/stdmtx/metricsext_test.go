@@ -20,8 +20,11 @@ import (
 	"math"
 	"testing"
 
+	"seehuhn.de/go/postscript/afm"
+
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
@@ -71,18 +74,58 @@ func TestGeometry(t *testing.T) {
 	}
 }
 
-// TestNotdef tests that the metrics include a non-zero width for the .notdef
-// glyph.
+// TestNotdef tests that the metrics give the .notdef width of the standard
+// font instances.
 func TestNotdef(t *testing.T) {
 	for _, f := range standard.All {
 		mtx, exists := stdmtx.Metrics[string(f)]
 		if !exists {
-			t.Errorf("Font %q not found in stdmtx.Metrics", f)
+			t.Errorf("font %q not found in stdmtx.Metrics", f)
 			continue
 		}
 
-		if mtx.Width[".notdef"] < 0 || mtx.Width[".notdef"] > 1000 {
-			t.Errorf("%s: implausible .notdef width: %v", f, mtx.Width[".notdef"])
+		want := font.Must(f.New()).GetGeometry().Widths[0] * 1000
+		if got, ok := mtx.Width[".notdef"]; !ok || got <= 0 || got != want {
+			t.Errorf("%s: .notdef width %v, want %v", f, got, want)
 		}
+	}
+}
+
+// TestAdobeWidths tests that the widths are those in Adobe's AFM files.
+func TestAdobeWidths(t *testing.T) {
+	l := loader.NewFontLoader()
+	for _, f := range standard.All {
+		name := string(f)
+		r, err := l.Open(name, loader.FontTypeAFM)
+		if err != nil {
+			t.Fatal(err)
+		}
+		metrics, err := afm.Read(r)
+		r.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mtx := stdmtx.Metrics[name]
+		// the table covers the glyphs of the standard font instance
+		for _, glyphName := range font.Must(f.New()).GlyphNames {
+			if glyphName == ".notdef" {
+				continue
+			}
+			want := metrics.Glyphs[glyphName].WidthX
+			if got, ok := mtx.Width[glyphName]; !ok || got != want {
+				t.Errorf("%s:%s: width %v, want %v", name, glyphName, got, want)
+			}
+		}
+		for glyphName, got := range mtx.Width {
+			if g, ok := metrics.Glyphs[glyphName]; ok && got != g.WidthX {
+				t.Errorf("%s:%s: width %v, want %v", name, glyphName, got, g.WidthX)
+			}
+		}
+	}
+
+	// the width of "fraction" in Helvetica is 167, not 278
+	if got := stdmtx.Metrics["Helvetica"].Width["fraction"]; got != 167 {
+		t.Errorf("Helvetica fraction: width %v, want 167", got)
 	}
 }

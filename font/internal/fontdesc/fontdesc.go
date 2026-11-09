@@ -143,8 +143,15 @@ func Type1Heights(psFont *type1.Font, metrics *afm.Metrics, fontBBox rect.Rect) 
 		ascent, descent = metrics.Ascent, metrics.Descent
 		capHeight, xHeight = metrics.CapHeight, metrics.XHeight
 	}
-	// Of these heights only the descender is legitimately negative, so for the
-	// others any non-positive value means the metrics do not record one.
+	return fillHeights(fontBBox, ascent, descent, capHeight, xHeight, psFont.CapHeightPDF, psFont.XHeightPDF)
+}
+
+// fillHeights replaces the heights which are not recorded with estimates.  Of
+// the heights only the descender is legitimately negative, so for the others
+// any non-positive value means that no height is recorded.  The ascent and
+// descent are then taken from fontBBox, and the cap height and x-height from
+// the given functions.
+func fillHeights(fontBBox rect.Rect, ascent, descent, capHeight, xHeight float64, measureCap, measureX func() float64) (float64, float64, float64, float64) {
 	if ascent <= 0 {
 		ascent = fontBBox.URy
 	}
@@ -152,10 +159,53 @@ func Type1Heights(psFont *type1.Font, metrics *afm.Metrics, fontBBox rect.Rect) 
 		descent = fontBBox.LLy
 	}
 	if capHeight <= 0 {
-		capHeight = psFont.CapHeightPDF()
+		capHeight = measureCap()
 	}
 	if xHeight <= 0 {
-		xHeight = psFont.XHeightPDF()
+		xHeight = measureX()
 	}
 	return ascent, descent, capHeight, xHeight
+}
+
+// FromAFM returns the design part of the font descriptor of a font known from
+// its AFM metrics only.  Dimensions are in PDF glyph space units.  The
+// entries left at their zero value for the caller to fill in are FontName,
+// IsSymbolic, IsSerif, ForceBold and MissingWidth, since AFM metrics record
+// none of them.  The stem widths are those recorded in the metrics, and are 0
+// where the metrics omit them.
+func FromAFM(metrics *afm.Metrics) *font.Descriptor {
+	italicAngle := pdf.Round(metrics.ItalicAngle, 1)
+	ascent, descent, capHeight, xHeight := AFMHeights(metrics)
+	return &font.Descriptor{
+		FontFamily:   metrics.FamilyName,
+		FontWeight:   os2.WeightFromString(metrics.Weight),
+		IsFixedPitch: metrics.IsFixedPitch,
+		IsItalic:     italicAngle != 0,
+		FontBBox:     metrics.FontBBoxPDF().Rounded(),
+		ItalicAngle:  italicAngle,
+		Ascent:       math.Round(ascent),
+		Descent:      math.Round(descent),
+		CapHeight:    math.Round(capHeight),
+		XHeight:      math.Round(xHeight),
+		StemV:        math.Round(metrics.StdVW),
+		StemH:        math.Round(metrics.StdHW),
+	}
+}
+
+// AFMHeights returns the ascent, descent, cap height and x-height recorded in
+// the metrics, in PDF glyph space units and unrounded.  A height the file does
+// not record is taken from the font bounding box (ascent, descent) or the
+// bounding box of the glyph "H" or "x" (cap height, x-height), and is 0 if
+// the glyph is missing.
+func AFMHeights(metrics *afm.Metrics) (ascent, descent, capHeight, xHeight float64) {
+	glyphTop := func(name string) func() float64 {
+		return func() float64 {
+			if gi := metrics.Glyphs[name]; gi != nil {
+				return gi.BBox.URy
+			}
+			return 0
+		}
+	}
+	return fillHeights(metrics.FontBBoxPDF(), metrics.Ascent, metrics.Descent,
+		metrics.CapHeight, metrics.XHeight, glyphTop("H"), glyphTop("x"))
 }

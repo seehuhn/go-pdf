@@ -84,6 +84,7 @@ func (f Font) NewSimple(opt *truetype.OptionsSimple) (*truetype.Simple, error) {
 
 // NewComposite returns a new composite font instance for the given Go font and options.
 // Composite fonts can encode the full Unicode range and are suitable for complex text.
+// The options must specify a CMap.
 func (f Font) NewComposite(opt *truetype.OptionsComposite) (*truetype.Composite, error) {
 	data, ok := ttf[f]
 	if !ok {

@@ -401,9 +401,13 @@ func TestEmbedLeavesSourceGlyphNamesAlone(t *testing.T) {
 		embed func(*sfnt.Font) (font.Layouter, error)
 	}{
 		{"cff.Simple", func(f *sfnt.Font) (font.Layouter, error) { return pdfcff.NewSimple(f, nil) }},
-		{"cff.Composite", func(f *sfnt.Font) (font.Layouter, error) { return pdfcff.NewComposite(f, nil) }},
+		{"cff.Composite", func(f *sfnt.Font) (font.Layouter, error) {
+			return pdfcff.NewComposite(f, &pdfcff.OptionsComposite{CMap: cmap.IdentityH})
+		}},
 		{"opentype.SimpleCFF", func(f *sfnt.Font) (font.Layouter, error) { return opentype.NewSimple(f, nil) }},
-		{"opentype.CompositeCFF", func(f *sfnt.Font) (font.Layouter, error) { return opentype.NewComposite(f, nil) }},
+		{"opentype.CompositeCFF", func(f *sfnt.Font) (font.Layouter, error) {
+			return opentype.NewComposite(f, &opentype.OptionsComposite{CMap: cmap.IdentityH})
+		}},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			src := sourceWithDuplicateGlyphName(t)
@@ -479,13 +483,21 @@ var embedders = []struct {
 	embed  func(*sfnt.Font) (font.Layouter, error)
 }{
 	{"cff.Simple", makefont.OpenType, func(f *sfnt.Font) (font.Layouter, error) { return pdfcff.NewSimple(f, nil) }},
-	{"cff.Composite", makefont.OpenType, func(f *sfnt.Font) (font.Layouter, error) { return pdfcff.NewComposite(f, nil) }},
+	{"cff.Composite", makefont.OpenType, func(f *sfnt.Font) (font.Layouter, error) {
+		return pdfcff.NewComposite(f, &pdfcff.OptionsComposite{CMap: cmap.IdentityH})
+	}},
 	{"opentype.SimpleCFF", makefont.OpenType, func(f *sfnt.Font) (font.Layouter, error) { return opentype.NewSimple(f, nil) }},
-	{"opentype.CompositeCFF", makefont.OpenType, func(f *sfnt.Font) (font.Layouter, error) { return opentype.NewComposite(f, nil) }},
+	{"opentype.CompositeCFF", makefont.OpenType, func(f *sfnt.Font) (font.Layouter, error) {
+		return opentype.NewComposite(f, &opentype.OptionsComposite{CMap: cmap.IdentityH})
+	}},
 	{"truetype.Simple", makefont.TrueType, func(f *sfnt.Font) (font.Layouter, error) { return truetype.NewSimple(f, nil) }},
-	{"truetype.Composite", makefont.TrueType, func(f *sfnt.Font) (font.Layouter, error) { return truetype.NewComposite(f, nil) }},
+	{"truetype.Composite", makefont.TrueType, func(f *sfnt.Font) (font.Layouter, error) {
+		return truetype.NewComposite(f, &truetype.OptionsComposite{CMap: cmap.IdentityH})
+	}},
 	{"opentype.SimpleGlyf", makefont.TrueType, func(f *sfnt.Font) (font.Layouter, error) { return opentype.NewSimple(f, nil) }},
-	{"opentype.CompositeGlyf", makefont.TrueType, func(f *sfnt.Font) (font.Layouter, error) { return opentype.NewComposite(f, nil) }},
+	{"opentype.CompositeGlyf", makefont.TrueType, func(f *sfnt.Font) (font.Layouter, error) {
+		return opentype.NewComposite(f, &opentype.OptionsComposite{CMap: cmap.IdentityH})
+	}},
 }
 
 // A subset is named by prefixing a tag to the name of the font it was made

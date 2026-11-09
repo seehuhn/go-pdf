@@ -17,6 +17,8 @@
 package opentype
 
 import (
+	"errors"
+
 	"golang.org/x/text/language"
 
 	"seehuhn.de/go/pdf/font"
@@ -45,9 +47,10 @@ type OptionsComposite struct {
 
 	// CMap encodes the text in the content stream.  It fixes the writing
 	// mode and, through its character collection, the CIDs the glyphs are
-	// written as.  A nil CMap selects the predefined Identity-H.  A CMap
-	// without mappings, such as [cmap.UTF8H], has codes allocated from its
-	// code space as the text requires.
+	// written as.  The CMap is required; use [cmap.IdentityH] or
+	// [cmap.IdentityV] for CIDs equal to GIDs.  A CMap without mappings,
+	// such as [cmap.UTF8H], has codes allocated from its code space as
+	// the text requires.
 	CMap *cmap.File
 
 	// GIDToCID, if set, decides the CID each glyph is written as; its
@@ -85,10 +88,10 @@ func NewSimple(info *sfnt.Font, opt *OptionsSimple) (font.Layouter, error) {
 
 // NewComposite creates a composite OpenType font from an sfnt.Font.
 // The function automatically chooses between CompositeGlyf and CompositeCFF
-// based on the font's outline format.
+// based on the font's outline format.  The options must specify a CMap.
 func NewComposite(info *sfnt.Font, opt *OptionsComposite) (font.Layouter, error) {
-	if opt == nil {
-		opt = &OptionsComposite{}
+	if opt == nil || opt.CMap == nil {
+		return nil, errors.New("composite font requires a CMap")
 	}
 
 	info, err := vfinstance.Apply(info, opt.Variations)

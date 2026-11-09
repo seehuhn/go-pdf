@@ -26,6 +26,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -222,7 +223,7 @@ func embedComposite(t *testing.T, F font.Layouter) *dict.CIDFontType2 {
 // the simple-font checks in checkInstanced).
 func TestVarFontComposite(t *testing.T) {
 	coords := map[string]float64{"wght": 700}
-	F, err := truetype.NewComposite(varfont.Glyf(), &truetype.OptionsComposite{Variations: coords})
+	F, err := truetype.NewComposite(varfont.Glyf(), &truetype.OptionsComposite{Variations: coords, CMap: cmap.IdentityH})
 	if err != nil {
 		t.Fatal(err)
 	}

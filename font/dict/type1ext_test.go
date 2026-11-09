@@ -24,6 +24,7 @@ import (
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -141,5 +142,52 @@ func TestType1Embedding(t *testing.T) {
 	err = r.Close()
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+// TestType1BuiltinText checks that the text of codes left to the built-in
+// encoding is found for a standard font which is not embedded, and only there.
+func TestType1BuiltinText(t *testing.T) {
+	builtinAt := func(code byte) encoding.Simple {
+		return func(c byte) string {
+			if c == code {
+				return encoding.UseBuiltin
+			}
+			return ""
+		}
+	}
+	cases := []struct {
+		name     string
+		psName   string
+		embedded bool
+		want     string
+	}{
+		{"standard", "Symbol", false, "α"},
+		{"embedded", "Symbol", true, ""},
+		{"not standard", "Foo", false, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &dict.Type1{
+				PostScriptName: tc.psName,
+				Descriptor:     &font.Descriptor{IsSymbolic: true},
+				Encoding:       builtinAt(0x61),
+			}
+			d.Width[0x61] = 631
+			if tc.embedded {
+				d.FontFile = &glyphdata.Stream{Type: glyphdata.Type1}
+			}
+
+			for code := range d.MakeFont().Codes(pdf.String("a")) {
+				if code.Text != tc.want {
+					t.Errorf("got text %q, want %q", code.Text, tc.want)
+				}
+			}
+
+			w, ok := d.GlyphWidth("α")
+			if ok != (tc.want != "") || (ok && w != 0.631) {
+				t.Errorf("GlyphWidth: got %g, %t", w, ok)
+			}
+		})
 	}
 }

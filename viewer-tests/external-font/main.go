@@ -182,7 +182,7 @@ func createDocument(filename string) error {
 		Color: color.Blue,
 	}
 	label := text.F{
-		Font:  font.Must(extended.NimbusMonoPSRegular.New()),
+		Font:  font.Must(extended.QuireMonoRegular.New(nil)),
 		Size:  12,
 		Color: color.Blue,
 	}

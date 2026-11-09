@@ -32,11 +32,7 @@ import (
 // identityEncoder returns an encoder for the predefined Identity-H CMap.
 func identityEncoder(t *testing.T) CIDEncoder {
 	t.Helper()
-	f, err := cmap.Predefined("Identity-H")
-	if err != nil {
-		t.Fatal(err)
-	}
-	enc, err := NewFromCMap(f, 500)
+	enc, err := NewFromCMap(cmap.IdentityH, 500)
 	if err != nil {
 		t.Fatal(err)
 	}

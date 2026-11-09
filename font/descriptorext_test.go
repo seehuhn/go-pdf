@@ -37,6 +37,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	cfffont "seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/font/truetype"
@@ -59,13 +60,21 @@ func TestDescriptorIndependentOfSubset(t *testing.T) {
 		make func() (font.Layouter, error)
 	}{
 		{"cff.NewSimple", func() (font.Layouter, error) { return cfffont.NewSimple(cff(), nil) }},
-		{"cff.NewComposite", func() (font.Layouter, error) { return cfffont.NewComposite(cff(), nil) }},
+		{"cff.NewComposite", func() (font.Layouter, error) {
+			return cfffont.NewComposite(cff(), &cfffont.OptionsComposite{CMap: cmap.IdentityH})
+		}},
 		{"truetype.NewSimple", func() (font.Layouter, error) { return truetype.NewSimple(ttf(), nil) }},
-		{"truetype.NewComposite", func() (font.Layouter, error) { return truetype.NewComposite(ttf(), nil) }},
+		{"truetype.NewComposite", func() (font.Layouter, error) {
+			return truetype.NewComposite(ttf(), &truetype.OptionsComposite{CMap: cmap.IdentityH})
+		}},
 		{"opentype.NewSimple/cff", func() (font.Layouter, error) { return opentype.NewSimple(cff(), nil) }},
-		{"opentype.NewComposite/cff", func() (font.Layouter, error) { return opentype.NewComposite(cff(), nil) }},
+		{"opentype.NewComposite/cff", func() (font.Layouter, error) {
+			return opentype.NewComposite(cff(), &opentype.OptionsComposite{CMap: cmap.IdentityH})
+		}},
 		{"opentype.NewSimple/glyf", func() (font.Layouter, error) { return opentype.NewSimple(ttf(), nil) }},
-		{"opentype.NewComposite/glyf", func() (font.Layouter, error) { return opentype.NewComposite(ttf(), nil) }},
+		{"opentype.NewComposite/glyf", func() (font.Layouter, error) {
+			return opentype.NewComposite(ttf(), &opentype.OptionsComposite{CMap: cmap.IdentityH})
+		}},
 	}
 
 	const all = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -174,8 +183,12 @@ func TestDescriptorStemsFromOriginalFD(t *testing.T) {
 		name string
 		make func() (font.Layouter, error)
 	}{
-		{"cff.NewComposite", func() (font.Layouter, error) { return cfffont.NewComposite(makeFont(), nil) }},
-		{"opentype.NewComposite", func() (font.Layouter, error) { return opentype.NewComposite(makeFont(), nil) }},
+		{"cff.NewComposite", func() (font.Layouter, error) {
+			return cfffont.NewComposite(makeFont(), &cfffont.OptionsComposite{CMap: cmap.IdentityH})
+		}},
+		{"opentype.NewComposite", func() (font.Layouter, error) {
+			return opentype.NewComposite(makeFont(), &opentype.OptionsComposite{CMap: cmap.IdentityH})
+		}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -44,12 +44,17 @@ func moreThanTen(a pdf.Array) bool {
 
 // widthsAreCompatible returns true, if the glyph widths ww are compatible with
 // the standard font metrics. The enc parameter provides the encoding used
-// to map character codes to glyph names.
+// to map character codes to glyph names.  Codes which enc leaves to the
+// built-in encoding are resolved through the standard font's built-in
+// encoding.
 func widthsAreCompatible(ww []float64, enc encoding.Simple, info *stdmtx.FontData) bool {
 	for code := range 256 {
 		glyphName := enc(byte(code))
 		if glyphName == "" {
 			continue
+		}
+		if glyphName == encoding.UseBuiltin {
+			glyphName = info.Encoding[code]
 		}
 		if math.Abs(ww[code]-info.Width[glyphName]) > 0.5 {
 			return false
@@ -78,7 +83,10 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 	if fd.IsSymbolic != stdInfo.IsSymbolic {
 		return false
 	}
-	if fd.IsScript || fd.IsItalic || fd.IsAllCap || fd.IsSmallCap || fd.ForceBold {
+	if fd.IsItalic != (stdInfo.ItalicAngle != 0) {
+		return false
+	}
+	if fd.IsScript || fd.IsAllCap || fd.IsSmallCap || fd.ForceBold {
 		return false
 	}
 

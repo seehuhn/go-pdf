@@ -18,6 +18,7 @@ package loader
 
 import (
 	"bufio"
+	"compress/gzip"
 	"embed"
 	"fmt"
 	"io"
@@ -38,9 +39,10 @@ const (
 )
 
 // A FontLoader can load fonts, in case fonts are not embedded in the PDF file.
-// Every FontLoader contains the 14 standard fonts required by the PDF
-// specification.  Other external fonts can be added using AddFontMap and
-// AddFont.
+// Every FontLoader contains the bundled fonts: AFM metrics and sfnt outlines
+// for each of the 14 standard font names required by the PDF specification,
+// and the Quire fonts which provide those outlines.  Other external fonts can
+// be added using AddFontMap and AddFont.
 //
 // It is safe to use a FontLoader concurrently from multiple goroutines.
 type FontLoader struct {
@@ -59,8 +61,7 @@ type val struct {
 }
 
 // NewFontLoader creates a new font loader.
-// The loader is initialized with the 14 standard fonts required by the PDF
-// specification.
+// The loader is initialized with the bundled fonts, see [FontLoader].
 func NewFontLoader() *FontLoader {
 	res := &FontLoader{
 		lookup: make(map[key]*val),
@@ -100,10 +101,57 @@ func (l *FontLoader) Open(postscriptName string, tp FontType) (io.ReadCloser, er
 
 	fname := font.fname
 	if font.isBuiltin {
-		return builtin.Open(fname)
+		return openFS(builtin, fname)
 	}
 
 	return os.Open(fname)
+}
+
+// IsBuiltin reports whether the loader's entry for the given PostScript name
+// and font type is a bundled font, as opposed to one added by the caller.  It
+// returns false if there is no such entry.
+func (l *FontLoader) IsBuiltin(postscriptName string, tp FontType) bool {
+	l.RLock()
+	font, ok := l.lookup[key{postscriptName, tp}]
+	l.RUnlock()
+	return ok && font.isBuiltin
+}
+
+// openFS opens a file from fsys.  Files with the extension ".gz" are
+// decompressed on the fly.
+func openFS(fsys fs.FS, fname string) (io.ReadCloser, error) {
+	f, err := fsys.Open(fname)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(fname, ".gz") {
+		return f, nil
+	}
+	zr, err := gzip.NewReader(f)
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	return &gzipReadCloser{zr: zr, f: f}, nil
+}
+
+// gzipReadCloser closes both the decompressor and the underlying file.
+type gzipReadCloser struct {
+	zr *gzip.Reader
+	f  fs.File
+}
+
+func (g *gzipReadCloser) Read(p []byte) (int, error) {
+	return g.zr.Read(p)
+}
+
+func (g *gzipReadCloser) Close() error {
+	err1 := g.zr.Close()
+	err2 := g.f.Close()
+	if err1 != nil {
+		return err1
+	}
+	return err2
 }
 
 // AddFontMap reads a font map from r and adds it to the loader.  A font map
@@ -158,7 +206,8 @@ func (l *FontLoader) AddFont(postscriptName string, tp FontType, fname string) {
 	l.Unlock()
 }
 
-// builtin holds the 14 standard fonts required by the PDF specification.
+// builtin holds the bundled font files: the Adobe AFM metrics of the 14
+// standard fonts and the Quire sfnt fonts.
 //
 //go:embed builtin
 var builtin embed.FS

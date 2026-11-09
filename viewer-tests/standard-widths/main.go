@@ -47,9 +47,42 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	F := font.Must(standard.TimesRoman.New())
-	geom := F.GetGeometry()
+	titleFont, err := standard.TimesBold.New()
+	if err != nil {
+		return err
+	}
 
+	for _, G := range standard.All {
+		probe, err := G.New()
+		if err != nil {
+			return err
+		}
+		// glyph IDs of probe are valid in any other instance of G, because
+		// the glyph ID assignment is deterministic per font
+		var gids []glyph.ID
+		for gid := range probe.GlyphNames {
+			gids = append(gids, glyph.ID(gid))
+		}
+
+		for len(gids) > 0 {
+			n := min(len(gids), maxCodes)
+			err = addPages(doc, paper, titleFont, G, gids[:n])
+			if err != nil {
+				return err
+			}
+			gids = gids[n:]
+		}
+	}
+
+	return doc.Close()
+}
+
+// maxCodes is the maximum number of glyphs in one simple font.
+const maxCodes = 256
+
+// addPages adds pages which show the given glyphs of a freshly created
+// instance of the standard font G.
+func addPages(doc *document.MultiPage, paper *pdf.Rectangle, titleFont font.Instance, G standard.Font, gids []glyph.ID) error {
 	const (
 		k        = 20
 		left     = 100
@@ -57,6 +90,12 @@ func createDocument(filename string) error {
 		gap1     = 50
 		gap2     = 380
 	)
+
+	F, err := G.New()
+	if err != nil {
+		return err
+	}
+	geom := F.GetGeometry()
 
 	ascent := geom.Ascent * fontSize
 	descent := geom.Descent * fontSize
@@ -91,10 +130,9 @@ func createDocument(filename string) error {
 		return err
 	}
 
-	gid := glyph.ID(0)
-	numGlyphs := min(glyph.ID(len(geom.Widths)), 256)
+	title := string(G)
 
-	for gid < numGlyphs {
+	for len(gids) > 0 {
 		page := doc.AddPage()
 
 		page.PushGraphicsState()
@@ -125,8 +163,17 @@ func createDocument(filename string) error {
 		page.PopGraphicsState()
 
 		page.TextBegin()
-		yPos := paper.URy - 10 - ascent
-		for i := 0; yPos+descent >= 10 && gid < numGlyphs; i++ {
+		page.TextSetFont(titleFont, 10)
+		page.TextFirstLine(left, paper.URy-20)
+		page.TextShow(title)
+		page.TextEnd()
+
+		page.TextBegin()
+		yPos := paper.URy - 30 - ascent
+		for i := 0; yPos+descent >= 10 && len(gids) > 0; i++ {
+			gid := gids[0]
+			gids = gids[1:]
+
 			switch i {
 			case 0:
 				page.TextFirstLine(left, yPos)
@@ -153,7 +200,6 @@ func createDocument(filename string) error {
 			page.TextShowAligned("I", gap2-k*glyphWidth+1, 0)
 			page.TextShow("I")
 
-			gid++
 			yPos -= leading
 		}
 		page.TextEnd()
@@ -163,6 +209,5 @@ func createDocument(filename string) error {
 			return err
 		}
 	}
-
-	return doc.Close()
+	return nil
 }

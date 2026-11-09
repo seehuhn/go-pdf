@@ -56,9 +56,10 @@ type OptionsComposite struct {
 
 	// CMap encodes the text in the content stream.  It fixes the writing
 	// mode and, through its character collection, the CIDs the glyphs are
-	// written as.  A nil CMap selects the predefined Identity-H.  A CMap
-	// without mappings, such as [cmap.UTF8H], has codes allocated from its
-	// code space as the text requires.
+	// written as.  The CMap is required; use [cmap.IdentityH] or
+	// [cmap.IdentityV] for CIDs equal to GIDs.  A CMap without mappings,
+	// such as [cmap.UTF8H], has codes allocated from its code space as
+	// the text requires.
 	CMap *cmap.File
 
 	// GIDToCID, if set, decides the CID each glyph is written as; its
@@ -112,10 +113,10 @@ func (f *Composite) ResourceName() pdf.Name {
 
 // NewComposite makes a PDF TrueType font from a sfnt.Font.
 // The font info must be an OpenType/TrueType font with glyf outlines.
-// The font can be embedded as a simple font or as a composite font.
+// The options must specify a CMap.
 func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
-	if opt == nil {
-		opt = &OptionsComposite{}
+	if opt == nil || opt.CMap == nil {
+		return nil, errors.New("composite font requires a CMap")
 	}
 
 	info, err := vfinstance.Apply(info, opt.Variations)

@@ -125,7 +125,7 @@ func (g *Generator) drawIcon(b *builder.Builder, name pdf.Name, bg color.Color) 
 	case "Paragraph":
 		g.symbol(b, ink, 16, 6, 8, 1.4, "¶")
 	case "Insert":
-		g.symbol(b, ink, 16, 5.5, 4, 1.4, "^")
+		g.symbol(b, ink, 16, 5.5, 5.1, 1.4, "^")
 	case "NewParagraph":
 		drawNewParagraphIcon(b, ink)
 	case "Graph":

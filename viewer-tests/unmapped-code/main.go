@@ -32,13 +32,13 @@ import (
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
-	"seehuhn.de/go/pdf/font/loader"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/font/subset"
 	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
+	"seehuhn.de/go/pdf/internal/debug/makefont"
 )
 
 func main() {
@@ -136,16 +136,8 @@ func makeMarkerFont() font.Instance {
 }
 
 func makeTestFont() (font.Instance, error) {
-	// load the original font
-	ll := loader.NewFontLoader()
-	r, err := ll.Open("Times-Roman", loader.FontTypeType1)
-	if err != nil {
-		return nil, err
-	}
-	F, err := type1.Read(r)
-	if err != nil {
-		return nil, err
-	}
+	// start with a Type 1 font which has the glyphs we need
+	F := makefont.Type1()
 
 	// copy the glyphs we want to keep
 	oldGlyphs := F.Glyphs
@@ -155,18 +147,20 @@ func makeTestFont() (font.Instance, error) {
 	F.Glyphs["AEacute"] = oldGlyphs["AEacute"]
 
 	// Since the original font has a blank .notdef glyph, we draw one manually.
+	// The coordinates are given in 1/1000 em and scaled to font units.
+	q := 1 / (F.FontInfo.FontMatrix[0] * 1000)
 	notdef := &type1.Glyph{
-		WidthX: 500,
+		WidthX: 500 * q,
 	}
-	notdef.MoveTo(10, 10)
-	notdef.LineTo(490, 10)
-	notdef.LineTo(490, 990)
-	notdef.LineTo(10, 990)
+	notdef.MoveTo(10*q, 10*q)
+	notdef.LineTo(490*q, 10*q)
+	notdef.LineTo(490*q, 990*q)
+	notdef.LineTo(10*q, 990*q)
 	notdef.ClosePath()
-	notdef.MoveTo(100, 100)
-	notdef.LineTo(100, 900)
-	notdef.LineTo(400, 900)
-	notdef.LineTo(400, 100)
+	notdef.MoveTo(100*q, 100*q)
+	notdef.LineTo(100*q, 900*q)
+	notdef.LineTo(400*q, 900*q)
+	notdef.LineTo(400*q, 100*q)
 	notdef.ClosePath()
 	F.Glyphs[".notdef"] = notdef
 
@@ -187,19 +181,20 @@ func makeTestFont() (font.Instance, error) {
 		}
 	}
 
+	psName := F.FontInfo.FontName
+	metrics := makefont.AFM()
 	fd := &font.Descriptor{
-		FontName:     subset.Join("AAAAAA", "NimbusRoman-Regular"),
-		IsSerif:      true,
-		FontBBox:     F.FontBBoxPDF(),
-		Ascent:       1000,
-		Descent:      100,
-		Leading:      2000,
-		CapHeight:    1000,
-		XHeight:      500,
+		FontName:     subset.Join("AAAAAA", psName),
+		IsSerif:      makefont.TrueType().IsSerif,
+		FontBBox:     F.FontBBoxPDF().Rounded(),
+		Ascent:       pdf.Round(metrics.Ascent, 1),
+		Descent:      pdf.Round(metrics.Descent, 1),
+		CapHeight:    pdf.Round(metrics.CapHeight, 1),
+		XHeight:      pdf.Round(metrics.XHeight, 1),
 		MissingWidth: 500,
 	}
 	dict := dict.Type1{
-		PostScriptName: "NimbusRoman-Regular",
+		PostScriptName: psName,
 		SubsetTag:      "AAAAAA",
 		Descriptor:     fd,
 		Encoding:       enc,
@@ -208,9 +203,9 @@ func makeTestFont() (font.Instance, error) {
 	for code := range 256 {
 		dict.Width[code] = 500
 	}
-	dict.Width[' '] = F.Glyphs["space"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	dict.Width['A'] = F.Glyphs["AEacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
-	dict.Width[0o335] = F.Glyphs["Yacute"].WidthX * F.FontInfo.FontMatrix[0] * 1000
+	dict.Width[' '] = pdf.Round(F.Glyphs["space"].WidthX*F.FontInfo.FontMatrix[0]*1000, 1)
+	dict.Width['A'] = pdf.Round(F.Glyphs["AEacute"].WidthX*F.FontInfo.FontMatrix[0]*1000, 1)
+	dict.Width[0o335] = pdf.Round(F.Glyphs["Yacute"].WidthX*F.FontInfo.FontMatrix[0]*1000, 1)
 	m := map[charcode.Code]string{
 		'A':   "Ǽ",
 		0o335: "Ý",

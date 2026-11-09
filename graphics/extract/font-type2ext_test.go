@@ -226,7 +226,7 @@ var t2Dicts = []*dict.CIDFontType2{
 			FontName: "Test",
 		},
 		ROS:  ros,
-		CMap: func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
+		CMap: cmap.IdentityH,
 		Width: map[cid.CID]float64{
 			0: 1000,
 			1: 500,
@@ -250,7 +250,7 @@ var t2Dicts = []*dict.CIDFontType2{
 			FontName: "ABCDEF+Test",
 		},
 		ROS:  ros,
-		CMap: func() *cmap.File { c, _ := cmap.Predefined("Identity-H"); return c }(),
+		CMap: cmap.IdentityH,
 		Width: map[cid.CID]float64{
 			0: 1000,
 			1: 500,

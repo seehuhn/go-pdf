@@ -175,12 +175,11 @@ func (r *reader) read(name string) (*type1.Instance, error) {
 	r.count[name]++
 	r.mu.Unlock()
 
-	psFont, metrics, err := Read(name)
+	metrics, err := ReadAFM(name)
 	if err != nil {
 		return nil, err
 	}
-	FixUpMetrics(metrics)
-	return type1.New(psFont, metrics)
+	return type1.New(nil, metrics)
 }
 
 func (r *reader) reads(name string) int {

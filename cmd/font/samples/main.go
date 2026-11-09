@@ -32,6 +32,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/standard"
 )
@@ -185,8 +186,8 @@ func (f *fontSamples) AddTitle(title string, fontSize, a, b float64) error {
 func (f *fontSamples) AddFontSample(fileName string, info *sfnt.Font) error {
 	f.fontNo++
 	opt := &embed.Options{
-		Composite: true,
-		Language:  language.AmericanEnglish,
+		CMap:     cmap.IdentityH,
+		Language: language.AmericanEnglish,
 	}
 	X, err := embed.OpenTypeFont(info, opt)
 	if err != nil {

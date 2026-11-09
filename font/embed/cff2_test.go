@@ -22,6 +22,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/glyphdata"
@@ -138,7 +139,7 @@ func TestEmbedCFF2SimpleVariable(t *testing.T) {
 // composite CFF embedder, landing in FontFile3/CIDFontType0C.
 func TestEmbedCFF2CompositeVariable(t *testing.T) {
 	coords := map[string]float64{"wght": 900}
-	F, err := embed.OpenTypeFont(varfont.CFF2(), &embed.Options{Variations: coords, Composite: true})
+	F, err := embed.OpenTypeFont(varfont.CFF2(), &embed.Options{Variations: coords, CMap: cmap.IdentityH})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +198,7 @@ func TestEmbedCFF2SimpleStatic(t *testing.T) {
 // non-empty re-parsed FontFile3.
 func TestEmbedCFF2Variable(t *testing.T) {
 	coords := map[string]float64{"wght": 900}
-	F, err := embed.OpenTypeFont(varfont.CFF2(), &embed.Options{Variations: coords, Composite: true})
+	F, err := embed.OpenTypeFont(varfont.CFF2(), &embed.Options{Variations: coords, CMap: cmap.IdentityH})
 	if err != nil {
 		t.Fatal(err)
 	}

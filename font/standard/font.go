@@ -15,18 +15,23 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Package standard provides access to the 14 standard PDF fonts.
+//
+// The fonts are metrics-only: they are built from Adobe's Core14 AFM data and
+// are never embedded in PDF files.  The outlines needed for rendering come
+// from the font loader, see [seehuhn.de/go/pdf/font/loader].
 package standard
 
 import (
 	"slices"
 	"strings"
 
-	pstype1 "seehuhn.de/go/postscript/type1"
+	"seehuhn.de/go/geom/rect"
 
 	"seehuhn.de/go/pdf/font/internal/bundled"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/font/type1"
 	"seehuhn.de/go/postscript/afm"
+	"seehuhn.de/go/sfnt/os2"
 )
 
 // Font identifies the individual fonts.
@@ -50,15 +55,21 @@ const (
 	ZapfDingbats         Font = "ZapfDingbats"
 )
 
+// String returns the PostScript name of the font.
 func (f Font) String() string {
 	return string(f)
 }
 
+// PostScriptName returns the PostScript name of the font, as used in the
+// BaseFont entry of the font dictionary.
 func (f Font) PostScriptName() string {
 	return string(f)
 }
 
 // New returns a new font instance for the given standard font.
+//
+// The instance is built from Adobe's metrics for the font and has no font
+// program: a PDF file which uses it relies on the viewer to supply the glyphs.
 //
 // The font data bundled with this package is immutable, so each of the 14
 // fonts is read and parsed at most once per process and the instances handed
@@ -75,63 +86,104 @@ func (f Font) New() (*type1.Instance, error) {
 	return shared.Get(f)
 }
 
-// Program returns the font program and metrics bundled for f, in the form
-// [Font.New] builds its instances from: restricted to the character set the
-// specification guarantees, with the metric repairs the bundled AFM files
-// need already applied.
-//
-// A caller which lays out or embeds text wants [Font.New]; this is for one
-// which needs the glyph outlines themselves, for example to convert the font
-// to a format some other system can read.  The values are read afresh on
-// every call and belong to the caller, unlike the shared data behind an
-// instance.
-func (f Font) Program() (*pstype1.Font, *afm.Metrics, error) {
-	return f.data()
-}
-
 // shared holds the instance each standard font is cloned from, read on first
 // use.
 var shared = bundled.New(allStandardFonts, Font.read)
 
-// read builds a font instance from the bundled font data.
+// read builds a font instance from the bundled metrics.  The instance has no
+// font program: the viewer supplies the glyphs.
 func (f Font) read() (*type1.Instance, error) {
-	psFont, metrics, err := f.data()
+	metrics, err := f.data()
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := type1.New(psFont, metrics)
+	res, err := type1.New(nil, metrics)
 	if err != nil {
 		return nil, err
 	}
 
 	res.Descriptor.IsSerif = isSerif[f]
 
+	// regular faces are 400, not the 500 implied by "Medium" in the metrics
+	if strings.Contains(string(f), "Bold") {
+		res.Descriptor.FontWeight = os2.WeightBold
+	} else {
+		res.Descriptor.FontWeight = os2.WeightNormal
+	}
+
 	return res, nil
 }
 
-// data reads the font program and metrics from the bundled font data,
-// restricted to the character set the specification guarantees.
-func (f Font) data() (*pstype1.Font, *afm.Metrics, error) {
+// data reads the metrics from the bundled font data, restricted to the
+// character set the specification guarantees.
+func (f Font) data() (*afm.Metrics, error) {
 	name := string(f)
 
-	psFont, metrics, err := bundled.Read(name)
+	metrics, err := bundled.ReadAFM(name)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// fix up the fonts
-	family, _, _ := strings.Cut(name, "-")
-	psFont.FontName = name
-	psFont.FamilyName = family
-	psFont.Encoding = f.restrictGlyphList(psFont.Glyphs)
 	metrics.FontName = name
 	metrics.Encoding = f.restrictGlyphList(metrics.Glyphs)
 	metrics.Kern = restrictKern(metrics.Kern, metrics.Glyphs)
 
-	bundled.FixUpMetrics(metrics)
+	if g := metrics.Glyphs["Euro"]; g != nil && g.BBox.IsZero() {
+		g.BBox = euroBBox[f]
+	}
 
-	return psFont, metrics, nil
+	nd := notdef[f]
+	metrics.Glyphs[".notdef"] = &nd
+
+	// no fi/fl ligatures: they would merge two fixed-pitch cells
+	if metrics.IsFixedPitch {
+		for _, g := range metrics.Glyphs {
+			g.Ligatures = nil
+		}
+	}
+
+	return metrics, nil
+}
+
+// euroBBox gives the Euro glyph bounding boxes for the fonts whose metrics
+// list the Euro with an empty box.  Without a box the glyph would count as
+// blank.  The boxes are those of the Euro in the corresponding Quire font,
+// which is used to draw the glyph and has the same advance width, rounded
+// outwards to integers.
+var euroBBox = map[Font]rect.Rect{
+	Courier:              {LLx: 44, LLy: -10, URx: 549, URy: 669},
+	CourierBold:          {LLx: 34, LLy: -10, URx: 576, URy: 669},
+	CourierBoldOblique:   {LLx: 26, LLy: -10, URx: 633, URy: 669},
+	CourierOblique:       {LLx: 36, LLy: -10, URx: 609, URy: 669},
+	Helvetica:            {LLx: 7, LLy: -10, URx: 542, URy: 699},
+	HelveticaBold:        {LLx: 4, LLy: -10, URx: 539, URy: 699},
+	HelveticaBoldOblique: {LLx: 13, LLy: -9, URx: 593, URy: 699},
+	HelveticaOblique:     {LLx: 9, LLy: -9, URx: 600, URy: 699},
+	TimesRoman:           {LLx: 15, LLy: -10, URx: 485, URy: 663},
+	TimesBold:            {LLx: 12, LLy: -10, URx: 489, URy: 663},
+	TimesBoldItalic:      {LLx: -6, LLy: -10, URx: 527, URy: 663},
+	TimesItalic:          {LLx: 11, LLy: -10, URx: 540, URy: 663},
+}
+
+// notdef gives the metrics of the .notdef glyph, which Adobe's metrics omit.
+// The values are those of the .notdef glyphs in the bundled Quire fonts,
+// which stand in for the standard fonts, with the box rounded outwards.
+var notdef = map[Font]afm.GlyphInfo{
+	Courier:              {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 659}},
+	CourierBold:          {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 659}},
+	CourierBoldOblique:   {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 659}},
+	CourierOblique:       {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 659}},
+	Helvetica:            {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 688}},
+	HelveticaBold:        {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 688}},
+	HelveticaBoldOblique: {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 688}},
+	HelveticaOblique:     {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 688}},
+	TimesRoman:           {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 655}},
+	TimesBold:            {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 655}},
+	TimesBoldItalic:      {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 655}},
+	TimesItalic:          {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 551, URy: 655}},
+	Symbol:               {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 550, URy: 700}},
+	ZapfDingbats:         {WidthX: 600, BBox: rect.Rect{LLx: 50, LLy: 0, URx: 550, URy: 700}},
 }
 
 // isSerif records the fonts with serifs, for the descriptor flag of the same

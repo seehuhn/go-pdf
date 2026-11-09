@@ -18,6 +18,9 @@ package gofont
 
 import (
 	"testing"
+
+	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/truetype"
 )
 
 // TestLigatures checks that letters are correctly combined into ligatures.
@@ -27,7 +30,7 @@ func TestLigatures(t *testing.T) {
 		Medium, MediumItalic, Regular, Smallcaps, SmallcapsItalic,
 		Mono, MonoBold, MonoBoldItalic, MonoItalic} {
 
-		F, err := Fx.NewComposite(nil)
+		F, err := Fx.NewComposite(&truetype.OptionsComposite{CMap: cmap.IdentityH})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	pdfcmap "seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -70,7 +71,7 @@ func main() {
 	italic := font.Must(standard.TimesItalic.New())
 	courier := font.Must(standard.Courier.New())
 	opt := &embed.Options{
-		Composite: true,
+		CMap: pdfcmap.IdentityH,
 	}
 	theFont, err := embed.OpenTypeFont(tt, opt)
 	if err != nil {

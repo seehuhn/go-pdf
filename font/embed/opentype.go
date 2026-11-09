@@ -20,16 +20,26 @@ import (
 	"golang.org/x/text/language"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/internal/vfinstance"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/sfnt"
 )
 
+// Options controls how [OpenTypeFont] embeds a font.
 type Options struct {
-	Language     language.Tag
+	// Language is the language used when selecting layout features.
+	Language language.Tag
+
+	// GsubFeatures enables or disables individual GSUB features.
 	GsubFeatures map[string]bool
+
+	// GposFeatures enables or disables individual GPOS features.
 	GposFeatures map[string]bool
-	Composite    bool
+
+	// CMap, if non-nil, selects a composite font written with this CMap,
+	// for example [cmap.IdentityH].  A nil CMap selects a simple font.
+	CMap *cmap.File
 
 	// Variations pins the axes of a variable font before embedding.  Keys are
 	// variation axis tags; omitted axes keep their default value.  A variable
@@ -60,11 +70,12 @@ func OpenTypeFont(info *sfnt.Font, opt *Options) (font.Layouter, error) {
 
 	var F font.Layouter
 	if info.IsCFF() {
-		if opt.Composite {
+		if opt.CMap != nil {
 			o := &cff.OptionsComposite{
 				Language:     opt.Language,
 				GsubFeatures: opt.GsubFeatures,
 				GposFeatures: opt.GposFeatures,
+				CMap:         opt.CMap,
 			}
 			F, err = cff.NewComposite(info, o)
 		} else {
@@ -76,11 +87,12 @@ func OpenTypeFont(info *sfnt.Font, opt *Options) (font.Layouter, error) {
 			F, err = cff.NewSimple(info, o)
 		}
 	} else {
-		if opt.Composite {
+		if opt.CMap != nil {
 			o := &truetype.OptionsComposite{
 				Language:     opt.Language,
 				GsubFeatures: opt.GsubFeatures,
 				GposFeatures: opt.GposFeatures,
+				CMap:         opt.CMap,
 			}
 			F, err = truetype.NewComposite(info, o)
 		} else {

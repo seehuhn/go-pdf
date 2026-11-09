@@ -31,6 +31,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/glyphdata/cffglyphs"
@@ -141,7 +142,7 @@ func TestCFF2CompositeVariable(t *testing.T) {
 	rm := pdf.NewResourceManager(w)
 
 	coords := map[string]float64{"wght": 900}
-	F, err := cff.NewComposite(varfont.CFF2(), &cff.OptionsComposite{Variations: coords})
+	F, err := cff.NewComposite(varfont.CFF2(), &cff.OptionsComposite{Variations: coords, CMap: cmap.IdentityH})
 	if err != nil {
 		t.Fatal(err)
 	}

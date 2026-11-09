@@ -18,6 +18,7 @@ package fonttypes
 
 import (
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/sfnt"
@@ -71,7 +72,7 @@ func (f openTypeEmbedder) font() font.Layouter {
 	}
 
 	if f.composite {
-		return font.Must(opentype.NewComposite(info, nil))
+		return font.Must(opentype.NewComposite(info, &opentype.OptionsComposite{CMap: cmap.IdentityH}))
 	}
 	return font.Must(opentype.NewSimple(info, nil))
 }

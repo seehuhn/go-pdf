@@ -68,7 +68,6 @@ projects.  Here is a list:
 - https://github.com/google/go-cmp/issues/350
 - https://github.com/google/go-cmp/issues/335
 - https://github.com/google/go-cmp/issues/317
-- https://github.com/ArtifexSoftware/urw-base35-fonts/issues/48
 - https://bugs.ghostscript.com/show_bug.cgi?id=707475 [fixed]
 - https://github.com/harfbuzz/harfbuzz/issues/3545 [fixed]
 - https://github.com/harfbuzz/harfbuzz/issues/3556 [rejected]

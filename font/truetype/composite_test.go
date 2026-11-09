@@ -23,6 +23,7 @@ import (
 	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -62,7 +63,7 @@ func TestCompositeDescriptor(t *testing.T) {
 // scale linearly with ptSize.
 func TestCompositeLayout(t *testing.T) {
 	fontData := makefont.TrueType()
-	F, err := truetype.NewComposite(fontData, nil)
+	F, err := truetype.NewComposite(fontData, &truetype.OptionsComposite{CMap: cmap.IdentityH})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +90,7 @@ func embedTrueTypeComposite(t *testing.T, v pdf.Version, fontData *sfnt.Font) *d
 	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
-	F, err := truetype.NewComposite(fontData, nil)
+	F, err := truetype.NewComposite(fontData, &truetype.OptionsComposite{CMap: cmap.IdentityH})
 	if err != nil {
 		t.Fatal(err)
 	}

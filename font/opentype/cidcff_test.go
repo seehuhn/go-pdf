@@ -25,6 +25,7 @@ import (
 	"seehuhn.de/go/sfnt/cff"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/opentype"
 	"seehuhn.de/go/pdf/graphics/extract"
@@ -92,7 +93,7 @@ func embedCompositeCFF(t *testing.T, v pdf.Version, fontData *sfnt.Font) *dict.C
 	w, _ := memfile.NewPDFWriter(t, v, nil)
 	rm := pdf.NewResourceManager(w)
 
-	F, err := opentype.NewComposite(fontData, nil)
+	F, err := opentype.NewComposite(fontData, &opentype.OptionsComposite{CMap: cmap.IdentityH})
 	if err != nil {
 		t.Fatal(err)
 	}

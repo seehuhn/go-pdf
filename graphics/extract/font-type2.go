@@ -203,11 +203,11 @@ func repairCIDType2(d *dict.CIDFontType2) {
 	d.Descriptor.MissingWidth = 0
 
 	if d.CMap == nil {
-		d.CMap, _ = cmap.Predefined("Identity-H")
+		d.CMap = cmap.IdentityH
 	}
 
 	if d.ROS == nil {
-		if d.CMap != nil && d.CMap.ROS != nil {
+		if d.CMap.ROS != nil {
 			d.ROS = d.CMap.ROS
 		} else {
 			d.ROS = &cid.SystemInfo{
@@ -218,17 +218,15 @@ func repairCIDType2(d *dict.CIDFontType2) {
 		}
 	}
 
-	if d.CMap != nil {
-		if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
-			!d.CMap.IsPredefined() {
-			if d.CMap.ROS == nil {
-				d.CMap = d.CMap.Clone()
-				d.CMap.ROS = d.ROS
-			} else if d.ROS.Registry != d.CMap.ROS.Registry ||
-				d.ROS.Ordering != d.CMap.ROS.Ordering {
-				d.CMap = d.CMap.Clone()
-				d.CMap.ROS = d.ROS
-			}
+	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
+		!d.CMap.IsPredefined() {
+		if d.CMap.ROS == nil {
+			d.CMap = d.CMap.Clone()
+			d.CMap.ROS = d.ROS
+		} else if d.ROS.Registry != d.CMap.ROS.Registry ||
+			d.ROS.Ordering != d.CMap.ROS.Ordering {
+			d.CMap = d.CMap.Clone()
+			d.CMap.ROS = d.ROS
 		}
 	}
 }

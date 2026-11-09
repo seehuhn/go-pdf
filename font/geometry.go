@@ -58,17 +58,14 @@ func (g *Geometry) BoundingBox(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
 	xPos := gg.Skip
 	for _, glyph := range gg.Seq {
 		bbox := g.GlyphExtents[glyph.GID]
-		if bbox.IsZero() {
-			continue
+		if !bbox.IsZero() {
+			res.Extend(&pdf.Rectangle{
+				LLx: bbox.LLx*fontSize + xPos,
+				LLy: bbox.LLy*fontSize + glyph.Rise,
+				URx: bbox.URx*fontSize + xPos,
+				URy: bbox.URy*fontSize + glyph.Rise,
+			})
 		}
-
-		b := &pdf.Rectangle{
-			LLx: bbox.LLx*fontSize + xPos,
-			LLy: bbox.LLy*fontSize + glyph.Rise,
-			URx: bbox.URx*fontSize + xPos,
-			URy: bbox.URy*fontSize + glyph.Rise,
-		}
-		res.Extend(b)
 		xPos += glyph.Advance
 	}
 	return res

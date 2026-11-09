@@ -20,9 +20,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/rect"
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/psenc"
 	"seehuhn.de/go/postscript/type1"
@@ -34,6 +36,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
 	"seehuhn.de/go/pdf/font/glyphdata/type1glyphs"
 	"seehuhn.de/go/pdf/font/internal/fontdesc"
@@ -47,10 +50,10 @@ import (
 //
 // Use [New] to create new font instances.
 type Instance struct {
-	// psFont is the font program to embed, and metrics (optional) the
-	// matching AFM metrics, which add kerning and ligatures.  Everything
-	// below is derived from the two, so neither may change once the
-	// instance exists.
+	// psFont is the font program to embed (nil for a metrics-only instance),
+	// and metrics the matching AFM metrics, which add kerning and ligatures.
+	// The metrics are optional if psFont is present.  Everything below is
+	// derived from the two, so neither may change once the instance exists.
 	psFont  *type1.Font
 	metrics *afm.Metrics
 
@@ -73,6 +76,12 @@ type Instance struct {
 
 	*simpleenc.Simple
 
+	// builtin is the built-in encoding of a metrics-only instance whose
+	// metrics give an encoding other than StandardEncoding, and nil otherwise.
+	// Such a font is symbolic, and since it is not embedded, the PDF file can
+	// only refer to its glyphs through this encoding (PDF 2.0, Table 112).
+	builtin *pdfenc.Encoding
+
 	// Name is the PDF resource-dictionary key under which this font is
 	// referenced in content streams.  If non-empty, the builder uses this
 	// value as the /Font subdictionary key; the spec requires the two to
@@ -89,9 +98,21 @@ func (f *Instance) ResourceName() pdf.Name {
 	return f.Name
 }
 
-// New creates a new Type 1 PDF font from a Type 1 PostScript font.
-// The argument psFont must be present, metrics is optional.
+// New creates a new Type 1 PDF font from a Type 1 PostScript font and/or
+// AFM metrics.  At least one of the arguments must be present.
+//
+// If psFont is nil, the instance is built from the metrics alone.  Such an
+// instance is never written with font data, so the PDF file relies on the
+// viewer to supply the glyphs, and every glyph has an empty outline.
+// Otherwise the font program is embedded (as a subset) and metrics is
+// optional.
 func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
+	if psFont == nil {
+		if metrics == nil {
+			return nil, errors.New("missing font program and metrics")
+		}
+		return newMetricsOnly(metrics), nil
+	}
 	if psFont.MM != nil {
 		return nil, errors.New("instantiate multiple master font before embedding")
 	}
@@ -143,16 +164,59 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 	geometry.XHeight = xHeight / 1000
 	fontgeom.FillHeights(geometry)
 
+	lig, kern := ligaturesAndKerns(metrics, glyphNames)
+
+	// The glyph list a name is looked up in is chosen by the name of the font,
+	// which a program taken out of a PDF file gives with a subset tag in front.
+	// The tag names the subset rather than the font, so it is dropped here.
+	_, psName := subset.Split(psFont.FontName)
+
+	cmap := buildCmap(glyphNames, psName)
+
+	return &Instance{
+		psFont:     psFont,
+		metrics:    metrics,
+		GlyphNames: glyphNames,
+		Descriptor: descriptor,
+		Geometry:   geometry,
+		lig:        lig,
+		kern:       kern,
+		cmap:       cmap,
+		Simple:     newEncoder(fontname.ForType1(psFont), widths[0], nil),
+	}, nil
+}
+
+// buildCmap maps each rune to the first glyph whose name stands for exactly
+// that rune.  psName is the font name, which selects the glyph list used to
+// look up the names.
+func buildCmap(glyphNames []string, psName string) map[rune]glyph.ID {
+	cmap := make(map[rune]glyph.ID)
+	for gid, name := range glyphNames {
+		rr := []rune(names.ToUnicode(name, psName))
+		if len(rr) != 1 {
+			continue
+		}
+		if _, exists := cmap[rr[0]]; !exists {
+			cmap[rr[0]] = glyph.ID(gid)
+		}
+	}
+	return cmap
+}
+
+// ligaturesAndKerns returns the ligature and kerning tables of the metrics,
+// indexed by position in glyphNames (metrics may be nil).
+//
+// The metrics may name glyphs the font program does not have: the two come
+// from separate files and need not agree, and a caller may have restricted
+// the glyph set.  Such entries are skipped, since an unknown name would
+// otherwise resolve to glyph ID 0 and quietly attach the ligature or the
+// kern to ".notdef".
+func ligaturesAndKerns(metrics *afm.Metrics, glyphNames []string) (map[glyph.Pair]glyph.ID, map[glyph.Pair]float64) {
 	nameGid := make(map[string]glyph.ID, len(glyphNames))
 	for i, name := range glyphNames {
 		nameGid[name] = glyph.ID(i)
 	}
 
-	// The metrics may name glyphs the font program does not have: the two come
-	// from separate files and need not agree, and a caller may have restricted
-	// the glyph set.  Such entries are skipped, since an unknown name would
-	// otherwise resolve to glyph ID 0 and quietly attach the ligature or the
-	// kern to ".notdef".
 	lig := make(map[glyph.Pair]glyph.ID)
 	kern := make(map[glyph.Pair]float64)
 	if metrics != nil {
@@ -179,47 +243,100 @@ func New(psFont *type1.Font, metrics *afm.Metrics) (*Instance, error) {
 			kern[glyph.Pair{Left: left, Right: right}] = k.Adjust
 		}
 	}
+	return lig, kern
+}
 
-	// The glyph list a name is looked up in is chosen by the name of the font,
-	// which a program taken out of a PDF file gives with a subset tag in front.
-	// The tag names the subset rather than the font, so it is dropped here.
-	_, psName := subset.Split(psFont.FontName)
-
-	cmap := make(map[rune]glyph.ID)
-	for gid, name := range glyphNames {
-		rr := []rune(names.ToUnicode(name, psName))
-		if len(rr) != 1 {
-			continue
-		}
-		r := rr[0]
-
-		if _, exists := cmap[r]; exists {
-			continue
-		}
-		cmap[r] = glyph.ID(gid)
+// newMetricsOnly creates an instance which has no font program.
+func newMetricsOnly(metrics *afm.Metrics) *Instance {
+	// glyph ID 0 must be ".notdef", where unmapped characters end up
+	glyphNames := metrics.GlyphList()
+	if len(glyphNames) == 0 || glyphNames[0] != ".notdef" {
+		glyphNames = slices.Insert(glyphNames, 0, ".notdef")
 	}
 
+	geometry := &font.Geometry{}
+	widths := make([]float64, len(glyphNames))
+	extents := make([]rect.Rect, len(glyphNames))
+	for i, name := range glyphNames {
+		widths[i] = metrics.GlyphWidthPDF(name) / 1000
+		if gi := metrics.Glyphs[name]; gi != nil {
+			b := gi.BBox
+			extents[i] = rect.Rect{
+				LLx: b.LLx / 1000,
+				LLy: b.LLy / 1000,
+				URx: b.URx / 1000,
+				URy: b.URy / 1000,
+			}
+		}
+	}
+	geometry.UnderlinePosition = pdf.Round(metrics.UnderlinePosition/1000, 6)
+	geometry.UnderlineThickness = pdf.Round(metrics.UnderlineThickness/1000, 6)
+	geometry.Widths = widths
+	geometry.GlyphExtents = extents
+	ascent, descent, capHeight, xHeight := fontdesc.AFMHeights(metrics)
+	geometry.Ascent = ascent / 1000
+	geometry.Descent = descent / 1000
+	geometry.CapHeight = capHeight / 1000
+	geometry.XHeight = xHeight / 1000
+	fontgeom.FillHeights(geometry)
+
+	lig, kern := ligaturesAndKerns(metrics, glyphNames)
+
+	_, psName := subset.Split(metrics.FontName)
+	cmap := buildCmap(glyphNames, psName)
+
+	builtin := fontSpecificEncoding(metrics)
+
 	return &Instance{
-		psFont:     psFont,
 		metrics:    metrics,
 		GlyphNames: glyphNames,
-		Descriptor: descriptor,
+		Descriptor: fontdesc.FromAFM(metrics),
 		Geometry:   geometry,
 		lig:        lig,
 		kern:       kern,
 		cmap:       cmap,
-		Simple:     newEncoder(fontname.ForType1(psFont), widths[0]),
-	}, nil
+		Simple:     newEncoder(fontname.ForAFM(metrics), widths[0], builtin),
+		builtin:    builtin,
+	}
+}
+
+// fontSpecificEncoding returns the encoding given in the metrics, or nil if
+// this is StandardEncoding.
+func fontSpecificEncoding(metrics *afm.Metrics) *pdfenc.Encoding {
+	res := &pdfenc.Encoding{Has: make(map[string]bool)}
+	isStandard := true
+	for code := range 256 {
+		name := ".notdef"
+		if code < len(metrics.Encoding) && metrics.Encoding[code] != "" {
+			name = metrics.Encoding[code]
+		}
+		if name != psenc.StandardEncoding[code] {
+			isStandard = false
+		}
+		res.Encoding[code] = name
+		if name != ".notdef" {
+			res.Has[name] = true
+		}
+	}
+	if isStandard {
+		return nil
+	}
+	return res
 }
 
 // newEncoder returns the encoding state of a fresh instance.  Type 1 fonts are
 // always simple fonts.  fontName is the name the font program gives itself, and
-// notdefWidth is the width of the ".notdef" glyph in text space units.
-func newEncoder(fontName string, notdefWidth float64) *simpleenc.Simple {
+// notdefWidth is the width of the ".notdef" glyph in text space units.  Codes
+// are preferably allocated where base has the glyph, and base defaults to
+// WinAnsiEncoding if nil.
+func newEncoder(fontName string, notdefWidth float64, base *pdfenc.Encoding) *simpleenc.Simple {
+	if base == nil {
+		base = &pdfenc.WinAnsi
+	}
 	return simpleenc.NewSimple(
 		math.Round(notdefWidth*1000),
 		fontName,
-		&pdfenc.WinAnsi,
+		base,
 	)
 }
 
@@ -237,7 +354,7 @@ func (f *Instance) Clone() *Instance {
 	other := *f
 	descriptor := *f.Descriptor
 	other.Descriptor = &descriptor
-	other.Simple = newEncoder(f.PostScriptName(), f.Widths[0])
+	other.Simple = newEncoder(f.PostScriptName(), f.Widths[0], f.builtin)
 	return &other
 }
 
@@ -266,6 +383,9 @@ func isConsistent(F *type1.Font, M *afm.Metrics) bool {
 // cannot be written.  The metrics are not consulted: they come from a separate
 // file and may name the font differently.
 func (f *Instance) PostScriptName() string {
+	if f.psFont == nil {
+		return fontname.ForAFM(f.metrics)
+	}
 	return fontname.ForType1(f.psFont)
 }
 
@@ -362,6 +482,9 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 	}
 
 	fontData := f.psFont
+	if fontData == nil {
+		return f.makeMetricsOnlyDict(), nil
+	}
 
 	// The dictionary describes the program it carries, so both the name and the
 	// glyph count come from the font data: the glyph IDs a subset is made of
@@ -426,6 +549,42 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 	return dict, nil
 }
 
+// makeMetricsOnlyDict returns the font dictionary of an instance without
+// font program.  It carries no font data and the name has no subset tag.
+func (f *Instance) makeMetricsOnlyDict() *dict.Type1 {
+	postScriptName := f.PostScriptName()
+
+	fd := *f.Descriptor
+	fd.FontName = postScriptName
+	fd.IsSymbolic = f.builtin != nil || f.Simple.IsSymbolic()
+	fd.MissingWidth = f.Simple.DefaultWidth()
+
+	enc := f.Simple.Encoding()
+	if f.builtin != nil {
+		// codes which agree with the built-in encoding need no /Encoding entry
+		allocated := enc
+		enc = func(c byte) string {
+			name := allocated(c)
+			if name != "" && name == f.builtin.Encoding[c] {
+				return encoding.UseBuiltin
+			}
+			return name
+		}
+	}
+
+	dict := &dict.Type1{
+		PostScriptName: postScriptName,
+		Descriptor:     &fd,
+		Encoding:       enc,
+		ToUnicode:      f.Simple.ToUnicode(),
+		Name:           f.Name,
+	}
+	for c, info := range f.Simple.MappedCodes() {
+		dict.Width[c] = info.Width
+	}
+	return dict
+}
+
 func clone[T any](x *T) *T {
 	y := *x
 	return &y
@@ -435,7 +594,11 @@ var _ font.Outliner = (*Instance)(nil)
 
 // Outline returns the outline of a glyph in text space.
 // See [font.Outliner.Outline].
+// A metrics-only instance has no outlines, so the result is empty.
 func (f *Instance) Outline(gid glyph.ID) path.Path {
+	if f.psFont == nil {
+		return func(yield func(path.Command, []vec.Vec2) bool) {}
+	}
 	g := f.psFont.Glyphs[f.GlyphNames[gid]]
 	return g.Path().Transform(f.psFont.FontMatrix)
 }

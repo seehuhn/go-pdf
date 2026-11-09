@@ -220,9 +220,27 @@ func (d *Type1) Codec() *charcode.Codec {
 	return codec
 }
 
+// textEncoding returns the encoding from which text is inferred.  For a
+// standard font which is not embedded, the codes left to the built-in
+// encoding are resolved through the encoding of the standard font, which is
+// the one the viewer uses.
+func (d *Type1) textEncoding() encoding.Simple {
+	info := stdmtx.Metrics[d.PostScriptName]
+	if d.FontFile != nil || info == nil {
+		return d.Encoding
+	}
+	return func(c byte) string {
+		name := d.Encoding(c)
+		if name == encoding.UseBuiltin {
+			name = info.Encoding[c]
+		}
+		return name
+	}
+}
+
 // GlyphWidth implements the [Dict] interface.
 func (d *Type1) GlyphWidth(text string) (float64, bool) {
-	textMap := SimpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
+	textMap := SimpleTextMap(d.PostScriptName, d.textEncoding(), d.ToUnicode)
 	for c := range 256 {
 		code := byte(c)
 		if d.Encoding(code) != "" && textMap[code] == text {
@@ -251,7 +269,7 @@ func (d *Type1) FontInfo() any {
 // The font is immutable, i.e. no new glyphs can be added and no new codes
 // can be defined via the returned font object.
 func (d *Type1) MakeFont() font.Instance {
-	textMap := SimpleTextMap(d.PostScriptName, d.Encoding, d.ToUnicode)
+	textMap := SimpleTextMap(d.PostScriptName, d.textEncoding(), d.ToUnicode)
 	return &t1Font{
 		Dict: d,
 		Text: textMap,

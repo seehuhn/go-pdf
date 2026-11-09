@@ -42,12 +42,8 @@ func createDocument(fname string) error {
 		return err
 	}
 
-	identityV, err := cmap.Predefined("Identity-V")
-	if err != nil {
-		return err
-	}
 	raw := makefont.OpenType()
-	F, err := opentype.NewComposite(raw, &opentype.OptionsComposite{CMap: identityV})
+	F, err := opentype.NewComposite(raw, &opentype.OptionsComposite{CMap: cmap.IdentityV})
 	if err != nil {
 		return err
 	}

@@ -120,7 +120,7 @@ type Generator struct {
 
 	// iconFont is the font used to render symbols inside some of the icons for
 	// text annotations.  If this is changed to be different from
-	// extended.NimbusRomanBold, the layout of some text icons may need to be
+	// extended.QuireSerifBold, the layout of some text icons may need to be
 	// adjusted.  Use [Generator.icons] to read it.
 	iconFont font.Layouter
 
@@ -146,8 +146,8 @@ type Generator struct {
 // reads it here rather than making a second instance.
 //
 // Where the [Style] supplied no font of its own, the default is made on first
-// use: most documents have no annotation which needs it, and reading a font
-// program costs more than building the appearance streams that use it.
+// use, since most documents have no annotation which needs it and parsing a
+// font program is far more expensive than building the appearance streams.
 func (g *Generator) ContentFont() font.Layouter {
 	if g.contentFont == nil {
 		g.contentFont = font.Must(standard.Helvetica.New())
@@ -184,11 +184,10 @@ func centredBaseline(F font.Layouter, height, size float64) float64 {
 // icons returns the font used for the symbols inside text annotation icons.
 //
 // Most documents have no annotation which needs it, so it is made on first use
-// rather than with the Generator: parsing a font program is far more expensive
-// than building the appearance streams that use it.
+// rather than with the Generator.
 func (g *Generator) icons() font.Layouter {
 	if g.iconFont == nil {
-		g.iconFont = font.Must(extended.NimbusRomanBold.New())
+		g.iconFont = font.Must(extended.QuireSerifBold.New(nil))
 	}
 	return g.iconFont
 }

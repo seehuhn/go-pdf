@@ -79,8 +79,8 @@ func TestCMapOptionIdentity(t *testing.T) {
 		name  string
 		wMode font.WritingMode
 	}{
-		{nil, "Identity-H", font.Horizontal},
-		{mustPredefined(t, "Identity-V"), "Identity-V", font.Vertical},
+		{cmap.IdentityH, "Identity-H", font.Horizontal},
+		{cmap.IdentityV, "Identity-V", font.Vertical},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			d, _ := embedWithCMap(t, c.f, "Hello")
@@ -115,15 +115,6 @@ func TestCMapOptionTemplateCodeSpace(t *testing.T) {
 	if _, err := truetype.NewComposite(makefont.TrueType(), &truetype.OptionsComposite{CMap: f}); err == nil {
 		t.Error("template with a UCS-2 code space was accepted")
 	}
-}
-
-func mustPredefined(t *testing.T, name string) *cmap.File {
-	t.Helper()
-	f, err := cmap.Predefined(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return f
 }
 
 // TestCMapOptionPrivateCollection writes a font with a hand-written CMap
@@ -208,5 +199,16 @@ func TestCMapOptionPrivateCollection(t *testing.T) {
 	}
 	if got != text {
 		t.Errorf("text reads back as %q, want %q", got, text)
+	}
+}
+
+// TestCompositeRequiresCMap checks that a composite font cannot be made
+// without a CMap.
+func TestCompositeRequiresCMap(t *testing.T) {
+	if _, err := truetype.NewComposite(makefont.TrueType(), nil); err == nil {
+		t.Error("nil options accepted")
+	}
+	if _, err := truetype.NewComposite(makefont.TrueType(), &truetype.OptionsComposite{}); err == nil {
+		t.Error("nil CMap accepted")
 	}
 }

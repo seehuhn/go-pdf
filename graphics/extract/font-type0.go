@@ -158,10 +158,10 @@ func repairCIDType0(d *dict.CIDFontType0) {
 		d.ROS = &cid.SystemInfo{}
 	}
 	if d.CMap == nil {
-		d.CMap, _ = cmap.Predefined("Identity-H")
+		d.CMap = cmap.IdentityH
 	}
 
-	if d.CMap != nil && d.CMap.ROS != nil {
+	if d.CMap.ROS != nil {
 		if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
 			!d.CMap.IsPredefined() {
 			if d.ROS.Registry != d.CMap.ROS.Registry ||

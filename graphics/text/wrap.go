@@ -43,16 +43,29 @@ type BreakOpportunity struct {
 	Replace    string // text ending the line if it breaks here, "-" for a hyphen
 }
 
-// WhitespaceBreaker breaks after runs of whitespace and at newlines.  It is
-// the default line breaker used by [Wrap].
+// WhitespaceBreaker breaks after runs of whitespace.  It is the default line
+// breaker used by [Wrap].
+//
+// Whitespace is as defined by [unicode.IsSpace], except for the no-break
+// spaces U+00A0, U+2007 and U+202F, which are never break opportunities and
+// remain part of the surrounding word.
 type WhitespaceBreaker struct{}
+
+// isBreakSpace reports whether r is whitespace at which a line may break.
+func isBreakSpace(r rune) bool {
+	switch r {
+	case 0xa0, 0x2007, 0x202f: // no-break spaces
+		return false
+	}
+	return unicode.IsSpace(r)
+}
 
 // Opportunities implements the [LineBreaker] interface.
 func (WhitespaceBreaker) Opportunities(s string) []BreakOpportunity {
 	var res []BreakOpportunity
 	start := -1
 	for i, r := range s {
-		if unicode.IsSpace(r) {
+		if isBreakSpace(r) {
 			if start < 0 {
 				start = i
 			}
@@ -99,7 +112,10 @@ type wrap struct {
 // Wrap creates a text wrapper that breaks text at the specified width, using
 // [WhitespaceBreaker].
 // Whitespace at the beginning of the first text and the end of the last text is ignored.
-// Newline characters in the input strings start a new line.
+// Line breaks in the input strings start a new line, see [WrapWith].
+// Adjacent text arguments are joined by a single space, so Wrap(w, "foo", "bar")
+// is equivalent to Wrap(w, "foo bar") unless the first argument ends in a line
+// break.
 func Wrap(width float64, text ...string) *wrap {
 	return WrapWith(WhitespaceBreaker{}, width, text...)
 }
@@ -107,7 +123,10 @@ func Wrap(width float64, text ...string) *wrap {
 // WrapWith creates a text wrapper that breaks text at the specified width,
 // using b to find break opportunities within each line of input.
 // Whitespace at the beginning of the first text and the end of the last text is ignored.
-// Newline characters in the input strings start a new line, regardless of b.
+// The mandatory line breaks of Unicode UAX #14 in the input strings start a
+// new line, regardless of b: CR LF, CR, LF, NEL (U+0085), VT, FF, LINE
+// SEPARATOR (U+2028) and PARAGRAPH SEPARATOR (U+2029).  Adjacent text
+// arguments are joined by a single space.
 func WrapWith(b LineBreaker, width float64, text ...string) *wrap {
 	var allWords [][]string
 	var allGaps [][]gap
@@ -123,17 +142,17 @@ func WrapWith(b LineBreaker, width float64, text ...string) *wrap {
 		t := orig
 		trimStart := 0
 		if i == 0 {
-			trimmed := strings.TrimLeftFunc(t, unicode.IsSpace)
+			trimmed := strings.TrimLeftFunc(t, isBreakSpace)
 			trimStart = len(t) - len(trimmed)
 			t = trimmed
 		}
 		if i == len(text)-1 {
-			t = strings.TrimRightFunc(t, unicode.IsSpace)
+			t = strings.TrimRightFunc(t, isBreakSpace)
 		}
 
 		first := true
 		localOffset := 0
-		for part := range strings.SplitSeq(t, "\n") {
+		for part, breakLen := range lineParts(t) {
 			base := argBase + trimStart + localOffset
 			words, gaps, spans := tokenize(b, part, base)
 			if first {
@@ -157,7 +176,7 @@ func WrapWith(b LineBreaker, width float64, text ...string) *wrap {
 				currentSpans = spans
 				currentBase = base
 			}
-			localOffset += len(part) + 1
+			localOffset += len(part) + breakLen
 		}
 		argBase += len(orig)
 	}
@@ -169,6 +188,34 @@ func WrapWith(b LineBreaker, width float64, text ...string) *wrap {
 	}
 
 	return &wrap{width: width, words: allWords, gaps: allGaps, spans: allSpans, base: allBase}
+}
+
+// lineParts splits s at the mandatory line breaks listed for [WrapWith].
+// It yields each line together with the byte length of the line break which
+// ends it, or 0 for the last line.
+func lineParts(s string) iter.Seq2[string, int] {
+	return func(yield func(string, int) bool) {
+		start := 0
+		for i := 0; i < len(s); {
+			r, size := utf8.DecodeRuneInString(s[i:])
+			switch r {
+			case '\r':
+				if strings.HasPrefix(s[i+1:], "\n") {
+					size = 2
+				}
+			case '\n', '\v', '\f', '\u0085', '\u2028', '\u2029':
+			default:
+				i += size
+				continue
+			}
+			if !yield(s[start:i], size) {
+				return
+			}
+			i += size
+			start = i
+		}
+		yield(s[start:], 0)
+	}
 }
 
 // tokenize splits s into words at the break opportunities b reports, along
@@ -207,17 +254,18 @@ func tokenize(b LineBreaker, s string, base int) ([]string, []gap, []span) {
 	words = append(words, s[pos:])
 	spans = append(spans, span{base + pos, base + len(s)})
 
-	if words[0] == "" {
+	// drop empty words at either end, together with the gap next to them
+	if len(words) > 1 && words[0] == "" {
 		words = words[1:]
 		gaps = gaps[1:]
 		spans = spans[1:]
 	}
-	if len(words) > 0 && words[len(words)-1] == "" {
+	if len(words) > 1 && words[len(words)-1] == "" {
 		words = words[:len(words)-1]
 		gaps = gaps[:len(gaps)-1]
 		spans = spans[:len(spans)-1]
 	}
-	if len(words) == 0 {
+	if len(words) == 1 && words[0] == "" {
 		return []string{}, nil, nil
 	}
 	return words, gaps, spans
@@ -234,128 +282,139 @@ func checkOffset(s string, i int) {
 	}
 }
 
-// paragraphLayout holds the laid-out glyphs of one paragraph together with
-// the per-gap data needed to decide line breaks.  It is shared between
-// [wrap.Lines] and [wrap.Ranges] so the two choose identical break points.
-type paragraphLayout struct {
-	glyphs []font.Glyph
-
-	// breakPos[k] is the glyph index at which a line ending at gap k stops
-	// (exclusive); nextStart[k] is where the following line starts.
-	breakPos  []int
-	nextStart []int
-
-	// replaceWidth[k] is the laid-out width of gaps[k].replace; replaceGlyphs[k]
-	// is its laid-out glyphs, reused so [wrap.Lines] need not lay it out again.
-	replaceWidth  []float64
-	replaceGlyphs [][]font.Glyph
-}
-
-// layoutParagraph lays out one paragraph's words, joined by gaps, and
-// computes the break-related data used by [wrap.breakLines].
-func layoutParagraph(F font.Layouter, ptSize float64, words []string, gaps []gap) *paragraphLayout {
-	var sb strings.Builder
-	gapStart := make([]int, len(gaps))
-	gapEnd := make([]int, len(gaps))
-	for i, word := range words {
-		sb.WriteString(word)
-		if i < len(gaps) {
-			gapStart[i] = sb.Len()
-			sb.WriteString(gaps[i].keep)
-			gapEnd[i] = sb.Len()
-		}
-	}
-	paragraphText := sb.String()
-	glyphs := F.Layout(nil, ptSize, paragraphText).Seq
-
-	breakPos := make([]int, len(gaps))
-	nextStart := make([]int, len(gaps))
-	bi, ni := 0, 0
-	pos := 0
-	for i := 0; i <= len(glyphs); i++ {
-		for bi < len(gaps) && pos >= gapStart[bi] {
-			breakPos[bi] = i
-			bi++
-		}
-		for ni < len(gaps) && pos >= gapEnd[ni] {
-			nextStart[ni] = i
-			ni++
-		}
-		if i < len(glyphs) {
-			pos += len(glyphs[i].Text)
-		}
-	}
-
-	replaceWidth := make([]float64, len(gaps))
-	replaceGlyphs := make([][]font.Glyph, len(gaps))
-	for i, g := range gaps {
-		if g.replace == "" {
-			continue
-		}
-		extra := F.Layout(nil, ptSize, g.replace)
-		replaceGlyphs[i] = extra.Seq
-		for _, gl := range extra.Seq {
-			replaceWidth[i] += gl.Advance
-		}
-	}
-
-	return &paragraphLayout{
-		glyphs:        glyphs,
-		breakPos:      breakPos,
-		nextStart:     nextStart,
-		replaceWidth:  replaceWidth,
-		replaceGlyphs: replaceGlyphs,
-	}
-}
-
-// lineBreak is one line decided by [wrap.breakLines]: [start,end) is the
-// glyph range of the line's own words, and gapIdx is the index of the gap
-// the line ends at, or -1 for the paragraph's final line, which consumes no
-// gap.
+// lineBreak is one line decided by [wrap.breakLines]: the line consists of
+// words[startWord..gapIdx] joined by their gaps, followed by the Replace text
+// of gap gapIdx, or gapIdx == -1 for the paragraph's final line, which
+// consumes no gap and extends to the last word.  glyphs is the line laid out on
+// its own.
 type lineBreak struct {
-	start, end, gapIdx int
+	startWord, gapIdx int
+	glyphs            []font.Glyph
 }
 
-// breakLines walks pl's glyphs and greedily decides where to end each line:
-// a line is extended until the next glyph would take it past w.width, then
-// it ends at the latest candidate gap whose line — including the width of
-// that gap's Replace text — still fits.  A candidate that does not fit even
-// with its own Replace text is not used; the line then keeps growing past
-// w.width until a later candidate fits or the paragraph ends, producing an
-// overlong line rather than a break that is itself too wide.
+// totalAdvance returns the sum of the advances of glyphs.
+func totalAdvance(glyphs []font.Glyph) float64 {
+	var sum float64
+	for _, g := range glyphs {
+		sum += g.Advance
+	}
+	return sum
+}
+
+// breakLines greedily decides where to end each line of one paragraph.  Every
+// line is measured by laying out its text on its own, exactly as it will be
+// drawn, so kerning and ligatures across the removed gap text are accounted
+// for.  A line ends at the last candidate gap whose line, including that
+// gap's Replace text, fits into w.width, where the candidates considered are
+// those up to the first word end at which the line without Replace text is
+// already too wide.  If no candidate fits, the line extends to the end of the
+// first word (the next gap without Replace text) and overflows; wrapping
+// continues after it.
+//
+// To keep the cost near linear in the paragraph length, each word is laid
+// out once and prefix sums of the advances propose a break by binary search.
+// The proposal is then corrected using standalone layouts of the candidate
+// lines: it moves left while the line is too wide and right while the next
+// longer line still fits.  The result is the one an exhaustive scan would
+// give, provided line width does not decrease when words are added; the
+// number of standalone layouts per line is one plus the proposal's error.
 //
 // [wrap.Lines] and [wrap.Ranges] both call this, so they always agree on
-// where lines break.
-func (w *wrap) breakLines(pl *paragraphLayout) []lineBreak {
-	glyphs := pl.glyphs
+// where lines break.  The paragraph must contain at least one word.
+func (w *wrap) breakLines(F font.Layouter, ptSize float64, words []string, gaps []gap) []lineBreak {
+	n := len(words)
 
-	prefixWidth := make([]float64, len(glyphs)+1)
-	for i, g := range glyphs {
-		prefixWidth[i+1] = prefixWidth[i] + g.Advance
+	// prefix[i] is the estimated width of words[:i], each followed by its gap
+	keepWidth := make(map[string]float64)
+	prefix := make([]float64, n+1)
+	for i, word := range words {
+		prefix[i+1] = prefix[i] + totalAdvance(F.Layout(nil, ptSize, word).Seq)
+		if i < n-1 && gaps[i].keep != "" {
+			kw, ok := keepWidth[gaps[i].keep]
+			if !ok {
+				kw = totalAdvance(F.Layout(nil, ptSize, gaps[i].keep).Seq)
+				keepWidth[gaps[i].keep] = kw
+			}
+			prefix[i+1] += kw
+		}
 	}
 
 	var breaks []lineBreak
-	startPos := 0
-	useCand := -1
-	nextCand := 0
-	for i := range glyphs {
-		for nextCand < len(pl.breakPos) && pl.breakPos[nextCand] <= i {
-			lineWidth := prefixWidth[pl.breakPos[nextCand]] - prefixWidth[startPos] + pl.replaceWidth[nextCand]
-			if lineWidth <= w.width {
-				useCand = nextCand
+	for s := 0; ; {
+		base := make(map[int][]font.Glyph) // line s..k without Replace text
+		layoutBase := func(k int) []font.Glyph {
+			g, ok := base[k]
+			if !ok {
+				g = F.Layout(nil, ptSize, joinWords(words[s:k+1], gaps[s:])).Seq
+				base[k] = g
 			}
-			nextCand++
+			return g
 		}
-		if prefixWidth[i+1]-prefixWidth[startPos] > w.width && useCand >= 0 && pl.breakPos[useCand] > startPos {
-			breaks = append(breaks, lineBreak{start: startPos, end: pl.breakPos[useCand], gapIdx: useCand})
-			startPos = pl.nextStart[useCand]
-			useCand = -1
+		// layoutCand returns the line s..k as it is drawn if it breaks at gap k
+		layoutCand := func(k int) []font.Glyph {
+			if k == n-1 || gaps[k].replace == "" {
+				return layoutBase(k)
+			}
+			return F.Layout(nil, ptSize, joinWords(words[s:k+1], gaps[s:])+gaps[k].replace).Seq
+		}
+
+		// proposal from the prefix sums
+		lo, hi := s, n-1
+		for lo < hi {
+			mid := (lo + hi + 1) / 2
+			e := prefix[mid+1] - prefix[s]
+			if mid < n-1 {
+				e -= keepWidth[gaps[mid].keep]
+			}
+			if e <= w.width {
+				lo = mid
+			} else {
+				hi = mid - 1
+			}
+		}
+		k := lo
+
+		for k > s && totalAdvance(layoutBase(k)) > w.width {
+			k--
+		}
+		for k < n-1 && totalAdvance(layoutBase(k+1)) <= w.width {
+			k++
+		}
+		var glyphs []font.Glyph
+		for ; k >= s; k-- {
+			glyphs = layoutCand(k)
+			if totalAdvance(glyphs) <= w.width {
+				break
+			}
+		}
+
+		if k < s {
+			// nothing fits: overflow to the end of the first word
+			k = s
+			for k < n-1 && gaps[k].replace != "" {
+				k++
+			}
+			glyphs = layoutBase(k)
+		}
+		if k == n-1 {
+			breaks = append(breaks, lineBreak{startWord: s, gapIdx: -1, glyphs: glyphs})
+			return breaks
+		}
+		breaks = append(breaks, lineBreak{startWord: s, gapIdx: k, glyphs: glyphs})
+		s = k + 1
+	}
+}
+
+// joinWords joins words using the keep text of the gaps between them.
+func joinWords(words []string, gaps []gap) string {
+	var sb strings.Builder
+	for i, word := range words {
+		sb.WriteString(word)
+		if i < len(words)-1 {
+			sb.WriteString(gaps[i].keep)
 		}
 	}
-	if startPos < len(glyphs) {
-		breaks = append(breaks, lineBreak{start: startPos, end: len(glyphs), gapIdx: -1})
-	}
-	return breaks
+	return sb.String()
 }
 
 // Lines arranges the text into lines.
@@ -363,7 +422,10 @@ func (w *wrap) breakLines(pl *paragraphLayout) []lineBreak {
 // [LineBreaker] (which are spaces, for the default breaker).
 // Lines are at most w.width wide, except when no candidate break lets a line
 // end within that width -- e.g. a single word wider than w.width, or a word
-// whose only break candidate's Replace text would push it over.
+// whose only break candidate's Replace text would push it over.  Such a line
+// ends at the first following break opportunity without Replace text, so it
+// overflows by at most one word (or word fragment); wrapping then continues
+// after it, and later lines are again at most w.width wide.
 func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {
 	return func(yield func(*font.GlyphSeq) bool) {
 		for pIdx, words := range w.words {
@@ -375,19 +437,8 @@ func (w *wrap) Lines(F font.Layouter, ptSize float64) iter.Seq[*font.GlyphSeq] {
 				continue
 			}
 			gaps := w.gaps[pIdx]
-			pl := layoutParagraph(F, ptSize, words, gaps)
-
-			for _, lb := range w.breakLines(pl) {
-				seq := pl.glyphs[lb.start:lb.end]
-				if lb.gapIdx >= 0 {
-					if extra := pl.replaceGlyphs[lb.gapIdx]; len(extra) > 0 {
-						combined := make([]font.Glyph, 0, len(seq)+len(extra))
-						combined = append(combined, seq...)
-						combined = append(combined, extra...)
-						seq = combined
-					}
-				}
-				if !yield(&font.GlyphSeq{Seq: seq}) {
+			for _, lb := range w.breakLines(F, ptSize, words, gaps) {
+				if !yield(&font.GlyphSeq{Seq: lb.glyphs}) {
 					return
 				}
 			}
@@ -406,6 +457,7 @@ type LineRange struct {
 
 // Ranges reports the same line breaks as [wrap.Lines], as byte ranges into
 // the text originally passed to [WrapWith] rather than as laid-out glyphs.
+// In particular, overlong lines overflow as described there.
 // It calls F the same way Lines does and so must choose exactly the same
 // break points; a caller which needs both the glyphs and the ranges for the
 // same text should call both, since the two do not share layout work.
@@ -425,21 +477,17 @@ func (w *wrap) Ranges(F font.Layouter, ptSize float64) iter.Seq[LineRange] {
 			}
 			gaps := w.gaps[pIdx]
 			spans := w.spans[pIdx]
-			pl := layoutParagraph(F, ptSize, words, gaps)
-
-			startWord := 0
-			for _, lb := range w.breakLines(pl) {
+			for _, lb := range w.breakLines(F, ptSize, words, gaps) {
 				var lr LineRange
 				if lb.gapIdx >= 0 {
 					lr = LineRange{
-						Start:  spans[startWord].start,
+						Start:  spans[lb.startWord].start,
 						End:    spans[lb.gapIdx].end,
 						Hyphen: gaps[lb.gapIdx].replace == "-",
 					}
-					startWord = lb.gapIdx + 1
 				} else {
 					lr = LineRange{
-						Start: spans[startWord].start,
+						Start: spans[lb.startWord].start,
 						End:   spans[len(words)-1].end,
 					}
 				}

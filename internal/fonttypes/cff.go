@@ -19,6 +19,7 @@ package fonttypes
 import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cff"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
 	"seehuhn.de/go/sfnt"
 )
@@ -59,7 +60,7 @@ func (f cffEmbedder) font() font.Layouter {
 	}
 
 	if f.composite {
-		return font.Must(cff.NewComposite(info, nil))
+		return font.Must(cff.NewComposite(info, &cff.OptionsComposite{CMap: cmap.IdentityH}))
 	}
 	return font.Must(cff.NewSimple(info, nil))
 }

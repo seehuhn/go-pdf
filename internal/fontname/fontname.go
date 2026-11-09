@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"seehuhn.de/go/pdf/font/subset"
+	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/cff"
@@ -103,6 +104,15 @@ func ForCFF(f *cff.Font) string {
 // PostScript font name, so the widest limit applies.
 func ForType1(f *type1.Font) string {
 	return FontName(f.FontName, f.FamilyName, "", subset.MaxBaseNameLen,
+		type1.CheckFontName)
+}
+
+// ForAFM returns the PostScript name a PDF file uses for a font which is
+// known from its AFM metrics only.  Such a font is never embedded, so the
+// name never carries a subset tag, even if the metrics give one.
+func ForAFM(m *afm.Metrics) string {
+	_, base := subset.Split(m.FontName)
+	return FontName(base, m.FamilyName, "", subset.MaxBaseNameLen,
 		type1.CheckFontName)
 }
 

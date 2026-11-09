@@ -25,9 +25,12 @@ import (
 	"seehuhn.de/go/pdf/destination"
 	"seehuhn.de/go/pdf/document"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/pdf/font/extended"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/outline"
 	"seehuhn.de/go/sfnt/glyph"
 )
@@ -72,7 +75,7 @@ func createDocument(fname string) error {
 
 	// Extended fonts
 	for _, f := range extended.All {
-		fontInstance := font.Must(f.New())
+		fontInstance := font.Must(f.New(extendedOptions()))
 		name := getFontDisplayName(f)
 		usage := getExtendedFontUsage(f)
 
@@ -337,7 +340,7 @@ func createFreshFontInstance(entry fontEntry) (font.Layouter, error) {
 		// Find the matching gofont and create new instance
 		for _, f := range gofont.All {
 			if getGoFontDisplayName(f) == fontName {
-				return f.NewComposite(nil)
+				return f.NewComposite(&truetype.OptionsComposite{CMap: cmap.IdentityH})
 			}
 		}
 	}
@@ -345,7 +348,7 @@ func createFreshFontInstance(entry fontEntry) (font.Layouter, error) {
 	// Check if it's an extended font
 	for _, f := range extended.All {
 		if getFontDisplayName(f) == fontName {
-			return f.New()
+			return f.New(extendedOptions())
 		}
 	}
 
@@ -482,44 +485,18 @@ func getUnicodeMapping(fontInstance font.Layouter) map[glyph.ID]rune {
 	return result
 }
 
+// extendedOptions selects composite fonts, so that a font instance is not
+// limited to 256 glyphs.
+func extendedOptions() *embed.Options {
+	return &embed.Options{CMap: cmap.IdentityH}
+}
+
 func getFontDisplayName(f extended.Font) string {
-	names := map[extended.Font]string{
-		extended.D050000L:               "D050000L (ZapfDingbats Extended)",
-		extended.NimbusMonoPSBold:       "NimbusMonoPS-Bold (Courier-Bold Extended)",
-		extended.NimbusMonoPSBoldItalic: "NimbusMonoPS-BoldItalic (Courier-BoldOblique Extended)",
-		extended.NimbusMonoPSItalic:     "NimbusMonoPS-Italic (Courier-Oblique Extended)",
-		extended.NimbusMonoPSRegular:    "NimbusMonoPS-Regular (Courier Extended)",
-		extended.NimbusRomanBold:        "NimbusRoman-Bold (Times-Bold Extended)",
-		extended.NimbusRomanBoldItalic:  "NimbusRoman-BoldItalic (Times-BoldItalic Extended)",
-		extended.NimbusRomanItalic:      "NimbusRoman-Italic (Times-Italic Extended)",
-		extended.NimbusRomanRegular:     "NimbusRoman-Regular (Times-Roman Extended)",
-		extended.NimbusSansBold:         "NimbusSans-Bold (Helvetica-Bold Extended)",
-		extended.NimbusSansBoldItalic:   "NimbusSans-BoldItalic (Helvetica-BoldOblique Extended)",
-		extended.NimbusSansItalic:       "NimbusSans-Italic (Helvetica-Oblique Extended)",
-		extended.NimbusSansRegular:      "NimbusSans-Regular (Helvetica Extended)",
-		extended.StandardSymbolsPS:      "StandardSymbolsPS (Symbol Extended)",
-	}
-	return names[f]
+	return fmt.Sprintf("%s (%s Extended)", f.PostScriptName(), f.Standard())
 }
 
 func getExtendedFontUsage(f extended.Font) string {
-	names := map[extended.Font]string{
-		extended.D050000L:               "font.Must(extended.D050000L.New())",
-		extended.NimbusMonoPSBold:       "font.Must(extended.NimbusMonoPSBold.New())",
-		extended.NimbusMonoPSBoldItalic: "font.Must(extended.NimbusMonoPSBoldItalic.New())",
-		extended.NimbusMonoPSItalic:     "font.Must(extended.NimbusMonoPSItalic.New())",
-		extended.NimbusMonoPSRegular:    "font.Must(extended.NimbusMonoPSRegular.New())",
-		extended.NimbusRomanBold:        "font.Must(extended.NimbusRomanBold.New())",
-		extended.NimbusRomanBoldItalic:  "font.Must(extended.NimbusRomanBoldItalic.New())",
-		extended.NimbusRomanItalic:      "font.Must(extended.NimbusRomanItalic.New())",
-		extended.NimbusRomanRegular:     "font.Must(extended.NimbusRomanRegular.New())",
-		extended.NimbusSansBold:         "font.Must(extended.NimbusSansBold.New())",
-		extended.NimbusSansBoldItalic:   "font.Must(extended.NimbusSansBoldItalic.New())",
-		extended.NimbusSansItalic:       "font.Must(extended.NimbusSansItalic.New())",
-		extended.NimbusSansRegular:      "font.Must(extended.NimbusSansRegular.New())",
-		extended.StandardSymbolsPS:      "font.Must(extended.StandardSymbolsPS.New())",
-	}
-	return names[f]
+	return fmt.Sprintf("font.Must(%#v.New(&embed.Options{CMap: cmap.IdentityH}))", f)
 }
 
 func getGoFontDisplayName(f gofont.Font) string {

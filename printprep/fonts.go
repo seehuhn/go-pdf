@@ -253,11 +253,6 @@ func (c *converter) finalizeGlyf(cf *convFont) (pdf.Reference, error) {
 		ww[cid.CID(id)] = w
 	}
 
-	cmapFile, err := cmap.Predefined("Identity-H")
-	if err != nil {
-		return 0, err
-	}
-
 	subsetTag := subset.Retag(subset.Tag(glyphs, g.src.NumGlyphs()), g.srcTag)
 
 	// composite fonts require MissingWidth to be zero; the descriptor's font
@@ -282,7 +277,7 @@ func (c *converter) finalizeGlyf(cf *convFont) (pdf.Reference, error) {
 		SubsetTag:       subsetTag,
 		Descriptor:      &fd,
 		ROS:             cmap.NewGIDToCIDIdentity().ROS(),
-		CMap:            cmapFile,
+		CMap:            cmap.IdentityH,
 		Width:           ww,
 		DefaultWidth:    math.Round(subsetFont.GlyphWidthPDF(0)),
 		DefaultVMetrics: dict.DefaultVMetricsDefault,

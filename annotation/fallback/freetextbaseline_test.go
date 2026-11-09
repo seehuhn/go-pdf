@@ -110,11 +110,12 @@ func TestFreeTextAscentsUsedForFirstBaseline(t *testing.T) {
 		a    *annotation.FreeText
 		want float64
 	}{
-		{"text box", &annotation.FreeText{}, 0.729},
+		// ascender entries of the AFM files: Helvetica 718, Courier 629
+		{"text box", &annotation.FreeText{}, 0.718},
 		{
 			"typewriter",
 			&annotation.FreeText{Intent: annotation.FreeTextIntentTypeWriter},
-			0.825,
+			0.629,
 		},
 	}
 	for _, c := range cases {

@@ -30,6 +30,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/document"
+	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/embed"
 	"seehuhn.de/go/sfnt"
 )
@@ -87,7 +88,9 @@ func run() error {
 	for row, opsz := range opticalSizes {
 		for col, wght := range weights {
 			opt := &embed.Options{
-				Composite: true, // there is more than one private cff DICT
+				// a composite font is needed, since the CFF2 font has
+				// more than one private DICT
+				CMap: cmap.IdentityH,
 				Variations: map[string]float64{
 					"opsz": opsz,
 					"wght": wght,

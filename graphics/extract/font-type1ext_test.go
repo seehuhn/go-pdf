@@ -53,6 +53,92 @@ func TestType1RoundTrip(t *testing.T) {
 	}
 }
 
+// TestType1StandardTrim checks that a standard font dictionary read from a
+// file is written back without widths, whatever form its encoding takes, and
+// that reading the result back gives the same encoding and widths.
+func TestType1StandardTrim(t *testing.T) {
+	encodings := []struct {
+		name string
+		obj  pdf.Object // nil for no /Encoding entry
+	}{
+		{"missing", nil},
+		{"empty dict", pdf.Dict{}},
+		{"WinAnsi", pdf.Name("WinAnsiEncoding")},
+		{"MacRoman", pdf.Name("MacRomanEncoding")},
+	}
+	for _, fontName := range []string{"Courier", "Helvetica", "Helvetica-Oblique", "Times-Bold", "Symbol"} {
+		for _, e := range encodings {
+			t.Run(fontName+"/"+e.name, func(t *testing.T) {
+				w1, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				fontDict := pdf.Dict{
+					"Type":     pdf.Name("Font"),
+					"Subtype":  pdf.Name("Type1"),
+					"BaseFont": pdf.Name(fontName),
+				}
+				if e.obj != nil {
+					fontDict["Encoding"] = e.obj
+				}
+				ref1 := w1.Alloc()
+				if err := w1.Put(ref1, fontDict); err != nil {
+					t.Fatal(err)
+				}
+				d1 := readType1(t, w1, ref1)
+
+				w2, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+				rm := pdf.NewResourceManager(w2)
+				ref2, err := rm.Embed(d1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := rm.Close(); err != nil {
+					t.Fatal(err)
+				}
+				out, err := pdf.NewCursor(w2).Dict(ref2)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Latin encodings name glyphs which Symbol lacks, so the
+				// widths of these codes are not given by the standard metrics
+				_, isNamed := e.obj.(pdf.Name)
+				wantTrim := !(fontName == "Symbol" && isNamed)
+				for _, key := range []pdf.Name{"Widths", "FontDescriptor"} {
+					if _, ok := out[key]; ok == wantTrim {
+						t.Errorf("/%s present: %t, want %t", key, ok, !wantTrim)
+					}
+				}
+
+				d2 := readType1(t, w2, ref2)
+				var enc1, enc2 [256]string
+				for code := range 256 {
+					enc1[code] = d1.Encoding(byte(code))
+					enc2[code] = d2.Encoding(byte(code))
+				}
+				if diff := cmp.Diff(enc1, enc2); diff != "" {
+					t.Errorf("encoding round trip failed (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(d1.Width, d2.Width); diff != "" {
+					t.Errorf("widths round trip failed (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+// readType1 reads the Type 1 font dictionary at ref.
+func readType1(t *testing.T, r pdf.Getter, ref pdf.Object) *dict.Type1 {
+	t.Helper()
+	x := pdf.NewExtractor(r)
+	dAny, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := dAny.(*dict.Type1)
+	if !ok {
+		t.Fatalf("expected *dict.Type1, got %T", dAny)
+	}
+	return d
+}
+
 // TestMMType1Extract checks that a hand-built font dictionary with Subtype
 // /MMType1 is extracted as a *dict.Type1 with MultipleMaster set.
 func TestMMType1Extract(t *testing.T) {

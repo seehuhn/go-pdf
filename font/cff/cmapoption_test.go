@@ -105,3 +105,14 @@ func TestCompositeCollectionCMap(t *testing.T) {
 		t.Errorf("text reads back as %q, want %q", got, text)
 	}
 }
+
+// TestCompositeRequiresCMap checks that a composite font cannot be made
+// without a CMap.
+func TestCompositeRequiresCMap(t *testing.T) {
+	if _, err := cff.NewComposite(makefont.OpenType(), nil); err == nil {
+		t.Error("nil options accepted")
+	}
+	if _, err := cff.NewComposite(makefont.OpenType(), &cff.OptionsComposite{}); err == nil {
+		t.Error("nil CMap accepted")
+	}
+}

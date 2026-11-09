@@ -17,69 +17,188 @@
 package standard
 
 import (
+	"math"
+	"slices"
+	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/internal/bundled"
+	"seehuhn.de/go/pdf/font/pdfenc"
 )
 
-// TestGlyphLists tests that the glyph lists of the 14 standard PDF
-// fonts are consistent between the .pfb and the .afm files.
+// TestGlyphLists tests that the glyph lists of the 14 standard PDF fonts are
+// the character sets guaranteed by the specification.
 func TestGlyphLists(t *testing.T) {
 	for _, G := range All {
-		psFont, metrics, err := G.data()
+		metrics, err := G.data()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		glyphNames1 := psFont.GlyphList()
-		glyphNames2 := metrics.GlyphList()
-		if d := cmp.Diff(glyphNames1, glyphNames2); d != "" {
-			t.Errorf("%-22s differ: %s", G, d)
+		var charset map[string]bool
+		switch G {
+		case Symbol:
+			charset = pdfenc.Symbol.Has
+		case ZapfDingbats:
+			charset = pdfenc.ZapfDingbats.Has
+		default:
+			charset = pdfenc.StandardLatin.Has
+		}
+		for name := range metrics.Glyphs {
+			if !charset[name] && name != ".notdef" {
+				t.Errorf("%-22s unexpected glyph %q", G, name)
+			}
+		}
+		for name := range charset {
+			if _, ok := metrics.Glyphs[name]; !ok {
+				t.Errorf("%-22s missing glyph %q", G, name)
+			}
 		}
 	}
 }
 
-// TestGlyphWidths tests that the glyph widths of the 14 standard PDF
-// fonts are consistent between the .pfb and the .afm files.
+// TestGlyphWidths tests that the widths of the font instances are those in
+// Adobe's AFM files.
 func TestGlyphWidths(t *testing.T) {
 	for _, G := range All {
-		psFont, metrics, err := G.data()
+		full, err := bundled.ReadAFM(string(G))
 		if err != nil {
 			t.Fatal(err)
 		}
+		F := font.Must(G.New())
 
-		for name, g := range psFont.Glyphs {
-			w1 := g.WidthX
-			w2 := metrics.Glyphs[name].WidthX
-			if w1 != w2 {
-				t.Errorf("%-22s %-8s width=%g, claimedWidth=%g",
-					G, name, w1, w2)
+		geom := F.GetGeometry()
+		for gid, name := range F.GlyphNames {
+			if name == ".notdef" {
+				continue
+			}
+			want := full.Glyphs[name].WidthX / 1000
+			if got := geom.Widths[gid]; math.Abs(got-want) > 1e-9 {
+				t.Errorf("%-22s %-8s width=%g, want %g", G, name, got, want)
 			}
 		}
 	}
 }
 
-// TestBlankGlyphs checks that glyphs are marked as blank in the
-// metrics file if and only if they are blank in the .pfb file.
+// TestBlankGlyphs checks that the glyphs of the font instances which have an
+// empty bounding box are exactly the white space glyphs.
 func TestBlankGlyphs(t *testing.T) {
 	for _, G := range All {
-		psFont, metrics, err := G.data()
-		if err != nil {
-			t.Fatal(err)
-		}
-		for name, g := range psFont.Glyphs {
-			isBlank := g.Outline == nil || len(g.Outline.Cmds) == 0
-			claimedBlank := metrics.Glyphs[name].BBox.IsZero()
-			// TODO(voss): fix this for the .notdef glyphs by
-			// life-patching the type 1 fonts after loading.
-			if isBlank != claimedBlank && name != ".notdef" {
-				t.Errorf("%-22s %-8s isBlank=%v, claimedBlank=%v",
-					G, name, isBlank, claimedBlank)
+		F := font.Must(G.New())
+		geom := F.GetGeometry()
+		for gid, name := range F.GlyphNames {
+			blank := geom.GlyphExtents[gid].IsZero()
+			if name == ".notdef" {
+				continue
+			}
+			if blank != (name == "space") {
+				t.Errorf("%-22s %-8s blank=%v", G, name, blank)
 			}
 		}
 	}
+}
+
+// TestEuroBBox checks the Euro bounding boxes against the Euro glyphs of the
+// bundled Quire fonts, which draw the glyph.
+func TestEuroBBox(t *testing.T) {
+	quire := map[string]string{
+		"Courier":   "QuireMono",
+		"Helvetica": "QuireSans",
+		"Times":     "QuireSerif",
+	}
+	for _, G := range All {
+		if G == Symbol || G == ZapfDingbats {
+			continue
+		}
+		bold, italic := G.Style()
+		style := "Regular"
+		switch {
+		case bold && italic:
+			style = "BoldItalic"
+		case bold:
+			style = "Bold"
+		case italic:
+			style = "Italic"
+		}
+		family, _, _ := strings.Cut(string(G), "-")
+		qName := quire[family] + "-" + style
+
+		q, err := bundled.ReadSfnt(qName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cm, err := q.CMapTable.GetBest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		gid := cm.Lookup('€')
+		if gid == 0 {
+			t.Fatalf("%s: no Euro glyph", qName)
+		}
+		qBox := q.GlyphBBoxesPDF()[gid]
+		want := rect.Rect{
+			LLx: math.Floor(qBox.LLx),
+			LLy: math.Floor(qBox.LLy),
+			URx: math.Ceil(qBox.URx),
+			URy: math.Ceil(qBox.URy),
+		}
+
+		F := font.Must(G.New())
+		idx := slices.Index(F.GlyphNames, "Euro")
+		if idx < 0 {
+			t.Fatalf("%s: no Euro glyph", G)
+		}
+		ext := F.GetGeometry().GlyphExtents[idx]
+		got := rect.Rect{LLx: ext.LLx * 1000, LLy: ext.LLy * 1000, URx: ext.URx * 1000, URy: ext.URy * 1000}
+		if !rectNear(got, want) {
+			t.Errorf("%s: Euro bbox %v, want %v", G, got, want)
+		}
+
+		// the Quire glyph must fit the advance width of the metrics
+		if w := F.GetGeometry().Widths[idx] * 1000; math.Abs(q.GlyphWidthPDF(gid)-w) > 0.5 {
+			t.Errorf("%s: Quire Euro width %g, want %g", G, q.GlyphWidthPDF(gid), w)
+		}
+	}
+}
+
+// TestNotdef checks the .notdef metrics against the .notdef glyphs of the
+// bundled Quire fonts.
+func TestNotdef(t *testing.T) {
+	for _, G := range All {
+		q, err := bundled.ReadSfnt(string(G))
+		if err != nil {
+			t.Fatal(err)
+		}
+		qBox := q.GlyphBBoxesPDF()[0]
+		want := rect.Rect{
+			LLx: math.Floor(qBox.LLx),
+			LLy: math.Floor(qBox.LLy),
+			URx: math.Ceil(qBox.URx),
+			URy: math.Ceil(qBox.URy),
+		}
+
+		F := font.Must(G.New())
+		if F.GlyphNames[0] != ".notdef" {
+			t.Fatalf("%s: glyph 0 is %q", G, F.GlyphNames[0])
+		}
+		geom := F.GetGeometry()
+		ext := geom.GlyphExtents[0]
+		got := rect.Rect{LLx: ext.LLx * 1000, LLy: ext.LLy * 1000, URx: ext.URx * 1000, URy: ext.URy * 1000}
+		if !rectNear(got, want) {
+			t.Errorf("%s: .notdef bbox %v, want %v", G, got, want)
+		}
+		if w := geom.Widths[0] * 1000; w != math.Round(q.GlyphWidthPDF(0)) {
+			t.Errorf("%s: .notdef width %g, want %g", G, w, math.Round(q.GlyphWidthPDF(0)))
+		}
+	}
+}
+
+func rectNear(a, b rect.Rect) bool {
+	const eps = 1e-6
+	return math.Abs(a.LLx-b.LLx) < eps && math.Abs(a.LLy-b.LLy) < eps &&
+		math.Abs(a.URx-b.URx) < eps && math.Abs(a.URy-b.URy) < eps
 }
 
 // TestLigatures checks that letters are correctly combined into ligatures.
@@ -173,7 +292,7 @@ func TestNewSharesFontData(t *testing.T) {
 // a pair naming a glyph the font no longer has describes nothing.
 func TestKernMatchesGlyphs(t *testing.T) {
 	for _, f := range All {
-		_, metrics, err := f.data()
+		metrics, err := f.data()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"seehuhn.de/go/postscript/afm"
 	"seehuhn.de/go/postscript/type1"
 	"seehuhn.de/go/sfnt"
 	"seehuhn.de/go/sfnt/glyf"
@@ -167,6 +168,13 @@ func TestFontNameFits(t *testing.T) {
 			got := FontName(tc.psName, tc.familyName, tc.subfam, b.maxLen, b.canCarry)
 			checkFontName(t, got, b.maxLen, b.canCarry)
 		}
+	}
+}
+
+func TestForAFMDropsSubsetTag(t *testing.T) {
+	m := &afm.Metrics{FontName: "ABCDEF+Helvetica"}
+	if got := ForAFM(m); got != "Helvetica" {
+		t.Errorf("got %q, want %q", got, "Helvetica")
 	}
 }
 

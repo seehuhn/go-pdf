@@ -46,7 +46,7 @@ func TestFromCMap(t *testing.T) {
 		// ros is the collection the CIDs belong to, nil for free CIDs
 		ros *cid.SystemInfo
 	}{
-		{"nil", nil, font.Horizontal, nil},
+		{"Identity-H", cmap.IdentityH, font.Horizontal, nil},
 		{"Identity-V", predefined(t, "Identity-V"), font.Vertical, nil},
 		{"UTF8H", cmap.UTF8H, font.Horizontal, nil},
 		{"UTF8V", cmap.UTF8V, font.Vertical, nil},

@@ -205,14 +205,10 @@ func TestSubsetTagLeavesSharedDataAlone(t *testing.T) {
 // they happen to be metrically compatible with.
 func TestStandardMetricsDoNotDiscardASubset(t *testing.T) {
 	// a bare font program, the way one taken out of a PDF file arrives
-	psFont, _, err := bundled.Read("Helvetica")
-	if err != nil {
-		t.Fatal(err)
-	}
-	psFont.FontName = "Helvetica"
+	psFont, metrics := helveticaProgram(t)
 
 	// the untagged font is metrically standard, so the program is left out
-	plain, err := type1.New(psFont, nil)
+	plain, err := type1.New(psFont, metrics)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +218,7 @@ func TestStandardMetricsDoNotDiscardASubset(t *testing.T) {
 	}
 
 	// the same program, named the way a subset is named
-	tagged, err := type1.New(withName(psFont, "ABCDEF+Helvetica"), nil)
+	tagged, err := type1.New(withName(psFont, "ABCDEF+Helvetica"), metrics)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,6 +281,33 @@ func TestSubsetTagIgnoresTheMetricsGlyphCount(t *testing.T) {
 	}
 }
 
+// helveticaProgram returns a font program named "Helvetica" whose glyphs have
+// the widths of Adobe's Helvetica, together with those metrics.
+func helveticaProgram(t *testing.T) (*pstype1.Font, *afm.Metrics) {
+	t.Helper()
+
+	metrics, err := bundled.ReadAFM("Helvetica")
+	if err != nil {
+		t.Fatal(err)
+	}
+	psFont := withName(makefont.Type1(), "Helvetica")
+	qh := psFont.FontMatrix[0] * 1000
+	glyphs := make(map[string]*pstype1.Glyph, len(psFont.Glyphs))
+	for name, g := range psFont.Glyphs {
+		gi := metrics.Glyphs[name]
+		if gi == nil {
+			continue
+		}
+		g2 := *g
+		g2.WidthX = gi.WidthX / qh
+		glyphs[name] = &g2
+	}
+	outlines := *psFont.Outlines
+	outlines.Glyphs = glyphs
+	psFont.Outlines = &outlines
+	return psFont, metrics
+}
+
 // withName returns a copy of the font program under a different PostScript
 // name, leaving the data it was copied from alone.
 func withName(f *pstype1.Font, name string) *pstype1.Font {
@@ -326,7 +349,7 @@ func TestDescriptorBBoxCoversWholeFont(t *testing.T) {
 // out to hold per-document state would let two documents corrupt each other.
 // Pinning the count forces that decision to be made rather than missed.
 func TestCloneConsidersEveryField(t *testing.T) {
-	const reviewed = 10
+	const reviewed = 11
 	if n := reflect.TypeFor[type1.Instance]().NumField(); n != reviewed {
 		t.Errorf("Instance has %d fields, want %d: decide whether Clone must "+
 			"give the new field a value of its own, then update this count", n, reviewed)
