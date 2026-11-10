@@ -46,7 +46,7 @@ seehuhn.de/go/membudget v0.7.6-0.20261017194028-ae85ae6a9664 h1:0tf2fVLTTNcl4vBE
 seehuhn.de/go/membudget v0.7.6-0.20261017194028-ae85ae6a9664/go.mod h1:lJJaMxMXPLVp0mpSQsFsA4buBPdA5LTWFGh0n4XHudc=
 seehuhn.de/go/postscript v0.7.6-0.20261109110413-d0c6d182bbbc h1:1sIaGTYTF9RG+zI51/HzASKO9K2JpHYlt6Weeuh+Ek8=
 seehuhn.de/go/postscript v0.7.6-0.20261109110413-d0c6d182bbbc/go.mod h1:CTBCn30henBPL5/N7mpWOxlkabH8DJu71YQ8k6K7uOY=
-seehuhn.de/go/sfnt v0.7.6-0.20261109114120-a8ffd1ab3082 h1:OG7eYiUqb2vm5PMXKwH7ltgaXG/qCvVCA7eU+Hkktdg=
-seehuhn.de/go/sfnt v0.7.6-0.20261109114120-a8ffd1ab3082/go.mod h1:e8BBYCmIDOrg8vyxz09jCd5mh9qTN6SBd0aHHqfXUcM=
+seehuhn.de/go/sfnt v0.7.6-0.20261110103803-ac11d30e1655 h1:ulBmVuezPn934Ra/NsvcGiOZlRCw7DstmBpzRR74IRA=
+seehuhn.de/go/sfnt v0.7.6-0.20261110103803-ac11d30e1655/go.mod h1:e8BBYCmIDOrg8vyxz09jCd5mh9qTN6SBd0aHHqfXUcM=
 seehuhn.de/go/xmp v0.7.6-0.20261020211332-c2d26d3a46a9 h1:XZj/k19vzw3I7pYxAS9/VXcFEwNOFXFPPLOkvIPf41k=
 seehuhn.de/go/xmp v0.7.6-0.20261020211332-c2d26d3a46a9/go.mod h1:T4/T1Ps7IAPZW4bJ3wPPtoEm85FI/bJZGSw30NXLHZA=

@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/text/language"
 	"seehuhn.de/go/postscript/afm"
 
 	"seehuhn.de/go/sfnt"
@@ -314,7 +315,8 @@ func mustCMap(t *testing.T, f *sfnt.Font) cmap.Subtable {
 
 // TestAddLiga checks that addLiga adds the ligatures to every language
 // system, keeps the feature list sorted and keeps the other features of each
-// language system.
+// language system.  Language systems may share their values, so the test
+// also checks that the input script list is left unchanged.
 func TestAddLiga(t *testing.T) {
 	src := readFont(t, "quire/QuireSans-Italic.ttf.gz")
 
@@ -333,7 +335,21 @@ func TestAddLiga(t *testing.T) {
 		t.Fatal("no liga feature")
 	}
 	gsub.FeatureList = slices.Delete(gsub.FeatureList, ligaIdx, ligaIdx+1)
+	// The font was read above and is used nowhere else, so its values can
+	// be changed in place, each shared value once.
+	seen := make(map[*gtab.Features]bool)
 	for _, ls := range gsub.ScriptList {
+		if seen[ls] {
+			continue
+		}
+		seen[ls] = true
+		switch {
+		case ls.Required == 0xFFFF:
+		case int(ls.Required) == ligaIdx:
+			ls.Required = 0xFFFF
+		case int(ls.Required) > ligaIdx:
+			ls.Required--
+		}
 		ls.Optional = slices.DeleteFunc(ls.Optional, func(i gtab.FeatureIndex) bool { return int(i) == ligaIdx })
 		for i, idx := range ls.Optional {
 			if int(idx) > ligaIdx {
@@ -342,8 +358,37 @@ func TestAddLiga(t *testing.T) {
 		}
 	}
 
+	// Grek is made to share Latn's value, so the test does not rely on the
+	// reader's sharing.  Latn and Cyrl get required features which sort
+	// after and before liga.
+	featureIdx := func(tag string) gtab.FeatureIndex {
+		i := slices.IndexFunc(gsub.FeatureList, func(ft *gtab.Feature) bool { return ft.Tag == tag })
+		if i < 0 {
+			t.Fatalf("no %s feature", tag)
+		}
+		return gtab.FeatureIndex(i)
+	}
+	latn := language.MustParse("und-Latn-x-latn")
+	grek := language.MustParse("und-Grek-x-grek")
+	cyrl := language.MustParse("und-Cyrl-x-cyrl")
+	for _, tag := range []language.Tag{latn, grek, cyrl} {
+		if gsub.ScriptList[tag] == nil {
+			t.Fatalf("no language system %s", tag)
+		}
+	}
+	if gsub.ScriptList[latn] == gsub.ScriptList[cyrl] {
+		t.Fatal("unexpected sharing")
+	}
+	gsub.ScriptList[grek] = gsub.ScriptList[latn]
+	gsub.ScriptList[latn].Required = featureIdx("subs")
+	gsub.ScriptList[cyrl].Required = featureIdx("dlig")
+
+	// the feature tags of a language system, the required one marked by "*"
 	tags := func(ls *gtab.Features) []string {
 		var res []string
+		if ls.Required != 0xFFFF {
+			res = append(res, "*"+gsub.FeatureList[ls.Required].Tag)
+		}
 		for _, idx := range ls.Optional {
 			res = append(res, gsub.FeatureList[idx].Tag)
 		}
@@ -358,6 +403,19 @@ func TestAddLiga(t *testing.T) {
 		t.Fatalf("only %d language systems", len(before))
 	}
 
+	snapshot := func(scripts gtab.ScriptListInfo) map[string]gtab.Features {
+		res := make(map[string]gtab.Features, len(scripts))
+		for lang, ls := range scripts {
+			res[lang.String()] = gtab.Features{
+				Required: ls.Required,
+				Optional: slices.Clone(ls.Optional),
+			}
+		}
+		return res
+	}
+	input := gsub.ScriptList
+	inputBefore := snapshot(input)
+
 	if err := addLiga(f); err != nil {
 		t.Fatal(err)
 	}
@@ -365,10 +423,13 @@ func TestAddLiga(t *testing.T) {
 		t.Error("feature list not sorted")
 	}
 	for lang, ls := range gsub.ScriptList {
-		want := slices.Sorted(slices.Values(append(before[lang.String()], "liga")))
+		want := slices.Sorted(slices.Values(slices.Concat(before[lang.String()], []string{"liga"})))
 		if got := tags(ls); !slices.Equal(got, want) {
 			t.Errorf("%s: features %v, want %v", lang, got, want)
 		}
+	}
+	if diff := cmp.Diff(inputBefore, snapshot(input)); diff != "" {
+		t.Errorf("input script list modified (-before +after):\n%s", diff)
 	}
 
 	if err := addLiga(f); err == nil {

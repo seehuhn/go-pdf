@@ -266,16 +266,28 @@ func addLiga(f *sfnt.Font) error {
 	gsub.FeatureList = sorted
 	ligaIdx := newIndex[len(features)-1]
 
-	for _, ls := range gsub.ScriptList {
-		if ls.Required != 0xFFFF {
-			ls.Required = newIndex[ls.Required]
+	// Language systems may share their Features values, with each other
+	// and with other fonts, so a new value is built for each distinct old one.
+	scripts := make(gtab.ScriptListInfo, len(gsub.ScriptList))
+	rebuilt := make(map[*gtab.Features]*gtab.Features)
+	for tag, ls := range gsub.ScriptList {
+		res, ok := rebuilt[ls]
+		if !ok {
+			res = &gtab.Features{Required: ls.Required}
+			if ls.Required != 0xFFFF {
+				res.Required = newIndex[ls.Required]
+			}
+			res.Optional = make([]gtab.FeatureIndex, 0, len(ls.Optional)+1)
+			for _, idx := range ls.Optional {
+				res.Optional = append(res.Optional, newIndex[idx])
+			}
+			res.Optional = append(res.Optional, ligaIdx)
+			slices.Sort(res.Optional)
+			rebuilt[ls] = res
 		}
-		for i, idx := range ls.Optional {
-			ls.Optional[i] = newIndex[idx]
-		}
-		ls.Optional = append(ls.Optional, ligaIdx)
-		slices.Sort(ls.Optional)
+		scripts[tag] = res
 	}
+	gsub.ScriptList = scripts
 	return nil
 }
 
