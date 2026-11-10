@@ -24,7 +24,9 @@ import (
 )
 
 // pdfiumNotice is added to the copyright field of the Foxit fonts.
-const pdfiumNotice = "Copyright 2014 PDFium Authors. All rights reserved."
+// It combines the two copyright lines the PDFium sources give for them.
+const pdfiumNotice = "Copyright 2014 PDFium Authors. All rights reserved. " +
+	"Original code copyright 2014 Foxit Software Inc. http://www.foxitsoftware.com"
 
 // symbolSpec describes one of the Foxit fonts.
 type symbolSpec struct {
