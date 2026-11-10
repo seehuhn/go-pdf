@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.7.6] (2026-11-10)
+
+### Added
+- JPEG 2000 images (the JPXDecode filter) can be read and written.
+  The colour space comes from the image dictionary or from the colour
+  specification in the codestream.  `image.NewJPXSource` embeds
+  existing JPEG 2000 data, and colour key masks are reported in
+  `image.Data.KeyMask`.
+- `pdf.Text` builds a `pdf.TextString`, which holds Unicode text in
+  which runs may carry a language tag.
+- Crypt filters are supported.  `WriterOptions.EncryptStreams`,
+  `EncryptStrings` and `EncryptEmbeddedFiles` select plaintext, RC4 or
+  AES separately for streams, strings and embedded file streams.
+  `Stream.AsEmbeddedFile` and `Writer.OpenEmbeddedFileStream` mark
+  streams that need the embedded-file filter.  A file in which only
+  embedded files are encrypted opens without a password.
+- The `acroform` package supports form filling.  `LogicalField` groups
+  the terminal fields that share a name, and its methods `SetText`,
+  `Select`, `SetEditText`, `SetState` and `Toggle` keep the values and
+  the appearance states of the widgets consistent.
+  `InteractiveForm.LogicalField` and `LogicalFields` find them.
+  `PushButtonField` and `InteractiveForm.ExportData` are new, and
+  `ExportData` lists the name-value pairs that a submit-form action
+  exports.
+- `pdf.ReadHeader` finds the `%PDF-` marker anywhere in a file, so that
+  files with a long preamble open.
+- `image.NewDCTSource` encodes 1, 3 or 4 components from interleaved
+  8-bit samples, and the DCT colour transform follows the
+  specification.
+- Colour conversions take a rendering intent: `Space.ToXYZ` and
+  `FromXYZ` have a new `icc.RenderingIntent` parameter, and
+  `color.BidirectionalSpace` names the spaces that convert in both
+  directions.
+
+### Changed
+- Go 1.27 or later is required.  `opaque.ObjectAs` is now the generic
+  method `opaque.Object.As`.
+- Fields that hold PDF text strings now use `pdf.TextString`.
+  `EncryptedPayload.Version` is a `pdf.Name`.
+- `annotation.Common.Lang` is an `optional.Value[language.Tag]`.  An
+  absent entry means the document language applies, and `language.Und`
+  states that the language is unknown.
+- `image.DCTSource` takes raw samples instead of a Go `image.Image`.
+- Several fields of the `acroform` field types are renamed after their
+  meaning (for example `ButtonField.Opt` is now `ExportValues`).  The
+  form is read through `annotation/decode.DocumentForm`, and a widget
+  whose field is not part of the form decodes without a field.
+- `font/standard` is metrics-only, `type1.New` accepts a nil font
+  program, and the bundled URW fonts are replaced by the Quire fonts
+  and the Adobe Core 14 metrics.
+- `NewReader` rebuilds the cross-reference table when a file cannot be
+  opened otherwise.
+
+### Removed
+- `Encryption.Cipher`.  The new fields `Streams`, `Strings` and
+  `EmbeddedFiles` of `Encryption` give a `CryptMethod` for each class of
+  object.
+- `ReaderOptions.ErrorHandling`, the type `ReaderErrorHandling` and
+  `Reader.Errors`.
+- `embed.Options.Composite`, replaced by `embed.Options.CMap`.
+- `annotation.PDFDefaultBorder`.  `ExtractBorder` returns a fresh
+  `Border` for each read.
+- `annotation/decode.Form`, replaced by `DocumentForm`.
+
+### Fixed
+- The reader is more permissive.  Null dictionary entries count as
+  absent, damaged older cross-reference sections end the `/Prev` chain
+  instead of failing the read, and malformed optional entries are
+  dropped.
+- Encrypted files open with the most permissive access that the
+  supplied password allows, and a clear bit 3 of `P` forbids all
+  printing for revision 3 and later.
+- A painting operator with no current path no longer adds an empty clip
+  path that removes all later content.
+- Every filter decoder is charged against the stream budget, and the
+  fixed limit on the length of a filter chain is removed.
+
 ## [v0.7.5] (2026-10-10)
 
 ### Added
