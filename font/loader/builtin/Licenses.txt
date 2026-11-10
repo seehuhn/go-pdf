@@ -1,3 +1,8 @@
+The fonts and font metrics in this directory are third-party material.
+They remain under the licences stated below, independently of the licence
+of the go-pdf code (see the file LICENSE in the root of the repository).
+Anyone who redistributes these files must comply with these licences.
+
 builtin/quire (QuireSans, QuireSerif, QuireMono)
 ------------------------------------------------
 
@@ -113,8 +118,13 @@ builtin/quire (QuireSymbol, QuireDingbats)
 
 These fonts are derived from FoxitSymbol and FoxitDingbats, downloaded from
 https://github.com/mozilla/pdf.js/tree/v2.16.105/external/standard_fonts .
-They are renamed and wrapped as OpenType.  The license text of the
-originals, from the PDFium project, is:
+They are renamed and wrapped as OpenType.  The PDFium project, where
+the originals come from, marks them with the lines
+
+  Copyright 2014 PDFium Authors. All rights reserved.
+  Original code copyright 2014 Foxit Software Inc. http://www.foxitsoftware.com
+
+The license text of the originals is:
 
 // Copyright 2014 PDFium Authors. All rights reserved.
 //

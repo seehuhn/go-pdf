@@ -1,2 +1,143 @@
-Unless otherwise stated, the code in this repository is distributed
-under the GNU General Public License v3.0 (see the file COPYING).
+Third-Party Material in go-pdf
+==============================
+
+Unless stated otherwise, the files in this repository are
+Copyright Jochen Voss and are distributed under the BSD 3-Clause License
+(see the file LICENSE).
+
+The material listed below was written by others or is derived from their
+work.  It remains under the licence given in each entry, independently of
+the licence of the go-pdf code, and the stated copyright notices and
+licence texts must be kept when it is redistributed.  The "Full text" line
+of each entry names the file which holds the licence text.
+
+Where the material was changed for go-pdf, the changes are Copyright Jochen
+Voss and are distributed under the BSD 3-Clause License.  The fonts derived
+from the Liberation Fonts are the exception: as the SIL Open Font License
+requires, they are distributed entirely under that licence.
+
+All files in this list use one layout: the path(s), a description, the
+upstream source, the copyright line(s), the licence and the location of the
+full licence text.
+
+
+font/loader/builtin/quire/Quire{Sans,Serif,Mono}-*.ttf.gz
+---------------------------------------------------------
+
+Description: Subsets of the Liberation Fonts, restricted to Latin, Greek and
+    Cyrillic and renamed.
+Upstream:    https://github.com/liberationfonts/liberation-fonts (version 2.1.5)
+Copyright:   Digitized data copyright (c) 2010 Google Corporation, with
+    Reserved Font Arimo, Tinos and Cousine.  Copyright (c) 2012 Red Hat, Inc.,
+    with Reserved Font Name Liberation.
+Licence:     SIL Open Font License, Version 1.1.  The fonts stay under this
+    licence.
+Full text:   font/loader/builtin/Licenses.txt
+
+
+font/loader/builtin/quire/QuireSymbol.otf.gz, QuireDingbats.otf.gz
+-------------------------------------------------------------------
+
+Description: The Foxit symbol and dingbats fonts as shipped with PDFium,
+    renamed and wrapped as OpenType.
+Upstream:    https://github.com/mozilla/pdf.js/tree/v2.16.105/external/standard_fonts
+Copyright:   Copyright 2014 PDFium Authors.  All rights reserved.
+    Original code copyright 2014 Foxit Software Inc. http://www.foxitsoftware.com
+Licence:     BSD 3-Clause License.
+Full text:   font/loader/builtin/Licenses.txt
+
+
+font/loader/builtin/adobe/*.afm.gz, font/loader/builtin/adobe/MustRead.html
+---------------------------------------------------------------------------
+
+Description: The AFM metrics files of the 14 standard PDF fonts (unmodified,
+    gzip-compressed), with Adobe's accompanying notice.
+Upstream:    https://github.com/apache/pdfbox/tree/78be2c012e6b5f0c0b368dc9863fc01e9ec78f85/pdfbox/src/main/resources/org/apache/pdfbox/resources/afm
+Copyright:   Copyright (c) 1985, 1987, 1988, 1989, 1990, 1991, 1992, 1993,
+    1997 Adobe Systems Incorporated.  All Rights Reserved.
+Licence:     Adobe's AFM licence notice (MustRead.html).  The AFM files must
+    not be distributed without that notice.
+Full text:   font/loader/builtin/adobe/MustRead.html and
+    font/loader/builtin/Licenses.txt
+
+
+internal/stdmtx/data.go
+-----------------------
+
+Description: Font metrics tables generated (by internal/stdmtx/generate)
+    from the Adobe AFM files listed above.
+Upstream:    see the entry for font/loader/builtin/adobe above.
+Copyright:   Copyright (c) 1985, 1987, 1988, 1989, 1990, 1991, 1992, 1993,
+    1997 Adobe Systems Incorporated.  All Rights Reserved.
+Licence:     Adobe's AFM licence notice; the notice is kept in the header
+    of the generated file.
+Full text:   font/loader/builtin/adobe/MustRead.html
+
+
+font/cmap/predefined/*.gz
+-------------------------
+
+Description: The 181 predefined CMap resources from the PDF specification,
+    gzip-compressed.  Each file carries Adobe's copyright and licence text in
+    its own header and records its own version in a %%Version comment.
+Upstream:    https://github.com/adobe-type-tools/cmap-resources , tag 20230118
+    (commit accdf06a1aee73ce53be2e0c1ff14fb2a2b96cdd).  The files are
+    unmodified apart from the compression, and LICENSE.md is an unmodified
+    copy.
+Copyright:   Copyright 1990-2019 Adobe.  All rights reserved.  (19 of the
+    files give the years as 1990-2022.)
+Licence:     BSD 3-Clause License.
+Full text:   font/cmap/predefined/LICENSE.md
+
+
+font/mapping/resources/Adobe-*-UCS2.gz
+--------------------------------------
+
+Description: Adobe mapping resources from CID to Unicode (gzip-compressed).
+Upstream:    https://github.com/adobe-type-tools/mapping-resources-pdf/tree/2dd5e53fb74a01718b9dfd448a0d1cce6fff2aa5/pdf2unicode
+Copyright:   Copyright 1990-2019 Adobe.  All rights reserved.
+Licence:     BSD 3-Clause License.
+Full text:   font/mapping/Licenses.txt
+
+
+internal/filter/dct/jpeg/*.go (all files except stream.go and writer_test.go)
+-----------------------------------------------------------------------------
+
+Description: JPEG decoder and encoder adapted from the Go standard library
+    package image/jpeg, modified to support the PDF ColorTransform
+    parameter and to read raw samples from a stream.
+Upstream:    https://go.dev/src/image/jpeg/ (Go 1.26 and 1.27)
+Copyright:   Copyright 2009, 2011, 2012 and 2025 The Go Authors.  All rights
+    reserved (the year of each file is given in its header).
+Licence:     BSD 3-Clause License.
+Full text:   internal/filter/dct/jpeg/Licenses.txt, and in the header of each
+    file.
+
+
+internal/filter/lzw/reader.go, internal/filter/lzw/writer.go
+------------------------------------------------------------
+
+Description: LZW decoder and encoder adapted from the Go standard library
+    package compress/lzw, modified for the PDF LZW variants.
+Upstream:    https://go.dev/src/compress/lzw/
+Copyright:   Copyright (c) 2009 The Go Authors.  All rights reserved.
+    Copyright 2011 The Go Authors.  All rights reserved.
+Licence:     BSD 3-Clause License.
+Full text:   internal/filter/lzw/Licenses.txt, and in the header of each
+    file.
+
+
+internal/filter/ccittfax/generate/main.go, internal/filter/ccittfax/tables.go
+-----------------------------------------------------------------------------
+
+Description: The generator is a Go re-implementation of mkg3states.c from
+    libtiff.  The generated file tables.go contains the CCITT decoding and
+    encoding tables and repeats the libtiff notice in its header.
+Upstream:    https://github.com/vadz/libtiff/blob/cda4b06914040aae5302b4da511ea266dad8a104/libtiff/mkg3states.c
+Copyright:   Copyright (c) 1991-1997 Sam Leffler.
+    Copyright (c) 1991-1997 Silicon Graphics, Inc.
+Licence:     The libtiff permissive licence.  The copyright and permission
+    notice must appear in all copies.
+Full text:   internal/filter/ccittfax/generate/Licenses.txt, in the header of
+    internal/filter/ccittfax/tables.go and in the constant libtiffNotice in
+    internal/filter/ccittfax/generate/main.go.

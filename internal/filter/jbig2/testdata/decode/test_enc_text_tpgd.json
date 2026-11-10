@@ -1,0 +1,35 @@
+{
+  "segments": [
+    {
+      "num": 0,
+      "type": "PageInformation",
+      "type_id": 48,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 19
+    },
+    {
+      "num": 1,
+      "type": "GenericRegion_Immediate",
+      "type_id": 38,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 3375
+    }
+  ],
+  "globals_bytes": 0,
+  "page_bytes": 3416,
+  "globals_segments": 0,
+  "page_segments": 2,
+  "source": {
+    "image": "800x400 pixels of the generated text page (generate/source.go), rendered by Ghostscript at 200 dpi",
+    "encoder": "jbig2enc: jbig2 -p -d (generic region, template 0, TPGDON=1)",
+    "expected_bitmap": "jbig2dec output, identical to the expected image computed from the source",
+    "tool_versions": {
+      "ghostscript": "10.08.0",
+      "jbig2dec": "0.20",
+      "jbig2enc": "0.32",
+      "libtiff": "4.7.2"
+    }
+  }
+}

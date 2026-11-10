@@ -1,18 +1,5 @@
-// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright 2026 Jochen Voss <voss@seehuhn.de>
+// SPDX-License-Identifier: BSD-3-Clause
 
 package jbig2
 
@@ -25,17 +12,27 @@ import (
 	"seehuhn.de/go/pdf/graphics/bitmap"
 )
 
+// The test cases in testdata/decode built from a generated text page are
+// written by the generate program; see testdata/README.md.
+//go:generate go run ./generate/
+
 const testdataDir = "testdata/decode"
 
 func TestDecodeGenericRegions(t *testing.T) {
 	// test cases that contain only generic region segments (no symbol dict/text)
 	genericTests := []string{
-		"test_gen_template0_arith",
-		"test_gen_template0_typred",
-		"test_gen_template1_typred",
-		"test_gen_template2_arith",
-		"test_gen_template3_arith",
-		"test_f01_200_default",
+		"test_enc_generic_border",
+		"test_enc_generic_plain",
+		"test_enc_generic_tpgd",
+		"test_enc_page_generic",
+		"test_enc_text_defpixel",
+		"test_enc_text_tpgd",
+		"test_g4_page_mmr",
+		"test_t88_gen_ext",
+		"test_t88_gen_t0_at",
+		"test_t88_gen_t1",
+		"test_t88_gen_t2",
+		"test_t88_gen_t3",
 	}
 
 	for _, name := range genericTests {

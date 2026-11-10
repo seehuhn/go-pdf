@@ -1,18 +1,5 @@
-// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright 2026 Jochen Voss <voss@seehuhn.de>
+// SPDX-License-Identifier: BSD-3-Clause
 
 package main
 
@@ -109,6 +96,10 @@ func makeLicenses(liberation, foxit, mustRead []byte) string {
 		return s.String()
 	}
 	var b strings.Builder
+	b.WriteString("The fonts and font metrics in this directory are third-party material.\n" +
+		"They remain under the licences stated below, independently of the licence\n" +
+		"of the go-pdf code (see the file LICENSE in the root of the repository).\n" +
+		"Anyone who redistributes these files must comply with these licences.\n\n")
 	b.WriteString(section("builtin/quire (QuireSans, QuireSerif, QuireMono)",
 		"These fonts are derived from Liberation Fonts 2.1.5, downloaded from\n"+
 			"https://github.com/liberationfonts/liberation-fonts/files/7261482/liberation-fonts-ttf-2.1.5.tar.gz .\n"+
@@ -118,8 +109,11 @@ func makeLicenses(liberation, foxit, mustRead []byte) string {
 	b.WriteString(section("builtin/quire (QuireSymbol, QuireDingbats)",
 		"These fonts are derived from FoxitSymbol and FoxitDingbats, downloaded from\n"+
 			"https://github.com/mozilla/pdf.js/tree/v2.16.105/external/standard_fonts .\n"+
-			"They are renamed and wrapped as OpenType.  The license text of the\n"+
-			"originals, from the PDFium project, is:",
+			"They are renamed and wrapped as OpenType.  The PDFium project, where\n"+
+			"the originals come from, marks them with the lines\n\n"+
+			"  Copyright 2014 PDFium Authors. All rights reserved.\n"+
+			"  Original code copyright 2014 Foxit Software Inc. http://www.foxitsoftware.com\n\n"+
+			"The license text of the originals is:",
 		string(foxit)))
 	b.WriteString(section("builtin/adobe",
 		"These files were downloaded from\n"+

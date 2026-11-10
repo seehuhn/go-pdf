@@ -1,0 +1,48 @@
+{
+  "segments": [
+    {
+      "num": 0,
+      "type": "PageInformation",
+      "type_id": 48,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 19
+    },
+    {
+      "num": 1,
+      "type": "GenericRegion_ImmediateLossless",
+      "type_id": 39,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 17213
+    },
+    {
+      "num": 2,
+      "type": "EndOfPage",
+      "type_id": 49,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 0
+    }
+  ],
+  "globals_bytes": 0,
+  "page_bytes": 17265,
+  "globals_segments": 0,
+  "page_segments": 3,
+  "source": {
+    "image": "1700x2200 pixels of the generated text page (generate/source.go), rendered by Ghostscript at 200 dpi",
+    "encoder": "jbig2enc: jbig2 -p (generic region, template 0, nominal AT pixels)",
+    "edits": [
+      "page information: set the combination operator override flag",
+      "generic region: segment type 38 changed to 39 (immediate lossless), combination operator XOR",
+      "end of page segment appended"
+    ],
+    "expected_bitmap": "jbig2dec output, identical to the expected image computed from the source",
+    "tool_versions": {
+      "ghostscript": "10.08.0",
+      "jbig2dec": "0.20",
+      "jbig2enc": "0.32",
+      "libtiff": "4.7.2"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "segments": [
+    {
+      "num": 0,
+      "type": "PageInformation",
+      "type_id": 48,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 19
+    },
+    {
+      "num": 1,
+      "type": "GenericRegion_ImmediateLossless",
+      "type_id": 39,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 753
+    },
+    {
+      "num": 2,
+      "type": "EndOfPage",
+      "type_id": 49,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 0
+    }
+  ],
+  "globals_bytes": 0,
+  "page_bytes": 805,
+  "globals_segments": 0,
+  "page_segments": 3,
+  "source": {
+    "image": "320x112 pixels of the generated text page (generate/source.go), rendered by Ghostscript at 200 dpi",
+    "encoder": "ITU-T T.88 sample software (JBIG2_SampleSoftware-A20180829), immediate lossless generic region",
+    "settings": [
+      "GBTEMPLATE=1",
+      "TPGDON=0",
+      "AT pixels (-3,-1)"
+    ],
+    "edits": [
+      "file header removed",
+      "page information: combination operator override flag set, since the generic region uses a combination operator other than the page default",
+      "terminating marker completed: 0xAC appended after the final 0xFF of the arithmetic-coded data"
+    ],
+    "expected_bitmap": "jbig2dec output and T.88 sample software decoder output, both identical to the encoder input",
+    "tool_versions": {
+      "ghostscript": "10.08.0",
+      "jbig2dec": "0.20",
+      "jbig2enc": "0.32",
+      "libtiff": "4.7.2",
+      "t88_sample_software": "JBIG2_SampleSoftware-A20180829"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "segments": [
+    {
+      "num": 0,
+      "type": "SymbolDictionary",
+      "type_id": 0,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 746
+    },
+    {
+      "num": 1,
+      "type": "PageInformation",
+      "type_id": 48,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 19
+    },
+    {
+      "num": 2,
+      "type": "TextRegion_Immediate",
+      "type_id": 6,
+      "page": 1,
+      "header_bytes": 12,
+      "data_bytes": 619
+    },
+    {
+      "num": 3,
+      "type": "EndOfPage",
+      "type_id": 49,
+      "page": 1,
+      "header_bytes": 11,
+      "data_bytes": 0
+    }
+  ],
+  "globals_bytes": 0,
+  "page_bytes": 1429,
+  "globals_segments": 0,
+  "page_segments": 4,
+  "source": {
+    "image": "1000x360 pixels of the generated text page (generate/source.go), rendered by Ghostscript at 200 dpi",
+    "encoder": "jbig2enc: jbig2 -s (arithmetic symbol dictionary and text region)",
+    "edits": [
+      "file header removed",
+      "symbol dictionary: page association 0 changed to 1 (page-local dictionary)",
+      "page information: page enlarged; text region moved to (4,1)"
+    ],
+    "expected_bitmap": "jbig2dec output (lossy symbol coding)",
+    "tool_versions": {
+      "ghostscript": "10.08.0",
+      "jbig2dec": "0.20",
+      "jbig2enc": "0.32",
+      "libtiff": "4.7.2"
+    }
+  }
+}

@@ -1,18 +1,5 @@
-// seehuhn.de/go/pdf - a library for reading and writing PDF files
-// Copyright (C) 2026  Jochen Voss <voss@seehuhn.de>
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// Copyright 2026 Jochen Voss <voss@seehuhn.de>
+// SPDX-License-Identifier: BSD-3-Clause
 
 package jbig2
 
@@ -372,5 +359,67 @@ func TestGenericImageVectors(t *testing.T) {
 				t.Errorf("%s:\n  got  %X\n  want %X", tt.name, got, expected)
 			}
 		})
+	}
+}
+
+// TestGenericDecodeStreamEnd checks that the decoder gives the same image
+// whether the arithmetic-coded data end with the terminating marker
+// 0xFF 0xAC, with a bare 0xFF, or without any part of the marker.  In all
+// three cases the decoder must supply 1-bits once the data are used up.
+func TestGenericDecodeStreamEnd(t *testing.T) {
+	tests := []struct {
+		name     string
+		template int
+		bm       *bitmap.Bitmap
+		data     string // without terminating marker
+	}{
+		{"template0_diagonal", 0, makeDiagonal(16, 16), "D2 4E 0B D3 4B 60 EF"},
+		{"template1_checkerboard", 1, makeCheckerboard(16, 16), "C0 F8 48 AF E0 04 7F"},
+		{"template1_hstripes", 1, makeHStripes(16, 16), "FE D5 EB 8B B1 FF 7F F8"},
+		{"template1_center", 1, makeCenterBlock(16, 16), "A0 03 D9 4E 16 66 42 3F 95 F0 4F"},
+		{"template2_diagonal", 2, makeDiagonal(16, 16), "C4 2E D6 C1 99"},
+		{"template3_diagonal", 3, makeDiagonal(16, 16), "D2 4E 0E 39 FF 7F"},
+	}
+	endings := []struct {
+		name   string
+		suffix []byte
+	}{
+		{"no marker", nil},
+		{"0xFF", []byte{0xFF}},
+		{"0xFF 0xAC", []byte{0xFF, 0xAC}},
+	}
+
+	for _, tt := range tests {
+		p := &genericRegionParams{
+			Width:    tt.bm.Width(),
+			Height:   tt.bm.Height(),
+			Template: tt.template,
+		}
+		if tt.template == 0 {
+			p.ATX = [12]int8{3, -3, 2, -2}
+			p.ATY = [12]int8{-1, -1, -2, -2}
+		} else {
+			p.ATX[0] = 2
+			if tt.template == 1 {
+				p.ATX[0] = 3
+			}
+			p.ATY[0] = -1
+		}
+		for _, e := range endings {
+			t.Run(tt.name+"/"+e.name, func(t *testing.T) {
+				base := hexBytes(tt.data)
+				data := make([]byte, len(base), len(base)+len(e.suffix))
+				copy(data, base)
+				data = append(data, e.suffix...)
+
+				got, err := decodeGenericRegion(testPool(), newMQDecoder(data), p, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bitmapsEqual(got, tt.bm) {
+					t.Errorf("decoded bitmap differs")
+				}
+			})
+		}
 	}
 }
