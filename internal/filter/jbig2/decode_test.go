@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 // The test cases in testdata/decode built from a generated text page are
@@ -151,5 +153,154 @@ func TestDecodeAllTestCases(t *testing.T) {
 					got.Width(), got.Height(), diffCount)
 			}
 		})
+	}
+}
+
+// TestDecodeScanSizedPage decodes full pages of 600 dpi scans, under the
+// memory budget a PDF stream of the encoded size receives.  A blank page
+// compresses to a few hundred bytes, so it is the hardest case for limits
+// sized from the input length.
+func TestDecodeScanSizedPage(t *testing.T) {
+	type page struct {
+		name string
+		w, h int
+		text bool
+		mmr  bool
+	}
+	pages := []page{
+		{"A4 blank", 4961, 7016, false, false},
+		{"A4 text", 4961, 7016, true, false},
+		{"letter blank MMR", 5100, 6600, false, true},
+		{"letter text MMR", 5100, 6600, true, true},
+	}
+	for _, p := range pages {
+		t.Run(p.name, func(t *testing.T) {
+			bm := bitmap.New(p.w, p.h)
+			if p.text {
+				scanText(bm)
+			}
+
+			var region []byte
+			if p.mmr {
+				var err error
+				region, err = EncodeGenericRegionSegmentMMR(bm, 0, 0, bitmap.CombOpOR)
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				region = EncodeGenericRegionSegment(bm, 0, 0, 0, bitmap.CombOpOR, true, false)
+			}
+			info := WritePageInfo(nil, p.w, p.h)
+			stream := WriteSegmentHeader(nil, 0, segPageInfo, 1, nil, uint32(len(info)))
+			stream = append(stream, info...)
+			stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(region)))
+			stream = append(stream, region...)
+
+			// the JBIG2Decode filter charges the stream data before decoding
+			budget := membudget.New(limits.StreamBudget(int64(len(stream))))
+			if err := budget.Charge(len(stream)); err != nil {
+				t.Fatal(err)
+			}
+			got, err := Decode(nil, stream, budget)
+			if err != nil {
+				t.Fatalf("%d bytes of stream: %v", len(stream), err)
+			}
+			if !bitmapsEqual(got, bm) {
+				t.Error("round trip failed")
+			}
+		})
+	}
+}
+
+// scanText fills bm with rows of glyph-like strokes, as on a 600 dpi scan
+// of a text page with 1 inch margins.
+func scanText(bm *bitmap.Bitmap) {
+	const margin, lineH, xh, stem = 600, 100, 45, 8
+	w, h := bm.Width(), bm.Height()
+	fill := func(x0, y0, x1, y1 int) {
+		for y := y0; y < y1; y++ {
+			for x := x0; x < x1; x++ {
+				bm.SetPixel(x, y, true)
+			}
+		}
+	}
+	n := 0
+	for base := margin + lineH; base < h-margin; base += lineH {
+		for x := margin; x < w-margin-60; n++ {
+			gw := 25 + (n*37)%30
+			fill(x, base-xh, x+stem, base)
+			switch n % 3 {
+			case 0:
+				fill(x+gw-stem, base-xh, x+gw, base)
+				fill(x, base-xh, x+gw, base-xh+stem)
+			case 1:
+				fill(x, base-stem, x+gw, base)
+				fill(x+gw-stem, base-xh, x+gw, base)
+			default:
+				fill(x, base-xh/2, x+gw, base-xh/2+stem)
+			}
+			x += gw + 8
+			if n%6 == 5 {
+				x += 30
+			}
+		}
+	}
+}
+
+// TestCompositeWholePage composites a region covering the whole page with
+// every combination operator onto pages of either default pixel value.  The
+// region becomes the page where the result equals the region.
+func TestCompositeWholePage(t *testing.T) {
+	const w, h = 37, 21
+	region := bitmap.New(w, h)
+	for y := range h {
+		for x := range w {
+			region.SetPixel(x, y, (x*y+x)%3 == 0)
+		}
+	}
+	ops := []bitmap.CombOp{bitmap.CombOpOR, bitmap.CombOpAND, bitmap.CombOpXOR,
+		bitmap.CombOpXNOR, bitmap.CombOpReplace}
+	for _, op := range ops {
+		for _, def := range []bool{false, true} {
+			want := bitmap.New(w, h)
+			for y := range h {
+				for x := range w {
+					want.SetPixel(x, y, def)
+				}
+			}
+			want.Combine(region, 0, 0, op)
+
+			info := WritePageInfo(nil, w, h)
+			if def {
+				info[16] |= 0x04
+			}
+			seg := EncodeGenericRegionSegment(region, 0, 0, 0, op, false, false)
+			stream := WriteSegmentHeader(nil, 0, segPageInfo, 1, nil, uint32(len(info)))
+			stream = append(stream, info...)
+			stream = WriteSegmentHeader(stream, 1, segImmediateGeneric, 1, nil, uint32(len(seg)))
+			stream = append(stream, seg...)
+
+			d := &decoder{
+				segments: make(map[uint32]segmentResult),
+				pool:     bitmapPool{budget: testBudget()},
+			}
+			if err := d.processStream(stream); err != nil {
+				t.Fatal(err)
+			}
+			got, err := d.page()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bitmapsEqual(got, want) {
+				t.Errorf("op %d, default %t: wrong page", op, def)
+			}
+
+			// an adopted region leaves a single bitmap at the peak
+			adopted := d.pool.peak == len(want.Pix)
+			if adopted != keepsRegion(op, def) {
+				t.Errorf("op %d, default %t: adopted %t, want %t",
+					op, def, adopted, keepsRegion(op, def))
+			}
+		}
 	}
 }

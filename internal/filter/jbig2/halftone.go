@@ -132,10 +132,10 @@ func (d *decoder) processHalftoneRegion(hdr *segmentHeader, data []byte) error {
 	d.pool.freeInts(grayImage)
 
 	// composite onto page (skip for intermediate segments)
-	if hdr.Type != segIntermediateHalftone && d.pageBitmap != nil {
-		op := bitmap.CombOp(rsi.CombOp)
-		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), op)
-		d.pool.freeBitmap(bm)
+	if hdr.Type != segIntermediateHalftone && d.hasPage {
+		if err := d.composite(bm, int(rsi.X), int(rsi.Y), rsi.CombOp); err != nil {
+			return err
+		}
 		bm = nil
 	}
 

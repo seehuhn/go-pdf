@@ -4,7 +4,9 @@
 package jbig2
 
 import (
+	"bytes"
 	"fmt"
+	"image"
 	"testing"
 
 	"seehuhn.de/go/membudget"
@@ -79,6 +81,23 @@ func testPool() *bitmapPool {
 func bitmapsEqual(a, b *bitmap.Bitmap) bool {
 	if a.Width() != b.Width() || a.Height() != b.Height() {
 		return false
+	}
+	if a.Rect.Min == (image.Point{}) && b.Rect.Min == (image.Point{}) {
+		// compare whole bytes, masking the padding bits of the last one
+		w, h := a.Width(), a.Height()
+		full := w / 8
+		mask := byte(0xFF << (8 - w%8))
+		for y := range h {
+			ra := a.Pix[y*a.Stride : y*a.Stride+(w+7)/8]
+			rb := b.Pix[y*b.Stride : y*b.Stride+(w+7)/8]
+			if !bytes.Equal(ra[:full], rb[:full]) {
+				return false
+			}
+			if w%8 != 0 && (ra[full]^rb[full])&mask != 0 {
+				return false
+			}
+		}
+		return true
 	}
 	for y := 0; y < a.Height(); y++ {
 		for x := 0; x < a.Width(); x++ {

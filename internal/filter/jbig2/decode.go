@@ -8,27 +8,29 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"math"
 	"slices"
 
 	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf/graphics/bitmap"
+	"seehuhn.de/go/pdf/internal/limits"
 )
 
 const (
-	// maximum total pixels (width * height) for a single bitmap
-	// (300 dpi A4 ≈ 8.7M pixels; 16M gives comfortable headroom)
-	maxPixels = 1 << 24
+	// maximum total pixels (width * height) for a single bitmap, the
+	// same as for any other image: 600 dpi scans of A4 or letter pages
+	// have about 35M pixels, and large-format scans several times that
+	maxPixels = limits.MaxImagePixels
 
 	// maxBitmapBytes is the maximum byte cost ((width+7)/8 * height)
 	// for a single bitmap.  This bounds the memory overhead from row
 	// padding in narrow bitmaps: a 1-pixel-wide bitmap at maxPixels
-	// height would cost maxPixels bytes (16 MB), far more than the
-	// 2 MB needed for a square bitmap of the same pixel count.
-	// 4 MB accommodates all realistic aspect ratios (W ≥ 8 always
-	// yields ≤ 2 MB) while rejecting pathological cases.
-	maxBitmapBytes = 4 << 20
+	// height would cost maxPixels bytes, eight times the maxPixels/8
+	// needed for a wide bitmap of the same pixel count.  A width of at
+	// least 8 always stays within maxPixels/4, which this admits.
+	maxBitmapBytes = maxPixels / 4
 
 	// maximum IAID code length (limits context array to 1 MB)
 	maxIAIDCodeLen = 20
@@ -51,9 +53,11 @@ const (
 // peak-memory budget bounds only live memory, not cumulative work, so this
 // separate counter enforces "resource usage in proportion to input size".
 const (
-	// baseline work allowance; a single full-size region (maxPixels) decodes
-	// well within this, so small legitimate images never trip the cap
-	workBudgetBase = 64 << 20
+	// baseline work allowance: one region with as many pixels as the
+	// [limits.StreamBudgetBase] that even the shortest stream receives
+	// holds as a 1-bit bitmap.  A blank page, whose stream is tiny, thus
+	// decodes whenever its bitmap fits in memory.
+	workBudgetBase = 8 * limits.StreamBudgetBase
 
 	// pixel-decode operations allowed per encoded input byte.  Realistic
 	// JBIG2 compression yields on the order of 100 decoded pixels per byte;
@@ -272,10 +276,14 @@ func Decode(globals, page []byte, budget *membudget.Budget) (*bitmap.Bitmap, err
 		return nil, fmt.Errorf("page: %w", err)
 	}
 
-	if d.pageBitmap == nil {
+	pg, err := d.page()
+	if err != nil {
+		return nil, err
+	}
+	if pg == nil {
 		return nil, errors.New("no page bitmap produced")
 	}
-	return d.pageBitmap, nil
+	return pg, nil
 }
 
 // prescanPageHeight scans segment headers to find the last
@@ -323,12 +331,73 @@ type segmentResult struct {
 }
 
 type decoder struct {
-	segments         map[uint32]segmentResult
-	pageBitmap       *bitmap.Bitmap
-	pageWidth        int
-	pageHeight       int
+	segments map[uint32]segmentResult
+
+	// The page bitmap is allocated on first use by [decoder.page], so that
+	// [decoder.composite] can make a region covering the whole page into the
+	// page instead of copying it.
+	pageBitmap  *bitmap.Bitmap
+	hasPage     bool // a page information segment has given a positive page height
+	pageWidth   int
+	pageHeight  int
+	pageDefault bool // default pixel value of the page
+
 	prescannedHeight int        // from prescanPageHeight; -1 if not available
 	pool             bitmapPool // bitmap working-memory accounting
+}
+
+// page returns the page bitmap, allocating it filled with the default pixel
+// value on first use.  It returns nil if no page information segment has
+// given a positive page height.
+func (d *decoder) page() (*bitmap.Bitmap, error) {
+	if d.pageBitmap == nil && d.hasPage {
+		bm, err := d.pool.allocBitmap(d.pageWidth, d.pageHeight)
+		if err != nil {
+			return nil, err
+		}
+		if d.pageDefault { // fill with 1 bits (black)
+			for i := range bm.Pix {
+				bm.Pix[i] = 0xFF
+			}
+		}
+		d.pageBitmap = bm
+	}
+	return d.pageBitmap, nil
+}
+
+// composite combines the region bitmap bm, placed at (x, y), into the page
+// and releases bm.  A region which covers the whole of a page not yet
+// allocated becomes the page itself, if combining it with the default pixel
+// value would reproduce it.  For scanned pages, which usually consist of a
+// single such region, this halves the peak memory.
+func (d *decoder) composite(bm *bitmap.Bitmap, x, y int, op bitmap.CombOp) error {
+	if d.pageBitmap == nil && x == 0 && y == 0 &&
+		bm.Rect == image.Rect(0, 0, d.pageWidth, d.pageHeight) &&
+		keepsRegion(op, d.pageDefault) {
+		d.pageBitmap = bm
+		return nil
+	}
+	pg, err := d.page()
+	if err != nil {
+		return err
+	}
+	pg.Combine(bm, x, y, op)
+	d.pool.freeBitmap(bm)
+	return nil
+}
+
+// keepsRegion reports whether combining a region with op onto pixels of
+// value def yields the region unchanged.
+func keepsRegion(op bitmap.CombOp, def bool) bool {
+	switch op {
+	case bitmap.CombOpReplace:
+		return true
+	case bitmap.CombOpOR, bitmap.CombOpXOR:
+		return !def
+	case bitmap.CombOpAND, bitmap.CombOpXNOR:
+		return def
+	}
+	return false
 }
 
 func (d *decoder) processStream(data []byte) error {
@@ -415,19 +484,15 @@ func (d *decoder) processPageInfo(data []byte) error {
 	}
 
 	// default pixel value (bit 2 of flags)
-	defaultPixel := flags&0x04 != 0
+	d.pageDefault = flags&0x04 != 0
 
-	if d.pageHeight > 0 {
-		var err error
-		d.pageBitmap, err = d.pool.allocBitmap(d.pageWidth, d.pageHeight)
-		if err != nil {
-			return err
-		}
-		if defaultPixel { // fill with 1 bits (black)
-			for i := range d.pageBitmap.Pix {
-				d.pageBitmap.Pix[i] = 0xFF
-			}
-		}
+	if d.pageBitmap != nil {
+		d.pool.freeBitmap(d.pageBitmap)
+		d.pageBitmap = nil
+	}
+	d.hasPage = d.pageHeight > 0
+	if d.hasPage {
+		return checkBitmapSize(d.pageWidth, d.pageHeight)
 	}
 	return nil
 }
@@ -519,9 +584,10 @@ func (d *decoder) processGenericRegion(hdr *segmentHeader, data []byte) error {
 	}
 
 	// composite onto page (skip for intermediate segments)
-	if hdr.Type != segIntermediateGeneric && d.pageBitmap != nil {
-		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
-		d.pool.freeBitmap(bm)
+	if hdr.Type != segIntermediateGeneric && d.hasPage {
+		if err := d.composite(bm, int(rsi.X), int(rsi.Y), rsi.CombOp); err != nil {
+			return err
+		}
 		bm = nil
 	}
 
@@ -565,21 +631,24 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 		ref = seg.bm
 	} else {
 		// case c: reference from page buffer
-		if d.pageBitmap == nil {
+		pg, err := d.page()
+		if err != nil {
+			return err
+		}
+		if pg == nil {
 			return errors.New("refinement region: no page buffer")
 		}
 		w := int(rsi.Width)
 		h := int(rsi.Height)
 		x0 := int(rsi.X)
 		y0 := int(rsi.Y)
-		var err error
 		ref, err = d.pool.allocBitmap(w, h)
 		if err != nil {
 			return err
 		}
 		for py := range h {
 			for px := range w {
-				ref.SetPixel(px, py, d.pageBitmap.GetPixel(x0+px, y0+py))
+				ref.SetPixel(px, py, pg.GetPixel(x0+px, y0+py))
 			}
 		}
 		freeRef = true
@@ -605,15 +674,15 @@ func (d *decoder) processRefinementRegion(hdr *segmentHeader, data []byte) error
 	}
 
 	// intermediate refinement: store result for later reference, no compositing
-	if hdr.Type != segIntermediateRefinement && d.pageBitmap != nil {
-		if len(hdr.RefSegments) > 0 {
-			// case d: composite using combOp
-			d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
-		} else {
-			// case c: replace the page buffer region
-			d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), bitmap.CombOpReplace)
+	if hdr.Type != segIntermediateRefinement && d.hasPage {
+		// case d composites using combOp, case c replaces the page region
+		op := rsi.CombOp
+		if len(hdr.RefSegments) == 0 {
+			op = bitmap.CombOpReplace
 		}
-		d.pool.freeBitmap(bm)
+		if err := d.composite(bm, int(rsi.X), int(rsi.Y), op); err != nil {
+			return err
+		}
 		bm = nil
 	}
 
@@ -885,9 +954,10 @@ func (d *decoder) processTextRegion(hdr *segmentHeader, data []byte) error {
 	}
 
 	// composite onto page (skip for intermediate segments)
-	if hdr.Type != segIntermediateTextRegion && d.pageBitmap != nil {
-		d.pageBitmap.Combine(bm, int(rsi.X), int(rsi.Y), rsi.CombOp)
-		d.pool.freeBitmap(bm)
+	if hdr.Type != segIntermediateTextRegion && d.hasPage {
+		if err := d.composite(bm, int(rsi.X), int(rsi.Y), rsi.CombOp); err != nil {
+			return err
+		}
 		bm = nil
 	}
 

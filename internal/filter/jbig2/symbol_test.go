@@ -4,7 +4,9 @@
 package jbig2
 
 import (
+	"math/rand"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -556,6 +558,64 @@ func TestGrowSymIDTable(t *testing.T) {
 		}
 		if diff := cmp.Diff(fresh.codes, tbl.codes[:numSyms]); diff != "" {
 			t.Fatalf("numSyms=%d: codes mismatch (-want +got):\n%s", numSyms, diff)
+		}
+	}
+}
+
+// TestSymbolDictReexport decodes a symbol dictionary which defines no new
+// symbols and re-exports all symbols of the dictionary it refers to.  Its
+// data is much shorter than the number of symbols it exports.
+func TestSymbolDictReexport(t *testing.T) {
+	const n = 300
+	rng := rand.New(rand.NewSource(1))
+	symbols := make([]*bitmap.Bitmap, n)
+	for i := range symbols {
+		bm := bitmap.New(4+i%5, 8)
+		for y := range 8 {
+			for x := range bm.Width() {
+				bm.SetPixel(x, y, rng.Intn(2) == 0)
+			}
+		}
+		symbols[i] = bm
+	}
+	slices.SortStableFunc(symbols, func(a, b *bitmap.Bitmap) int { return a.Width() - b.Width() })
+	first := EncodeSymbolDictSegment(symbols, 0)
+
+	// flags (template 0), AT pixels, SDNUMEXSYMS = n, SDNUMNEWSYMS = 0, and
+	// export flags: none skipped, then all n exported
+	second := appendUint16(nil, 0)
+	second, _, _ = appendDefaultAT(second, 0)
+	second = appendUint32(second, n)
+	second = appendUint32(second, 0)
+	enc := newMQEncoder()
+	iaex := &intCtx{}
+	iaex.encode(enc, 0)
+	iaex.encode(enc, n)
+	enc.flush()
+	second = append(second, enc.bytes()...)
+	if len(second) >= n {
+		t.Fatalf("re-exporting dictionary has %d bytes, want fewer than %d", len(second), n)
+	}
+
+	stream := WriteSegmentHeader(nil, 0, segSymbolDict, 1, nil, uint32(len(first)))
+	stream = append(stream, first...)
+	stream = WriteSegmentHeader(stream, 1, segSymbolDict, 1, []uint32{0}, uint32(len(second)))
+	stream = append(stream, second...)
+
+	d := &decoder{
+		segments: make(map[uint32]segmentResult),
+		pool:     bitmapPool{budget: testBudget()},
+	}
+	if err := d.processStream(stream); err != nil {
+		t.Fatal(err)
+	}
+	got := d.segments[1].symbols
+	if len(got) != n {
+		t.Fatalf("re-exported %d symbols, want %d", len(got), n)
+	}
+	for i := range got {
+		if !bitmapsEqual(got[i], symbols[i]) {
+			t.Fatalf("symbol %d differs", i)
 		}
 	}
 }

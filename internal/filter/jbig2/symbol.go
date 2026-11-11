@@ -70,14 +70,12 @@ func (d *decoder) decodeSymbolDictionary(hdr *segmentHeader, data []byte) ([]*bi
 	sdNumNewSyms := int(binary.BigEndian.Uint32(data[offset+4 : offset+8]))
 	offset += 8
 
-	// each symbol needs at least a few bytes of encoded data
+	// Each new symbol needs at least a few bytes of encoded data.  Exported
+	// symbols may instead come from the referred dictionaries, so their
+	// count is limited below, once the input symbols are known.
 	if sdNumNewSyms > len(data) {
 		return nil, fmt.Errorf("symbol count %d too large for %d bytes of data",
 			sdNumNewSyms, len(data))
-	}
-	if sdNumExSyms > len(data) {
-		return nil, fmt.Errorf("export count %d too large for %d bytes of data",
-			sdNumExSyms, len(data))
 	}
 
 	// collect input symbols from referred segments
