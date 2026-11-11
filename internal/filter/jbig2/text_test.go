@@ -5,6 +5,7 @@ package jbig2
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -273,7 +274,7 @@ func buildTextRefineInstances(
 		3: makeVStripes(symbols[3].Width(), symbols[3].Height()),
 	}
 
-	width, height, instances, expected = buildTextInstances(
+	width, height, instances, _ = buildTextInstances(
 		symbols, refCorner, transposed)
 
 	// patch instances: use refined bitmaps for symbols 1 and 3
@@ -593,8 +594,12 @@ func TestTextRegionStrips(t *testing.T) {
 func TestEncodeSymIDHuffTableRejectsLargeCodeLen(t *testing.T) {
 	// the RUNCODE scheme can only represent literal code lengths 0-31,
 	// so numSyms requiring codeLen > 31 must be rejected
+	if strconv.IntSize < 64 {
+		t.Skip("such symbol counts do not fit into int")
+	}
+	numSyms := int64(1)<<31 + 1
 	w := &bitWriter{}
-	_, err := encodeSymIDHuffTable(w, 1<<31+1)
+	_, err := encodeSymIDHuffTable(w, int(numSyms))
 	if err == nil {
 		t.Fatal("expected error for numSyms requiring codeLen > 31")
 	}

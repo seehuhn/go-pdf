@@ -6,7 +6,7 @@ package predict
 import (
 	"bytes"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -354,7 +354,7 @@ func TestRoundTripRandomData(t *testing.T) {
 			// Generate random data
 			dataSize := (params.Colors*params.BitsPerComponent*params.Columns*10 + 7) / 8
 			originalData := make([]byte, dataSize)
-			rand.Read(originalData)
+			rand.NewChaCha8([32]byte{}).Read(originalData)
 
 			// Encode
 			encodedBuf := &writeCloser{Buffer: &bytes.Buffer{}}

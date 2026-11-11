@@ -6,6 +6,8 @@ package decode
 import (
 	"fmt"
 	"maps"
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -486,6 +488,39 @@ func TestDecodeCombSnap(t *testing.T) {
 				t.Errorf("MaxLen = %d, want %d", tx.MaxLen, tc.wantMaxLen)
 			}
 		})
+	}
+}
+
+// a /MaxLen beyond the range of int is dropped rather than truncated
+func TestDecodeMaxLenRange(t *testing.T) {
+	var beyond32 int64 // 0 where the value does not fit into int
+	if strconv.IntSize == 64 {
+		beyond32 = 1<<32 + 5
+	}
+	tests := []struct {
+		maxLen pdf.Integer
+		want   int64
+	}{
+		{5, 5},
+		{-5, 0},
+		{math.MaxInt32, math.MaxInt32},
+		{1<<32 + 5, beyond32},
+	}
+	for _, tc := range tests {
+		w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+		x := pdf.NewExtractor(w)
+		ref := w.Alloc()
+		dict := pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("x"), "MaxLen": tc.maxLen}
+		if err := w.Put(ref, dict); err != nil {
+			t.Fatal(err)
+		}
+		node, err := decodeRootField(x, ref)
+		if err != nil {
+			t.Fatalf("decode failed: %v", err)
+		}
+		if got := int64(node.(*acroform.TextField).MaxLen); got != tc.want {
+			t.Errorf("MaxLen %d: got %d, want %d", tc.maxLen, got, tc.want)
+		}
 	}
 }
 
@@ -988,6 +1023,8 @@ func TestDecodeChoiceIndexRemap(t *testing.T) {
 		{"shifted indices", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(2), pdf.Integer(4)}, pdf.Integer(4), nil, []int{1, 2}, 2},
 		{"dropped option", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(1), pdf.Integer(2)}, pdf.Integer(1), nil, []int{1}, 0},
 		{"out of range", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(0), pdf.Integer(7)}, pdf.Integer(7), nil, []int{0}, 0},
+		{"beyond 32 bits", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(0), pdf.Integer(1<<32 + 2)}, pdf.Integer(1<<32 + 2), nil, []int{0}, 0},
+		{"negative", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(-1), pdf.Integer(2)}, pdf.Integer(-1), nil, []int{1}, 0},
 		{"unsorted duplicates", acroform.FieldMultiSelect, pdf.Array{pdf.Integer(4), pdf.Integer(0), pdf.Integer(4)}, nil, nil, []int{0, 2}, 0},
 		{"single select drops several", 0, pdf.Array{pdf.Integer(0), pdf.Integer(2)}, nil, nil, nil, 0},
 		{"single select keeps duplicates of one", 0, pdf.Array{pdf.Integer(2), pdf.Integer(2)}, nil, nil, []int{1}, 0},

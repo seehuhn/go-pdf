@@ -204,7 +204,7 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
+		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
 			continue
 		}
 		res.CIDSingles = append(res.CIDSingles, Single{
@@ -217,7 +217,7 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
+		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
 			continue
 		}
 		res.CIDRanges = append(res.CIDRanges, Range{
@@ -231,7 +231,7 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
+		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
 			continue
 		}
 		res.NotdefSingles = append(res.NotdefSingles, Single{
@@ -244,7 +244,7 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || cidVal > 0xFFFF_FFFF {
+		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
 			continue
 		}
 		res.NotdefRanges = append(res.NotdefRanges, Range{

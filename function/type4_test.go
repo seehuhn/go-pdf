@@ -814,6 +814,11 @@ func TestType4NumberLiterals(t *testing.T) {
 // Integer overflow and real-to-integer conversion at the limits of int.
 func TestType4IntegerLimits(t *testing.T) {
 	minInt := strconv.Itoa(math.MinInt)
+	// MaxInt+1, the smallest integer-valued float above MaxInt
+	pastMax := -float64(math.MinInt)
+	// the largest integer-valued float which converts
+	belowMax := math.Trunc(math.Nextafter(pastMax, 0))
+	fmtReal := func(x float64) string { return strconv.FormatFloat(x, 'f', 1, 64) }
 	tests := []struct {
 		prog string
 		want value // zero value: an error is expected
@@ -825,9 +830,9 @@ func TestType4IntegerLimits(t *testing.T) {
 		{minInt + " -1 mul", realVal(-float64(math.MinInt))},
 		{minInt + " -1 idiv", value{}},
 		{minInt + " 1 idiv", intVal(math.MinInt)},
-		{"9223372036854775807.0 cvi", value{}}, // rounds to 2^63
-		{"-9223372036854775808.0 cvi", intVal(math.MinInt)},
-		{"9223372036854774784.0 cvi", intVal(9223372036854774784)},
+		{fmtReal(pastMax) + " cvi", value{}},
+		{fmtReal(-pastMax) + " cvi", intVal(math.MinInt)},
+		{fmtReal(belowMax) + " cvi", intVal(int(belowMax))},
 	}
 	for _, tc := range tests {
 		t.Run(tc.prog, func(t *testing.T) {

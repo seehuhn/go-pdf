@@ -4,6 +4,7 @@
 package jbig2
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -112,12 +113,9 @@ func TestCheckBitmapSize(t *testing.T) {
 		{"width at cap", maxPixels, 1, false},
 		{"width above cap", maxPixels + 1, 1, true},
 		{"height above cap", 1, maxPixels + 1, true},
-		// Dimensions that defeat the multiplication-based checks: the
-		// pixel-count multiplication wraps mod 2^64 to a small value,
-		// and for 2^33 x 2^33 the byte-cost multiplication wraps too;
-		// the zero-area case bypasses both via the early return.
-		{"overflow 2^33 x 2^33", 1 << 33, 1 << 33, true},
-		{"overflow huge width zero height", 1 << 31, 0, true},
+		{"pixel count above cap", maxPixels, maxPixels, true},
+		// the cap check must precede the zero-area early return
+		{"huge width zero height", math.MaxInt, 0, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

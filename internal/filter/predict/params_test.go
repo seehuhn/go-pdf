@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"testing"
 
 	"seehuhn.de/go/membudget"
@@ -183,7 +184,7 @@ func TestParamsValidate(t *testing.T) {
 			params: Params{
 				Colors:           1,
 				BitsPerComponent: 8,
-				Columns:          9000000000002,
+				Columns:          math.MaxInt,
 				Predictor:        2,
 			},
 			expectError: true,

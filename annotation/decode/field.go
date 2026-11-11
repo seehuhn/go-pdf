@@ -6,6 +6,7 @@
 package decode
 
 import (
+	"math"
 	"slices"
 	"strings"
 
@@ -68,7 +69,7 @@ func applyOwnContext(ctx inherited, c pdf.Cursor, dict pdf.Dict) (inherited, err
 	} else if pdf.IsReadError(err) {
 		return ctx, err
 	}
-	if ml, err := c.Integer(dict["MaxLen"]); err == nil && ml > 0 {
+	if ml, err := c.Integer(dict["MaxLen"]); err == nil && ml > 0 && ml <= math.MaxInt {
 		ctx.maxLen = int(ml)
 	} else if pdf.IsReadError(err) {
 		return ctx, err
@@ -562,7 +563,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 		// options that remain and drop those left without a target
 		if ti, err := pdf.Optional(c.Integer(dict["TI"])); err != nil {
 			return nil, err
-		} else if idx, ok := remapOptIndex(int(ti), len(f.Options), dropped); ok {
+		} else if idx, ok := remapOptIndex(ti, len(f.Options), dropped); ok {
 			f.TopIndex = idx
 		}
 		if arr, err := pdf.Optional(c.Array(dict["I"])); err != nil {
@@ -571,7 +572,7 @@ func buildTerminalField(c pdf.Cursor, dict pdf.Dict, ctx inherited) (acroform.Fi
 			for _, el := range arr {
 				if idx, err := pdf.Optional(c.Integer(el)); err != nil {
 					return nil, err
-				} else if idx, ok := remapOptIndex(int(idx), len(f.Options), dropped); ok {
+				} else if idx, ok := remapOptIndex(idx, len(f.Options), dropped); ok {
 					f.Selected = append(f.Selected, idx)
 				}
 			}
@@ -804,16 +805,16 @@ func decodeChoiceOption(c pdf.Cursor, el pdf.Object) (acroform.ChoiceOption, boo
 // into the decoded options, given the ascending original indices of the
 // elements that were dropped. It reports false if the index pointed at a
 // dropped element or lies outside the array.
-func remapOptIndex(idx, numOpt int, dropped []int) (int, bool) {
-	pos, found := slices.BinarySearch(dropped, idx)
+func remapOptIndex(idx pdf.Integer, numOpt int, dropped []int) (int, bool) {
+	// the original /Opt array had numOpt+len(dropped) entries
+	if idx < 0 || idx >= pdf.Integer(numOpt+len(dropped)) {
+		return 0, false
+	}
+	pos, found := slices.BinarySearch(dropped, int(idx))
 	if found {
 		return 0, false
 	}
-	idx -= pos
-	if idx < 0 || idx >= numOpt {
-		return 0, false
-	}
-	return idx, true
+	return int(idx) - pos, true
 }
 
 // keepOptions returns the entries of a choice value which are display

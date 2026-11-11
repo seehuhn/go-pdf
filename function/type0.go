@@ -111,7 +111,7 @@ func extractType0(c pdf.Cursor, stream *pdf.Stream) (*Type0, error) {
 	// so a decompression bomb cannot allocate unbounded memory
 	m, n := len(domain)/2, len(rangeArray)/2
 	if m <= 0 || n <= 0 {
-		return nil, &pdf.MalformedFileError{Err: errors.New("Type 0 function has invalid shape")}
+		return nil, &pdf.MalformedFileError{Err: errors.New("type 0 function has invalid shape")}
 	}
 	totalBytes, err := sampleTableBytes(size, n, int(bitsPerSample))
 	if err != nil {
@@ -261,29 +261,29 @@ func sampleTableBytes(size []int, n, bitsPerSample int) (int, error) {
 	switch bitsPerSample {
 	case 1, 2, 4, 8, 12, 16, 24, 32:
 	default:
-		return 0, fmt.Errorf("Type 0 function: invalid BitsPerSample %d", bitsPerSample)
+		return 0, fmt.Errorf("type 0 function: invalid BitsPerSample %d", bitsPerSample)
 	}
 	if n <= 0 {
-		return 0, fmt.Errorf("Type 0 function: invalid output count %d", n)
+		return 0, fmt.Errorf("type 0 function: invalid output count %d", n)
 	}
 	totalSamples := 1
 	for _, sz := range size {
 		if sz <= 0 {
-			return 0, fmt.Errorf("Type 0 function: invalid Size entry %d", sz)
+			return 0, fmt.Errorf("type 0 function: invalid Size entry %d", sz)
 		}
 		next := totalSamples * sz
 		if totalSamples != next/sz {
-			return 0, errors.New("Type 0 function sample count overflow")
+			return 0, errors.New("type 0 function sample count overflow")
 		}
 		totalSamples = next
 	}
 	totalBits := totalSamples * (n * bitsPerSample)
 	if totalSamples != totalBits/(n*bitsPerSample) {
-		return 0, errors.New("Type 0 function sample count overflow")
+		return 0, errors.New("type 0 function sample count overflow")
 	}
 	totalBytes := (totalBits + 7) / 8
 	if totalBytes > limits.MaxSampleBytes {
-		return 0, errors.New("Type 0 function sample table too large")
+		return 0, errors.New("type 0 function sample table too large")
 	}
 	return totalBytes, nil
 }

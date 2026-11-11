@@ -5,6 +5,7 @@ package ccittfax
 
 import (
 	"bytes"
+	"math"
 	"testing"
 )
 
@@ -31,7 +32,7 @@ func TestColumnsLimit(t *testing.T) {
 		},
 		{
 			name:        "excessive columns - prevent memory exhaustion",
-			columns:     9000000000002,
+			columns:     math.MaxInt,
 			expectError: true,
 		},
 		{
