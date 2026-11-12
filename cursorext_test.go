@@ -162,3 +162,78 @@ func TestCursorOptionalBoolean(t *testing.T) {
 		t.Errorf("read error: got %v, want %v", err, errTestRead)
 	}
 }
+
+// writeChain writes a dictionary obj together with two references to it,
+// a (1 step: a -> obj) and b (2 steps: b -> a -> obj).
+func writeChain(t *testing.T) (w *pdf.Writer, obj, a, b pdf.Reference) {
+	t.Helper()
+	w, _ = memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	obj, a, b = w.Alloc(), w.Alloc(), w.Alloc()
+	for ref, val := range map[pdf.Reference]pdf.Object{
+		obj: pdf.Dict{"X": pdf.Integer(1)},
+		a:   obj,
+		b:   a,
+	} {
+		if err := w.Put(ref, val); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return w, obj, a, b
+}
+
+// TestDecodeChain checks that decoders which reach one object through
+// different references share one value, also when one of them publishes its
+// result while the other is still decoding.
+func TestDecodeChain(t *testing.T) {
+	w, obj, a, b := writeChain(t)
+	starts := map[string]pdf.Reference{"obj": obj, "a": a, "b": b}
+	pairs := [][2]string{
+		{"a", "obj"}, {"b", "a"}, {"b", "obj"}, {"a", "b"}, {"obj", "a"},
+	}
+	for _, p := range pairs {
+		t.Run(p[0]+"/"+p[1], func(t *testing.T) {
+			x := pdf.NewExtractor(w)
+
+			// The first call stands for a second goroutine, which decodes
+			// the object through another reference and publishes its value
+			// first.
+			var inner *int
+			calls := 0
+			var decode func(pdf.Cursor, pdf.Object, bool) (*int, error)
+			decode = func(pdf.Cursor, pdf.Object, bool) (*int, error) {
+				calls++
+				if calls == 1 {
+					v, err := pdf.CursorAt(x, nil).Decode(starts[p[1]], decode)
+					if err != nil {
+						t.Fatal(err)
+					}
+					inner = v
+				}
+				return new(int), nil
+			}
+
+			outer, err := pdf.CursorAt(x, nil).Decode(starts[p[0]], decode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if outer != inner {
+				t.Error("outer and inner decoder got different values")
+			}
+			for name, ref := range starts {
+				v, err := pdf.CursorAt(x, nil).Decode(ref, decode)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if v != inner {
+					t.Errorf("decoding via %s gave a different value", name)
+				}
+			}
+			if calls != 2 {
+				t.Errorf("decode function ran %d times, want 2", calls)
+			}
+		})
+	}
+}

@@ -508,35 +508,49 @@ func (x *Extractor) cacheGet(key extractorKey) (any, bool) {
 	return v, ok
 }
 
-// cacheStoreOrLoad publishes res under every reference in refs and returns res.
-// If the first reference is already cached — another goroutine decoded the same
-// object concurrently — it stores nothing and returns the existing value, so
-// every caller ends up with one shared object. The first writer for a reference
-// wins; later racers adopt its result and discard their own.
+// cacheStoreOrLoad publishes res under key and returns res.  The reference in
+// key must name the object itself, not a reference leading to it.  If key is
+// already cached — another goroutine decoded the same object concurrently — it
+// stores nothing and returns the existing value, so every caller ends up with
+// one shared object.  The first writer wins; later racers adopt its result and
+// discard their own.
 //
 // Publishing this way (rather than waiting on an in-flight marker) keeps decode
 // deadlock-free: two goroutines decoding mutually-referential objects never wait
 // on each other, so a malformed file cannot hang the reader.
-func (x *Extractor) cacheStoreOrLoad(refs []Reference, tp reflect.Type, res any) any {
+func (x *Extractor) cacheStoreOrLoad(key extractorKey, res any) any {
 	x.mu.Lock()
 	defer x.mu.Unlock()
-	if v, ok := x.cache[extractorKey{ref: refs[0], tp: tp}]; ok {
+	if v, ok := x.cache[key]; ok {
 		return v
 	}
-	for _, ref := range refs {
-		x.cache[extractorKey{ref: ref, tp: tp}] = res
-	}
+	x.cache[key] = res
 	return res
 }
 
-// StoreOrLoad publishes v as the decoded value of the object at ref, cached
-// under the Go type T as [Cursor.Decode] would cache it.  If a value is
-// already cached there, it returns that value and stores nothing.
+// objectRef returns the reference of the object which ref leads to,
+// following any chain of indirect objects whose values are references.
+func (x *Extractor) objectRef(ref Reference) (Reference, error) {
+	_, path, err := resolvePath(x.R, nil, ref, true)
+	if err != nil {
+		return 0, err
+	}
+	return path.Ref, nil
+}
+
+// StoreOrLoad publishes v as the decoded value of the object which ref leads
+// to, cached under the Go type T as [Cursor.Decode] would cache it.  If a
+// value is already cached there, it returns that value and stores nothing.
+// If ref cannot be resolved, it returns v and stores nothing.
 //
 // This lets a decoder build a value out of the cache's sight and publish it
 // once it is complete, so that no other caller sees it half-built.
 func (x *Extractor) StoreOrLoad[T any](ref Reference, v T) T {
-	v, _ = x.cacheStoreOrLoad([]Reference{ref}, reflect.TypeFor[T](), v).(T)
+	ref, err := x.objectRef(ref)
+	if err != nil {
+		return v
+	}
+	v, _ = x.cacheStoreOrLoad(extractorKey{ref: ref, tp: reflect.TypeFor[T]()}, v).(T)
 	if w, ok := x.R.(*Writer); ok {
 		w.recordOrigin(v, ref)
 	}
@@ -545,14 +559,19 @@ func (x *Extractor) StoreOrLoad[T any](ref Reference, v T) T {
 
 // StoreOrLoadPair publishes two typed views of a single PDF object — for
 // example the field half and the widget half of a merged field/widget
-// dictionary — under one object reference, atomically. If the reference is
-// already populated (another goroutine decoded the same object), it returns the
-// existing pair and stores nothing, so every caller shares one consistent pair.
+// dictionary — for the object which ref leads to, atomically.  If the object is
+// already populated (another goroutine decoded it), it returns the existing
+// pair and stores nothing, so every caller shares one consistent pair.  If ref
+// cannot be resolved, it returns a and b and stores nothing.
 //
 // The two views are cached under their respective Go types, exactly as
 // [Cursor.Decode] would cache them, so a later Decode for either type finds
 // the published value.
 func (x *Extractor) StoreOrLoadPair[A, B any](ref Reference, a A, b B) (A, B) {
+	ref, err := x.objectRef(ref)
+	if err != nil {
+		return a, b
+	}
 	ka := extractorKey{ref: ref, tp: reflect.TypeFor[A]()}
 	kb := extractorKey{ref: ref, tp: reflect.TypeFor[B]()}
 	a, b = x.storeOrLoadPairLocked(ka, kb, a, b)

@@ -315,3 +315,66 @@ func TestStoreOrLoad(t *testing.T) {
 		t.Errorf("decode returned %v, %v, want the published value", got, err)
 	}
 }
+
+// TestStoreOrLoadChain checks that a value published under a reference which
+// leads to an object through a chain is found by decoding the object.
+func TestStoreOrLoadChain(t *testing.T) {
+	w, obj, a, b := writeChain(t)
+	x := pdf.NewExtractor(w)
+	noDecode := func(pdf.Cursor, pdf.Object, bool) (*int, error) {
+		t.Error("decode function called for a published object")
+		return nil, nil
+	}
+
+	v := new(int)
+	if got := x.StoreOrLoad(b, v); got != v {
+		t.Error("first publication not stored")
+	}
+	if got := x.StoreOrLoad(a, new(int)); got != v {
+		t.Error("publication via another reference did not adopt the first")
+	}
+	for _, ref := range []pdf.Reference{obj, a, b} {
+		got, err := pdf.CursorAt(x, nil).Decode(ref, noDecode)
+		if err != nil || got != v {
+			t.Errorf("decode of %s returned %v, %v, want the published value", ref, got, err)
+		}
+	}
+
+	s := new(string)
+	gotV, gotS := x.StoreOrLoadPair(a, new(int), s)
+	if gotV != v || gotS != s {
+		t.Error("pair publication did not adopt the existing value")
+	}
+	gotS, err := pdf.CursorAt(x, nil).Decode(obj, func(pdf.Cursor, pdf.Object, bool) (*string, error) {
+		t.Error("decode function called for a published object")
+		return nil, nil
+	})
+	if err != nil || gotS != s {
+		t.Errorf("decode returned %v, %v, want the published value", gotS, err)
+	}
+}
+
+// TestStoreOrLoadCycle checks that a reference which cannot be resolved is
+// not published.
+func TestStoreOrLoadCycle(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	refA, refB := w.Alloc(), w.Alloc()
+	if err := w.Put(refA, refB); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(refB, refA); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	x := pdf.NewExtractor(w)
+
+	v := new(int)
+	if got := x.StoreOrLoad(refA, v); got != v {
+		t.Error("value not returned")
+	}
+	if got := x.StoreOrLoad(refA, new(int)); got == v {
+		t.Error("value was published under a reference cycle")
+	}
+}

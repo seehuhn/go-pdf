@@ -279,8 +279,9 @@ func (c Cursor) Version() Version {
 }
 
 // Decode resolves any indirect references in obj and decodes the result with
-// the given function. The decoded value is cached under every reference that
-// was followed, so decoding the same reference again returns the same Go value.
+// the given function.  The decoded value is cached for the object the
+// references lead to, so decoding any reference to the same object again
+// returns the same Go value.
 //
 // The decode function receives a Cursor positioned at the resolved object, the
 // resolved object itself, and a flag that is true when obj was a direct
@@ -294,12 +295,18 @@ func (c Cursor) Decode[T any](obj Object, decode func(Cursor, Object, bool) (T, 
 	path := c.path
 	tp := reflect.TypeFor[T]()
 
-	var refs []Reference
+	// The cache is keyed by the reference of the object itself, i.e. the
+	// last reference of a chain such as "1 0 obj 2 0 R endobj".  Keying by
+	// every reference followed would let decoders that start at different
+	// points of a chain publish different values for one object.
+	var last Reference
+	followed := false
 	for {
 		ref, ok := obj.(Reference)
 		if !ok {
 			break
 		}
+		// a hit means that ref names the object itself, as only those are cached
 		key := extractorKey{ref: ref, tp: tp}
 		if v, ok := x.cacheGet(key); ok {
 			// a cached nil interface result (T is an interface type and the
@@ -315,7 +322,7 @@ func (c Cursor) Decode[T any](obj Object, decode func(Cursor, Object, bool) (T, 
 		if err != nil {
 			return zero, err
 		}
-		refs = append(refs, ref)
+		last, followed = ref, true
 
 		obj, err = x.R.Get(ref, true)
 		if err != nil {
@@ -323,20 +330,19 @@ func (c Cursor) Decode[T any](obj Object, decode func(Cursor, Object, bool) (T, 
 		}
 	}
 
-	isDirect := len(refs) == 0
-	res, err := decode(Cursor{x: x, path: path}, obj, isDirect)
+	res, err := decode(Cursor{x: x, path: path}, obj, !followed)
 	if err != nil {
 		return zero, err
 	}
 
-	// publish under all refs; adopt a concurrent decoder's result on a race so
-	// callers share one object (see cacheStoreOrLoad)
-	if len(refs) > 0 {
-		res, _ = x.cacheStoreOrLoad(refs, tp, res).(T)
+	// adopt a concurrent decoder's result on a race, so that callers share
+	// one value (see cacheStoreOrLoad)
+	if followed {
+		res, _ = x.cacheStoreOrLoad(extractorKey{ref: last, tp: tp}, res).(T)
 		// a value decoded through a Writer stands for the object it was
-		// read from; the last reference of the chain is that object
+		// read from
 		if w, ok := x.R.(*Writer); ok {
-			w.recordOrigin(res, refs[len(refs)-1])
+			w.recordOrigin(res, last)
 		}
 	}
 
@@ -350,8 +356,9 @@ func (c Cursor) DecodeOptional[T any](obj Object, decode func(Cursor, Object, bo
 }
 
 // DecodeExclusive is like [Cursor.Decode] but runs the decode function at most
-// once per reference: concurrent callers for the same reference wait for the
-// first to finish and share its result.
+// once per object: concurrent callers for the same object wait for the first
+// to finish and share its result, even if they reach the object through
+// different references.
 //
 // Use this ONLY for decodes that cannot participate in a cross-goroutine
 // reference cycle — that is, a document "sink" such as the annotation list of
@@ -364,8 +371,21 @@ func (c Cursor) DecodeExclusive[T any](obj Object, decode func(Cursor, Object, b
 		return decode(c, obj, true) // direct object: not shared
 	}
 	key := extractorKey{ref: ref, tp: reflect.TypeFor[T]()}
+	if v, ok := c.x.cacheGet(key); ok {
+		// nil interface result
+		r, _ := v.(T)
+		return r, nil
+	}
+
+	// single-flight on the object itself, as the cache does
+	_, path, err := resolvePath(c.x.R, c.path, ref, true)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	key.ref = path.Ref
 	return exclusive(c.x, key, func() (T, error) {
-		return c.Decode(obj, decode)
+		return Cursor{x: c.x, path: path.Parent}.Decode(path.Ref, decode)
 	})
 }
 
