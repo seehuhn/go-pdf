@@ -69,51 +69,23 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 	// the consumer, so that glyph streams without a Resources entry
 	// still have none when the font is written back
 	if fontDict["Resources"] != nil {
-		d.Resources, _ = c.Decode(fontDict["Resources"], Resources)
+		d.Resources, err = c.Decode(fontDict["Resources"], Resources)
+		if pdf.IsReadError(err) {
+			return nil, err
+		}
 	}
 
+	// Names which refer to the same stream share one value, so that each
+	// glyph procedure is read, repaired and written only once.
 	charProcs := make(map[pdf.Name]*dict.CharProc, len(charProcsDict))
 	for name, obj := range charProcsDict {
-		stm, err := c.Stream(obj)
-		if err != nil {
+		cp, err := c.DecodeOptional(obj, decodeCharProc)
+		if pdf.IsReadError(err) {
+			return nil, err
+		} else if err != nil || cp == nil {
 			continue // permissive: skip malformed CharProcs
 		}
-		if stm == nil {
-			continue
-		}
-
-		var glyphRes *content.Resources
-		if stm.Dict["Resources"] != nil {
-			glyphRes, _ = c.Decode(stm.Dict["Resources"], Resources)
-		}
-
-		// store a reader factory closure so each iteration re-opens the PDF stream
-		glyphStm := stm // capture for closure
-		stream := content.NewScanner(func() (io.ReadCloser, error) {
-			return c.StreamReader(glyphStm)
-		})
-
-		// Cheap shape check: a Type 3 glyph procedure must start with
-		// either d0 (colored) or d1 (uncolored).  Anything else is
-		// rejected here; later operators are not validated.  Break after
-		// the first operator closes the underlying reader; subsequent
-		// painting reopens via a fresh iterator.
-		var firstName content.OpName
-		var firstOK bool
-		for name := range stream.NewIter().All() {
-			firstName = name
-			firstOK = true
-			break
-		}
-		if !firstOK ||
-			(firstName != content.OpType3ColoredGlyph && firstName != content.OpType3UncoloredGlyph) {
-			continue
-		}
-
-		charProcs[name] = &dict.CharProc{
-			Content:   stream,
-			Resources: glyphRes,
-		}
+		charProcs[name] = cp
 	}
 	d.CharProcs = charProcs
 
@@ -127,6 +99,36 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 	repairType3(d, c.Getter())
 
 	return d, nil
+}
+
+// decodeCharProc reads a Type 3 glyph procedure.  It returns nil if obj is
+// nil.  The content stream is repaired so that it starts with a d0 or d1
+// operator and contains no other (see [content.RepairGlyph]).  This reads the
+// stream up to its first usable d0 or d1 operator, or all of it if it has
+// none; the remainder is read when the glyph is used.
+func decodeCharProc(c pdf.Cursor, obj pdf.Object, _ bool) (*dict.CharProc, error) {
+	stm, err := c.Stream(obj)
+	if err != nil || stm == nil {
+		return nil, err
+	}
+
+	var glyphRes *content.Resources
+	if stm.Dict["Resources"] != nil {
+		glyphRes, err = c.Decode(stm.Dict["Resources"], Resources)
+		if pdf.IsReadError(err) {
+			return nil, err
+		}
+	}
+
+	// each iteration re-opens the PDF stream
+	stream := content.NewScanner(func() (io.ReadCloser, error) {
+		return c.StreamReader(stm)
+	})
+
+	return &dict.CharProc{
+		Content:   content.RepairGlyph(stream),
+		Resources: glyphRes,
+	}, nil
 }
 
 // repairType3 fixes invalid data in a Type3 font dictionary after extraction.

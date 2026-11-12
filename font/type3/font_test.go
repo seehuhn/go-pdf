@@ -4,6 +4,8 @@
 package type3
 
 import (
+	"errors"
+	"io"
 	"math"
 	"testing"
 
@@ -129,5 +131,48 @@ func TestGeometryFallbackGlyphs(t *testing.T) {
 	}
 	if math.Abs(geom.XHeight-430./unitsPerEm) > 1e-9 {
 		t.Errorf("XHeight = %g, want %g", geom.XHeight, 430./unitsPerEm)
+	}
+}
+
+// TestNewInvalidGlyphs checks that Font.New reports glyph procedures which
+// cannot be written.
+func TestNewInvalidGlyphs(t *testing.T) {
+	noMetrics := &content.Operators{Ops: []content.Operator{
+		{Name: content.OpFill},
+	}}
+
+	unreadable := content.NewScanner(func() (io.ReadCloser, error) {
+		return nil, errors.New("I/O error")
+	})
+
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
+	b.Type3ColoredGlyph(500, 0)
+	valid := builder.Must(b.Harvest())
+
+	cases := []struct {
+		name   string
+		glyphs []*Glyph
+		ok     bool
+	}{
+		{"valid", []*Glyph{{}, {Name: "A", Content: valid}}, true},
+		{"empty notdef", []*Glyph{{}}, true},
+		{"nil content", []*Glyph{{}, {Name: "A"}}, false},
+		{"empty content", []*Glyph{{}, {Name: "A", Content: &content.Operators{}}}, false},
+		{"no metrics", []*Glyph{{}, {Name: "A", Content: noMetrics}}, false},
+		{"read error", []*Glyph{{}, {Name: "A", Content: unreadable}}, false},
+		{"no glyph 0", nil, false},
+		{"named glyph 0", []*Glyph{{Name: "A", Content: valid}}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := &Font{
+				Glyphs:     c.glyphs,
+				FontMatrix: [6]float64{0.001, 0, 0, 0.001, 0, 0},
+			}
+			_, err := f.New()
+			if (err == nil) != c.ok {
+				t.Errorf("err = %v, want success = %t", err, c.ok)
+			}
+		})
 	}
 }

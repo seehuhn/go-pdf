@@ -86,7 +86,8 @@ type Glyph struct {
 	Name string
 
 	// Content is the glyph's content stream.
-	// It must start with either the d0 or d1 operator.
+	// It must start with either the d0 or d1 operator.  Only the unnamed
+	// glyph 0 may have a nil or empty content stream.
 	// Use [content/builder.Builder] to construct content streams; its
 	// [content/builder.Builder.Build] / [content/builder.Builder.Harvest]
 	// methods return a [*content.Operators] that satisfies [content.Stream].
@@ -105,12 +106,11 @@ type Glyph struct {
 // this method ensures the stream is read at most once per glyph.
 func (g *Glyph) extract() (width float64, bbox rect.Rect, err error) {
 	if g.Content == nil {
-		return 0, rect.Rect{}, nil
+		return 0, rect.Rect{}, g.errEmpty()
 	}
 
 	it := g.Content.NewIter()
 	first := true
-	var firstName content.OpName
 	// d0 path-bbox accumulator
 	pathBBox := rect.Rect{
 		LLx: math.Inf(+1),
@@ -125,13 +125,16 @@ func (g *Glyph) extract() (width float64, bbox rect.Rect, err error) {
 	}
 	for name, args := range it.All() {
 		if first {
-			first = false
-			firstName = name
-			width, bbox, err = parseGlyphMetricsOp(name, args)
-			if err != nil {
-				return 0, rect.Rect{}, err
+			if name == content.OpRawContent {
+				continue
 			}
-			if firstName == content.OpType3UncoloredGlyph {
+			first = false
+			m, ok := content.ParseGlyphMetrics(name, args)
+			if !ok {
+				return 0, rect.Rect{}, errors.New("glyph must start with a valid d0 or d1 operator")
+			}
+			width, bbox = m.Width, m.BBox
+			if m.Uncolored {
 				// d1: bbox came from the args; the remaining content
 				// has no metric significance, so stop reading.
 				return width, bbox, nil
@@ -168,8 +171,11 @@ func (g *Glyph) extract() (width float64, bbox rect.Rect, err error) {
 			}
 		}
 	}
+	if err := it.Err(); err != nil {
+		return 0, rect.Rect{}, err
+	}
 	if first {
-		return 0, rect.Rect{}, nil
+		return 0, rect.Rect{}, g.errEmpty()
 	}
 	if hasPoints {
 		bbox = pathBBox
@@ -177,37 +183,13 @@ func (g *Glyph) extract() (width float64, bbox rect.Rect, err error) {
 	return width, bbox, nil
 }
 
-// parseGlyphMetricsOp reads the leading d0/d1 operator and returns the
-// glyph's advance width and (for d1) the explicit bounding box.
-func parseGlyphMetricsOp(name content.OpName, args []pdf.Object) (float64, rect.Rect, error) {
-	switch name {
-	case content.OpType3ColoredGlyph: // d0
-		if len(args) < 2 {
-			return 0, rect.Rect{}, errors.New("d0 requires 2 arguments (wx, wy)")
-		}
-		wy, _ := getNumber(args[1])
-		if wy != 0 {
-			return 0, rect.Rect{}, errors.New("wy must be 0")
-		}
-		wx, _ := getNumber(args[0])
-		return wx, rect.Rect{}, nil
-	case content.OpType3UncoloredGlyph: // d1
-		if len(args) < 6 {
-			return 0, rect.Rect{}, errors.New("d1 requires 6 arguments (wx, wy, llx, lly, urx, ury)")
-		}
-		wy, _ := getNumber(args[1])
-		if wy != 0 {
-			return 0, rect.Rect{}, errors.New("wy must be 0")
-		}
-		wx, _ := getNumber(args[0])
-		llx, _ := getNumber(args[2])
-		lly, _ := getNumber(args[3])
-		urx, _ := getNumber(args[4])
-		ury, _ := getNumber(args[5])
-		return wx, rect.Rect{LLx: llx, LLy: lly, URx: urx, URy: ury}, nil
-	default:
-		return 0, rect.Rect{}, fmt.Errorf("content must start with d0 or d1, got %s", name)
+// errEmpty returns the error for a glyph without any operators.
+// Only the unnamed glyph 0 may be empty.
+func (g *Glyph) errEmpty() error {
+	if g.Name == "" {
+		return nil
 	}
+	return errors.New("empty glyph procedure")
 }
 
 // Width returns the glyph's advance width in glyph coordinate units.

@@ -137,23 +137,25 @@ func (m *Operators) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 
 // WriteStream writes the bytes of the content stream s to w.
 //
-// Only an [Operators] stream is formatted for the output options opt, which
-// should be those of the PDF file the content is written to (see
-// [Operator.Format]).  Any other stream is copied unchanged from
-// [Stream.RawBytes].  For a stream read from a PDF file, this keeps the
-// bytes as found, including comments, but nothing checks that they are
-// valid for the version of the output file: names keep any #xx escapes,
+// An [Operators] stream and a stream rebuilt by [RepairGlyph] are formatted
+// for the output options opt, which should be those of the PDF file the
+// content is written to (see [Operator.Format]).  Any other stream is copied
+// unchanged from [Stream.RawBytes].  For a stream read from a PDF file, this
+// keeps the bytes as found, including comments, but nothing checks that they
+// are valid for the version of the output file: names keep any #xx escapes,
 // and operators from later PDF versions are kept.  A stream composed of
 // several parts, such as a page with several content segments, is copied
 // unchanged as well, so any [Operators] part in it uses PDF 1.2 syntax.
 func WriteStream(w io.Writer, s Stream, opt pdf.OutputOptions) error {
-	if ops, ok := s.(*Operators); ok {
-		for _, op := range ops.Ops {
-			if err := op.Format(w, opt); err != nil {
+	switch s.(type) {
+	case *Operators, *repairedGlyph:
+		it := s.NewIter()
+		for name, args := range it.All() {
+			if err := (Operator{Name: name, Args: args}).Format(w, opt); err != nil {
 				return err
 			}
 		}
-		return nil
+		return it.Err()
 	}
 
 	rc, err := s.RawBytes()

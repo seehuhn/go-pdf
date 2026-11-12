@@ -164,7 +164,7 @@ func (s *State) IsSet(bits graphics.Bits) bool {
 func (s *State) Push() error {
 	if s.Version > 0 && s.Version < pdf.V2_0 {
 		if s.CurrentObject == ObjText {
-			return fmt.Errorf("q in text object: %w", ErrInvalidContext)
+			return fmt.Errorf("operator q in text object: %w", ErrInvalidContext)
 		}
 		if len(s.stack) >= 28 {
 			return fmt.Errorf("q stack depth %d exceeds PDF 1.x limit of 28",
@@ -341,7 +341,7 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 		requires := info.Requires
 
 		// Conditional LineCap relaxation: not needed for closed paths without dashes
-		if isStrokeOp(name) && s.allSubpathsClosed() && len(s.GState.DashPattern) == 0 {
+		if pp, _ := PathPainting(name); pp.Stroke && s.allSubpathsClosed() && len(s.GState.DashPattern) == 0 {
 			requires &^= graphics.StateLineCap
 		}
 
@@ -380,25 +380,6 @@ func (s *State) allSubpathsClosed() bool {
 // with a paint operator.
 func (s *State) PaintedPath() *path.Data {
 	return &s.paintedPath
-}
-
-// needsClose returns true if the operator implicitly closes the path.
-func needsClose(name OpName) bool {
-	switch name {
-	case OpCloseAndStroke, OpCloseFillAndStroke, OpCloseFillAndStrokeEvenOdd:
-		return true
-	}
-	return false
-}
-
-// isStrokeOp returns true if the operator is a stroking operation.
-func isStrokeOp(name OpName) bool {
-	switch name {
-	case OpStroke, OpCloseAndStroke, OpFillAndStroke, OpFillAndStrokeEvenOdd,
-		OpCloseFillAndStroke, OpCloseFillAndStrokeEvenOdd:
-		return true
-	}
-	return false
 }
 
 // ApplyStateChanges applies all state-modifying effects of an operator
@@ -504,7 +485,7 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 		OpFillAndStroke, OpFillAndStrokeEvenOdd, OpCloseFillAndStroke,
 		OpCloseFillAndStrokeEvenOdd, OpEndPath:
 		// close path for close-first operators (s, b, b*)
-		if needsClose(name) {
+		if pp, _ := PathPainting(name); pp.Close {
 			n := len(s.currentPath.Cmds)
 			if n > 0 && s.currentPath.Cmds[n-1] != path.CmdClose {
 				s.currentPath.Close()

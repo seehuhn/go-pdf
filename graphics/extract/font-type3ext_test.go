@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -123,6 +124,13 @@ func FuzzType3Dict(f *testing.F) {
 			}
 
 			f.Add(out.Data)
+		}
+	}
+
+	// glyph procedures which the writer rejects, written as raw objects
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		for _, proc := range invalidGlyphProcs {
+			f.Add(rawType3File(f, v, proc))
 		}
 	}
 
@@ -439,6 +447,270 @@ func TestType3VersionRepair(t *testing.T) {
 			if diff := cmp.Diff(d2, d3, contentStreamOpt); diff != "" {
 				t.Errorf("round trip failed (-want +got):\n%s", diff)
 			}
+		})
+	}
+}
+
+// invalidGlyphProcs holds glyph procedures which break the rules for Type 3
+// glyphs in different ways.
+var invalidGlyphProcs = map[string]string{
+	"operators before d0": "0 0 m 100 100 l f 500 0 d0 0 0 m",
+	"second d0":           "500 0 d0 0 0 m 600 0 d0 1 2 3 4 5 6 d1 f",
+	"short d1":            "1 0 5 d1 0 0 m 700 0 d0",
+	"no metrics":          "0 0 m 100 100 l S",
+	"empty":               "",
+	"comment first":       "% comment\n500 0 d0 0 0 m",
+	"comment only":        "% comment\n",
+	"wy":                  "500 3 d0 0 0 m",
+	"d1 wy":               "500 3 1 2 3 4 d1 0 0 m",
+	"non-numeric":         "/a /b d0 0 0 m",
+	"inline image":        "0 0 m BI /W 1 /H 1 /BPC 8 /CS /G ID \x80\nEI f",
+}
+
+// rawType3File returns a PDF file containing a Type 3 font with a single
+// glyph g0 at code 65, whose glyph procedure is proc.  The font dictionary
+// is stored in the trailer under Quir:E.
+func rawType3File(tb testing.TB, v pdf.Version, proc string) []byte {
+	tb.Helper()
+
+	out := memfile.New()
+	w, err := pdf.NewWriter(out, v, &pdf.WriterOptions{HumanReadable: true})
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if err := memfile.AddBlankPage(w); err != nil {
+		tb.Fatal(err)
+	}
+
+	ref := w.Alloc()
+	stm, err := w.OpenStream(ref, nil)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	if _, err := stm.Write([]byte(proc)); err != nil {
+		tb.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		tb.Fatal(err)
+	}
+
+	fontDict := pdf.Dict{
+		"Type":       pdf.Name("Font"),
+		"Subtype":    pdf.Name("Type3"),
+		"FontBBox":   &pdf.Rectangle{URx: 1000, URy: 1000},
+		"FontMatrix": pdf.Array{pdf.Real(0.001), pdf.Integer(0), pdf.Integer(0), pdf.Real(0.001), pdf.Integer(0), pdf.Integer(0)},
+		"CharProcs":  pdf.Dict{"g0": ref},
+		"Encoding": pdf.Dict{
+			"Type":        pdf.Name("Encoding"),
+			"Differences": pdf.Array{pdf.Integer(65), pdf.Name("g0")},
+		},
+		"FirstChar": pdf.Integer(65),
+		"LastChar":  pdf.Integer(65),
+		"Widths":    pdf.Array{pdf.Integer(250)},
+	}
+	fontRef := w.Alloc()
+	if err := w.Put(fontRef, fontDict); err != nil {
+		tb.Fatal(err)
+	}
+	w.GetMeta().Trailer["Quir:E"] = fontRef
+	if err := w.Close(); err != nil {
+		tb.Fatal(err)
+	}
+	return out.Data
+}
+
+// Glyph procedures which break the rules are repaired on read, so that every
+// glyph is kept and the font can be written again.
+func TestType3RepairGlyphs(t *testing.T) {
+	for _, v := range []pdf.Version{pdf.V1_7, pdf.V2_0} {
+		for key, proc := range invalidGlyphProcs {
+			t.Run(fmt.Sprintf("v%s-%s", v, key), func(t *testing.T) {
+				data := rawType3File(t, v, proc)
+				r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)), nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				obj := r.GetMeta().Trailer["Quir:E"]
+				d1Any, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(r), nil), obj, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				d1 := d1Any.(*dict.Type3)
+
+				cp := d1.CharProcs["g0"]
+				if cp == nil {
+					t.Fatal("glyph was dropped")
+				}
+				m1, ok := content.ReadGlyphMetrics(cp.Content)
+				if !ok {
+					t.Fatal("glyph procedure is not valid")
+				}
+				if !strings.Contains(proc, "d0") && !strings.Contains(proc, "d1") && m1.Width != 0 {
+					t.Errorf("synthesised width = %g, want 0", m1.Width)
+				}
+				nMetrics := 0
+				for name := range cp.Content.NewIter().All() {
+					if name == content.OpType3ColoredGlyph || name == content.OpType3UncoloredGlyph {
+						nMetrics++
+					}
+				}
+				if nMetrics != 1 {
+					t.Errorf("glyph procedure has %d d0/d1 operators, want 1", nMetrics)
+				}
+
+				w, _ := memfile.NewPDFWriter(t, v, nil)
+				rm := pdf.NewResourceManager(w)
+				ref, err := rm.Embed(d1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := rm.Close(); err != nil {
+					t.Fatal(err)
+				}
+				d2Any, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(w), nil), ref, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				d2 := d2Any.(*dict.Type3)
+				if !content.StreamsEqual(cp.Content, d2.CharProcs["g0"].Content) {
+					t.Error("second read differs from first read")
+				}
+				d1.Encoding, d2.Encoding = nil, nil
+				if diff := cmp.Diff(d1, d2, contentStreamOpt); diff != "" {
+					t.Errorf("round trip failed (-want +got):\n%s", diff)
+				}
+			})
+		}
+	}
+}
+
+// TestType3SharedCharProcs checks that glyph names which refer to one
+// stream, in one font or in several, share one CharProc, and that the
+// sharing is kept when the fonts are written and read again.
+func TestType3SharedCharProcs(t *testing.T) {
+	procs := map[string]string{
+		"valid":      "500 0 d0 0 0 m 100 100 l f",
+		"no metrics": "0 0 m 100 100 l f",
+	}
+	for key, proc := range procs {
+		t.Run(key, func(t *testing.T) {
+			out := memfile.New()
+			w, err := pdf.NewWriter(out, pdf.V2_0, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := memfile.AddBlankPage(w); err != nil {
+				t.Fatal(err)
+			}
+			stmRef := w.Alloc()
+			stm, err := w.OpenStream(stmRef, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := stm.Write([]byte(proc)); err != nil {
+				t.Fatal(err)
+			}
+			if err := stm.Close(); err != nil {
+				t.Fatal(err)
+			}
+			fontDict := func(charProcs pdf.Dict, diff pdf.Array) pdf.Dict {
+				return pdf.Dict{
+					"Type":       pdf.Name("Font"),
+					"Subtype":    pdf.Name("Type3"),
+					"FontBBox":   &pdf.Rectangle{URx: 1000, URy: 1000},
+					"FontMatrix": pdf.Array{pdf.Real(0.001), pdf.Integer(0), pdf.Integer(0), pdf.Real(0.001), pdf.Integer(0), pdf.Integer(0)},
+					"CharProcs":  charProcs,
+					"Encoding":   pdf.Dict{"Differences": diff},
+					"FirstChar":  pdf.Integer(65),
+					"LastChar":   pdf.Integer(66),
+					"Widths":     pdf.Array{pdf.Integer(500), pdf.Integer(500)},
+				}
+			}
+			f1, f2 := w.Alloc(), w.Alloc()
+			err = w.Put(f1, fontDict(pdf.Dict{"g0": stmRef, "g1": stmRef},
+				pdf.Array{pdf.Integer(65), pdf.Name("g0"), pdf.Name("g1")}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = w.Put(f2, fontDict(pdf.Dict{"g0": stmRef},
+				pdf.Array{pdf.Integer(65), pdf.Name("g0")}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			// read both fonts through one extractor
+			read := func(g pdf.Getter, refs ...pdf.Reference) []*dict.Type3 {
+				t.Helper()
+				x := pdf.NewExtractor(g)
+				var res []*dict.Type3
+				for _, ref := range refs {
+					d, err := extract.Dict(pdf.CursorAt(x, nil), ref, false)
+					if err != nil {
+						t.Fatal(err)
+					}
+					res = append(res, d.(*dict.Type3))
+				}
+				return res
+			}
+			r, err := pdf.NewReader(bytes.NewReader(out.Data), int64(len(out.Data)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fonts := read(r, f1, f2)
+			checkShared := func(fonts []*dict.Type3) {
+				t.Helper()
+				cp := fonts[0].CharProcs["g0"]
+				if cp == nil {
+					t.Fatal("glyph was dropped")
+				}
+				if fonts[0].CharProcs["g1"] != cp || fonts[1].CharProcs["g0"] != cp {
+					t.Error("glyph procedure is not shared")
+				}
+			}
+			checkShared(fonts)
+
+			// write both fonts to a new file
+			w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w2)
+			var refs []pdf.Reference
+			for _, d := range fonts {
+				obj, err := rm.Embed(d)
+				if err != nil {
+					t.Fatal(err)
+				}
+				refs = append(refs, obj.(pdf.Reference))
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			c := pdf.CursorAt(pdf.NewExtractor(w2), nil)
+			var stmRefs []pdf.Object
+			for i, ref := range refs {
+				fd, err := c.Dict(ref)
+				if err != nil {
+					t.Fatal(err)
+				}
+				charProcs, err := c.Dict(fd["CharProcs"])
+				if err != nil {
+					t.Fatal(err)
+				}
+				stmRefs = append(stmRefs, charProcs["g0"])
+				if i == 0 {
+					stmRefs = append(stmRefs, charProcs["g1"])
+				}
+			}
+			for _, obj := range stmRefs[1:] {
+				if obj != stmRefs[0] {
+					t.Errorf("glyph procedure written more than once: %v", stmRefs)
+					break
+				}
+			}
+
+			checkShared(read(w2, refs...))
 		})
 	}
 }

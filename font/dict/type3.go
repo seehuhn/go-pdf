@@ -5,6 +5,7 @@ package dict
 
 import (
 	"errors"
+	"fmt"
 	"iter"
 	"maps"
 	"slices"
@@ -22,10 +23,19 @@ import (
 )
 
 // CharProc represents a Type 3 glyph procedure (content stream).
+//
+// Several glyph names, also in different fonts, may share one CharProc; a
+// shared value is written to a PDF file as a single stream.  A CharProc read
+// from a file must not be modified: to change one glyph, replace its entry in
+// [Type3.CharProcs].
 type CharProc struct {
 	// Content is the parsed content stream for the glyph.
 	// A typical value is a [*content.Operators] holding the parsed
 	// operators of the glyph procedure.
+	//
+	// The stream must start with a well-formed d0 or d1 operator (see
+	// [content.ReadGlyphMetrics]); the dictionary cannot be written
+	// otherwise.
 	Content content.Stream
 
 	// Resources (optional; PDF 2.0) holds named resources used by this
@@ -95,16 +105,46 @@ func (d *Type3) validate(w *pdf.Writer) error {
 			return err
 		}
 	}
-	for _, cp := range d.CharProcs {
-		if cp != nil && cp.Resources != nil {
-			if err := pdf.CheckVersion(w, "Type 3 glyph Resources", pdf.V2_0); err != nil {
-				return err
-			}
-			break
-		}
-	}
 
 	return nil
+}
+
+var _ pdf.Embedder = (*CharProc)(nil)
+
+// Embed writes the glyph procedure to a PDF file as a stream.
+// This implements the [pdf.Embedder] interface.
+func (cp *CharProc) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	w := rm.Out()
+
+	if _, ok := content.ReadGlyphMetrics(cp.Content); !ok {
+		return nil, errors.New("glyph procedure must start with d0 or d1")
+	}
+
+	var streamDict pdf.Dict
+	if cp.Resources != nil {
+		if err := pdf.CheckVersion(w, "Type 3 glyph Resources", pdf.V2_0); err != nil {
+			return nil, err
+		}
+		resObj, err := rm.Embed(cp.Resources)
+		if err != nil {
+			return nil, err
+		}
+		streamDict = pdf.Dict{"Resources": resObj}
+	}
+
+	ref := rm.AllocSelf()
+	stm, err := w.OpenStream(ref, streamDict, pdf.FilterCompress{})
+	if err != nil {
+		return nil, err
+	}
+	if err := content.WriteStream(stm, cp.Content, w.GetOptions()); err != nil {
+		stm.Close()
+		return nil, err
+	}
+	if err := stm.Close(); err != nil {
+		return nil, err
+	}
+	return ref, nil
 }
 
 // Embed adds the font dictionary to a PDF file.
@@ -143,41 +183,20 @@ func (d *Type3) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	compressedObjects := []pdf.Object{fontDict}
 	compressedRefs := []pdf.Reference{ref}
 
-	// Write CharProc streams and build the CharProcs dictionary.  The glyph
-	// names are sorted because the loop allocates object numbers.
+	// Write the CharProc streams and build the CharProcs dictionary.  The
+	// glyph names are sorted because embedding allocates object numbers.  A
+	// CharProc shared by several names is written once.
 	charProcsDict := make(pdf.Dict, len(d.CharProcs))
 	for _, name := range slices.Sorted(maps.Keys(d.CharProcs)) {
 		cp := d.CharProcs[name]
 		if cp == nil {
 			continue
 		}
-		cpRef := w.Alloc()
-		charProcsDict[name] = cpRef
-
-		// Build stream dictionary with per-glyph resources if present
-		var streamDict pdf.Dict
-		if cp.Resources != nil {
-			resObj, err := rm.Embed(cp.Resources)
-			if err != nil {
-				return nil, err
-			}
-			streamDict = pdf.Dict{"Resources": resObj}
-		}
-
-		stm, err := w.OpenStream(cpRef, streamDict, pdf.FilterCompress{})
+		obj, err := rm.Embed(cp)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("glyph %q: %w", name, err)
 		}
-
-		if err := content.WriteStream(stm, cp.Content, w.GetOptions()); err != nil {
-			stm.Close()
-			return nil, err
-		}
-
-		err = stm.Close()
-		if err != nil {
-			return nil, err
-		}
+		charProcsDict[name] = obj
 	}
 	if len(charProcsDict) > 5 {
 		charProcsRef := w.Alloc()

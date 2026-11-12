@@ -103,3 +103,43 @@ func TestOperatorCategories(t *testing.T) {
 		}
 	}
 }
+
+// TestStateAndCompatibilityContexts checks that the text state and
+// compatibility operators are allowed at the content stream level and in
+// text objects only.
+func TestStateAndCompatibilityContexts(t *testing.T) {
+	ops := []OpName{
+		OpTextSetCharacterSpacing, OpTextSetWordSpacing,
+		OpTextSetHorizontalScaling, OpTextSetLeading, OpTextSetFont,
+		OpTextSetRenderingMode, OpTextSetRise,
+		OpBeginCompatibility, OpEndCompatibility,
+	}
+	contexts := []struct {
+		obj     Object
+		allowed bool
+	}{
+		{ObjPage, true},
+		{ObjText, true},
+		{ObjPath, false},
+		{ObjClippingPath, false},
+		{ObjType3Start, false},
+	}
+	for _, op := range ops {
+		for _, c := range contexts {
+			s := NewState(Page, nil)
+			s.CurrentObject = c.obj
+			err := s.CheckOperatorAllowed(op)
+			if (err == nil) != c.allowed {
+				t.Errorf("%s in %s: err = %v, want allowed = %t", op, c.obj, err, c.allowed)
+			}
+		}
+	}
+}
+
+// TestGlyphLeadingComment checks that a comment may precede d0 or d1.
+func TestGlyphLeadingComment(t *testing.T) {
+	s := NewState(Glyph, nil)
+	if err := s.CheckOperatorAllowed(OpRawContent); err != nil {
+		t.Errorf("comment before d0: %v", err)
+	}
+}

@@ -143,3 +143,97 @@ func TestType3GlyphNameVersion(t *testing.T) {
 		}
 	}
 }
+
+// A glyph procedure must start with a well-formed d0 or d1 operator.
+func TestType3InvalidGlyph(t *testing.T) {
+	op := func(name content.OpName, args ...pdf.Object) content.Operator {
+		return content.Operator{Name: name, Args: args}
+	}
+	cases := map[string]content.Stream{
+		"nil":   nil,
+		"empty": &content.Operators{},
+		"no metrics": &content.Operators{Ops: []content.Operator{
+			op(content.OpMoveTo, pdf.Integer(0), pdf.Integer(0)),
+		}},
+		"wy": &content.Operators{Ops: []content.Operator{
+			op(content.OpType3ColoredGlyph, pdf.Integer(500), pdf.Integer(1)),
+		}},
+		"short d1": &content.Operators{Ops: []content.Operator{
+			op(content.OpType3UncoloredGlyph, pdf.Integer(500), pdf.Integer(0)),
+		}},
+	}
+	for name, stm := range cases {
+		t.Run(name, func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
+			d := &Type3{
+				Descriptor: &font.Descriptor{},
+				Encoding:   encodeAt(0x41),
+				CharProcs:  map[pdf.Name]*CharProc{"A": {Content: stm}},
+				FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+			}
+			if _, err := rm.Embed(d); err == nil {
+				t.Error("invalid glyph procedure was accepted")
+			}
+		})
+	}
+}
+
+// A glyph procedure shared by several glyph names, and by several fonts, is
+// written to the file only once.
+func TestType3SharedCharProc(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	cp := &CharProc{
+		Content: &content.Operators{Ops: []content.Operator{
+			{Name: content.OpType3ColoredGlyph, Args: []pdf.Object{pdf.Integer(500), pdf.Integer(0)}},
+		}},
+	}
+	newFont := func(charProcs map[pdf.Name]*CharProc) *Type3 {
+		return &Type3{
+			Descriptor: &font.Descriptor{},
+			Encoding:   encodeAt(0x41),
+			CharProcs:  charProcs,
+			FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+		}
+	}
+	var fontObjs []pdf.Native
+	for _, d := range []*Type3{
+		newFont(map[pdf.Name]*CharProc{"A": cp, "B": cp}),
+		newFont(map[pdf.Name]*CharProc{"A": cp}),
+	} {
+		obj, err := rm.Embed(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fontObjs = append(fontObjs, obj)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var refs []pdf.Object
+	for _, fontObj := range fontObjs {
+		fontDict, err := pdf.Resolve(w, fontObj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		charProcs, err := pdf.Resolve(w, fontDict.(pdf.Dict)["CharProcs"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, obj := range charProcs.(pdf.Dict) {
+			refs = append(refs, obj)
+		}
+	}
+	if len(refs) != 3 {
+		t.Fatalf("got %d glyph procedures, want 3", len(refs))
+	}
+	for _, ref := range refs[1:] {
+		if ref != refs[0] {
+			t.Errorf("glyph procedure written more than once: %v", refs)
+			break
+		}
+	}
+}

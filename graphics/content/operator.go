@@ -92,9 +92,9 @@ const (
 // operators maps operator names to their metadata
 var operators = map[OpName]*opInfo{
 	// General Graphics State (allowed in page and text contexts)
-	OpPushGraphicsState:    {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
-	OpPopGraphicsState:     {Since: pdf.V1_0, Allowed: ObjPage | ObjText},
-	OpTransform:            {Since: pdf.V1_0, Allowed: ObjPage}, // special graphics state
+	OpPushGraphicsState:    {Since: pdf.V1_0, Allowed: ObjPage | ObjText}, // pre-PDF 2.0 not in text objects, see State.Push
+	OpPopGraphicsState:     {Since: pdf.V1_0, Allowed: ObjPage | ObjText}, // pre-PDF 2.0 not in text objects, see State.Pop
+	OpTransform:            {Since: pdf.V1_0, Allowed: ObjPage},           // special graphics state
 	OpSetLineWidth:         {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineWidth},
 	OpSetLineCap:           {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineCap},
 	OpSetLineJoin:          {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateLineJoin},
@@ -133,14 +133,14 @@ var operators = map[OpName]*opInfo{
 	OpTextBegin: {Since: pdf.V1_0, Allowed: ObjPage, Transition: ObjText, Sets: graphics.StateTextMatrix},
 	OpTextEnd:   {Since: pdf.V1_0, Allowed: ObjText, Transition: ObjPage},
 
-	// Text State (allowed in any context)
-	OpTextSetCharacterSpacing:  {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextCharacterSpacing},
-	OpTextSetWordSpacing:       {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextWordSpacing},
-	OpTextSetHorizontalScaling: {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextHorizontalScaling},
-	OpTextSetLeading:           {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextLeading},
-	OpTextSetFont:              {Since: pdf.V1_0, Allowed: ObjAny}, // Sets determined from resources
-	OpTextSetRenderingMode:     {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextRenderingMode},
-	OpTextSetRise:              {Since: pdf.V1_0, Allowed: ObjAny, Sets: graphics.StateTextRise},
+	// Text State (allowed in page and text contexts)
+	OpTextSetCharacterSpacing:  {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateTextCharacterSpacing},
+	OpTextSetWordSpacing:       {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateTextWordSpacing},
+	OpTextSetHorizontalScaling: {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateTextHorizontalScaling},
+	OpTextSetLeading:           {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateTextLeading},
+	OpTextSetFont:              {Since: pdf.V1_0, Allowed: ObjPage | ObjText}, // Sets determined from resources
+	OpTextSetRenderingMode:     {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateTextRenderingMode},
+	OpTextSetRise:              {Since: pdf.V1_0, Allowed: ObjPage | ObjText, Sets: graphics.StateTextRise},
 
 	// Text Positioning (only in text context)
 	OpTextMoveOffset:           {Since: pdf.V1_0, Allowed: ObjText},
@@ -190,9 +190,9 @@ var operators = map[OpName]*opInfo{
 	OpBeginMarkedContentWithProperties: {Since: pdf.V1_2, Allowed: ObjPage | ObjText},
 	OpEndMarkedContent:                 {Since: pdf.V1_2, Allowed: ObjPage | ObjText},
 
-	// Compatibility (allowed in any context)
-	OpBeginCompatibility: {Since: pdf.V1_1, Allowed: ObjAny},
-	OpEndCompatibility:   {Since: pdf.V1_1, Allowed: ObjAny},
+	// Compatibility (allowed in page and text contexts)
+	OpBeginCompatibility: {Since: pdf.V1_1, Allowed: ObjPage | ObjText},
+	OpEndCompatibility:   {Since: pdf.V1_1, Allowed: ObjPage | ObjText},
 
 	// Pseudo-operators (internal use, allowed in any context)
 	OpRawContent:  {Since: pdf.V1_0, Allowed: ObjAny},
