@@ -706,8 +706,8 @@ func (s *scanner) skipToImageData() (bool, error) {
 
 // readImageData reads the data of an inline image which follows the ID
 // operator, and consumes the EI operator after it.  dict is the image
-// dictionary.  If the dictionary has a Length entry, the entry is set to the
-// actual length of the data.
+// dictionary.  The Length entry of the dictionary is set to the actual length
+// of the data, and is added if absent.
 //
 // Data longer than [maxInlineImageBytes] is skipped, and the image is
 // dropped with a parseError.  Scanning then resumes after the data.
@@ -837,12 +837,24 @@ func (s *scanner) skipSpaceBytes() {
 	}
 }
 
-// setInlineImageLength sets the Length entry of an inline image dictionary,
-// if present, to n.
+// setInlineImageLength sets the Length entry of an inline image dictionary
+// to n, adding the entry if it is absent.  The entry is what
+// [Operator.Format] writes, so that the image reads back unchanged.  Where
+// the dictionary gives both L and Length, L takes precedence and the
+// redundant Length is dropped.  A nil dict, used for an image which is
+// dropped, is left alone.
 func setInlineImageLength(dict pdf.Dict, n int) {
-	if key, ok := imagedict.InlineKey(dict, "Length"); ok {
-		dict[key] = pdf.Integer(n)
+	if dict == nil {
+		return
 	}
+	key, ok := imagedict.InlineKey(dict, "Length")
+	if !ok {
+		key = "L"
+	}
+	if key == "L" {
+		delete(dict, "Length")
+	}
+	dict[key] = pdf.Integer(n)
 }
 
 // endsBeforeEI reports whether data ends with a white-space byte followed by

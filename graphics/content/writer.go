@@ -5,14 +5,21 @@ package content
 
 import (
 	"io"
+	"maps"
 	"slices"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/imagedict"
 )
 
 // Format writes op's PDF representation to out (its args followed by the
 // operator name, with the appropriate separators).  The pseudo-operators
 // [OpRawContent] and [OpInlineImage] have dedicated handling.
+//
+// An inline image is written with a Length entry, which is added if the
+// image dictionary does not give one.  An entry which is given must equal
+// the length of the image data, and must be given only once, as either L or
+// Length; otherwise Format returns an error.
 //
 // The output options opt should be those of the PDF file the content is
 // written to (see [pdf.Writer.GetOptions]); they select version-dependent
@@ -39,6 +46,19 @@ func (op Operator) Format(out io.Writer, opt pdf.OutputOptions) error {
 		if len(op.Args) >= 2 {
 			dict, _ := op.Args[0].(pdf.Dict)
 			data, _ := op.Args[1].(pdf.String)
+
+			// With a Length entry, a reader finds the end of the data even
+			// where the data contains an EI marker.
+			if err := ValidateInlineImageLength(dict, len(data)); err != nil {
+				return err
+			}
+			if _, ok := imagedict.InlineKey(dict, "Length"); !ok {
+				dict = maps.Clone(dict)
+				if dict == nil {
+					dict = pdf.Dict{}
+				}
+				dict["L"] = pdf.Integer(len(data))
+			}
 
 			if _, err := out.Write([]byte("BI\n")); err != nil {
 				return err

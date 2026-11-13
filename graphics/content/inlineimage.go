@@ -46,6 +46,24 @@ func ValidateInlineImageFilter(dict pdf.Dict) error {
 	return nil
 }
 
+// ValidateInlineImageLength reports an error if the Length (or L) entry of an
+// inline image dict is present but is not an integer equal to n, the length
+// of the image data, or if the dict gives both Length and L.  Other entries
+// of the dict are not inspected.
+func ValidateInlineImageLength(dict pdf.Dict, n int) error {
+	key, ok := imagedict.InlineKey(dict, "Length")
+	if !ok {
+		return nil
+	}
+	if _, both := dict["Length"]; both && key != "Length" {
+		return errors.New("inline image has both L and Length")
+	}
+	if l, isInt := dict[key].(pdf.Integer); !isInt || l != pdf.Integer(n) {
+		return fmt.Errorf("inline image Length %v, but %d data bytes", dict[key], n)
+	}
+	return nil
+}
+
 // DecodeInlineImage decompresses the image data from an inline image operator.
 // The operator must have name [OpInlineImage] with two arguments:
 // a [pdf.Dict] containing image parameters and a [pdf.String] holding the

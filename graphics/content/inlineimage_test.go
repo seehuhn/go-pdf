@@ -477,3 +477,30 @@ func TestInlineImageKeyEscaped(t *testing.T) {
 		t.Errorf("key not escaped: %q", buf.String())
 	}
 }
+
+func TestValidateInlineImageLength(t *testing.T) {
+	data := []byte("abcd")
+	for _, tc := range []struct {
+		name    string
+		dict    pdf.Dict
+		wantErr bool
+	}{
+		{"absent", pdf.Dict{"W": pdf.Integer(4)}, false},
+		{"nil dict", nil, false},
+		{"correct L", pdf.Dict{"L": pdf.Integer(4)}, false},
+		{"correct Length", pdf.Dict{"Length": pdf.Integer(4)}, false},
+		{"wrong L", pdf.Dict{"L": pdf.Integer(3)}, true},
+		{"wrong Length", pdf.Dict{"Length": pdf.Integer(5)}, true},
+		{"real L", pdf.Dict{"L": pdf.Real(4)}, true},
+		{"name L", pdf.Dict{"L": pdf.Name("x")}, true},
+		{"L and Length", pdf.Dict{"L": pdf.Integer(4), "Length": pdf.Integer(4)}, true},
+		{"L and stale Length", pdf.Dict{"L": pdf.Integer(4), "Length": pdf.Integer(9)}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateInlineImageLength(tc.dict, len(data))
+			if (err != nil) != tc.wantErr {
+				t.Errorf("got error %v, want error %t", err, tc.wantErr)
+			}
+		})
+	}
+}

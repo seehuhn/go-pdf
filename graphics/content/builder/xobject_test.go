@@ -101,42 +101,25 @@ func TestDrawInlineImageRawLength(t *testing.T) {
 		dict    pdf.Dict
 		data    []byte
 		wantErr bool
-		wantL   bool // whether L is added
 	}{
-		{"2.0 adds L", pdf.V2_0, gray(nil), plain, false, true},
-		{"2.0 keeps correct L", pdf.V2_0, gray(pdf.Dict{"L": pdf.Integer(4)}), plain, false, false},
-		{"2.0 keeps correct Length", pdf.V2_0, gray(pdf.Dict{"Length": pdf.Integer(4)}), plain, false, false},
-		{"2.0 wrong L", pdf.V2_0, gray(pdf.Dict{"L": pdf.Integer(5)}), plain, true, false},
-		{"2.0 real L", pdf.V2_0, gray(pdf.Dict{"L": pdf.Real(4)}), plain, true, false},
-		{"2.0 EI in data", pdf.V2_0, gray(nil), marker, false, true},
-		{"1.7 no L", pdf.V1_7, gray(nil), plain, false, false},
-		{"1.7 wrong L", pdf.V1_7, gray(pdf.Dict{"L": pdf.Integer(3)}), plain, true, false},
-		{"1.7 EI in data", pdf.V1_7, gray(nil), marker, true, false},
-		{"1.7 EI at start of data", pdf.V1_7, gray(nil), []byte{'E', 'I', '\n', 4}, true, false},
-		{"1.7 EI in data with L", pdf.V1_7, gray(pdf.Dict{"L": pdf.Integer(4)}), marker, true, false},
+		{"2.0 no L", pdf.V2_0, gray(nil), plain, false},
+		{"2.0 correct L", pdf.V2_0, gray(pdf.Dict{"L": pdf.Integer(4)}), plain, false},
+		{"2.0 correct Length", pdf.V2_0, gray(pdf.Dict{"Length": pdf.Integer(4)}), plain, false},
+		{"2.0 wrong L", pdf.V2_0, gray(pdf.Dict{"L": pdf.Integer(5)}), plain, true},
+		{"2.0 real L", pdf.V2_0, gray(pdf.Dict{"L": pdf.Real(4)}), plain, true},
+		{"2.0 EI in data", pdf.V2_0, gray(nil), marker, false},
+		{"2.0 L and Length", pdf.V2_0, gray(pdf.Dict{"L": pdf.Integer(4), "Length": pdf.Integer(4)}), plain, true},
+		{"1.7 no L", pdf.V1_7, gray(nil), plain, false},
+		{"1.7 wrong L", pdf.V1_7, gray(pdf.Dict{"L": pdf.Integer(3)}), plain, true},
+		{"1.7 EI in data", pdf.V1_7, gray(nil), marker, true},
+		{"1.7 EI at start of data", pdf.V1_7, gray(nil), []byte{'E', 'I', '\n', 4}, true},
+		{"1.7 EI in data with L", pdf.V1_7, gray(pdf.Dict{"L": pdf.Integer(4)}), marker, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			b := New(content.Page, nil, tc.version)
 			b.DrawInlineImageRaw(tc.dict, tc.data)
 			if (b.Err != nil) != tc.wantErr {
 				t.Fatalf("got error %v, want error %t", b.Err, tc.wantErr)
-			}
-			if tc.wantErr {
-				return
-			}
-			got := b.Stream[len(b.Stream)-1].Args[0].(pdf.Dict)
-			_, hasL := got["L"]
-			_, hadL := tc.dict["L"]
-			if hasL != (tc.wantL || hadL) {
-				t.Errorf("L present = %t, want %t", hasL, tc.wantL || hadL)
-			}
-			if tc.wantL {
-				if _, ok := tc.dict["L"]; ok {
-					t.Error("caller's dict was modified")
-				}
-				if got["L"] != pdf.Integer(len(tc.data)) {
-					t.Errorf("got L %v, want %d", got["L"], len(tc.data))
-				}
 			}
 		})
 	}

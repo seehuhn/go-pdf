@@ -6,7 +6,6 @@ package builder
 import (
 	"errors"
 	"fmt"
-	"maps"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
@@ -46,10 +45,11 @@ func (b *Builder) DrawXObject(obj graphics.XObject) {
 // the filter fixes the sample size (CCITTFaxDecode, DCTDecode); a given entry
 // must agree with that size.
 //
-// For PDF 2.0, the Length entry is added if dict does not give it.  Before
-// PDF 2.0, the data must not contain a white-space byte followed by "EI" and
-// a delimiter, since readers would take this as the end of the data; the
-// ASCIIHexDecode filter avoids this.
+// A Length entry, if given, must equal the length of data and must be given
+// only once, as either L or Length; where it is absent, it is added when the content stream is written.  Before PDF 2.0,
+// readers ignore the entry, so the data must not contain a white-space byte
+// followed by "EI" and a delimiter, since readers would take this as the end
+// of the data; the ASCIIHexDecode filter avoids this.
 //
 // Inline images should be used only for small images of up to 4096 bytes;
 // for larger images use [Builder.DrawXObject] instead.
@@ -69,35 +69,25 @@ func (b *Builder) DrawInlineImageRaw(dict pdf.Dict, data []byte) {
 		b.Err = err
 		return
 	}
-	dict, err := inlineLength(dict, data, b.version)
-	if err != nil {
+	if err := checkInlineLength(dict, data, b.version); err != nil {
 		b.Err = err
 		return
 	}
 	b.emit(content.OpInlineImage, dict, pdf.String(data))
 }
 
-// inlineLength checks the Length entry of an inline image dictionary against
-// the image data.  PDF 2.0 requires the entry; where it is missing, it is
-// added to a copy of dict.  Before PDF 2.0, readers find the end of the data
-// by searching for EI, so data which contains that pattern is rejected.
-func inlineLength(dict pdf.Dict, data []byte, v pdf.Version) (pdf.Dict, error) {
-	key, hasLength := imagedict.InlineKey(dict, "Length")
-	if hasLength {
-		obj := dict[key]
-		if l, ok := obj.(pdf.Integer); !ok || int64(l) != int64(len(data)) {
-			return nil, fmt.Errorf("inline image Length %v, but %d data bytes", obj, len(data))
-		}
+// checkInlineLength checks the Length entry of an inline image dictionary,
+// if present, against the image data.  Before PDF 2.0, readers find the end
+// of the data by searching for EI, so data which contains that pattern is
+// rejected.
+func checkInlineLength(dict pdf.Dict, data []byte, v pdf.Version) error {
+	if err := content.ValidateInlineImageLength(dict, len(data)); err != nil {
+		return err
 	}
-	if v >= pdf.V2_0 {
-		if !hasLength {
-			dict = maps.Clone(dict)
-			dict["L"] = pdf.Integer(len(data))
-		}
-	} else if content.ContainsInlineImageEnd(data) {
-		return nil, errors.New("inline image data contains an EI marker")
+	if v < pdf.V2_0 && content.ContainsInlineImageEnd(data) {
+		return errors.New("inline image data contains an EI marker")
 	}
-	return dict, nil
+	return nil
 }
 
 // checkInlineDict checks the required entries of an inline image dictionary.

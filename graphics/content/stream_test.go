@@ -1073,7 +1073,7 @@ func TestInlineImageMalformedDict(t *testing.T) {
 
 	// EI before ID ends an image without data, and scanning resumes after it
 	next := Operator{Name: OpInlineImage, Args: []pdf.Object{
-		pdf.Dict{"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"), "BPC": pdf.Integer(8)},
+		pdf.Dict{"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"), "BPC": pdf.Integer(8), "L": pdf.Integer(1)},
 		pdf.String("x"),
 	}}
 	for _, dict := range []string{
@@ -1345,7 +1345,7 @@ func TestInlineImageEmptyData(t *testing.T) {
 	}{
 		{"no Length", "/W 1 /H 1 /CS /G /BPC 8", pdf.Dict{
 			"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
-			"BPC": pdf.Integer(8),
+			"BPC": pdf.Integer(8), "L": pdf.Integer(0),
 		}},
 		{"zero Length", "/W 1 /H 1 /CS /G /BPC 8 /L 0", pdf.Dict{
 			"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
@@ -1353,7 +1353,11 @@ func TestInlineImageEmptyData(t *testing.T) {
 		}},
 		{"ASCII filter", "/W 1 /H 1 /CS /G /BPC 8 /F /AHx", pdf.Dict{
 			"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
-			"BPC": pdf.Integer(8), "F": pdf.Name("AHx"),
+			"BPC": pdf.Integer(8), "F": pdf.Name("AHx"), "L": pdf.Integer(0),
+		}},
+		{"L and Length", "/W 1 /H 1 /CS /G /BPC 8 /L 0 /Length 7", pdf.Dict{
+			"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+			"BPC": pdf.Integer(8), "L": pdf.Integer(0),
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1424,7 +1428,7 @@ func TestInlineImageLeadingWhiteSpace(t *testing.T) {
 			"BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx ID \n\n41>\nEI 3 w\n",
 			pdf.Dict{
 				"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
-				"BPC": pdf.Integer(8), "F": pdf.Name("AHx"),
+				"BPC": pdf.Integer(8), "F": pdf.Name("AHx"), "L": pdf.Integer(5),
 			},
 			"\n\n41>"},
 	} {
@@ -1449,5 +1453,44 @@ func TestInlineImageLeadingWhiteSpace(t *testing.T) {
 			}
 			roundTripTest(t, pdf.V2_0, got)
 		})
+	}
+}
+
+// TestFormatInlineImageLength checks that an inline image is written with a
+// Length entry, so that data which contains an EI marker reads back
+// unchanged, and that a Length entry which disagrees with the data is
+// rejected.
+func TestFormatInlineImageLength(t *testing.T) {
+	data := pdf.String("ab\nEI cd")
+	dict := pdf.Dict{"W": pdf.Integer(8), "H": pdf.Integer(1), "CS": pdf.Name("G"), "BPC": pdf.Integer(8)}
+	op := Operator{Name: OpInlineImage, Args: []pdf.Object{dict, data}}
+
+	buf := &bytes.Buffer{}
+	if err := op.Format(buf, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := dict["L"]; ok {
+		t.Error("Format modified the dictionary of the operator")
+	}
+	got, err := collectStream(NewScanner(bytesOpener(buf.Bytes())))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDict := maps.Clone(dict)
+	wantDict["L"] = pdf.Integer(len(data))
+	want := []Operator{{Name: OpInlineImage, Args: []pdf.Object{wantDict, data}}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+
+	for _, key := range []pdf.Name{"L", "Length"} {
+		for _, val := range []pdf.Object{pdf.Integer(3), pdf.Real(8), pdf.Name("x")} {
+			bad := maps.Clone(dict)
+			bad[key] = val
+			op := Operator{Name: OpInlineImage, Args: []pdf.Object{bad, data}}
+			if err := op.Format(io.Discard, 0); err == nil {
+				t.Errorf("%s %v: no error for wrong Length", key, val)
+			}
+		}
 	}
 }
