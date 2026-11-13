@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/imagedict"
 )
 
 // Stream is an immutable content stream exposed in two views: an
@@ -529,81 +530,27 @@ func (s *scanner) ScanToken() (pdf.Native, error) {
 	}
 }
 
-// getInlineImageInt extracts an integer value from an inline image dictionary,
-// checking both the abbreviated and full key names.
-// Returns -1 if the key is not found or the value is not a valid integer.
-func getInlineImageInt(dict pdf.Dict, abbrev, full pdf.Name) int {
-	v, _ := getInlineImageIntOK(dict, abbrev, full)
-	return v
-}
-
-// getInlineImageIntOK is like getInlineImageInt but also reports whether the
-// key was present, distinguishing an absent key from one whose value is not a
-// valid integer (both yield -1).
-func getInlineImageIntOK(dict pdf.Dict, abbrev, full pdf.Name) (int, bool) {
-	var val pdf.Object
-	if v, ok := dict[abbrev]; ok {
-		val = v // abbreviated key takes precedence per spec
-	} else if v, ok := dict[full]; ok {
-		val = v
+// inlineImageLength returns the Length entry of an inline image dictionary,
+// or -1 if the entry is absent or not a non-negative integer.  A value too
+// large for an int32 is returned as [math.MaxInt32], so that the result fits
+// an int on all platforms.
+func inlineImageLength(dict pdf.Dict) int {
+	l, ok := imagedict.InlineValue(dict, "Length").(pdf.Integer)
+	switch {
+	case !ok || l < 0:
+		return -1
+	case l > math.MaxInt32:
+		return math.MaxInt32
 	}
-	if val == nil {
-		return -1, false
-	}
-	switch v := val.(type) {
-	case pdf.Integer:
-		return int(v), true
-	case pdf.Real:
-		return int(v), true
-	}
-	return -1, true
-}
-
-// getInlineImageFilter extracts the filter name(s) from an inline image dictionary.
-// Returns the final filter in the chain (the one applied last during encoding,
-// first during decoding).
-func getInlineImageFilter(dict pdf.Dict) pdf.Name {
-	var val pdf.Object
-	if v, ok := dict["F"]; ok {
-		val = v
-	} else if v, ok := dict["Filter"]; ok {
-		val = v
-	}
-	if val == nil {
-		return ""
-	}
-	switch v := val.(type) {
-	case pdf.Name:
-		return v
-	case pdf.Array:
-		// last filter in array is the final/outermost one
-		if len(v) > 0 {
-			if name, ok := v[len(v)-1].(pdf.Name); ok {
-				return name
-			}
-		}
-	}
-	return ""
-}
-
-// isASCIIFilter returns true if the filter is ASCIIHexDecode or ASCII85Decode.
-func isASCIIFilter(filter pdf.Name) bool {
-	switch filter {
-	case "ASCIIHexDecode", "AHx", "ASCII85Decode", "A85":
-		return true
-	}
-	return false
-}
-
-// readValue reads one complete PDF value (atomic or composite) from the stream.
-// It handles arrays ([...]) and dictionaries (<<...>>) recursively.
-func (s *scanner) readValue() (pdf.Object, error) {
-	return s.readValueDepth(0)
+	return int(l)
 }
 
 // maxValueDepth limits nesting of arrays and dicts to prevent stack overflow.
 const maxValueDepth = 10
 
+// readValueDepth reads one complete PDF value (atomic or composite) from the
+// stream.  It handles arrays ([...]) and dictionaries (<<...>>) recursively;
+// depth is the number of enclosing arrays and dictionaries.
 func (s *scanner) readValueDepth(depth int) (pdf.Object, error) {
 	tok, err := s.ScanToken()
 	if err != nil {
@@ -611,6 +558,10 @@ func (s *scanner) readValueDepth(depth int) (pdf.Object, error) {
 	}
 
 	switch tok {
+	case pdf.Operator("ID"):
+		return nil, errImageData
+	case pdf.Operator("EI"):
+		return nil, errImageEnd
 	case pdf.Operator("["):
 		if depth >= maxValueDepth {
 			return nil, parseError{}
@@ -681,100 +632,229 @@ func (s *scanner) readDictBody(term string, valueDepth int) (pdf.Dict, error) {
 	}
 }
 
-// readInlineImage reads a BI...ID...EI sequence and returns it as a %image% pseudo-operator
+// errImageData and errImageEnd report that the ID or EI operator was found
+// where an inline image dictionary expects a key or a value.  Neither error
+// leaves [scanner.readInlineImage].
+var (
+	errImageData = errors.New("ID operator inside inline image dictionary")
+	errImageEnd  = errors.New("EI operator inside inline image dictionary")
+)
+
+// readInlineImage reads a BI...ID...EI sequence and returns it as a %image%
+// pseudo-operator.
+//
+// The image entries are not checked here: the data is bounded by the length
+// of the content stream, and DecodeInlineImage checks the entries before
+// decoding it.  An image with a malformed dictionary is dropped, but its data
+// is still read, so that it is not parsed as operators.  An EI operator before
+// ID ends an image without data.
 func (s *scanner) readInlineImage() (Operator, error) {
-	// read image dictionary (between BI and ID)
 	dict, err := s.readDictBody("ID", 0)
+	if err != nil {
+		switch {
+		case errors.Is(err, errImageEnd):
+			// the EI operator has been consumed
+			return Operator{}, parseError{}
+		case errors.Is(err, errImageData):
+			// the ID operator has been consumed
+		case errors.Is(err, parseError{}):
+			found, err := s.skipToImageData()
+			if err != nil {
+				return Operator{}, err
+			}
+			if !found {
+				return Operator{}, parseError{}
+			}
+		default:
+			return Operator{}, err
+		}
+		if _, err := s.readImageData(nil); err != nil {
+			return Operator{}, err
+		}
+		return Operator{}, parseError{}
+	}
+
+	data, err := s.readImageData(dict)
 	if err != nil {
 		return Operator{}, err
 	}
-
-	// validate image dimensions (defense against resource exhaustion)
-	width := getInlineImageInt(dict, "W", "Width")
-	height := getInlineImageInt(dict, "H", "Height")
-	if width <= 0 || height <= 0 || width > maxInlineImageDim || height > maxInlineImageDim {
-		return Operator{}, parseError{}
-	}
-	if width*height > maxInlineImagePixels {
-		return Operator{}, parseError{}
-	}
-
-	// get length (PDF 2.0) and filter
-	length := getInlineImageInt(dict, "L", "Length")
-	filter := getInlineImageFilter(dict)
-
-	// skip whitespace after ID
-	// spec: "the ID operator shall be followed by a single white-space character"
-	// for ASCII filters, we may need to skip additional whitespace
-	b, _ := s.Peek()
-	if class[b] == space {
-		s.ReadByte()
-	}
-	if isASCIIFilter(filter) {
-		if err := s.SkipWhiteSpace(); err != nil {
-			return Operator{}, err
-		}
-	}
-
-	var imageData []byte
-
-	if length > 0 {
-		// PDF 2.0: use Length key for efficient reading
-		if length > maxInlineImageBytes {
-			return Operator{}, parseError{}
-		}
-		imageData = make([]byte, length)
-		for i := range length {
-			b, err := s.ReadByte()
-			if err != nil {
-				return Operator{}, err
-			}
-			imageData[i] = b
-		}
-		// skip optional whitespace before EI
-		if err := s.SkipWhiteSpace(); err != nil {
-			return Operator{}, err
-		}
-	} else {
-		// no Length key: the data ends at a white-space byte followed by
-		// "EI" and a delimiter (§8.9.7)
-		var prevByte byte
-		for len(imageData) < maxInlineImageBytes {
-			if len(imageData) > 0 && class[prevByte] == space && s.checkEI() {
-				// remove the white-space byte before EI from the image data
-				imageData = imageData[:len(imageData)-1]
-				break
-			}
-
-			b, err := s.ReadByte()
-			if err != nil {
-				return Operator{}, err
-			}
-			imageData = append(imageData, b)
-			prevByte = b
-		}
-
-		if len(imageData) >= maxInlineImageBytes {
-			// no valid EI found within limit
-			return Operator{}, parseError{}
-		}
-	}
-
-	// consume the EI operator
-	if err := s.SkipString("EI"); err != nil {
-		return Operator{}, err
-	}
-
-	// verify EI is followed by whitespace, delimiter, or EOF
-	nextByte, err := s.Peek()
-	if err != io.EOF && class[nextByte] == regular {
-		return Operator{}, parseError{}
-	}
-
 	return Operator{
 		Name: OpInlineImage,
-		Args: []pdf.Object{dict, pdf.String(imageData)},
+		Args: []pdf.Object{dict, pdf.String(data)},
 	}, nil
+}
+
+// skipToImageData skips the remaining tokens of a malformed inline image
+// dictionary, up to and including the ID operator.  It reports whether ID was
+// found; the search also stops at EI, which ends an image without data.
+func (s *scanner) skipToImageData() (bool, error) {
+	for {
+		tok, err := s.ScanToken()
+		if errors.Is(err, parseError{}) {
+			continue
+		} else if err != nil {
+			return false, err
+		}
+		switch tok {
+		case pdf.Operator("ID"):
+			return true, nil
+		case pdf.Operator("EI"):
+			return false, nil
+		}
+	}
+}
+
+// readImageData reads the data of an inline image which follows the ID
+// operator, and consumes the EI operator after it.  dict is the image
+// dictionary.  If the dictionary has a Length entry, the entry is set to the
+// actual length of the data.
+//
+// Data longer than [maxInlineImageBytes] is skipped, and the image is
+// dropped with a parseError.  Scanning then resumes after the data.
+func (s *scanner) readImageData(dict pdf.Dict) ([]byte, error) {
+	length := inlineImageLength(dict)
+
+	// the ID operator is followed by a single white-space byte
+	b, _ := s.Peek()
+	spaceAfterID := class[b] == space
+	if spaceAfterID {
+		s.ReadByte()
+	}
+
+	data := []byte{}
+	tooLarge := false
+	if length > maxInlineImageBytes {
+		for range length {
+			if _, err := s.ReadByte(); err != nil {
+				return nil, err
+			}
+		}
+		s.skipSpaceBytes()
+		if s.checkEI() {
+			s.SkipN(2)
+			return nil, parseError{}
+		}
+		// The Length entry is wrong: the data ends as for an image without
+		// a Length entry.
+		tooLarge = true
+	} else if length >= 0 {
+		// The buffer grows with the data actually read, so that a Length
+		// beyond the end of the stream cannot force a large allocation.
+		data = make([]byte, 0, min(length, 64<<10))
+		for range length {
+			b, err := s.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			data = append(data, b)
+		}
+
+		// the data is followed by optional white space and EI
+		var ws []byte
+		for {
+			b, err := s.Peek()
+			if err != nil || class[b] != space {
+				break
+			}
+			s.SkipByte()
+			if len(data)+len(ws) < maxInlineImageBytes {
+				ws = append(ws, b)
+			} else {
+				tooLarge = true
+			}
+		}
+		if s.checkEI() {
+			s.SkipN(2)
+			setInlineImageLength(dict, len(data))
+			return data, nil
+		}
+
+		if i := inlineImageEnd(data); i >= 0 {
+			if i+2 == len(data) && (len(ws) > 0 || s.atDelimiter()) {
+				// The Length entry is too large, but only the EI marker and
+				// the white space before it have been read.
+				data = data[:max(i-1, 0)]
+				setInlineImageLength(dict, len(data))
+				return data, nil
+			} else if i+2 < len(data) {
+				// The Length entry is too large: the data ended at an EI
+				// marker already read, and the bytes after the marker have
+				// been consumed too.
+				return nil, parseError{}
+			}
+			// An "EI" at the end of data, followed by a regular character,
+			// is not an EI marker.
+		}
+		if len(ws) == 0 && s.endsBeforeEI(data) {
+			// The Length entry is too large, but only the white space and
+			// "E" of the EI marker have been read.
+			data = data[:len(data)-2]
+			s.SkipByte()
+			setInlineImageLength(dict, len(data))
+			return data, nil
+		}
+		// The Length entry is too small: the data ends as for an image
+		// without a Length entry.
+		data = append(data, ws...)
+	}
+
+	// The data ends at a white-space byte followed by "EI" and a delimiter.
+	// The white space after ID counts, so that the data may be empty.
+	if !(len(data) == 0 && !tooLarge && spaceAfterID && s.checkEI()) {
+		for {
+			b, err := s.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			if class[b] == space && s.checkEI() {
+				break
+			}
+			if !tooLarge && len(data) < maxInlineImageBytes {
+				data = append(data, b)
+			} else {
+				tooLarge = true
+			}
+		}
+	}
+	s.SkipN(2)
+	if tooLarge {
+		return nil, parseError{}
+	}
+
+	setInlineImageLength(dict, len(data))
+	return data, nil
+}
+
+// skipSpaceBytes consumes white-space bytes.  Unlike
+// [scanner.SkipWhiteSpace], it leaves comments in place.
+func (s *scanner) skipSpaceBytes() {
+	for {
+		b, err := s.Peek()
+		if err != nil || class[b] != space {
+			return
+		}
+		s.SkipByte()
+	}
+}
+
+// setInlineImageLength sets the Length entry of an inline image dictionary,
+// if present, to n.
+func setInlineImageLength(dict pdf.Dict, n int) {
+	if key, ok := imagedict.InlineKey(dict, "Length"); ok {
+		dict[key] = pdf.Integer(n)
+	}
+}
+
+// endsBeforeEI reports whether data ends with a white-space byte followed by
+// "E", and the input continues with "I" and a delimiter, so that an EI marker
+// straddles the end of data.
+func (s *scanner) endsBeforeEI(data []byte) bool {
+	n := len(data)
+	if n < 2 || class[data[n-2]] != space || data[n-1] != 'E' {
+		return false
+	}
+	buf := s.PeekN(2)
+	return len(buf) > 0 && buf[0] == 'I' && (len(buf) == 1 || class[buf[1]] != regular)
 }
 
 // checkEI checks if we're at a valid EI terminator.
@@ -794,17 +874,41 @@ func (s *scanner) checkEI() bool {
 	return class[buf[2]] != regular
 }
 
+// ContainsInlineImageEnd reports whether data, used as the data of an inline
+// image without a Length entry, would be taken to end early.  This is the
+// case if data contains "EI" followed by a byte other than a regular
+// character, or by the end of data, where the "EI" is at the start of data
+// or follows a white-space byte.  At the start of data, the white space
+// after the ID operator precedes the "EI".
+func ContainsInlineImageEnd(data []byte) bool {
+	return inlineImageEnd(data) >= 0
+}
+
+// inlineImageEnd returns the index of the first "EI" in data which
+// [ContainsInlineImageEnd] would take as the end of the data, or -1 if there
+// is none.
+func inlineImageEnd(data []byte) int {
+	for i := 0; i+1 < len(data); i++ {
+		if (i == 0 || class[data[i-1]] == space) && data[i] == 'E' && data[i+1] == 'I' &&
+			(i+2 == len(data) || class[data[i+2]] != regular) {
+			return i
+		}
+	}
+	return -1
+}
+
+// atDelimiter reports whether the input continues with a byte other than a
+// regular character, or has ended.
+func (s *scanner) atDelimiter() bool {
+	b, err := s.Peek()
+	return err != nil || class[b] != regular
+}
+
 // LookingAt checks if the next n bytes match the given string
 func (s *scanner) LookingAt(str string) bool {
 	buf := s.PeekN(len(str))
 	return string(buf) == str
 }
-
-const (
-	maxInlineImageBytes  = 4096       // spec recommendation for inline image data
-	maxInlineImagePixels = 256 * 1024 // ~512×512 max
-	maxInlineImageDim    = 65536      // max width or height
-)
 
 // ReadComment reads a comment line and returns it as a byte slice.
 // A comment longer than maxNameBytes is rejected with parseError; the
@@ -1233,6 +1337,8 @@ var (
 	maxArrayLen = 1 << 20
 	// maxDictLen caps the number of entries in a dictionary.
 	maxDictLen = 64 << 10
+	// maxInlineImageBytes caps the byte length of inline image data.
+	maxInlineImageBytes = 16 * 1024 * 1024
 )
 
 type characterClass byte

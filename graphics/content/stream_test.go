@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -132,23 +134,34 @@ func TestInlineImageLimits(t *testing.T) {
 			wantParsed: true,
 		},
 		{
+			// the entries are checked by DecodeInlineImage
 			name:       "width too large",
 			stream:     "BI\n/W 100000\n/H 10\nID\ndata\nEI\n",
-			wantParsed: false,
+			wantParsed: true,
 		},
 		{
 			name:       "height too large",
 			stream:     "BI\n/W 10\n/H 100000\nID\ndata\nEI\n",
-			wantParsed: false,
+			wantParsed: true,
 		},
 		{
-			name:       "pixel count too large",
-			stream:     "BI\n/W 1000\n/H 1000\nID\ndata\nEI\n", // 1M pixels > 256K limit
-			wantParsed: false,
+			name:       "many pixels",
+			stream:     "BI\n/W 1000\n/H 1000\nID\ndata\nEI\n",
+			wantParsed: true,
 		},
 		{
-			name:       "pixel count at limit",
-			stream:     "BI\n/W 512\n/H 512\nID\ndata\nEI\n", // 262144 pixels < 256K limit
+			name:       "dimensions at limit",
+			stream:     "BI\n/W 65536\n/H 65536\nID\ndata\nEI\n",
+			wantParsed: true,
+		},
+		{
+			name:       "more than 4096 bytes",
+			stream:     "BI\n/W 10\n/H 10\nID\n" + strings.Repeat("x", 5000) + "\nEI\n",
+			wantParsed: true,
+		},
+		{
+			name:       "more than 4096 bytes with L key",
+			stream:     "BI\n/W 10\n/H 10\n/L 5000\nID\n" + strings.Repeat("x", 5000) + "\nEI\n",
 			wantParsed: true,
 		},
 		{
@@ -157,8 +170,13 @@ func TestInlineImageLimits(t *testing.T) {
 			wantParsed: true,
 		},
 		{
-			name:       "L key too large",
+			name:       "L key beyond end of stream",
 			stream:     "BI\n/W 10\n/H 10\n/L 10000\nID\ndata\nEI\n",
+			wantParsed: false,
+		},
+		{
+			name:       "huge L key",
+			stream:     "BI\n/W 10\n/H 10\n/L 9999999999\nID\ndata\nEI\n",
 			wantParsed: false,
 		},
 		{
@@ -307,12 +325,12 @@ func TestReadValue(t *testing.T) {
 				buf: make([]byte, 512),
 				src: bytes.NewReader([]byte(tt.input)),
 			}
-			got, err := s.readValue()
+			got, err := s.readValueDepth(0)
 			if err != nil {
-				t.Fatalf("readValue() error: %v", err)
+				t.Fatalf("readValueDepth error: %v", err)
 			}
 			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("readValue() mismatch (-want +got):\n%s", diff)
+				t.Errorf("readValueDepth mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -497,7 +515,7 @@ func TestContentReadValueArrayBomb(t *testing.T) {
 	withSizeBound(t, &maxArrayLen, 100)
 	body := "[" + strings.Repeat("1 ", maxArrayLen+1) + "]"
 	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(body)}
-	if _, err := s.readValue(); err == nil {
+	if _, err := s.readValueDepth(0); err == nil {
 		t.Fatal("expected error, got nil")
 	} else if !errors.Is(err, parseError{}) {
 		t.Errorf("expected parseError, got %T: %v", err, err)
@@ -513,7 +531,7 @@ func TestContentReadValueDictBomb(t *testing.T) {
 	}
 	b.WriteString(">>")
 	s := &scanner{buf: make([]byte, 512), src: strings.NewReader(b.String())}
-	if _, err := s.readValue(); err == nil {
+	if _, err := s.readValueDepth(0); err == nil {
 		t.Fatal("expected error, got nil")
 	} else if !errors.Is(err, parseError{}) {
 		t.Errorf("expected parseError, got %T: %v", err, err)
@@ -560,7 +578,7 @@ func TestReadValueDepthLimit(t *testing.T) {
 		buf: make([]byte, 512),
 		src: bytes.NewReader(buf.Bytes()),
 	}
-	_, err := s.readValue()
+	_, err := s.readValueDepth(0)
 	if err == nil {
 		t.Error("expected error for deeply nested value")
 	}
@@ -1000,6 +1018,271 @@ func TestInlineImageWhiteSpaceBeforeEI(t *testing.T) {
 	}
 }
 
+// TestInlineImageInvalidEntries checks that the data of an inline image with
+// invalid entries is read as image data, not parsed as operators.
+func TestInlineImageInvalidEntries(t *testing.T) {
+	for _, tc := range []struct {
+		entries string
+		valid   bool
+	}{
+		{"/H 1 /CS /G /BPC 8", false},
+		{"/W 0 /H 1 /CS /G /BPC 8", false},
+		{"/W 0.4 /H 1 /CS /G /BPC 8", false},
+		{"/W 100000 /H 1 /CS /G /BPC 8", false},
+		{"/W 1 /H 1 /CS /G /BPC 8 /L 0", true},
+	} {
+		entries := tc.entries
+		raw := "BI " + entries + " ID 0 0 9 9 re f\nEI\n2 w\n"
+		stream, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("%q: collectStream error: %v", entries, err)
+		}
+		if len(stream) != 2 || stream[0].Name != OpInlineImage || stream[1].Name != OpSetLineWidth {
+			t.Errorf("%q: got %v, want inline image followed by w", entries, stream)
+			continue
+		}
+		if diff := cmp.Diff(pdf.String("0 0 9 9 re f"), stream[0].Args[1]); diff != "" {
+			t.Errorf("%q: wrong image data (-want +got):\n%s", entries, diff)
+		}
+		if _, err := DecodeInlineImage(stream[0], nil); (err == nil) != tc.valid {
+			t.Errorf("%q: DecodeInlineImage error %v, want valid=%v", entries, err, tc.valid)
+		}
+	}
+}
+
+// TestInlineImageMalformedDict checks that an inline image with a malformed
+// dictionary is dropped, and that its data is not parsed as operators.
+func TestInlineImageMalformedDict(t *testing.T) {
+	for _, dict := range []string{
+		"/W 1 /H 1 5 /CS /G",  // key which is not a name
+		"/W ID",               // ID as a value
+		"/W 1 /DP << /K ID",   // ID inside a nested dictionary
+		"/W 1 /D [0 ID",       // ID inside an array
+		"/W 1 /DP << 5 6 >> ", // malformed nested dictionary
+	} {
+		raw := "BI " + dict + " ID 0 0 9 9 re f\nEI\n2 w\n"
+		got, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("%q: collectStream error: %v", dict, err)
+		}
+		want := []Operator{{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(2)}}}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%q: wrong operators (-want +got):\n%s", dict, diff)
+		}
+	}
+
+	// EI before ID ends an image without data, and scanning resumes after it
+	next := Operator{Name: OpInlineImage, Args: []pdf.Object{
+		pdf.Dict{"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"), "BPC": pdf.Integer(8)},
+		pdf.String("x"),
+	}}
+	for _, dict := range []string{
+		"/W 1 5",         // after a malformed entry
+		"/W 1 /H 1",      // as a key
+		"/W 1 /H",        // as a value
+		"/W 1 /D [0",     // inside an array
+		"/W 1 /DP << /K", // inside a nested dictionary
+	} {
+		raw := "BI " + dict + " EI\n2 w\nBI /W 1 /H 1 /CS /G /BPC 8 ID x\nEI\n3 w\n"
+		got, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("%q: collectStream error: %v", dict, err)
+		}
+		want := []Operator{
+			{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(2)}},
+			next,
+			{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(3)}},
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%q: wrong operators (-want +got):\n%s", dict, diff)
+		}
+	}
+}
+
+// TestInlineImageWrongLength checks inline images whose Length entry
+// disagrees with the data.
+func TestInlineImageWrongLength(t *testing.T) {
+	setW := Operator{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(3)}}
+
+	t.Run("too short", func(t *testing.T) {
+		raw := "BI /W 1 /H 1 /CS /G /BPC 8 /L 3 ID 0 0 9 9 re f\nEI\n3 w\n"
+		got, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("collectStream error: %v", err)
+		}
+		want := []Operator{
+			{Name: OpInlineImage, Args: []pdf.Object{
+				pdf.Dict{
+					"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+					"BPC": pdf.Integer(8), "L": pdf.Integer(12),
+				},
+				pdf.String("0 0 9 9 re f"),
+			}},
+			setW,
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("wrong operators (-want +got):\n%s", diff)
+		}
+		roundTripTest(t, pdf.V2_0, got)
+	})
+
+	// The data ends before the Length says, so the bytes up to the end of
+	// the Length are lost.  Scanning resumes after them.
+	t.Run("too long", func(t *testing.T) {
+		raw := "BI /W 1 /H 1 /CS /G /BPC 8 /L 9 ID abcd\nEI\n2 w\n3 w\n"
+		got, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("collectStream error: %v", err)
+		}
+		for _, op := range got {
+			if op.Name == OpInlineImage {
+				t.Errorf("unexpected inline image %v", op)
+			}
+		}
+		if len(got) == 0 || !cmp.Equal(got[len(got)-1], setW) {
+			t.Errorf("got %v, want 3 w at the end", got)
+		}
+	})
+
+	// The Length ends inside the EI marker, so nothing after the marker has
+	// been read and the image is kept.
+	t.Run("too long, EI straddles the end", func(t *testing.T) {
+		raw := "BI /W 1 /H 1 /CS /G /BPC 8 /L 6 ID abcd\nEI\n2 w\n3 w\n"
+		got, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("collectStream error: %v", err)
+		}
+		want := []Operator{
+			{Name: OpInlineImage, Args: []pdf.Object{
+				pdf.Dict{
+					"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+					"BPC": pdf.Integer(8), "L": pdf.Integer(4),
+				},
+				pdf.String("abcd"),
+			}},
+			{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(2)}},
+			setW,
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("wrong operators (-want +got):\n%s", diff)
+		}
+		roundTripTest(t, pdf.V2_0, got)
+	})
+
+	// The Length ends just after the EI marker, so nothing after the marker
+	// has been read and the image is kept.
+	gray := pdf.Dict{"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"), "BPC": pdf.Integer(8)}
+	for _, tc := range []struct {
+		name, raw string
+		want      []Operator
+	}{
+		{"too long by the EI marker",
+			"BI /W 1 /H 1 /CS /G /BPC 8 /L 7 ID abcd\nEI\n3 w\n",
+			[]Operator{{Name: OpInlineImage, Args: []pdf.Object{
+				withEntry(gray, "L", pdf.Integer(4)), pdf.String("abcd"),
+			}}, setW}},
+		{"too long by the EI marker, at the end of the stream",
+			"BI /W 1 /H 1 /CS /G /BPC 8 /L 7 ID abcd\nEI",
+			[]Operator{{Name: OpInlineImage, Args: []pdf.Object{
+				withEntry(gray, "L", pdf.Integer(4)), pdf.String("abcd"),
+			}}}},
+		{"too long by the EI marker, empty data",
+			"BI /W 1 /H 1 /CS /G /BPC 8 /L 2 ID EI\n3 w\n",
+			[]Operator{{Name: OpInlineImage, Args: []pdf.Object{
+				withEntry(gray, "L", pdf.Integer(0)), pdf.String(""),
+			}}, setW}},
+		{"EI at the end of data, not a marker",
+			"BI /W 1 /H 1 /CS /G /BPC 8 /L 7 ID abcd\nEIx\nEI\n3 w\n",
+			[]Operator{{Name: OpInlineImage, Args: []pdf.Object{
+				withEntry(gray, "L", pdf.Integer(8)), pdf.String("abcd\nEIx"),
+			}}, setW}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := collectStream(NewScanner(bytesOpener([]byte(tc.raw))))
+			if err != nil {
+				t.Fatalf("collectStream error: %v", err)
+			}
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Fatalf("wrong operators (-want +got):\n%s", diff)
+			}
+			roundTripTest(t, pdf.V2_0, got)
+		})
+	}
+}
+
+// withEntry returns a copy of dict with key set to val.
+func withEntry(dict pdf.Dict, key pdf.Name, val pdf.Object) pdf.Dict {
+	res := maps.Clone(dict)
+	res[key] = val
+	return res
+}
+
+// TestInlineImageRealLength checks that a Length entry given as a real
+// number is ignored, and replaced by the integer length of the data.
+func TestInlineImageRealLength(t *testing.T) {
+	for _, l := range []string{"4.0", "4.5"} {
+		raw := "BI /W 1 /H 1 /CS /G /BPC 8 /L " + l + " ID abcd\nEI\n3 w\n"
+		got, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+		if err != nil {
+			t.Fatalf("/L %s: collectStream error: %v", l, err)
+		}
+		want := []Operator{
+			{Name: OpInlineImage, Args: []pdf.Object{
+				pdf.Dict{
+					"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+					"BPC": pdf.Integer(8), "L": pdf.Integer(4),
+				},
+				pdf.String("abcd"),
+			}},
+			{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(3)}},
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("/L %s: wrong operators (-want +got):\n%s", l, diff)
+		}
+	}
+}
+
+// TestInlineImageDataLimit checks that inline image data longer than
+// maxInlineImageBytes is dropped, and that scanning resumes after it.
+func TestInlineImageDataLimit(t *testing.T) {
+	withSizeBound(t, &maxInlineImageBytes, 16)
+	atLimit := strings.Repeat("x", 16)
+	beyond := strings.Repeat("x", 17)
+
+	for _, tc := range []struct {
+		name, raw string
+		wantImage bool
+	}{
+		{"at limit", "BI /W 1 ID " + atLimit + "\nEI\n3 w\n", true},
+		{"beyond limit", "BI /W 1 ID " + beyond + "\nEI\n3 w\n", false},
+		{"Length at limit", "BI /W 1 /L 16 ID " + atLimit + "\nEI\n3 w\n", true},
+		{"Length beyond limit", "BI /W 1 /L 17 ID " + beyond + "\nEI\n3 w\n", false},
+		{"Length beyond limit and too small",
+			"BI /W 1 /L 17 ID " + beyond + "yy\nEI\n3 w\n", false},
+		{"Length too small, data beyond limit",
+			"BI /W 1 /L 4 ID " + beyond + "\nEI\n3 w\n", false},
+		{"white space after data", "BI /W 1 /L 4 ID abcd" +
+			strings.Repeat(" ", 40) + "EI\n3 w\n", true},
+		{"white space beyond limit", "BI /W 1 /L 4 ID abcd" +
+			strings.Repeat(" ", 40) + "x\nEI\n3 w\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := collectStream(NewScanner(bytesOpener([]byte(tc.raw))))
+			if err != nil {
+				t.Fatalf("collectStream error: %v", err)
+			}
+			setW := Operator{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(3)}}
+			if len(got) == 0 || !cmp.Equal(got[len(got)-1], setW) {
+				t.Fatalf("got %v, want 3 w at the end", got)
+			}
+			hasImage := len(got) == 2 && got[0].Name == OpInlineImage
+			if hasImage != tc.wantImage || len(got) > 2 {
+				t.Errorf("got %v, want image %t", got, tc.wantImage)
+			}
+		})
+	}
+}
+
 // TestReadNameNullEscape checks that "#00" is kept literally, since a name
 // cannot contain a null byte.
 func TestReadNameNullEscape(t *testing.T) {
@@ -1027,5 +1310,144 @@ func TestReadNameBraces(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("read failed (-want +got):\n%s", diff)
+	}
+}
+
+func TestInlineImageLengthEntry(t *testing.T) {
+	for _, tc := range []struct {
+		dict pdf.Dict
+		want int
+	}{
+		{pdf.Dict{"L": pdf.Integer(7)}, 7},
+		{pdf.Dict{"Length": pdf.Integer(7)}, 7},
+		{pdf.Dict{"L": pdf.Integer(7), "Length": pdf.Integer(9)}, 7},
+		{pdf.Dict{"L": pdf.Integer(0)}, 0},
+		{pdf.Dict{"L": pdf.Integer(-3)}, -1},
+		{pdf.Dict{"L": pdf.Integer(1) << 40}, math.MaxInt32},
+		{pdf.Dict{"L": pdf.Real(7)}, -1},
+		{pdf.Dict{"L": pdf.Name("7")}, -1},
+		{pdf.Dict{}, -1},
+		{nil, -1},
+	} {
+		if got := inlineImageLength(tc.dict); got != tc.want {
+			t.Errorf("%v: got %d, want %d", tc.dict, got, tc.want)
+		}
+	}
+}
+
+// TestInlineImageEmptyData checks that an inline image without data ends at
+// the EI marker directly after ID, so that the operators after it are kept.
+func TestInlineImageEmptyData(t *testing.T) {
+	setW := Operator{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(3)}}
+	for _, tc := range []struct {
+		name, header string
+		want         pdf.Dict
+	}{
+		{"no Length", "/W 1 /H 1 /CS /G /BPC 8", pdf.Dict{
+			"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+			"BPC": pdf.Integer(8),
+		}},
+		{"zero Length", "/W 1 /H 1 /CS /G /BPC 8 /L 0", pdf.Dict{
+			"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+			"BPC": pdf.Integer(8), "L": pdf.Integer(0),
+		}},
+		{"ASCII filter", "/W 1 /H 1 /CS /G /BPC 8 /F /AHx", pdf.Dict{
+			"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+			"BPC": pdf.Integer(8), "F": pdf.Name("AHx"),
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := "BI " + tc.header + " ID EI 3 w\n"
+			got, err := collectStream(NewScanner(bytesOpener([]byte(raw))))
+			if err != nil {
+				t.Fatalf("collectStream error: %v", err)
+			}
+			want := []Operator{
+				{Name: OpInlineImage, Args: []pdf.Object{tc.want, pdf.String("")}},
+				setW,
+			}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("wrong operators (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestContainsInlineImageEnd(t *testing.T) {
+	for _, tc := range []struct {
+		data string
+		want bool
+	}{
+		{"", false},
+		{"E", false},
+		{"EI", true},
+		{"EI ", true},
+		{"EIb", false},
+		{"a EI", true},
+		{"a EI b", true},
+		{"a\nEI/", true},
+		{"a EIb", false},
+		{"aEI b", false},
+		{"a E I", false},
+	} {
+		if got := ContainsInlineImageEnd([]byte(tc.data)); got != tc.want {
+			t.Errorf("%q: got %t, want %t", tc.data, got, tc.want)
+		}
+	}
+}
+
+// TestInlineImageLeadingWhiteSpace checks that white space at the start of
+// inline image data is kept as data, so that a Length entry which counts it
+// ends the data at the EI marker.
+func TestInlineImageLeadingWhiteSpace(t *testing.T) {
+	setW := Operator{Name: OpSetLineWidth, Args: []pdf.Object{pdf.Integer(3)}}
+	for _, tc := range []struct {
+		name, raw string
+		want      pdf.Dict
+		data      string
+	}{
+		{"exact Length",
+			"BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx /L 5 ID \n\n41>\nEI 3 w\n",
+			pdf.Dict{
+				"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+				"BPC": pdf.Integer(8), "F": pdf.Name("AHx"), "L": pdf.Integer(5),
+			},
+			"\n\n41>"},
+		{"Length without the white space",
+			"BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx /L 3 ID\r\n41>\nEI 3 w\n",
+			pdf.Dict{
+				"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+				"BPC": pdf.Integer(8), "F": pdf.Name("AHx"), "L": pdf.Integer(4),
+			},
+			"\n41>"},
+		{"no Length",
+			"BI /W 1 /H 1 /CS /G /BPC 8 /F /AHx ID \n\n41>\nEI 3 w\n",
+			pdf.Dict{
+				"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+				"BPC": pdf.Integer(8), "F": pdf.Name("AHx"),
+			},
+			"\n\n41>"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := collectStream(NewScanner(bytesOpener([]byte(tc.raw))))
+			if err != nil {
+				t.Fatalf("collectStream error: %v", err)
+			}
+			want := []Operator{
+				{Name: OpInlineImage, Args: []pdf.Object{tc.want, pdf.String(tc.data)}},
+				setW,
+			}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Fatalf("wrong operators (-want +got):\n%s", diff)
+			}
+			decoded, err := DecodeInlineImage(got[0], nil)
+			if err != nil {
+				t.Fatalf("DecodeInlineImage error: %v", err)
+			}
+			if diff := cmp.Diff([]byte{0x41}, decoded); diff != "" {
+				t.Errorf("wrong decoded data (-want +got):\n%s", diff)
+			}
+			roundTripTest(t, pdf.V2_0, got)
+		})
 	}
 }

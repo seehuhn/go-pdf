@@ -14,6 +14,7 @@ import (
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
+	"seehuhn.de/go/pdf/internal/imagedict"
 	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/measure"
 
@@ -28,7 +29,8 @@ import (
 // painting an image.
 //
 // To extract an image mask from a PDF file, use
-// [seehuhn.de/go/pdf/graphics/extract.ImageMask].
+// [seehuhn.de/go/pdf/graphics/extract.ImageMask].  An inline image mask is
+// read with [ExtractInline].
 type Mask struct {
 	// Width is the width of the image mask in pixels.
 	Width int
@@ -181,35 +183,13 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 		return nil, pdf.Error("ImageMask flag not set for image mask")
 	}
 
-	// Extract required fields
-	width, err := c.Integer(dict["Width"])
+	width, height, err := imagedict.ReadDimensions(c, dict)
 	if err != nil {
-		return nil, fmt.Errorf("missing or invalid Width: %w", err)
+		return nil, err
 	}
-	if width <= 0 {
-		return nil, pdf.Errorf("invalid image mask width %d", width)
-	}
-	if width > limits.MaxImageWidth {
-		return nil, pdf.Errorf("image mask width %d exceeds limit", width)
-	}
-
-	height, err := c.Integer(dict["Height"])
-	if err != nil {
-		return nil, fmt.Errorf("missing or invalid Height: %w", err)
-	}
-	if height <= 0 {
-		return nil, pdf.Errorf("invalid image mask height %d", height)
-	}
-	if height > limits.MaxImageHeight {
-		return nil, pdf.Errorf("image mask height %d exceeds limit", height)
-	}
-	if limits.ImagePixelsExceedLimit(int(width), int(height)) {
-		return nil, pdf.Error("image mask pixel count exceeds limit")
-	}
-
 	mask := &Mask{
-		Width:  int(width),
-		Height: int(height),
+		Width:  width,
+		Height: height,
 	}
 
 	filters, err := c.Filters(dict)
@@ -218,37 +198,9 @@ func ExtractMask(c pdf.Cursor, obj pdf.Object, _ bool) (*Mask, error) {
 	}
 	jpxIndex := jpxFilterIndex(filters)
 
-	// BitsPerComponent is optional for image masks, but if present must
-	// be 1.  For JPXDecode masks the entry is ignored.
-	if bpc, err := pdf.Optional(c.Integer(dict["BitsPerComponent"])); err != nil {
-		return nil, err
-	} else if jpxIndex < 0 && bpc > 0 && bpc != 1 {
-		return nil, pdf.Errorf("invalid BitsPerComponent %d for image mask (must be 1)", bpc)
-	}
-
-	// Decode must be [0 1] or [1 0] for image masks
-	if decodeArray, err := pdf.Optional(c.Array(dict["Decode"])); err != nil {
-		return nil, err
-	} else if len(decodeArray) == 2 {
-		// a Decode array with a malformed element is dropped
-		d0, err := c.Number(decodeArray[0])
-		if pdf.IsReadError(err) {
-			return nil, err
-		}
-		d1, err2 := c.Number(decodeArray[1])
-		if pdf.IsReadError(err2) {
-			return nil, err2
-		}
-		if err == nil && err2 == nil && d0 == 1 && d1 == 0 {
-			mask.Inverted = true
-		}
-	}
-
-	interp, _, err := c.OptionalBoolean(dict["Interpolate"])
-	if err != nil {
+	if err := mask.readMaskEntries(c, dict); err != nil {
 		return nil, err
 	}
-	mask.Interpolate = interp
 
 	// drop the whole Alternates list if it exceeds MaxAlternates rather
 	// than silently truncate

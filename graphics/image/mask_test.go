@@ -113,6 +113,19 @@ func TestExtractMaskForbiddenEntries(t *testing.T) {
 	}
 }
 
+// TestExtractMaskInvalidBPC checks that a BitsPerComponent entry other than
+// 1 is ignored, so that the mask reads as though the entry were absent.
+func TestExtractMaskInvalidBPC(t *testing.T) {
+	opt := cmpopts.IgnoreFields(Mask{}, "Source")
+	want := extractMaskWith(t, nil)
+	for _, bad := range []pdf.Object{pdf.Integer(0), pdf.Integer(8), pdf.Name("x")} {
+		got := extractMaskWith(t, pdf.Dict{"BitsPerComponent": bad})
+		if diff := cmp.Diff(want, got, opt); diff != "" {
+			t.Errorf("BitsPerComponent %v: entry not ignored (-want +got):\n%s", bad, diff)
+		}
+	}
+}
+
 // TestExtractMaskMalformedDecode checks that a Decode array with a
 // malformed element does not invert the mask.
 func TestExtractMaskMalformedDecode(t *testing.T) {

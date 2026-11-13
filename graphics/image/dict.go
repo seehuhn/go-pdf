@@ -17,6 +17,7 @@ import (
 	"seehuhn.de/go/pdf/file"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/imagedict"
 	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/measure"
 
@@ -30,7 +31,8 @@ import (
 // Dict represents a PDF image XObject dictionary.
 //
 // To extract an image from a PDF file, use
-// [seehuhn.de/go/pdf/graphics/extract.Image].
+// [seehuhn.de/go/pdf/graphics/extract.Image].  An inline image is read with
+// [ExtractInline].
 type Dict struct {
 	// Width is the width of the image in pixels.
 	Width int
@@ -197,35 +199,13 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 	jpxIndex := jpxFilterIndex(filters)
 	hasJPX := jpxIndex >= 0
 
-	// Extract required fields
-	width, err := c.Integer(dict["Width"])
+	width, height, err := imagedict.ReadDimensions(c, dict)
 	if err != nil {
-		return nil, fmt.Errorf("missing or invalid Width: %w", err)
+		return nil, err
 	}
-	if width <= 0 {
-		return nil, pdf.Errorf("invalid image width %d", width)
-	}
-	if width > limits.MaxImageWidth {
-		return nil, pdf.Errorf("image width %d exceeds limit", width)
-	}
-
-	height, err := c.Integer(dict["Height"])
-	if err != nil {
-		return nil, fmt.Errorf("missing or invalid Height: %w", err)
-	}
-	if height <= 0 {
-		return nil, pdf.Errorf("invalid image height %d", height)
-	}
-	if height > limits.MaxImageHeight {
-		return nil, pdf.Errorf("image height %d exceeds limit", height)
-	}
-	if limits.ImagePixelsExceedLimit(int(width), int(height)) {
-		return nil, pdf.Error("image pixel count exceeds limit")
-	}
-
 	img := &Dict{
-		Width:  int(width),
-		Height: int(height),
+		Width:  width,
+		Height: height,
 	}
 
 	// Extract ColorSpace (required for images, Pattern not allowed)
@@ -244,53 +224,8 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 		return nil, pdf.Error("missing ColorSpace for non-JPXDecode image")
 	}
 
-	// Extract BitsPerComponent.  For JPXDecode images the entry is
-	// optional and shall be ignored if present (spec §8.9.5); drop any
-	// value to keep round-trip parity with check() which requires
-	// img.BitsPerComponent == 0 for JPX.  Where the filter fixes the
-	// sample size, that size wins over the entry.
-	if hasJPX {
-		img.BitsPerComponent = 0
-	} else if bits, ok := graphics.FilterSampleBits(filters); ok {
-		img.BitsPerComponent = bits
-	} else if bpc, err := pdf.Optional(c.Integer(dict["BitsPerComponent"])); err != nil {
+	if err := img.readSampleEntries(c, dict, filters, hasJPX); err != nil {
 		return nil, err
-	} else if bpc != 0 {
-		switch bpc {
-		case 1, 2, 4, 8, 16:
-			img.BitsPerComponent = int(bpc)
-		default:
-			return nil, pdf.Errorf("invalid BitsPerComponent %d", bpc)
-		}
-	} else {
-		return nil, pdf.Error("missing BitsPerComponent")
-	}
-
-	// Refine the pixel-count cap above with a byte-count check when
-	// ColorSpace and BitsPerComponent are known, since up-front-allocating
-	// filters bypass the downstream LimitReader.  JPXDecode images do not
-	// reach this branch (ColorSpace is optional and may be nil) and are
-	// covered by the pixel-count cap alone; their decoder is responsible
-	// for honouring channel and bit-depth bounds from the JP2 codestream.
-	if img.ColorSpace != nil && img.BitsPerComponent > 0 {
-		channels := img.ColorSpace.Channels()
-		if limits.ImageBytesExceedLimit(img.Width, img.Height,
-			channels, img.BitsPerComponent) {
-			return nil, pdf.Error("image data exceeds size limit")
-		}
-		// the encoded-bytes cap admits up to 32× expansion into the
-		// per-channel float32 buffer at bpc=1; cap the decoded form
-		// separately to bound decoder memory use
-		if limits.ImageDecodedExceedsLimit(img.Width, img.Height, channels) {
-			return nil, pdf.Error("image decoded data exceeds size limit")
-		}
-	}
-
-	// Extract optional fields
-	if intent, err := pdf.Optional(c.Name(dict["Intent"])); err != nil {
-		return nil, err
-	} else if intent != "" {
-		img.Intent = graphics.RenderingIntent(intent)
 	}
 
 	// Mask can either be an image mask or a color key mask array.
@@ -347,47 +282,6 @@ func ExtractDict(c pdf.Cursor, obj pdf.Object, _ bool) (*Dict, error) {
 			img.MaskColors = maskColors
 		}
 	}
-
-	// Extract Decode array, substituting the default if not present.
-	// For JPXDecode images without an explicit ColorSpace, the spec
-	// (§7.4.9, §8.9.5) says the Decode array shall be ignored unless
-	// ImageMask is true.  Skip extraction entirely in that case and
-	// leave img.Decode nil.  For JPXDecode images the default depends on
-	// the bit depth of the JPEG 2000 data, so an absent array stays nil.
-	if img.ColorSpace != nil {
-		// honor a Decode array with at least 2*ncomp entries, ignoring any
-		// surplus; a shorter array falls back to the default
-		n := 2 * img.ColorSpace.Channels()
-		if decodeArray, err := pdf.Optional(c.Array(dict["Decode"])); err != nil {
-			return nil, err
-		} else if len(decodeArray) >= n {
-			decode := make([]float64, n)
-			valid := true
-			for i := range decode {
-				num, err := c.Number(decodeArray[i])
-				if pdf.IsMalformed(err) {
-					valid = false
-					break
-				} else if err != nil {
-					return nil, err
-				}
-				decode[i] = num
-			}
-			if valid {
-				img.Decode = decode
-			}
-		}
-		if img.Decode == nil && !hasJPX {
-			img.Decode = DefaultDecode(img.ColorSpace, img.BitsPerComponent)
-		}
-	}
-
-	// Extract Interpolate
-	interp, _, err := c.OptionalBoolean(dict["Interpolate"])
-	if err != nil {
-		return nil, err
-	}
-	img.Interpolate = interp
 
 	// extract alternates (Table 89); drop the whole list if it exceeds
 	// MaxAlternates rather than silently truncate
@@ -878,7 +772,7 @@ func (d *Dict) check(out *pdf.Writer) error {
 	}
 	if d.Decode != nil {
 		if d.ColorSpace == nil {
-			return errors.New("Decode array not permitted when ColorSpace is absent")
+			return errors.New("a Decode array is not permitted when ColorSpace is absent")
 		}
 		if len(d.Decode) != 2*numChannels {
 			return fmt.Errorf("wrong Decode length: expected %d, got %d",

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("BI/W 1/H 1/IM true/0[000]ID0 EI")

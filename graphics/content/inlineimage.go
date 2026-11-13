@@ -13,6 +13,7 @@ import (
 	"seehuhn.de/go/membudget"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/internal/imagedict"
 	"seehuhn.de/go/pdf/internal/limits"
 )
 
@@ -29,11 +30,7 @@ var inlineFilterForbidden = map[pdf.Name]bool{
 // images: JBIG2Decode, JPXDecode, or Crypt.  Other entries of the dict are
 // not inspected.
 func ValidateInlineImageFilter(dict pdf.Dict) error {
-	filter, ok := dict["F"]
-	if !ok {
-		filter = dict["Filter"]
-	}
-	switch f := filter.(type) {
+	switch f := imagedict.InlineValue(dict, "Filter").(type) {
 	case pdf.Name:
 		if inlineFilterForbidden[f] {
 			return fmt.Errorf("filter %s not permitted in inline image", f)
@@ -54,6 +51,12 @@ func ValidateInlineImageFilter(dict pdf.Dict) error {
 // a [pdf.Dict] containing image parameters and a [pdf.String] holding the
 // raw image data.  res is the parsed resource dictionary of the surrounding
 // content stream; it is used to resolve named colour spaces.
+//
+// Before any data is decoded, the entries the image data depends on are
+// checked with the same rules as for image XObjects: Width and Height, and
+// for an image which is not an image mask, ColorSpace and BitsPerComponent.
+// An image whose filter fixes the sample size needs no BitsPerComponent
+// entry.
 func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 	if op.Name != OpInlineImage {
 		return nil, fmt.Errorf("expected %s operator, got %s", OpInlineImage, op.Name)
@@ -71,74 +74,32 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 		return nil, fmt.Errorf("inline image: expected String, got %T", op.Args[1])
 	}
 
-	if err := checkInlineImageDimensions(dict, res); err != nil {
-		return nil, err
-	}
 	if err := ValidateInlineImageFilter(dict); err != nil {
 		return nil, &pdf.MalformedFileError{Err: err}
 	}
-	sizeLimit := inlineImageSizeLimit(dict, res)
+	// the values of an inline image are direct objects
+	c := pdf.NewCursor(nil)
+	full := imagedict.ExpandInline(dict)
+	filters, err := c.Filters(full)
+	if err != nil {
+		return nil, err
+	}
+	sizeLimit, err := inlineImageSizeLimit(c, full, filters, res)
+	if err != nil {
+		return nil, err
+	}
 
 	data := []byte(rawData)
-
-	// extract filter name(s)
-	filterObj := dict["F"]
-	if filterObj == nil {
-		filterObj = dict["Filter"]
-	}
-	if filterObj == nil {
+	if len(filters) == 0 {
 		return data, nil
-	}
-
-	// extract decode parameters
-	parmsObj := dict["DP"]
-	if parmsObj == nil {
-		parmsObj = dict["DecodeParms"]
-	}
-
-	type filterSpec struct {
-		name  pdf.Name
-		parms pdf.Dict
-	}
-
-	var filters []filterSpec
-	switch f := filterObj.(type) {
-	case pdf.Name:
-		var pDict pdf.Dict
-		if d, ok := parmsObj.(pdf.Dict); ok {
-			pDict = d
-		}
-		filters = append(filters, filterSpec{f, pDict})
-	case pdf.Array:
-		parmsArr, _ := parmsObj.(pdf.Array)
-		for i, elem := range f {
-			name, ok := elem.(pdf.Name)
-			if !ok {
-				return nil, fmt.Errorf("inline image: filter element %d: expected Name, got %T", i, elem)
-			}
-			var pDict pdf.Dict
-			if i < len(parmsArr) {
-				if d, ok := parmsArr[i].(pdf.Dict); ok {
-					pDict = d
-				}
-			}
-			filters = append(filters, filterSpec{name, pDict})
-		}
-	default:
-		return nil, fmt.Errorf("inline image: unexpected filter type %T", filterObj)
 	}
 
 	// per-decode working-memory budget, sized to the raw inline data
 	budget := membudget.New(limits.StreamBudget(int64(len(data))))
 
-	// chain filters
 	var r io.Reader = bytes.NewReader(data)
 	var closers []io.Closer
-	for _, fs := range filters {
-		f, err := pdf.MakeFilter(fs.name, fs.parms)
-		if err != nil {
-			return nil, err
-		}
+	for _, f := range filters {
 		rc, err := f.Decode(pdf.V2_0, r, budget)
 		if err != nil {
 			return nil, err
@@ -162,6 +123,36 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 	return result, nil
 }
 
+// inlineImageSizeLimit checks the entries of an inline image which its image
+// data depends on, and returns the number of bytes the decoded data may have.
+// full holds the entries of the image under their full names.
+func inlineImageSizeLimit(c pdf.Cursor, full pdf.Dict, filters []pdf.Filter, res *Resources) (int64, error) {
+	width, height, err := imagedict.ReadDimensions(c, full)
+	if err != nil {
+		return 0, err
+	}
+	if IsInlineImageMask(full) {
+		return limits.ImageDataLimit(width, height, 1, 1), nil
+	}
+
+	cs := InlineImageColorSpace(full, res)
+	if cs == nil {
+		return 0, pdf.Error("missing or invalid inline image ColorSpace")
+	}
+	if cs.Family() == color.FamilyPattern {
+		return 0, pdf.Error("Pattern colour space not permitted for images")
+	}
+	bpc, err := imagedict.ReadBitsPerComponent(c, full, filters)
+	if err != nil {
+		return 0, err
+	}
+	channels := cs.Channels()
+	if err := imagedict.CheckDataSize(width, height, channels, bpc); err != nil {
+		return 0, err
+	}
+	return limits.ImageDataLimit(width, height, channels, bpc), nil
+}
+
 // InlineImageColorSpace resolves the ColorSpace of an inline image dict.
 // It handles the three forms allowed by PDF 2.0 §8.9.7: device colour space
 // names (with abbreviations), the limited Indexed array form whose base is
@@ -169,13 +160,7 @@ func DecodeInlineImage(op Operator, res *Resources) ([]byte, error) {
 // It returns nil when CS is missing, malformed, or refers to a name that
 // is not present in res.
 func InlineImageColorSpace(dict pdf.Dict, res *Resources) color.Space {
-	var val pdf.Object
-	if v, ok := dict["CS"]; ok {
-		val = v
-	} else if v, ok := dict["ColorSpace"]; ok {
-		val = v
-	}
-	switch v := val.(type) {
+	switch v := imagedict.InlineValue(dict, "ColorSpace").(type) {
 	case nil:
 		return nil
 	case pdf.Name:
@@ -192,110 +177,9 @@ func InlineImageColorSpace(dict pdf.Dict, res *Resources) color.Space {
 	return nil
 }
 
-// checkInlineImageDimensions rejects inline images whose W/H values exceed
-// [limits.MaxImageWidth] or [limits.MaxImageHeight], whose
-// pixel count exceeds [limits.MaxImagePixels], whose declared pixel
-// data exceeds [limits.MaxImageBytes], or whose decoded per-channel
-// float32 buffer exceeds [limits.MaxImageDecodedBytes].  These
-// checks match the caps enforced for image XObjects.
-func checkInlineImageDimensions(dict pdf.Dict, res *Resources) error {
-	width := getInlineImageInt(dict, "W", "Width")
-	height := getInlineImageInt(dict, "H", "Height")
-	if width > limits.MaxImageWidth {
-		return &pdf.MalformedFileError{Err: fmt.Errorf("inline image width %d exceeds limit", width)}
-	}
-	if height > limits.MaxImageHeight {
-		return &pdf.MalformedFileError{Err: fmt.Errorf("inline image height %d exceeds limit", height)}
-	}
-	if limits.ImagePixelsExceedLimit(width, height) {
-		return &pdf.MalformedFileError{Err: errors.New("inline image pixel count exceeds limit")}
-	}
-
-	// byte-count refinement when ColorSpace and BPC are known
-	channels, bpc := 0, 0
-	if IsInlineImageMask(dict) {
-		channels, bpc = 1, 1
-	} else {
-		var present bool
-		bpc, present = getInlineImageIntOK(dict, "BPC", "BitsPerComponent")
-		if present {
-			// validate an explicitly-present bit depth against the same
-			// whitelist as image XObjects
-			if err := checkInlineBPC(bpc); err != nil {
-				return err
-			}
-		} else {
-			// match the renderer's default so the byte-count cap below is
-			// computed against the depth that will actually be decoded
-			bpc = 8
-		}
-		if cs := InlineImageColorSpace(dict, res); cs != nil {
-			channels = cs.Channels()
-		}
-	}
-	if limits.ImageBytesExceedLimit(width, height, channels, bpc) {
-		return &pdf.MalformedFileError{Err: errors.New("inline image data exceeds size limit")}
-	}
-	// the encoded-bytes cap admits up to 32× expansion into the per-channel
-	// float32 buffer at bpc=1; cap the decoded form separately
-	if limits.ImageDecodedExceedsLimit(width, height, channels) {
-		return &pdf.MalformedFileError{Err: errors.New("inline image decoded data exceeds size limit")}
-	}
-	return nil
-}
-
-// checkInlineBPC reports whether bpc is a bit depth allowed for image samples,
-// matching the whitelist enforced for image XObjects.
-func checkInlineBPC(bpc int) error {
-	switch bpc {
-	case 1, 2, 4, 8, 16:
-		return nil
-	}
-	return &pdf.MalformedFileError{Err: fmt.Errorf("invalid inline image BitsPerComponent %d", bpc)}
-}
-
-// inlineImageSizeLimit computes the per-image decoded-size cap for an inline
-// image dict.  Keys may use abbreviated (W/H/BPC/CS/IM) or full
-// (Width/Height/BitsPerComponent/ColorSpace/ImageMask) names per Table 91.
-func inlineImageSizeLimit(dict pdf.Dict, res *Resources) int64 {
-	width := getInlineImageInt(dict, "W", "Width")
-	height := getInlineImageInt(dict, "H", "Height")
-	if width <= 0 || height <= 0 {
-		return limits.MaxImageBytes
-	}
-
-	// image masks are always 1 bpc, 1 channel
-	if IsInlineImageMask(dict) {
-		return limits.ImageDataLimit(width, height, 1, 1)
-	}
-
-	bpc, present := getInlineImageIntOK(dict, "BPC", "BitsPerComponent")
-	if !present {
-		bpc = 8 // default when BPC is absent, matching the renderer
-	}
-	if bpc <= 0 {
-		return limits.MaxImageBytes
-	}
-	cs := InlineImageColorSpace(dict, res)
-	if cs == nil {
-		return limits.MaxImageBytes
-	}
-	channels := cs.Channels()
-	if channels <= 0 {
-		return limits.MaxImageBytes
-	}
-	return limits.ImageDataLimit(width, height, channels, bpc)
-}
-
 // IsInlineImageMask reports whether the parameter dictionary of an inline
 // image describes an image mask.
 func IsInlineImageMask(dict pdf.Dict) bool {
-	var val pdf.Object
-	if v, ok := dict["IM"]; ok {
-		val = v
-	} else if v, ok := dict["ImageMask"]; ok {
-		val = v
-	}
-	b, ok := val.(pdf.Boolean)
+	b, ok := imagedict.InlineValue(dict, "ImageMask").(pdf.Boolean)
 	return ok && bool(b)
 }

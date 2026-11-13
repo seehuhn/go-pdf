@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"fmt"
+	"maps"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -17,7 +18,7 @@ func TestDecodeInlineImageNoFilter(t *testing.T) {
 	raw := []byte("hello world")
 	op := Operator{
 		Name: OpInlineImage,
-		Args: []pdf.Object{pdf.Dict{}, pdf.String(raw)},
+		Args: []pdf.Object{grayHeader(pdf.Dict{}, len(raw)), pdf.String(raw)},
 	}
 	got, err := DecodeInlineImage(op, nil)
 	if err != nil {
@@ -35,7 +36,7 @@ func TestDecodeInlineImageFlateDecode(t *testing.T) {
 	op := Operator{
 		Name: OpInlineImage,
 		Args: []pdf.Object{
-			pdf.Dict{"Filter": pdf.Name("FlateDecode")},
+			grayHeader(pdf.Dict{"Filter": pdf.Name("FlateDecode")}, len(original)),
 			pdf.String(compressed),
 		},
 	}
@@ -55,7 +56,7 @@ func TestDecodeInlineImageAbbreviatedFilter(t *testing.T) {
 	op := Operator{
 		Name: OpInlineImage,
 		Args: []pdf.Object{
-			pdf.Dict{"F": pdf.Name("Fl")},
+			grayHeader(pdf.Dict{"F": pdf.Name("Fl")}, len(original)),
 			pdf.String(compressed),
 		},
 	}
@@ -72,7 +73,7 @@ func TestDecodeInlineImageUnknownFilter(t *testing.T) {
 	op := Operator{
 		Name: OpInlineImage,
 		Args: []pdf.Object{
-			pdf.Dict{"Filter": pdf.Name("NoSuchFilter")},
+			grayHeader(pdf.Dict{"Filter": pdf.Name("NoSuchFilter")}, 4),
 			pdf.String("data"),
 		},
 	}
@@ -89,9 +90,7 @@ func TestDecodeInlineImageFilterArray(t *testing.T) {
 	op := Operator{
 		Name: OpInlineImage,
 		Args: []pdf.Object{
-			pdf.Dict{
-				"Filter": pdf.Array{pdf.Name("Fl")},
-			},
+			grayHeader(pdf.Dict{"Filter": pdf.Array{pdf.Name("Fl")}}, len(original)),
 			pdf.String(compressed),
 		},
 	}
@@ -181,12 +180,10 @@ func TestDecodeInlineImageRejectsInvalidBPC(t *testing.T) {
 }
 
 func TestDecodeInlineImageAcceptsValidBPC(t *testing.T) {
-	// valid bit depths, and a missing BPC (defaulted downstream), must decode
 	for _, dict := range []pdf.Dict{
 		{"W": pdf.Integer(1), "H": pdf.Integer(1), "BPC": pdf.Integer(1), "CS": pdf.Name("G")},
 		{"W": pdf.Integer(1), "H": pdf.Integer(1), "BPC": pdf.Integer(8), "CS": pdf.Name("RGB")},
 		{"W": pdf.Integer(1), "H": pdf.Integer(1), "BPC": pdf.Integer(16), "CS": pdf.Name("RGB")},
-		{"W": pdf.Integer(1), "H": pdf.Integer(1), "CS": pdf.Name("RGB")}, // missing BPC
 	} {
 		op := Operator{
 			Name: OpInlineImage,
@@ -200,18 +197,117 @@ func TestDecodeInlineImageAcceptsValidBPC(t *testing.T) {
 
 func TestDecodeInlineImageMaskIgnoresBPC(t *testing.T) {
 	// image masks are implicitly 1 bpc and must decode regardless of BPC
-	dict := pdf.Dict{
-		"W":  pdf.Integer(1),
-		"H":  pdf.Integer(1),
-		"IM": pdf.Boolean(true),
+	for _, bpc := range []pdf.Object{nil, pdf.Integer(1), pdf.Integer(8), pdf.Name("x")} {
+		dict := pdf.Dict{
+			"W":  pdf.Integer(1),
+			"H":  pdf.Integer(1),
+			"IM": pdf.Boolean(true),
+		}
+		if bpc != nil {
+			dict["BPC"] = bpc
+		}
+		op := Operator{
+			Name: OpInlineImage,
+			Args: []pdf.Object{dict, pdf.String([]byte{0})},
+		}
+		if _, err := DecodeInlineImage(op, nil); err != nil {
+			t.Errorf("BPC %v: %v", bpc, err)
+		}
 	}
-	op := Operator{
-		Name: OpInlineImage,
-		Args: []pdf.Object{dict, pdf.String([]byte{0})},
+}
+
+// TestDecodeInlineImageRejectsMissingEntries checks that an inline image
+// lacking an entry its image data depends on is rejected.  Each dictionary
+// differs from a valid one in a single entry.
+func TestDecodeInlineImageRejectsMissingEntries(t *testing.T) {
+	res := &Resources{
+		ColorSpace: map[pdf.Name]color.Space{"P": color.SpacePatternColored},
 	}
-	if _, err := DecodeInlineImage(op, nil); err != nil {
+	valid := pdf.Dict{
+		"W": pdf.Integer(2), "H": pdf.Integer(2), "BPC": pdf.Integer(8),
+		"CS": pdf.Name("G"), "F": pdf.Name("Fl"),
+	}
+	data := deflate(t, make([]byte, 4))
+	op := Operator{Name: OpInlineImage, Args: []pdf.Object{valid, pdf.String(data)}}
+	if _, err := DecodeInlineImage(op, res); err != nil {
+		t.Fatalf("valid image: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		key  pdf.Name
+		val  pdf.Object // nil deletes the entry
+	}{
+		{"missing W", "W", nil},
+		{"zero W", "W", pdf.Integer(0)},
+		{"missing H", "H", nil},
+		{"missing BPC", "BPC", nil},
+		{"non-integer BPC", "BPC", pdf.Name("8")},
+		{"missing CS", "CS", nil},
+		{"unknown CS resource", "CS", pdf.Name("Missing")},
+		{"Pattern CS", "CS", pdf.Name("P")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dict := maps.Clone(valid)
+			if tc.val == nil {
+				delete(dict, tc.key)
+			} else {
+				dict[tc.key] = tc.val
+			}
+			op := Operator{Name: OpInlineImage, Args: []pdf.Object{dict, pdf.String(data)}}
+			if _, err := DecodeInlineImage(op, res); err == nil {
+				t.Error("expected an error")
+			}
+		})
+	}
+}
+
+// TestDecodeInlineImageFilterFixesBPC checks that a filter delivering a fixed
+// sample size makes the BitsPerComponent entry unnecessary.
+func TestDecodeInlineImageFilterFixesBPC(t *testing.T) {
+	parms := pdf.Dict{"K": pdf.Integer(-1), "Columns": pdf.Integer(8)}
+	f, err := pdf.MakeFilter("CCITTFaxDecode", parms)
+	if err != nil {
 		t.Fatal(err)
 	}
+	buf := &bytes.Buffer{}
+	w, err := f.Encode(pdf.V2_0, nopCloser{buf})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte{0x5A}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	dict := pdf.Dict{
+		"W": pdf.Integer(8), "H": pdf.Integer(1), "CS": pdf.Name("G"),
+		"F": pdf.Name("CCF"), "DP": parms,
+	}
+	op := Operator{Name: OpInlineImage, Args: []pdf.Object{dict, pdf.String(buf.Bytes())}}
+	got, err := DecodeInlineImage(op, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, []byte{0x5A}) {
+		t.Errorf("got %x, want 5a", got)
+	}
+}
+
+type nopCloser struct{ *bytes.Buffer }
+
+func (nopCloser) Close() error { return nil }
+
+// grayHeader adds the entries of an n×1 DeviceGray image with 8 bits per
+// sample to dict.
+func grayHeader(dict pdf.Dict, n int) pdf.Dict {
+	dict["W"] = pdf.Integer(n)
+	dict["H"] = pdf.Integer(1)
+	dict["BPC"] = pdf.Integer(8)
+	dict["CS"] = pdf.Name("G")
+	return dict
 }
 
 func TestInlineImageColorSpaceDeviceNames(t *testing.T) {
