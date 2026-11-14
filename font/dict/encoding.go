@@ -85,9 +85,8 @@ func SimpleTextMap(postScriptName string, encoding encoding.Simple, toUnicode *c
 		}
 	}
 	if toUnicode != nil {
-		codec, _ := charcode.NewCodec(charcode.Simple)
-		for code, text := range toUnicode.All(codec) {
-			if text != "" {
+		for code := range 256 {
+			if text, ok := toUnicode.Lookup([]byte{byte(code)}); ok && text != "" {
 				textMap[byte(code)] = text
 			}
 		}

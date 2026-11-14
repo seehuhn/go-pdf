@@ -420,49 +420,79 @@ func boxContains(first, last, code []byte) bool {
 }
 
 // indexedBoxes appends to boxes the parts of the range first..last whose
-// codes have an index, as computed by [rangeIndex], of at most maxIndex.
-// Codes with larger index are treated as unmapped.  The argument maxIndex
-// must lie between 0 and math.MaxInt32.  The result consists of at most
-// len(first)+1 boxes.
-func indexedBoxes(boxes []box, first, last []byte, maxIndex, id int) []box {
+// codes have an index, as computed by [rangeIndex], between lo and hi
+// inclusive.  Codes with other indices are treated as unmapped.  The
+// arguments must satisfy 0 <= lo <= hi <= math.MaxInt32.  The result
+// consists of at most 2*len(first) boxes, and of at most len(first) boxes
+// if lo is 0.
+func indexedBoxes(boxes []box, first, last []byte, lo, hi, id int) []box {
 	if !boxIsValid(first, last) {
 		return boxes
 	}
-
-	// mixed-radix digits of maxIndex, most significant digit first
-	l := len(first)
-	digits := make([]int, l)
-	rest := int64(maxIndex)
-	for i := l - 1; i >= 0; i-- {
-		span := int64(last[i]) - int64(first[i]) + 1
-		digits[i] = int(rest % span)
-		rest /= span
-	}
-	if rest > 0 {
-		// all indices are at most maxIndex
-		return append(boxes, box{first, last, id})
-	}
-
-	// The codes with index at most maxIndex are those which agree with
-	// the limit in the first j positions and are smaller at position j, for
-	// some j, together with the limit itself.
-	for j := range l {
-		if digits[j] > 0 {
-			lo := slices.Clone(first)
-			hi := slices.Clone(last)
-			for i := range j {
-				lo[i] = first[i] + byte(digits[i])
-				hi[i] = lo[i]
-			}
-			hi[j] = first[j] + byte(digits[j]-1)
-			boxes = append(boxes, box{lo, hi, id})
+	if len(first) == 0 {
+		// the empty code is the only code, at index 0
+		if lo == 0 {
+			boxes = append(boxes, box{first, last, id})
 		}
+		return boxes
 	}
-	limit := slices.Clone(first)
-	for i := range l {
-		limit[i] = first[i] + byte(digits[i])
+
+	// weights[d] is the number of codes which share the first d+1 bytes,
+	// saturated at weightCap; since hi < weightCap, saturation leaves the
+	// decomposition unchanged
+	const weightCap = 1 << 32
+	l := len(first)
+	weights := make([]int64, l)
+	w := int64(1)
+	for d := l - 1; d >= 0; d-- {
+		weights[d] = w
+		w = min(w*(int64(last[d])-int64(first[d])+1), weightCap)
 	}
-	return append(boxes, box{limit, limit, id})
+	hi64 := min(int64(hi), w-1)
+	if int64(lo) > hi64 {
+		return boxes
+	}
+	return appendIndexedBoxes(boxes, first, last, slices.Clone(first), weights, 0, int64(lo), hi64, id)
+}
+
+// appendIndexedBoxes appends the boxes for the codes which agree with prefix
+// in the first d bytes, and whose index among these codes lies between lo
+// and hi.  The bytes of prefix from position d onwards equal those of first.
+func appendIndexedBoxes(boxes []box, first, last, prefix []byte, weights []int64, d int, lo, hi int64, id int) []box {
+	w := weights[d]
+	a, b := lo/w, hi/w
+	loFull := lo%w == 0
+	hiFull := hi%w == w-1
+
+	withDigit := func(digit int64) []byte {
+		p := slices.Clone(prefix)
+		p[d] = first[d] + byte(digit)
+		return p
+	}
+
+	if a == b && !(loFull && hiFull) {
+		return appendIndexedBoxes(boxes, first, last, withDigit(a), weights, d+1, lo-a*w, hi-a*w, id)
+	}
+
+	start, end := a, b
+	if !loFull {
+		boxes = appendIndexedBoxes(boxes, first, last, withDigit(a), weights, d+1, lo-a*w, w-1, id)
+		start++
+	}
+	if !hiFull {
+		end--
+	}
+	if start <= end {
+		boxLo := withDigit(start)
+		boxHi := slices.Clone(boxLo)
+		boxHi[d] = first[d] + byte(end)
+		copy(boxHi[d+1:], last[d+1:])
+		boxes = append(boxes, box{boxLo, boxHi, id})
+	}
+	if !hiFull {
+		boxes = appendIndexedBoxes(boxes, first, last, withDigit(b), weights, d+1, 0, hi-b*w, id)
+	}
+	return boxes
 }
 
 // levelIndex is the index of the mappings of a single CMap in a usecmap

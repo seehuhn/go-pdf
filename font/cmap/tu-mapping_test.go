@@ -67,6 +67,28 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 				255: "Ω",
 			},
 		},
+		{
+			name: "beyond_unicode",
+			input: map[charcode.Code]string{
+				0: "\U0010FFFF",
+				1: "\uFFFD",
+			},
+		},
+		{
+			name: "before_surrogates",
+			input: map[charcode.Code]string{
+				0: "\uD7FF",
+				1: "\uFFFD",
+			},
+		},
+		{
+			name: "empty_strings",
+			input: map[charcode.Code]string{
+				0: "",
+				1: "",
+				2: "",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -80,12 +102,12 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Check that all mappings are preserved exactly
+			// all mappings preserved exactly
 			for b := range charcode.Code(256) {
-				got := decoded[b]
-				want := tt.input[b]
-				if got != want {
-					t.Errorf("byte %d: got %q, want %q", b, got, want)
+				got, gotOK := decoded[b]
+				want, wantOK := tt.input[b]
+				if got != want || gotOK != wantOK {
+					t.Errorf("byte %d: got %q, %t, want %q, %t", b, got, gotOK, want, wantOK)
 				}
 			}
 		})

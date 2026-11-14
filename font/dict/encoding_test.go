@@ -274,3 +274,29 @@ func TestMakeCodecJohab(t *testing.T) {
 		}
 	}
 }
+
+// TestSimpleTextMapWideToUnicode checks that the one-byte mappings of a
+// ToUnicode CMap are used even where a wide range of longer codes takes
+// precedence.  Enumerating the codes of the wide range first would exhaust
+// any enumeration budget before the one-byte codes are reached.
+func TestSimpleTextMapWideToUnicode(t *testing.T) {
+	toUnicode := &cmap.ToUnicodeFile{
+		Ranges: []cmap.ToUnicodeRange{
+			{First: []byte{0x00}, Last: []byte{0xFF}, Values: []string{"Ā"}},
+			{
+				First:  []byte{0x00, 0x00, 0x00, 0x00},
+				Last:   []byte{0xFF, 0xFF, 0xFF, 0xFF},
+				Values: []string{"x"},
+			},
+		},
+	}
+	enc := func(byte) string { return "" }
+
+	textMap := SimpleTextMap("", enc, toUnicode)
+	for code := range 256 {
+		want := string(rune(0x100 + code))
+		if got := textMap[byte(code)]; got != want {
+			t.Fatalf("code %02x: got %q, want %q", code, got, want)
+		}
+	}
+}

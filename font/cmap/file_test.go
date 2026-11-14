@@ -744,6 +744,51 @@ func TestLookupPrecedence(t *testing.T) {
 	}
 }
 
+// TestReadCMapPrecedence checks that, for a CMap read from a file, a later
+// mapping takes precedence over an earlier one.
+func TestReadCMapPrecedence(t *testing.T) {
+	src := `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /Test def
+/CIDSystemInfo << /Registry (Seehuhn) /Ordering (Test) /Supplement 0 >> def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+3 begincidchar
+<45> 300
+<44> 400
+<45> 301
+endcidchar
+2 begincidrange
+<10> <20> 100
+<00> <FF> 1
+endcidrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`
+	f, _, err := readCMap(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		code byte
+		cid  cid.CID
+	}{
+		{0x05, 6},   // second range
+		{0x15, 22},  // second range overrides first
+		{0x44, 400}, // single
+		{0x45, 301}, // later single overrides earlier
+	}
+	for _, c := range cases {
+		if got := f.LookupCID([]byte{c.code}); got != c.cid {
+			t.Errorf("LookupCID(%02x) = %d, want %d", c.code, got, c.cid)
+		}
+	}
+}
+
 // TestFileNil checks that the lookup methods accept a nil receiver.
 func TestFileNil(t *testing.T) {
 	var f *File

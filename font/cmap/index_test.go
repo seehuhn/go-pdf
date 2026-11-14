@@ -84,7 +84,9 @@ func refToUnicodeLookup(tu *ToUnicodeFile, code []byte) (string, bool) {
 			if index < len(r.Values) {
 				return r.Values[index], true
 			}
-			return nextString(r.Values[0], index), true
+			if s, ok := generatedText(r.Values[0], index); ok {
+				return s, true
+			}
 		}
 	}
 	return "", false
@@ -441,18 +443,39 @@ func TestIndexedBoxes(t *testing.T) {
 				first[i], last[i] = last[i], first[i]
 			}
 		}
-		maxIndex := math.MaxInt32
+		lo, hi := 0, math.MaxInt32
 		if rng.IntN(2) == 0 {
-			maxIndex = rng.IntN(1 << 20)
+			hi = rng.IntN(1 << 20)
 		}
-		boxes := indexedBoxes(nil, first, last, maxIndex, 0)
-		for range 2000 {
-			code := make([]byte, 4)
-			for i := range code {
-				code[i] = first[i] + byte(rng.IntN(int(last[i]-first[i])+1))
+		if rng.IntN(2) == 0 {
+			lo = rng.IntN(hi + 1)
+		}
+		boxes := indexedBoxes(nil, first, last, lo, hi, 0)
+		maxBoxes := 2 * len(first)
+		if lo == 0 {
+			maxBoxes = len(first)
+		}
+		if len(boxes) > maxBoxes {
+			t.Fatalf("% x-% x, %d-%d: %d boxes", first, last, lo, hi, len(boxes))
+		}
+		e := toUnicodeEntry{first: first, last: last, isRange: true}
+		for k := range 2000 {
+			var code []byte
+			if k%2 == 0 {
+				code = make([]byte, 4)
+				for i := range code {
+					code[i] = first[i] + byte(rng.IntN(int(last[i]-first[i])+1))
+				}
+			} else {
+				// codes near the ends of the indexed interval
+				pos := lo - 3 + rng.IntN(7)
+				if rng.IntN(2) == 0 {
+					pos = hi - 3 + rng.IntN(7)
+				}
+				code = e.codeAt(max(pos, 0))
 			}
 			index, want := rangeIndex(first, last, code)
-			want = want && index <= maxIndex
+			want = want && index >= lo && index <= hi
 			n := 0
 			for _, b := range boxes {
 				if boxContains(b.first, b.last, code) {
@@ -463,6 +486,57 @@ func TestIndexedBoxes(t *testing.T) {
 				t.Fatalf("% x-% x: code % x in %d boxes, indexed %t", first, last, code, n, want)
 			}
 		}
+	}
+}
+
+// TestIndexedBoxesLongCodes checks codes of more than four bytes, where the
+// number of codes in a range exceeds the range of positions, together with
+// the empty code and intervals beyond the end of a range.
+func TestIndexedBoxesLongCodes(t *testing.T) {
+	rng := rand.New(rand.NewPCG(11, 12))
+	for range 200 {
+		l := 5 + rng.IntN(4)
+		first := make([]byte, l)
+		last := make([]byte, l)
+		for i := range l {
+			first[i] = byte(rng.IntN(16))
+			last[i] = 0xFF - byte(rng.IntN(16))
+		}
+		hi := math.MaxInt32 - 8 - rng.IntN(1<<20) // hi+3 fits into a 32-bit int
+		lo := rng.IntN(hi + 1)
+		boxes := indexedBoxes(nil, first, last, lo, hi, 0)
+		if len(boxes) > 2*l {
+			t.Fatalf("% x-% x, %d-%d: %d boxes", first, last, lo, hi, len(boxes))
+		}
+		e := toUnicodeEntry{first: first, last: last, isRange: true}
+		for range 1000 {
+			pos := lo - 3 + rng.IntN(7)
+			if rng.IntN(2) == 0 {
+				pos = hi - 3 + rng.IntN(7)
+			}
+			code := e.codeAt(max(pos, 0))
+			index, want := rangeIndex(first, last, code)
+			want = want && index >= lo && index <= hi
+			n := 0
+			for _, b := range boxes {
+				if boxContains(b.first, b.last, code) {
+					n++
+				}
+			}
+			if (n == 1) != want || n > 1 {
+				t.Fatalf("% x-% x: code % x in %d boxes, indexed %t", first, last, code, n, want)
+			}
+		}
+	}
+
+	if boxes := indexedBoxes(nil, nil, nil, 0, 0, 0); len(boxes) != 1 {
+		t.Errorf("empty code at index 0: %d boxes, want 1", len(boxes))
+	}
+	if boxes := indexedBoxes(nil, nil, nil, 1, 5, 0); len(boxes) != 0 {
+		t.Errorf("empty code outside the interval: %d boxes, want 0", len(boxes))
+	}
+	if boxes := indexedBoxes(nil, []byte{0x00}, []byte{0x03}, 5, 9, 0); len(boxes) != 0 {
+		t.Errorf("interval beyond the range: %d boxes, want 0", len(boxes))
 	}
 }
 
@@ -595,9 +669,17 @@ func TestExtractTooComplex(t *testing.T) {
 // TestExtractToUnicodeTooComplex checks that a ToUnicode CMap whose index
 // would exceed the piece budget is dropped as if absent.
 func TestExtractToUnicodeTooComplex(t *testing.T) {
+	// A range maps only the codes whose generated text stays within
+	// Unicode, so the ranges are smaller than those of [hostileRanges].
+	// Starting above the surrogates, each range maps all its codes, and
+	// its two varying leading bytes cost 14*14-1 extra pieces.
 	tu := &ToUnicodeFile{CodeSpaceRange: fullByteRange}
-	for _, r := range hostileRanges(maxHostileRanges + 1) {
-		tu.Ranges = append(tu.Ranges, ToUnicodeRange{First: r.First, Last: r.Last, Values: []string{"A"}})
+	for i := range limits.MaxCMapIndexExtraPieces/(14*14-1) + 1 {
+		tu.Ranges = append(tu.Ranges, ToUnicodeRange{
+			First:  []byte{0x01, 0x01, 0x01, 0x00},
+			Last:   []byte{0x01, 0xFE, 0xFE, byte(0x0F - i%16)},
+			Values: []string{"\uE000"},
+		})
 	}
 	body := &bytes.Buffer{}
 	if err := toUnicodeTmplNew.Execute(body, tu); err != nil {

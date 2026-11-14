@@ -18,6 +18,7 @@ import (
 	"sync"
 	"text/template"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"seehuhn.de/go/postscript"
 
@@ -60,7 +61,14 @@ func (s ToUnicodeSingle) String() string {
 	return fmt.Sprintf("% 02x: %q", s.Code, s.Value)
 }
 
-// ToUnicodeRange describes a range of character codes.
+// ToUnicodeRange maps a range of character codes to text.
+//
+// The codes of the range are numbered from 0, with the last byte varying
+// fastest.  The code with number i maps to Values[i] if i < len(Values).
+// Otherwise it maps to Values[0] with its last character increased by i,
+// provided that Values[0] is not empty and that the increased character is
+// a Unicode scalar value, that is at most U+10FFFF and not a surrogate.
+// The range does not map the remaining codes.
 type ToUnicodeRange struct {
 	First  []byte
 	Last   []byte
@@ -298,8 +306,9 @@ func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, str
 //
 // A mapping in a CMap takes precedence over one in the CMap it uses.
 // Within one CMap, bfchar mappings take precedence over bfrange mappings,
-// and a later mapping takes precedence over an earlier one.  A code whose
-// position in a range exceeds math.MaxInt32 is not mapped by that range.
+// and a later mapping takes precedence over an earlier one.  A code which a
+// range does not map, see [ToUnicodeRange], or whose position in the range
+// exceeds math.MaxInt32, is left to the mappings of lower precedence.
 //
 // The lookup uses an index which is built on first use, see
 // [ToUnicodeFile].
@@ -323,19 +332,147 @@ func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
 // codes map to text, the smallest one is returned.  The flag is false if no
 // code maps to text.
 //
-// The search is bounded, so on malformed input some matches may be missed.
+// The search takes time proportional to the number of mappings in the CMap,
+// not to the number of codes they cover.
 func (tu *ToUnicodeFile) CodeForText(text string) ([]byte, bool) {
 	if tu == nil {
 		return nil, false
 	}
+
 	var best []byte
-	tu.index().mapped(func(x *toUnicodeLevel, id, pos int, code []byte) bool {
-		if (best == nil || codeLess(code, best)) && x.entries[id].text(pos) == text {
-			best = bytes.Clone(code)
+
+	// try checks the code at position pos of entry e.  It reports whether
+	// the search within e can stop: either the code has been accepted, or it
+	// is not smaller than the best code found so far.
+	try := func(e *toUnicodeEntry, pos int) bool {
+		code := e.codeAt(pos)
+		if best != nil && !codeLess(code, best) {
+			return true
 		}
-		return true
-	})
+		if got, ok := tu.Lookup(code); ok && got == text {
+			best = code
+			return true
+		}
+		return false
+	}
+
+	x := tu.index()
+	y := x
+	for range x.depth {
+		for i := range y.level.entries {
+			e := &y.level.entries[i]
+			if !e.isRange {
+				if e.values[0] == text {
+					try(e, 0)
+				}
+				continue
+			}
+
+			size := rangeSize(e.first, e.last)
+			n := int(min(int64(len(e.values)), size))
+			done := false
+			for pos := range n {
+				if e.values[pos] == text && try(e, pos) {
+					done = true
+					break
+				}
+			}
+			if pos, ok := generatedPosition(e.values[0], text); !done && ok && pos >= int64(n) && pos < size {
+				try(e, int(pos))
+			}
+		}
+		y = y.parent
+	}
 	return best, best != nil
+}
+
+// generatedText returns the text which a range whose first value is base
+// gives the code at position i, for a position beyond the range's list of
+// values: base with its last character increased by i.  The flag is false,
+// and the range does not map the code, if base is empty or if the increased
+// character is not a Unicode scalar value.  The position i must not be
+// negative.
+func generatedText(base string, i int) (string, bool) {
+	rr := []rune(base)
+	if len(rr) == 0 {
+		return "", false
+	}
+	r := int64(rr[len(rr)-1]) + int64(i)
+	if r > utf8.MaxRune || !utf8.ValidRune(rune(r)) {
+		return "", false
+	}
+	rr[len(rr)-1] = rune(r)
+	return string(rr), true
+}
+
+// generatedPosition returns the position i at which [generatedText] gives
+// text for base.  The flag is false if there is no such position.
+func generatedPosition(base, text string) (int64, bool) {
+	rr := []rune(base)
+	if len(rr) == 0 {
+		return 0, false
+	}
+	rest, ok := strings.CutPrefix(text, string(rr[:len(rr)-1]))
+	if !ok {
+		return 0, false
+	}
+	r, size := utf8.DecodeRuneInString(rest)
+	if size == 0 || size != len(rest) || r == utf8.RuneError && size == 1 {
+		return 0, false
+	}
+	i := int64(r) - int64(rr[len(rr)-1])
+	return i, i >= 0
+}
+
+// positionRun is an inclusive interval of positions in a range.
+type positionRun struct {
+	lo, hi int
+}
+
+// mappedPositions returns the positions, up to math.MaxInt32, at which a
+// range with the given values maps codes to text, as a list of disjoint,
+// non-adjacent runs in increasing order.  The slice values must not be
+// empty.
+func mappedPositions(values []string) []positionRun {
+	n := len(values)
+	runs := []positionRun{{0, min(n-1, math.MaxInt32)}}
+	add := func(lo, hi int64) {
+		lo = max(lo, int64(n))
+		hi = min(hi, math.MaxInt32)
+		if lo > hi {
+			return
+		}
+		if last := &runs[len(runs)-1]; int64(last.hi)+1 == lo {
+			last.hi = int(hi)
+			return
+		}
+		runs = append(runs, positionRun{int(lo), int(hi)})
+	}
+
+	rr := []rune(values[0])
+	if len(rr) > 0 {
+		// generated characters must avoid the surrogates U+D800 to U+DFFF
+		b := int64(rr[len(rr)-1])
+		add(0, 0xD7FF-b)
+		add(0xE000-b, utf8.MaxRune-b)
+	}
+	return runs
+}
+
+// rangeSize returns the number of codes in the range from first to last
+// which have a position of at most math.MaxInt32, see [rangeIndex].
+func rangeSize(first, last []byte) int64 {
+	if !rangeIsValid(first, last) {
+		return 0
+	}
+	size := int64(1)
+	for i := range first {
+		size *= int64(last[i]) - int64(first[i]) + 1
+		if size > math.MaxInt32 {
+			return math.MaxInt32 + 1
+		}
+	}
+	return size
 }
 
 // toUnicodeLevel allows to look up the mappings of a single ToUnicode CMap,
@@ -380,12 +517,30 @@ func (e toUnicodeEntry) codes() iter.Seq2[int, []byte] {
 	}
 }
 
+// codeAt returns the code at the given position in the entry.  This is the
+// inverse of [rangeIndex].
+func (e toUnicodeEntry) codeAt(pos int) []byte {
+	if !e.isRange {
+		return bytes.Clone(e.first)
+	}
+	code := make([]byte, len(e.first))
+	for i := len(code) - 1; i >= 0; i-- {
+		span := int(e.last[i]) - int(e.first[i]) + 1
+		code[i] = e.first[i] + byte(pos%span)
+		pos /= span
+	}
+	return code
+}
+
 // text returns the text for the code at the given position in the entry.
+// The index attributes a code to the entry only where this text exists, see
+// [mappedPositions].
 func (e toUnicodeEntry) text(i int) string {
 	if i < len(e.values) {
 		return e.values[i]
 	}
-	return nextString(e.values[0], i)
+	s, _ := generatedText(e.values[0], i)
+	return s
 }
 
 // toUnicodeIndexes holds the indices of [ToUnicodeFile] objects, see
@@ -434,7 +589,9 @@ func toUnicodeLevelBoxes(tu *ToUnicodeFile) (x *toUnicodeLevel, boxes []box) {
 		if len(r.Values) == 0 {
 			continue
 		}
-		boxes = indexedBoxes(boxes, r.First, r.Last, math.MaxInt32, len(x.entries))
+		for _, run := range mappedPositions(r.Values) {
+			boxes = indexedBoxes(boxes, r.First, r.Last, run.lo, run.hi, len(x.entries))
+		}
 		x.entries = append(x.entries, toUnicodeEntry{
 			first:   r.First,
 			last:    r.Last,

@@ -12,8 +12,8 @@ require (
 	seehuhn.de/go/icc v0.8.0
 	seehuhn.de/go/jpx v0.8.0
 	seehuhn.de/go/membudget v0.8.0
-	seehuhn.de/go/postscript v0.8.0
-	seehuhn.de/go/sfnt v0.8.1-0.20261113192212-b427659d5269
+	seehuhn.de/go/postscript v0.8.1-0.20261114140500-8461cfa32468
+	seehuhn.de/go/sfnt v0.8.1-0.20261114143742-18dffffcac52
 	seehuhn.de/go/xmp v0.8.0
 )
 

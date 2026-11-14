@@ -63,7 +63,8 @@ func NewToUnicodeFile(csr charcode.CodeSpaceRange, data map[charcode.Code]string
 
 					needsList := false
 					for j := start; j < i-1; j++ {
-						if data[info[j+1].code] != nextString(data[info[j].code], 1) {
+						next, ok := generatedText(data[info[j].code], 1)
+						if !ok || data[info[j+1].code] != next {
 							needsList = true
 							break
 						}
@@ -108,13 +109,4 @@ func (tu *ToUnicodeFile) GetMapping() (map[charcode.Code]string, error) {
 	}
 
 	return maps.Collect(tu.All(codec)), nil
-}
-
-func nextString(s string, inc int) string {
-	rr := []rune(s)
-	if len(rr) == 0 {
-		return ""
-	}
-	rr[len(rr)-1] += rune(inc)
-	return string(rr)
 }

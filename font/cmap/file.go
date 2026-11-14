@@ -577,7 +577,7 @@ func fileLevelBoxes(f *File) (x *fileLevel, mapped, notdef []box) {
 	for _, r := range slices.Backward(f.CIDRanges) {
 		id := len(x.mapped)
 		x.mapped = append(x.mapped, mappedEntry{first: r.First, last: r.Last, value: r.Value, isRange: true})
-		mapped = indexedBoxes(mapped, r.First, r.Last, maxRangeIndex(r.Value), id)
+		mapped = indexedBoxes(mapped, r.First, r.Last, 0, maxRangeIndex(r.Value), id)
 	}
 	for _, s := range slices.Backward(f.NotdefSingles) {
 		notdef = append(notdef, box{s.Code, s.Code, len(x.notdef)})

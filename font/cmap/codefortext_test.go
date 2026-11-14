@@ -5,8 +5,8 @@ package cmap
 
 import (
 	"bytes"
+	"math/rand/v2"
 	"testing"
-	"time"
 
 	"seehuhn.de/go/pdf/internal/limits"
 )
@@ -47,6 +47,16 @@ func TestCodeForTextRange(t *testing.T) {
 	code, ok := tu.CodeForText("y")
 	if !ok || !bytes.Equal(code, []byte{0x11}) {
 		t.Errorf("CodeForText(y) = % x, %v; want 11, true", code, ok)
+	}
+
+	// only the last rune is incremented, so the text must keep the prefix
+	tu = &ToUnicodeFile{
+		Ranges: []ToUnicodeRange{
+			{First: []byte{0x10}, Last: []byte{0x12}, Values: []string{"ax"}},
+		},
+	}
+	if code, ok := tu.CodeForText("by"); ok {
+		t.Errorf("CodeForText(by) = % x, true; want false", code)
 	}
 }
 
@@ -112,34 +122,17 @@ func TestCodeForTextManyRanges(t *testing.T) {
 	}
 	tu := &ToUnicodeFile{Ranges: ranges}
 
-	done := make(chan struct{})
-	go func() {
-		code, ok := tu.CodeForText("x")
-		// smallest code among all matches is the last range's (code 1)
-		if !ok || !bytes.Equal(code, []byte{0x00, 0x01}) {
-			t.Errorf("CodeForText(x) = % x, %v; want 00 01, true", code, ok)
-		}
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("CodeForText did not finish promptly with many ranges")
+	code, ok := tu.CodeForText("x")
+	// smallest code among all matches is the last range's (code 1)
+	if !ok || !bytes.Equal(code, []byte{0x00, 0x01}) {
+		t.Errorf("CodeForText(x) = % x, %v; want 00 01, true", code, ok)
 	}
 }
 
-// TestCodeForTextBudget checks that the reverse scan in CodeForText stops at
-// limits.MaxCMapMappings, independent of how wide the range is. The range's
-// values auto-increment from "a", so the code at enumeration index i carries
-// the text rune('a'+i); the code a little past the budget therefore has a
-// known, unique text that a bounded scan never reaches. A scan that ignored the
-// budget would walk the whole range and report it. This is a deterministic
-// stand-in for a wall-clock "finishes in time" check, which is sensitive to
-// machine load.
-func TestCodeForTextBudget(t *testing.T) {
-	n := limits.MaxCMapMappings
-	// A 3-byte range spans 256^3 ≈ 16.8M codes, far more than the budget. Codes
-	// are enumerated last-byte-fastest, so index i is reached after i steps.
+// TestCodeForTextWideRange checks that a code deep inside a wide range is
+// found.  Enumerating the codes of the range would take time proportional to
+// the position of the code.
+func TestCodeForTextWideRange(t *testing.T) {
 	tu := &ToUnicodeFile{
 		Ranges: []ToUnicodeRange{
 			{
@@ -150,10 +143,153 @@ func TestCodeForTextBudget(t *testing.T) {
 		},
 	}
 
-	// text of a code just past the budget; n stays well below the Unicode
-	// maximum, so the incremented value is a valid, unique rune.
-	target := nextString("a", n+1000)
-	if _, ok := tu.CodeForText(target); ok {
-		t.Errorf("CodeForText found a code past the %d-entry budget", n)
+	pos := limits.MaxCMapMappings + 1000
+	text, ok := generatedText("a", pos)
+	if !ok {
+		t.Fatal("test text is not valid")
+	}
+	code, ok := tu.CodeForText(text)
+	want := []byte{byte(pos >> 16), byte(pos >> 8), byte(pos)}
+	if !ok || !bytes.Equal(code, want) {
+		t.Errorf("CodeForText = % x, %v; want % x, true", code, ok, want)
+	}
+}
+
+// TestCodeForTextUnmappedPositions checks ranges whose generated text would
+// contain a surrogate or a character beyond U+10FFFF.  The range does not
+// map these codes, and mappings of lower precedence apply to them.
+func TestCodeForTextUnmappedPositions(t *testing.T) {
+	cases := []struct {
+		name string
+		tu   *ToUnicodeFile
+		text string
+		want []byte
+	}{
+		{
+			name: "after the surrogates",
+			tu: &ToUnicodeFile{Ranges: []ToUnicodeRange{
+				{First: []byte{0x00, 0x00}, Last: []byte{0xFF, 0xFF}, Values: []string{"\uD7FE"}},
+			}},
+			text: "\uE000",
+			want: []byte{0x08, 0x02},
+		},
+		{
+			name: "U+FFFD itself",
+			tu: &ToUnicodeFile{Ranges: []ToUnicodeRange{
+				{First: []byte{0x00}, Last: []byte{0xFF}, Values: []string{"\uFFFB"}},
+			}},
+			text: "\uFFFD",
+			want: []byte{0x02},
+		},
+		{
+			name: "beyond Unicode",
+			tu: &ToUnicodeFile{Ranges: []ToUnicodeRange{
+				{First: []byte{0x00}, Last: []byte{0xFF}, Values: []string{"\U0010FFFE"}},
+			}},
+			text: "\uFFFD",
+			want: nil,
+		},
+		{
+			name: "parent mapping beyond Unicode",
+			tu: &ToUnicodeFile{
+				Ranges: []ToUnicodeRange{
+					{First: []byte{0x00}, Last: []byte{0xFF}, Values: []string{"\U0010FFFF"}},
+				},
+				Parent: &ToUnicodeFile{Singles: []ToUnicodeSingle{
+					{Code: []byte{0x05}, Value: "\uFFFD"},
+				}},
+			},
+			text: "\uFFFD",
+			want: []byte{0x05},
+		},
+		{
+			name: "empty first value",
+			tu: &ToUnicodeFile{Ranges: []ToUnicodeRange{
+				{First: []byte{0x00, 0x00}, Last: []byte{0xFF, 0xFF}, Values: []string{""}},
+			}},
+			text: "",
+			want: []byte{0x00, 0x00},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			code, ok := c.tu.CodeForText(c.text)
+			if !bytes.Equal(code, c.want) || ok != (c.want != nil) {
+				t.Errorf("CodeForText(%q) = % x, %v; want % x", c.text, code, ok, c.want)
+			}
+		})
+	}
+}
+
+// TestCodeForTextBruteForce compares CodeForText with an exhaustive search
+// over all one- and two-byte codes, for random ToUnicode CMaps.
+func TestCodeForTextBruteForce(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	bases := []rune{'a', 'z', 0xD7F0, 0xFFF8, 0x10FFF0}
+
+	randCode := func() []byte {
+		code := make([]byte, 1+rng.IntN(2))
+		for i := range code {
+			code[i] = byte(rng.IntN(8)) * 0x20
+		}
+		return code
+	}
+	randText := func() string {
+		if rng.IntN(8) == 0 {
+			return ""
+		}
+		return string(bases[rng.IntN(len(bases))] + rune(rng.IntN(16)))
+	}
+	randFile := func() *ToUnicodeFile {
+		tu := &ToUnicodeFile{}
+		for range rng.IntN(4) {
+			tu.Singles = append(tu.Singles, ToUnicodeSingle{Code: randCode(), Value: randText()})
+		}
+		for range rng.IntN(4) {
+			first := randCode()
+			last := bytes.Clone(first)
+			for i := range last {
+				last[i] += byte(rng.IntN(0x40))
+			}
+			var values []string
+			for range 1 + rng.IntN(3) {
+				values = append(values, randText())
+			}
+			tu.Ranges = append(tu.Ranges, ToUnicodeRange{First: first, Last: last, Values: values})
+		}
+		return tu
+	}
+
+	for range 100 {
+		tu := randFile()
+		if rng.IntN(2) == 0 {
+			tu.Parent = randFile()
+		}
+
+		want := make(map[string][]byte)
+		for n := 1; n <= 2; n++ {
+			code := make([]byte, n)
+			for c := range 1 << (8 * n) {
+				for i := range code {
+					code[i] = byte(c >> (8 * (n - 1 - i)))
+				}
+				text, ok := tu.Lookup(code)
+				if _, seen := want[text]; ok && !seen {
+					want[text] = bytes.Clone(code)
+				}
+			}
+		}
+
+		targets := []string{"", "\uFFFD", "q"}
+		for text := range want {
+			targets = append(targets, text)
+		}
+		for _, text := range targets {
+			code, ok := tu.CodeForText(text)
+			if !bytes.Equal(code, want[text]) || ok != (want[text] != nil) {
+				t.Fatalf("CodeForText(%q) = % x, %v; want % x\n%v",
+					text, code, ok, want[text], tu)
+			}
+		}
 	}
 }

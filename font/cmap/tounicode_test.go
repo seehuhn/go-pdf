@@ -108,12 +108,12 @@ func TestToUnicodeLookupEmpty(t *testing.T) {
 			ok:   true,
 		},
 		{
-			// past the range start, exercises the increment branch
+			// past the range start there is no character to increase
 			name: "empty string past range start",
 			r:    ToUnicodeRange{First: []byte{0x00, 0x00}, Last: []byte{0x00, 0xFF}, Values: []string{""}},
 			code: []byte{0x00, 0x05},
 			want: "",
-			ok:   true,
+			ok:   false,
 		},
 		{
 			// empty destination array, e.g. <0000> <00FF> []
@@ -368,6 +368,98 @@ func TestExtractToUnicode(t *testing.T) {
 	}
 	if parent.Parent != nil {
 		t.Fatal("parent.Parent is not nil")
+	}
+}
+
+// TestReadToUnicodePrecedence checks that, for a ToUnicode CMap read from a
+// file, a later mapping takes precedence over an earlier one.
+func TestReadToUnicodePrecedence(t *testing.T) {
+	src := `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /Test def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+3 beginbfchar
+<45> <0058>
+<44> <0059>
+<45> <005A>
+endbfchar
+2 beginbfrange
+<10> <20> <0061>
+<00> <FF> <0100>
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`
+	tu, err := readToUnicode(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		code byte
+		text string
+	}{
+		{0x05, "\u0105"}, // second range
+		{0x15, "\u0115"}, // second range overrides first
+		{0x44, "Y"},      // single
+		{0x45, "Z"},      // later single overrides earlier
+	}
+	for _, c := range cases {
+		if got, _ := tu.Lookup([]byte{c.code}); got != c.text {
+			t.Errorf("Lookup(%02x) = %q, want %q", c.code, got, c.text)
+		}
+	}
+}
+
+// TestToUnicodeLookupUnmappedPositions checks that a range does not map
+// codes whose generated text would contain a surrogate or a character beyond
+// U+10FFFF, or which have no generated text because the first value is
+// empty, and that mappings of lower precedence apply to these codes.
+func TestToUnicodeLookupUnmappedPositions(t *testing.T) {
+	tu := &ToUnicodeFile{
+		Ranges: []ToUnicodeRange{
+			{First: []byte{0x00, 0x00}, Last: []byte{0x00, 0xFF}, Values: []string{"\U0010FFFE"}},
+			{First: []byte{0x01, 0x00}, Last: []byte{0x01, 0xFF}, Values: []string{""}},
+			{First: []byte{0x02, 0x00}, Last: []byte{0x0A, 0xFF}, Values: []string{"\uD7FE"}},
+		},
+		Parent: &ToUnicodeFile{Singles: []ToUnicodeSingle{
+			{Code: []byte{0x00, 0x02}, Value: "p"},
+		}},
+	}
+	cases := []struct {
+		code []byte
+		text string
+		ok   bool
+	}{
+		{[]byte{0x00, 0x01}, "\U0010FFFF", true},
+		{[]byte{0x00, 0x02}, "p", true}, // from the parent
+		{[]byte{0x00, 0x03}, "", false},
+		{[]byte{0x01, 0x00}, "", true},
+		{[]byte{0x01, 0x01}, "", false},
+		{[]byte{0x02, 0x01}, "\uD7FF", true},
+		{[]byte{0x02, 0x02}, "", false}, // U+D800
+		{[]byte{0x0A, 0x01}, "", false}, // U+DFFF
+		{[]byte{0x0A, 0x02}, "\uE000", true},
+	}
+	for _, c := range cases {
+		text, ok := tu.Lookup(c.code)
+		if text != c.text || ok != c.ok {
+			t.Errorf("Lookup(% x) = %q, %t, want %q, %t", c.code, text, ok, c.text, c.ok)
+		}
+	}
+
+	codec, err := charcode.NewCodec(charcode.CodeSpaceRange{{Low: []byte{0x00, 0x00}, High: []byte{0xFF, 0xFF}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for code, text := range tu.All(codec) {
+		if _, ok := tu.Lookup(codec.AppendCode(nil, code)); !ok {
+			t.Errorf("All reports unmapped code %x with text %q", code, text)
+		}
 	}
 }
 
