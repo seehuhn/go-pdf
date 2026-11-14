@@ -199,13 +199,16 @@ func repairCIDType2(d *dict.CIDFontType2) {
 
 // repairROS makes the character collection and the CMap of a CIDFont
 // consistent.  A missing character collection is taken from the CMap, or set
-// to Adobe-Identity-0.  Apart from the predefined Identity-H and Identity-V,
-// the CMap is replaced by a copy with the font's character collection if the
-// two are missing or incompatible.
+// to Adobe-Identity-0.  The predefined Identity-H and Identity-V are
+// compatible with every character collection.  If the two are otherwise
+// missing or incompatible, a predefined CMap determines the character
+// collection, since its CIDs are those of its own collection.  An embedded
+// CMap is replaced by a copy with the font's character collection.
 func repairROS(ros **cid.SystemInfo, cm **cmap.File) {
+	c := *cm
 	if *ros == nil {
-		if (*cm).ROS != nil {
-			*ros = (*cm).ROS
+		if c.ROS != nil {
+			*ros = c.ROS
 		} else {
 			*ros = &cid.SystemInfo{
 				Registry:   "Adobe",
@@ -215,13 +218,20 @@ func repairROS(ros **cid.SystemInfo, cm **cmap.File) {
 		}
 	}
 
-	c := *cm
-	if c.Name != "Identity-H" && c.Name != "Identity-V" || !c.IsPredefined() {
-		if c.ROS == nil || (*ros).Registry != c.ROS.Registry ||
-			(*ros).Ordering != c.ROS.Ordering {
-			c = c.Clone()
-			c.ROS = *ros
-			*cm = c
-		}
+	predefined := c.IsPredefined()
+	if predefined && (c.Name == "Identity-H" || c.Name == "Identity-V") {
+		return
 	}
+	if c.ROS != nil && (*ros).Registry == c.ROS.Registry &&
+		(*ros).Ordering == c.ROS.Ordering {
+		return
+	}
+
+	if predefined && c.ROS != nil {
+		*ros = c.ROS
+		return
+	}
+	c = c.Clone()
+	c.ROS = *ros
+	*cm = c
 }

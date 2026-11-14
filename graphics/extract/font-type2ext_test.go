@@ -466,3 +466,99 @@ func TestType2ManyCodeSpaceRanges(t *testing.T) {
 		t.Errorf("got code lengths %v, want %v", n, want)
 	}
 }
+
+// TestPredefinedCMapROSMismatch checks that a CIDFont whose character
+// collection disagrees with its predefined CMap keeps the CMap, and takes the
+// character collection from it.
+func TestPredefinedCMapROSMismatch(t *testing.T) {
+	for _, tc := range []struct {
+		subtype  pdf.Name
+		embedded bool
+	}{
+		{"CIDFontType2", false},
+		{"CIDFontType2", true},
+		{"CIDFontType0", false},
+	} {
+		t.Run(fmt.Sprintf("%s-%t", tc.subtype, tc.embedded), func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+
+			fd := pdf.Dict{
+				"Type":        pdf.Name("FontDescriptor"),
+				"FontName":    pdf.Name("Test"),
+				"Flags":       pdf.Integer(4),
+				"FontBBox":    &pdf.Rectangle{URx: 1000, URy: 1000},
+				"ItalicAngle": pdf.Integer(0),
+				"Ascent":      pdf.Integer(800),
+				"Descent":     pdf.Integer(-200),
+				"CapHeight":   pdf.Integer(700),
+				"StemV":       pdf.Integer(80),
+			}
+			if tc.embedded {
+				fontFileRef := w.Alloc()
+				stm, err := w.OpenStream(fontFileRef, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := stm.Close(); err != nil {
+					t.Fatal(err)
+				}
+				fd["FontFile2"] = fontFileRef
+			}
+			fontDict := pdf.Dict{
+				"Type":     pdf.Name("Font"),
+				"Subtype":  pdf.Name("Type0"),
+				"BaseFont": pdf.Name("Test"),
+				"Encoding": pdf.Name("UniJIS-UCS2-H"),
+				"DescendantFonts": pdf.Array{pdf.Dict{
+					"Type":     pdf.Name("Font"),
+					"Subtype":  tc.subtype,
+					"BaseFont": pdf.Name("Test"),
+					"CIDSystemInfo": pdf.Dict{
+						"Registry":   pdf.String("Adobe"),
+						"Ordering":   pdf.String("GB1"),
+						"Supplement": pdf.Integer(2),
+					},
+					"FontDescriptor": fd,
+				}},
+			}
+
+			d, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(w), nil), fontDict, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ros *cid.SystemInfo
+			var cm *cmap.File
+			switch d := d.(type) {
+			case *dict.CIDFontType0:
+				ros, cm = d.ROS, d.CMap
+			case *dict.CIDFontType2:
+				ros, cm = d.ROS, d.CMap
+			default:
+				t.Fatalf("unexpected font dict type %T", d)
+			}
+
+			if !cm.IsPredefined() || cm.Name != "UniJIS-UCS2-H" {
+				t.Errorf("predefined CMap not kept, got %q", cm.Name)
+			}
+			if ros.Registry != "Adobe" || ros.Ordering != "Japan1" {
+				t.Errorf("wrong character collection %s-%s", ros.Registry, ros.Ordering)
+			}
+
+			rm := pdf.NewResourceManager(w)
+			ref, err := rm.Embed(d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := rm.Close(); err != nil {
+				t.Fatal(err)
+			}
+			written, err := pdf.NewCursor(w).Dict(ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if enc, ok := written["Encoding"].(pdf.Name); !ok || enc != "UniJIS-UCS2-H" {
+				t.Errorf("CMap not written by name, got %v", written["Encoding"])
+			}
+		})
+	}
+}
