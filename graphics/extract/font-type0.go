@@ -13,7 +13,6 @@ import (
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/subset"
-	"seehuhn.de/go/postscript/cid"
 )
 
 // extractFontCIDType0 reads a Type 0 CIDFont dictionary from the PDF file.
@@ -101,7 +100,7 @@ func extractFontCIDType0(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType0, erro
 	if err != nil {
 		return nil, err
 	}
-	if dw, err := c.Number(cidFontDict["DW"]); err == nil {
+	if dw, err := number(c, cidFontDict["DW"]); err == nil {
 		d.DefaultWidth = dw
 	} else if pdf.IsReadError(err) {
 		return nil, err
@@ -141,21 +140,9 @@ func repairCIDType0(d *dict.CIDFontType0) {
 
 	d.Descriptor.MissingWidth = 0
 
-	if d.ROS == nil {
-		d.ROS = &cid.SystemInfo{}
-	}
 	if d.CMap == nil {
 		d.CMap = cmap.IdentityH
 	}
 
-	if d.CMap.ROS != nil {
-		if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
-			!d.CMap.IsPredefined() {
-			if d.ROS.Registry != d.CMap.ROS.Registry ||
-				d.ROS.Ordering != d.CMap.ROS.Ordering {
-				d.CMap = d.CMap.Clone()
-				d.CMap.ROS = d.ROS
-			}
-		}
-	}
+	repairROS(&d.ROS, &d.CMap)
 }

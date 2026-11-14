@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -94,6 +95,10 @@ func FuzzType2Dict(f *testing.F) {
 
 			f.Add(out.Data)
 		}
+	}
+
+	for _, data := range malformedMetricsFiles(f, "CIDFontType2") {
+		f.Add(data)
 	}
 
 	f.Fuzz(func(t *testing.T, fileData []byte) {
@@ -359,5 +364,105 @@ func TestCIDDefaultWidth(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestType2ManyCodeSpaceRanges reads a font whose embedded CMap has a code
+// space with 32768 ranges, whose lookup tree has more than 65535 nodes.
+func TestType2ManyCodeSpaceRanges(t *testing.T) {
+	// For every first byte b there is a one-code two-byte range at every
+	// even second byte x, except that some x give the three-byte range
+	// <b x 00>..<b x b> instead.  This gives many distinct sub-trees.
+	var csr charcode.CodeSpaceRange
+	for b := range 256 {
+		for x := 0; x < 256; x += 2 {
+			if x == 2*(b%128) || b >= 128 && x == 254 {
+				csr = append(csr, charcode.Range{Low: []byte{byte(b), byte(x), 0}, High: []byte{byte(b), byte(x), byte(b)}})
+			} else {
+				csr = append(csr, charcode.Range{Low: []byte{byte(b), byte(x)}, High: []byte{byte(b), byte(x)}})
+			}
+		}
+	}
+	cm := &cmap.File{
+		Name:           "Test-Many",
+		ROS:            ros,
+		CodeSpaceRange: csr,
+		CIDRanges: []cmap.Range{
+			{First: []byte{0x05, 0x0A, 0x00}, Last: []byte{0x05, 0x0A, 0x05}, Value: 10},
+			{First: []byte{0xC8, 0x92}, Last: []byte{0xC8, 0x92}, Value: 20},
+		},
+	}
+
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+	cmapRef, err := rm.Embed(cm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// an embedded CMap needs an embedded font; the font data is not used
+	fontFileRef := w.Alloc()
+	stm, err := w.OpenStream(fontFileRef, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	fontDict := pdf.Dict{
+		"Type":     pdf.Name("Font"),
+		"Subtype":  pdf.Name("Type0"),
+		"BaseFont": pdf.Name("Test"),
+		"Encoding": cmapRef,
+		"DescendantFonts": pdf.Array{pdf.Dict{
+			"Type":     pdf.Name("Font"),
+			"Subtype":  pdf.Name("CIDFontType2"),
+			"BaseFont": pdf.Name("Test"),
+			"CIDSystemInfo": pdf.Dict{
+				"Registry":   pdf.String(ros.Registry),
+				"Ordering":   pdf.String(ros.Ordering),
+				"Supplement": pdf.Integer(ros.Supplement),
+			},
+			"FontDescriptor": pdf.Dict{
+				"Type":        pdf.Name("FontDescriptor"),
+				"FontName":    pdf.Name("Test"),
+				"Flags":       pdf.Integer(4),
+				"FontBBox":    &pdf.Rectangle{URx: 1000, URy: 1000},
+				"ItalicAngle": pdf.Integer(0),
+				"Ascent":      pdf.Integer(800),
+				"Descent":     pdf.Integer(-200),
+				"CapHeight":   pdf.Integer(700),
+				"StemV":       pdf.Integer(80),
+				"FontFile2":   fontFileRef,
+			},
+		}},
+	}
+
+	d, err := extract.Dict(pdf.CursorAt(pdf.NewExtractor(w), nil), fontDict, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []cid.CID
+	var n []int
+	codec := d.Codec()
+	s := pdf.String{0x05, 0x0A, 0x03, 0xC8, 0x92}
+	for c := range d.MakeFont().Codes(s) {
+		got = append(got, c.CID)
+	}
+	for len(s) > 0 {
+		_, k, valid := codec.Decode(s)
+		if !valid {
+			t.Fatalf("invalid code at % x", s)
+		}
+		n = append(n, k)
+		s = s[k:]
+	}
+	if want := []cid.CID{13, 20}; !slices.Equal(got, want) {
+		t.Errorf("got CIDs %v, want %v", got, want)
+	}
+	if want := []int{3, 2}; !slices.Equal(n, want) {
+		t.Errorf("got code lengths %v, want %v", n, want)
 	}
 }

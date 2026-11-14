@@ -19,7 +19,7 @@ import (
 // identityEncoder returns an encoder for the predefined Identity-H CMap.
 func identityEncoder(t *testing.T) CIDEncoder {
 	t.Helper()
-	enc, err := NewFromCMap(cmap.IdentityH, 500)
+	enc, err := NewFromCMap(cmap.IdentityH, cmap.IdentityH.ROS, 500, VMetrics{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestConcurrentReaders(t *testing.T) {
 	}
 
 	encoders := map[string]CIDEncoder{
-		"utf8":     NewCompositeUtf8(500, font.Horizontal),
+		"utf8":     NewCompositeUtf8(nil, 500, VMetrics{}, font.Horizontal),
 		"identity": identityEncoder(t),
 	}
 	for name, enc := range encoders {
@@ -47,7 +47,7 @@ func TestConcurrentReaders(t *testing.T) {
 				defer close(done)
 				for i := range cid.CID(200) {
 					text := string(rune('A' + i%26))
-					_, _ = enc.Encode(i+1, text, float64(i))
+					_, _ = enc.Encode(i+1, text, float64(i), VMetrics{})
 
 					// Pace the writer.  Without this it allocates every code
 					// well inside a single reader pass, and the readers spend
@@ -91,15 +91,15 @@ func TestConcurrentReaders(t *testing.T) {
 // it already has.
 func TestEncodeRepeat(t *testing.T) {
 	for name, enc := range map[string]CIDEncoder{
-		"utf8":     NewCompositeUtf8(500, font.Horizontal),
+		"utf8":     NewCompositeUtf8(nil, 500, VMetrics{}, font.Horizontal),
 		"identity": identityEncoder(t),
 	} {
 		t.Run(name, func(t *testing.T) {
-			c1, err := enc.Encode(5, "A", 600)
+			c1, err := enc.Encode(5, "A", 600, VMetrics{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			c2, err := enc.Encode(5, "A", 600)
+			c2, err := enc.Encode(5, "A", 600, VMetrics{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -111,21 +111,34 @@ func TestEncodeRepeat(t *testing.T) {
 }
 
 // TestEncodeConflict checks that an encoder backed by a fixed CMap, which can
-// hold only one text and one width per CID, rejects a conflicting value
-// instead of encoding one it cannot represent.  A rejected call must leave the
-// stored value alone.
+// hold only one text, one width and one set of vertical metrics per CID,
+// rejects a conflicting value instead of encoding one it cannot represent.  A
+// rejected call must leave the stored value alone.
 func TestEncodeConflict(t *testing.T) {
-	enc := identityEncoder(t)
-	code, err := enc.Encode(5, "A", 600)
+	enc, err := NewFromCMap(cmap.IdentityV, cmap.IdentityV.ROS, 500, VMetrics{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := VMetrics{OffsY: 800, DeltaY: -900}
+	code, err := enc.Encode(5, "A", 600, vm)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := enc.Encode(5, "B", 600); err == nil {
+	if _, err := enc.Encode(5, "B", 600, vm); err == nil {
 		t.Error("conflicting text was accepted")
 	}
-	if _, err := enc.Encode(5, "A", 700); err == nil {
+	if _, err := enc.Encode(5, "A", 700, vm); err == nil {
 		t.Error("conflicting width was accepted")
+	}
+	if _, err := enc.Encode(5, "A", 600, VMetrics{OffsY: 800, DeltaY: -1000}); err == nil {
+		t.Error("conflicting advance was accepted")
+	}
+	if _, err := enc.Encode(5, "A", 600, VMetrics{OffsY: 880, DeltaY: -900}); err == nil {
+		t.Error("conflicting origin was accepted")
+	}
+	if c, err := enc.Encode(5, "A", 600, vm); err != nil || c != code {
+		t.Errorf("repeated call gave (%d, %v), want (%d, nil)", c, err, code)
 	}
 
 	found := false
@@ -134,8 +147,9 @@ func TestEncodeConflict(t *testing.T) {
 			continue
 		}
 		found = true
-		if info.Text != "A" || info.Width != 600 {
-			t.Errorf("stored entry is (%q, %g), want (\"A\", 600)", info.Text, info.Width)
+		if info.Text != "A" || info.Width != 600 || info.VMetrics != vm {
+			t.Errorf("stored entry is (%q, %g, %v), want (\"A\", 600, %v)",
+				info.Text, info.Width, info.VMetrics, vm)
 		}
 	}
 	if !found {
@@ -143,16 +157,33 @@ func TestEncodeConflict(t *testing.T) {
 	}
 }
 
+// TestEncodeHorizontalVMetrics checks that vertical metrics, which are not
+// used in horizontal writing mode, cannot make Encode fail there.
+func TestEncodeHorizontalVMetrics(t *testing.T) {
+	enc := identityEncoder(t)
+	code, err := enc.Encode(5, "A", 600, VMetrics{OffsY: 800, DeltaY: -900})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := enc.Encode(5, "A", 600, VMetrics{OffsY: 880, DeltaY: -1000})
+	if err != nil || c != code {
+		t.Errorf("second call gave (%d, %v), want (%d, nil)", c, err, code)
+	}
+	if _, err := enc.Encode(0, "", 500, VMetrics{OffsY: 1, DeltaY: 2}); err != nil {
+		t.Errorf("CID 0: %v", err)
+	}
+}
+
 // TestEncodeNewText checks that an encoder which allocates its own codes gives
 // a second text for the same CID a code of its own, where an encoder backed by
 // a fixed CMap has to reject it (see [TestEncodeConflict]).
 func TestEncodeNewText(t *testing.T) {
-	enc := NewCompositeUtf8(500, font.Horizontal)
-	c1, err := enc.Encode(5, "A", 600)
+	enc := NewCompositeUtf8(nil, 500, VMetrics{}, font.Horizontal)
+	c1, err := enc.Encode(5, "A", 600, VMetrics{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	c2, err := enc.Encode(5, "B", 600)
+	c2, err := enc.Encode(5, "B", 600, VMetrics{})
 	if err != nil {
 		t.Fatal(err)
 	}

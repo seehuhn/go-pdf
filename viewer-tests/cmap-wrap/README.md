@@ -14,10 +14,10 @@ endcidrange
 
 Here, CID 34 is 'A' in the Adobe-Japan1 character collection.
 The question is: Will this assign CIDs to all 9 possible codes?
-Or just the CIDs <3030>, <3031>, <3032>?
+Or just the codes <3030>, <3031>, <3032>?
 Or is this invalid?
 
-The PDF shows a 3x3 grid of glyps, using the following codes:
+The PDF shows a 3x3 grid of glyphs, using the following codes:
 
 ```
 <3030> <3031> <3032>
@@ -25,7 +25,11 @@ The PDF shows a 3x3 grid of glyps, using the following codes:
 <3230> <3231> <3232>
 ```
 
-Results (September 2024):
-- Adobe Reader, Ghostscript: all codes are mapped
-- Firefox, Google Chrome: only the first row is mapped
-- MacOS Preview: no codes are mapped
+The font has the glyphs A to I at the CIDs 34 to 42, and the glyphs a to f
+at the CIDs 290 to 292 and 546 to 548.  These are the CIDs which the second
+and third row get if the codes in the range are counted as two-byte numbers.
+
+Results (November 2026):
+- Adobe Reader, Ghostscript: `ABC`, `DEF`, `GHI` (each byte varies independently)
+- Firefox, Google Chrome, MuPDF, Poppler: `ABC`, `abc`, `def` (codes counted as two-byte numbers)
+- macOS Preview: no codes are mapped

@@ -94,10 +94,10 @@ func (e *TextExtractor) setupCallbacks() {
 
 		text = remapPUA(text)
 
-		// TextRenderingMatrix does not panic when the content stream
-		// never set the text state explicitly.
-		trm := e.reader.State.GState.TextRenderingMatrix()
-		xDev := trm[4]
+		// GlyphMatrix does not panic when the content stream never set
+		// the text state explicitly.
+		p := e.reader.State.GState
+		xDev := p.GlyphMatrix(&c).Mul(p.CTM)[4]
 		if xDev < e.XRangeMin || xDev >= e.XRangeMax {
 			return nil
 		}

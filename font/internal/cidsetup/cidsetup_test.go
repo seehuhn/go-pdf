@@ -4,9 +4,15 @@
 package cidsetup
 
 import (
+	"bytes"
+	"math"
 	"testing"
 
+	"golang.org/x/image/font/gofont/goregular"
 	"seehuhn.de/go/postscript/cid"
+	"seehuhn.de/go/sfnt"
+	"seehuhn.de/go/sfnt/glyph"
+	"seehuhn.de/go/sfnt/parser"
 
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -44,7 +50,7 @@ func TestFromCMap(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gidToCID, enc, err := FromCMap(c.f, nil, info, 500)
+			gidToCID, enc, err := FromCMap(c.f, nil, info)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -84,7 +90,7 @@ func TestFromCMapErrors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if _, _, err := FromCMap(c.f, nil, info, 500); err == nil {
+			if _, _, err := FromCMap(c.f, nil, info); err == nil {
 				t.Error("no error")
 			}
 		})
@@ -123,7 +129,7 @@ func TestFromCMapGIDToCID(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, _, err := FromCMap(c.f, c.gidToCID, info, 500)
+			got, _, err := FromCMap(c.f, c.gidToCID, info)
 			if c.wantErr {
 				if err == nil {
 					t.Error("no error")
@@ -135,6 +141,67 @@ func TestFromCMapGIDToCID(t *testing.T) {
 			}
 			if got != c.gidToCID {
 				t.Error("the supplied GIDToCID was not used")
+			}
+		})
+	}
+}
+
+// TestFromCMapNotdefMetrics checks that CID 0 gets the metrics of glyph 0,
+// even though the Japan1 collection implies U+FFFD for it, which the font
+// has a glyph for.
+func TestFromCMapNotdefMetrics(t *testing.T) {
+	info, err := sfnt.Read(bytes.NewReader(goregular.TTF), parser.NewBudget(int64(len(goregular.TTF))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gidToCID, enc, err := FromCMap(predefined(t, "Adobe-Japan1-7"), nil, info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gid := gidToCID.GID(0); gid != 0 {
+		t.Errorf("CID 0 selects glyph %d", gid)
+	}
+	wantWidth, wantV := math.Round(info.GlyphWidthPDF(0)), GlyphVMetrics(info, 0)
+	if w, v := enc.CID0Metrics(); w != wantWidth || v != wantV {
+		t.Errorf("CID 0 has metrics %g %v, want %g %v", w, v, wantWidth, wantV)
+	}
+}
+
+// TestFromCMapNotdefContract checks that a GIDToCID which does not map CID 0
+// and glyph 0 to each other is rejected.
+func TestFromCMapNotdefContract(t *testing.T) {
+	info := makefont.TrueType()
+	ros := &cid.SystemInfo{Registry: "Test", Ordering: "Private"}
+	f := &cmap.File{
+		Name: "Test-Private-H",
+		ROS:  ros,
+		CodeSpaceRange: charcode.CodeSpaceRange{
+			{Low: []byte{0x00}, High: []byte{0x7F}},
+		},
+		CIDRanges: []cmap.Range{{First: []byte{0x20}, Last: []byte{0x7E}, Value: 1}},
+	}
+	cases := []struct {
+		name string
+		g2c  map[glyph.ID]cid.CID
+		bad  bool
+	}{
+		{"valid", map[glyph.ID]cid.CID{0: 0, 5: 7}, false},
+		{"glyph 0 omitted", map[glyph.ID]cid.CID{5: 7}, false},
+		{"other glyph is CID 0", map[glyph.ID]cid.CID{5: 0}, true},
+		{"glyph 0 is other CID", map[glyph.ID]cid.CID{0: 3}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			g := cmap.NewGIDToCIDFromMap(ros, c.g2c)
+			_, _, err := FromCMap(f, g, info)
+			if (err != nil) != c.bad {
+				t.Errorf("got error %v, want error: %v", err, c.bad)
+			}
+
+			// the same check applies to a CMap without mappings
+			_, _, err = FromCMap(cmap.UTF8H, cmap.NewGIDToCIDFromMap(g.ROS(), c.g2c), info)
+			if (err != nil) != c.bad {
+				t.Errorf("template: got error %v, want error: %v", err, c.bad)
 			}
 		})
 	}

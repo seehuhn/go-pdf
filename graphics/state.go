@@ -356,7 +356,7 @@ func (s *State) GetTextPositionDevice() (float64, float64) {
 	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
 		panic(err)
 	}
-	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M := s.glyphScale()
 	M = M.Mul(s.TextMatrix)
 	M = M.Mul(s.CTM)
 	return M[4], M[5]
@@ -370,9 +370,15 @@ func (s *State) GetTextPositionDevice() (float64, float64) {
 // caller has not set TextFontSize or TextHorizontalScaling, the returned
 // matrix is degenerate.
 func (s *State) TextRenderingMatrix() matrix.Matrix {
-	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M := s.glyphScale()
 	M = M.Mul(s.TextMatrix)
 	return M.Mul(s.CTM)
+}
+
+// glyphScale returns the matrix [Tfs×Th 0 0 Tfs 0 Trise] which maps glyph
+// space to text space.
+func (s *State) glyphScale() matrix.Matrix {
+	return matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
 }
 
 // GetTextPositionUser returns the current text position in user coordinates.
@@ -380,9 +386,31 @@ func (s *State) GetTextPositionUser() (float64, float64) {
 	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
 		panic(err)
 	}
-	M := matrix.Matrix{s.TextFontSize * s.TextHorizontalScaling, 0, 0, s.TextFontSize, 0, s.TextRise}
+	M := s.glyphScale()
 	M = M.Mul(s.TextMatrix)
 	return M[4], M[5]
+}
+
+// GlyphMatrix returns the matrix which maps the outline of the glyph
+// described by info to user space, for a glyph shown at the current text
+// position.  The outline is given in text space units, relative to the
+// horizontal glyph origin.
+//
+// In horizontal writing mode the horizontal glyph origin is placed at the
+// current text position, and the result is the text rendering matrix without
+// the CTM.  In vertical writing mode the current text position is the
+// vertical glyph origin, so the outline is first shifted by minus the position
+// vector ([font.Code.VerticalOriginX], [font.Code.VerticalOriginY]):
+//
+//	[1 0 0 1 -vx -vy] × [Tfs×Th 0 0 Tfs 0 Trise] × Tm
+//
+// Calling this without a font set gives the matrix for horizontal writing.
+func (s *State) GlyphMatrix(info *font.Code) matrix.Matrix {
+	M := s.glyphScale()
+	if s.TextFont != nil && s.TextFont.WritingMode() == font.Vertical {
+		M = matrix.Translate(-info.VerticalOriginX, -info.VerticalOriginY).Mul(M)
+	}
+	return M.Mul(s.TextMatrix)
 }
 
 // AdvanceTextMatrix updates [State.TextMatrix] to account for the displacement
@@ -391,9 +419,6 @@ func (s *State) GetTextPositionUser() (float64, float64) {
 // current font size, character spacing, word spacing (when
 // [font.Code.UseWordSpacing] is set), and — in horizontal writing mode —
 // horizontal scaling.
-//
-// In vertical writing mode the per-glyph (vx, vy) origin offset from
-// W2/DW2 is not applied.
 //
 // Calling this without a font set is a no-op, matching the permissive
 // behaviour of content-stream consumers that may not have seen a Tf
@@ -411,12 +436,7 @@ func (s *State) AdvanceTextMatrix(info *font.Code) {
 		advance *= s.TextHorizontalScaling
 		s.TextMatrix = matrix.Translate(advance, 0).Mul(s.TextMatrix)
 	case font.Vertical:
-		vAdv := info.VerticalAdvance
-		if vAdv == 0 {
-			// spec default DW2 is [880 -1000]
-			vAdv = -1
-		}
-		advance := vAdv*s.TextFontSize + s.TextCharacterSpacing
+		advance := info.VerticalAdvance*s.TextFontSize + s.TextCharacterSpacing
 		if info.UseWordSpacing {
 			advance += s.TextWordSpacing
 		}

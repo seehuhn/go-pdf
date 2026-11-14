@@ -12,6 +12,7 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/internal/cidtest"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
@@ -197,5 +198,58 @@ func TestCompositeRequiresCMap(t *testing.T) {
 	}
 	if _, err := truetype.NewComposite(makefont.TrueType(), &truetype.OptionsComposite{}); err == nil {
 		t.Error("nil CMap accepted")
+	}
+}
+
+// TestCMapOptionNotdef checks that the font as written and the font read
+// back agree on every field of [font.Code], for a hand-written CMap with
+// notdef mappings to CIDs other than 0.
+func TestCMapOptionNotdef(t *testing.T) {
+	for _, wMode := range []font.WritingMode{font.Horizontal, font.Vertical} {
+		t.Run(wMode.String(), func(t *testing.T) {
+			info := makefont.TrueType()
+			f, gidToCID := cidtest.NotdefCMap(t, info, wMode)
+			F, err := truetype.NewComposite(info, &truetype.OptionsComposite{
+				CMap:     f,
+				GIDToCID: gidToCID,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cidtest.CheckNotdef(t, F)
+		})
+	}
+}
+
+// TestCompositeNotdefGlyph checks that, with a CMap whose collection implies a
+// glyph for CID 0, CID 0 is still glyph 0 of the font.
+func TestCompositeNotdefGlyph(t *testing.T) {
+	info := makefont.TrueType()
+	f, err := cmap.Predefined("Adobe-Japan1-7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	F, err := truetype.NewComposite(info, &truetype.OptionsComposite{CMap: f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cidtest.CheckNotdefGlyph(t, F, info, "Hello")
+}
+
+// TestCompositeBadGIDToCID checks that a GIDToCID which does not map CID 0
+// and glyph 0 to each other is rejected.
+func TestCompositeBadGIDToCID(t *testing.T) {
+	info := makefont.TrueType()
+	f, gidToCID := cidtest.NotdefCMap(t, info, font.Horizontal)
+	if _, err := truetype.NewComposite(info, &truetype.OptionsComposite{CMap: f, GIDToCID: gidToCID}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, g2c := range []map[glyph.ID]cid.CID{{5: 0}, {0: 3}} {
+		bad := cmap.NewGIDToCIDFromMap(gidToCID.ROS(), g2c)
+		_, err := truetype.NewComposite(info, &truetype.OptionsComposite{CMap: f, GIDToCID: bad})
+		if err == nil {
+			t.Errorf("table %v accepted", g2c)
+		}
 	}
 }

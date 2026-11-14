@@ -4,6 +4,7 @@
 package dict
 
 import (
+	"slices"
 	"testing"
 
 	"seehuhn.de/go/postscript/cid"
@@ -101,6 +102,40 @@ func TestHorizontalCodeNoVerticalAdvance(t *testing.T) {
 	for c := range f.Codes(pdf.String{0x01}) {
 		if c.VerticalAdvance != 0 {
 			t.Errorf("horizontal-mode VerticalAdvance = %v, want 0", c.VerticalAdvance)
+		}
+	}
+}
+
+// TestVerticalCodeMetrics checks the vertical advance and the position
+// vector the composite font readers report: from W2, or from DW2 with half
+// the glyph width.  A displacement of zero is reported as zero.
+func TestVerticalCodeMetrics(t *testing.T) {
+	ros := &cid.SystemInfo{Registry: "Adobe", Ordering: "Identity", Supplement: 0}
+	width := map[cid.CID]float64{1: 600, 2: 500}
+	dw2 := DefaultVMetrics{OffsY: 880, DeltaY: 0}
+	w2 := map[cid.CID]VMetrics{2: {OffsX: 250, OffsY: 772, DeltaY: 0}, 3: {OffsX: 100, OffsY: 700, DeltaY: -900}}
+	want := [][3]float64{
+		{0, 0.3, 0.88},   // CID 1: DW2, half of W
+		{0, 0.25, 0.772}, // CID 2: W2
+		{-0.9, 0.1, 0.7}, // CID 3: W2
+		{0, 0.5, 0.88},   // CID 4: DW2, half of DW
+	}
+	for name, F := range map[string]font.Instance{
+		"CIDFontType0": (&CIDFontType0{
+			PostScriptName: "Test", ROS: ros, CMap: makeVerticalCMap(),
+			Width: width, DefaultWidth: 1000, DefaultVMetrics: dw2, VMetrics: w2,
+		}).MakeFont(),
+		"CIDFontType2": (&CIDFontType2{
+			PostScriptName: "Test", ROS: ros, CMap: makeVerticalCMap(),
+			Width: width, DefaultWidth: 1000, DefaultVMetrics: dw2, VMetrics: w2,
+		}).MakeFont(),
+	} {
+		var got [][3]float64
+		for c := range F.Codes(pdf.String{1, 2, 3, 4}) {
+			got = append(got, [3]float64{c.VerticalAdvance, c.VerticalOriginX, c.VerticalOriginY})
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s: got %v, want %v", name, got, want)
 		}
 	}
 }

@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 
 	"seehuhn.de/go/geom/matrix"
@@ -28,6 +27,7 @@ import (
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/text"
+	"seehuhn.de/go/pdf/viewer-tests/internal/notdefgrid"
 )
 
 func main() {
@@ -120,9 +120,9 @@ func createDocument(filename string) error {
 	)
 
 	y -= 4
-	showRow(page, test, &y, 'A', 0, 0)
-	showRow(page, test, &y, 'B', 1, 1)
-	showRow(page, test, &y, 'C', 2, 2)
+	notdefgrid.Row(page, test, margin, &y, 'A', 0, 0)
+	notdefgrid.Row(page, test, margin, &y, 'B', 1, 1)
+	notdefgrid.Row(page, test, margin, &y, 'C', 2, 2)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -149,8 +149,8 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showHeaders(page, label, &y)
-	showRow(page, test, &y, 'C', 2, 2)
+	notdefgrid.Headers(page, label, margin, &y)
+	notdefgrid.Row(page, test, margin, &y, 'C', 2, 2)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -163,7 +163,7 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showRow(page, test, &y, 'E', 0, 2)
+	notdefgrid.Row(page, test, margin, &y, 'E', 0, 2)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -175,7 +175,7 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showRow(page, test, &y, 'e', 1, -1)
+	notdefgrid.Row(page, test, margin, &y, 'G', 1, -1)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -187,7 +187,7 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showRow(page, test, &y, 'x', 0, -1)
+	notdefgrid.Row(page, test, margin, &y, 'H', 0, -1)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -199,7 +199,7 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showRow(page, test, &y, '0', 0, 0)
+	notdefgrid.Row(page, test, margin, &y, '0', 0, 0)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -211,7 +211,7 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showRow(page, test, &y, '1', 1, 1)
+	notdefgrid.Row(page, test, margin, &y, '1', 1, 1)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -223,7 +223,7 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showRow(page, test, &y, '2', 0, 1)
+	notdefgrid.Row(page, test, margin, &y, '2', 0, 1)
 	y -= smallskip
 
 	text.Show(page.Builder,
@@ -235,7 +235,7 @@ func createDocument(filename string) error {
 		text.RecordPos{UserX: nil, UserY: &y},
 	)
 	y -= 4
-	showRow(page, test, &y, '!', 0, 0)
+	notdefgrid.Row(page, test, margin, &y, '!', 0, 0)
 
 	// -----------------------------------------------------------------------
 
@@ -247,109 +247,13 @@ func createDocument(filename string) error {
 	return nil
 }
 
-func showHeaders(page *document.Page, font text.F, y *float64) {
-	*y -= 32
-
-	q := 30.0 / 1000.0
-
-	M := matrix.Translate(margin+250*q+2, *y)
-	M = matrix.RotateDeg(90).Mul(M)
-
-	page.TextBegin()
-	page.TextSetFont(font.Font, font.Size)
-	page.SetFillColor(font.Color)
-	page.TextSetMatrix(M)
-	page.TextShow("CID 0")
-	page.TextSecondLine(0, -500*q)
-	page.TextShow("notdef")
-	page.TextNextLine()
-	page.TextShow("glyph")
-	page.TextFirstLine(0, -1500*q)
-	page.TextShow("width 0")
-	page.TextNextLine()
-	page.TextShow("CID 0 width")
-	page.TextNextLine()
-	page.TextShow("notdef width")
-	page.TextNextLine()
-	page.TextShow("glyph width")
-	page.TextNextLine()
-	page.TextShow("default width")
-	page.TextEnd()
-
-	*y -= 11
-}
-
-func showRow(page *document.Page, test text.F, y *float64, code byte, gIdx, wIdx int) {
-	for i := range 3 {
-		if i == gIdx {
-			good(page, *y, i)
-		} else {
-			choice(page, *y, i)
-		}
-	}
-	choice(page, *y, 5)
-	for j := range 3 {
-		if j == wIdx {
-			good(page, *y, j+6)
-		} else {
-			choice(page, *y, j+6)
-		}
-	}
-	choice(page, *y, 9)
-	text.Show(page.Builder,
-		text.M{X: margin, Y: *y},
-		test,
-		pdf.String{code, 'D', 'D', 'D', 'D', 'D', 'A'},
-	)
-
-	*y -= 13
-}
-
-func choice(page *document.Page, y0 float64, idx int) {
-	page.SetLineWidth(0.8)
-	page.SetStrokeColor(color.DeviceGray(0.6))
-	circle(page, y0, idx)
-	page.Stroke()
-}
-
-func good(page *document.Page, y0 float64, idx int) {
-	page.SetFillColor(color.DeviceRGB{0.3, 1, 0.3})
-	circle(page, y0, idx)
-	page.Fill()
-}
-
-func circle(page *document.Page, y0 float64, idx int) {
-	q := 30.0 / 1000.0
-	x := margin + (250+500*float64(idx))*q
-	y := y0 + 150*q
-	page.Circle(x, y, 130*q)
-}
-
 func makeTestFont() (font.Instance, error) {
-	var glyphs []*cff.Glyph
-
-	g := &cff.Glyph{ // CID 0
-		Width: 500,
+	glyphs := []*cff.Glyph{
+		notdefgrid.CrossGlyph(250, notdefgrid.WidthCID0),   // CID 0
+		notdefgrid.CrossGlyph(750, notdefgrid.WidthNotdef), // CID 1
+		notdefgrid.CrossGlyph(1250, notdefgrid.WidthGlyph), // CID 2
+		notdefgrid.CrossGlyph(-1, 500),                     // CID 3, blank
 	}
-	drawCross(g, 250, 150, 140, 32)
-	glyphs = append(glyphs, g)
-
-	g = &cff.Glyph{ // CID 1
-		Width: 1000,
-	}
-	drawCross(g, 750, 150, 140, 32)
-	glyphs = append(glyphs, g)
-
-	g = &cff.Glyph{ // CID 2
-		Width: 1500,
-	}
-	drawCross(g, 1250, 150, 140, 32)
-	glyphs = append(glyphs, g)
-
-	g = &cff.Glyph{ // CID 3, blank
-		Width: 500,
-	}
-	glyphs = append(glyphs, g)
 
 	o := &cff.Outlines{
 		Glyphs: glyphs,
@@ -388,7 +292,7 @@ func makeTestFont() (font.Instance, error) {
 		ROS:   o.ROS,
 		WMode: font.Horizontal,
 		CodeSpaceRange: []charcode.Range{
-			{Low: []byte{'A'}, High: []byte{'Z'}},
+			{Low: []byte{'0'}, High: []byte{'Z'}},
 		},
 		CIDRanges: []cmap.Range{
 			{First: []byte{'A'}, Last: []byte{'Z'}, Value: 0},
@@ -398,8 +302,8 @@ func makeTestFont() (font.Instance, error) {
 			{Code: []byte{'2'}, Value: 5},
 		},
 		NotdefRanges: []cmap.Range{
-			{First: []byte{'a'}, Last: []byte{'w'}, Value: 1},
-			{First: []byte{'x'}, Last: []byte{'z'}, Value: 5},
+			{First: []byte{'G'}, Last: []byte{'G'}, Value: 1},
+			{First: []byte{'H'}, Last: []byte{'H'}, Value: 5},
 		},
 	}
 
@@ -410,6 +314,8 @@ func makeTestFont() (font.Instance, error) {
 		3: 500,
 		4: 1500, // missing glyph
 		5: 1000,
+		6: 1500, // missing glyph, notdef CID 1
+		7: 1500, // missing glyph, notdef CID 5
 	}
 	dw := 2000.0
 
@@ -434,22 +340,4 @@ func makeTestFont() (font.Instance, error) {
 	}
 
 	return dict.MakeFont(), nil
-}
-
-func drawCross(g *cff.Glyph, x, y, r, lw float64) {
-	a := math.Round(r / math.Sqrt(2))
-	b := math.Round(0.5 * lw / math.Sqrt(2))
-
-	g.MoveTo(x-a-b, y-a+b)
-	g.LineTo(x-a+b, y-a-b)
-	g.LineTo(x, y-2*b)
-	g.LineTo(x+a-b, y-a-b)
-	g.LineTo(x+a+b, y-a+b)
-	g.LineTo(x+2*b, y)
-	g.LineTo(x+a+b, y+a-b)
-	g.LineTo(x+a-b, y+a+b)
-	g.LineTo(x, y+2*b)
-	g.LineTo(x-a+b, y+a+b)
-	g.LineTo(x-a-b, y+a-b)
-	g.LineTo(x-2*b, y)
 }

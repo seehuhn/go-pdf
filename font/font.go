@@ -126,7 +126,10 @@ const (
 
 // InstancesEqual compares two font instances for semantic equality.
 // Two fonts are equal if they have the same PostScript name, writing mode,
-// and code space range.
+// and code space range.  Code space ranges are compared as sets of ranges:
+// the order of the ranges and repeated ranges do not matter, but two code
+// spaces which cover the same codes with differently split ranges compare as
+// different.
 //
 // The comparison is deliberately structural rather than exhaustive:
 // instances with the same PostScript name share the embedded font
@@ -151,7 +154,7 @@ func InstancesEqual(a, b Instance) bool {
 	if (codecA == nil) != (codecB == nil) {
 		return false
 	}
-	if codecA != nil && !codecA.CodeSpaceRange().Equivalent(codecB.CodeSpaceRange()) {
+	if codecA != nil && !codecA.Equal(codecB) {
 		return false
 	}
 
@@ -172,13 +175,23 @@ type Code struct {
 	// the glyph is shown.
 	Width float64
 
-	// VerticalAdvance is the y-component of the text-matrix displacement
-	// applied to the following glyph in vertical writing mode, in PDF text
-	// space units (typically negative, since vertical text advances
-	// downward).  Zero means "use the spec default" (one em downward); the
-	// reader and builder fall back to that when this field is left unset.
-	// In horizontal writing mode this field is unused.
+	// VerticalAdvance is the vertical component of the glyph displacement
+	// in vertical writing mode, in PDF text space units.  This still needs to
+	// be scaled by the font size.  It is the displacement applied to the
+	// text matrix after the glyph is shown, and is normally negative, since
+	// vertical text advances downward.  Zero means that the text position
+	// does not move.  In horizontal writing mode this field is unused.
 	VerticalAdvance float64
+
+	// VerticalOriginX and VerticalOriginY give the position vector of the
+	// glyph in vertical writing mode, in PDF text space units: the position
+	// of the vertical glyph origin, relative to the horizontal glyph origin.
+	// These still need to be scaled by the font size.  In vertical writing
+	// mode the current text position is the vertical origin, so the glyph
+	// outline is painted shifted by minus this vector.  In horizontal writing
+	// mode these fields are unused.
+	VerticalOriginX float64
+	VerticalOriginY float64
 
 	// Text is the textual representation of the character.
 	Text string

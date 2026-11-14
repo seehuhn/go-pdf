@@ -10,7 +10,7 @@ import (
 	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
-	_ "seehuhn.de/go/pdf/font" // for the doc strings
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
 )
 
@@ -177,6 +177,21 @@ type VMetrics struct {
 	//
 	// This is normally negative, so that writing goes from top to bottom.
 	DeltaY float64
+}
+
+// setVerticalMetrics sets the vertical writing mode fields of c, whose CID
+// and Width are already set.  The metrics come from the W2 entry for the CID
+// if there is one, and from DW2 and half the glyph width otherwise.
+func setVerticalMetrics(c *font.Code, w2 map[cid.CID]VMetrics, dw2 DefaultVMetrics) {
+	if vm, ok := w2[c.CID]; ok {
+		c.VerticalAdvance = vm.DeltaY / 1000
+		c.VerticalOriginX = vm.OffsX / 1000
+		c.VerticalOriginY = vm.OffsY / 1000
+		return
+	}
+	c.VerticalAdvance = dw2.DeltaY / 1000
+	c.VerticalOriginX = c.Width / 2
+	c.VerticalOriginY = dw2.OffsY / 1000
 }
 
 // encodeVMetrics creates a W2 array for a composite font from a map of CID to vertical metrics.

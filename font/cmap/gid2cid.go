@@ -21,6 +21,9 @@ import (
 // GIDToCID encodes a mapping from Glyph Identifier (GID) values to Character
 // Identifier (CID) values.
 //
+// CID 0 and glyph 0 always correspond: GID(0) is 0, and glyph 0 is written
+// as CID 0.
+//
 // Implementations must be safe for concurrent use.
 type GIDToCID interface {
 	CID(glyph.ID, string) cid.CID
@@ -138,7 +141,7 @@ type gidToCIDFromCMap struct {
 // to CIDs via the text the CMap's character collection assigns to each CID,
 // looked up in lookup.  Where several such CIDs share a glyph, each of them
 // selects that glyph, while the glyph itself is written as the smallest of
-// them.
+// them.  CID 0 is always glyph 0, and no text is matched to it.
 //
 // The error wraps [fs.ErrNotExist] if no text mapping is known for the
 // collection, as for Adobe-Identity.
@@ -159,6 +162,9 @@ func NewGIDToCIDFromCMap(f *File, lookup interface{ Lookup(rune) glyph.ID }) (GI
 	g2c := make(map[glyph.ID]cid.CID)
 	c2g := make(map[cid.CID]glyph.ID)
 	for _, cidVal := range encodable {
+		if cidVal == 0 {
+			continue
+		}
 		rr := []rune(m[cidVal])
 		if len(rr) != 1 {
 			continue
@@ -193,7 +199,8 @@ func (g *gidToCIDFromCMap) ROS() *cid.SystemInfo {
 // NewGIDToCIDFromMap returns a GIDToCID for a fixed table of CIDs, for a
 // character collection the library knows nothing about.  Glyphs missing
 // from the table are written as CID 0.  Where several glyphs share a CID,
-// the CID selects the smallest of them.
+// the CID selects the smallest of them.  The table must map glyph 0 to
+// CID 0 or leave it out, and must map no other glyph to CID 0.
 func NewGIDToCIDFromMap(ros *cid.SystemInfo, g2c map[glyph.ID]cid.CID) GIDToCID {
 	c2g := make(map[cid.CID]glyph.ID, len(g2c))
 	for gid, c := range g2c {

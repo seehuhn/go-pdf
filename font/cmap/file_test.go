@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -24,7 +26,7 @@ import (
 
 var _ pdf.Embedder = (*File)(nil)
 
-// The following variabes contain test CMap data used in the tests below.
+// The following variables contain test CMap data used in the tests below.
 var (
 	// testCMapParent is a CMap file which defines a horizontal CMap.
 	// This is used as the parent CMap of testCMapChild.
@@ -678,5 +680,211 @@ func TestExtractCMapOversize(t *testing.T) {
 
 	if _, err := Extract(pdf.NewCursor(w), ref, false); err == nil {
 		t.Fatal("expected error for oversize CMap, got nil")
+	}
+}
+
+// TestLookupPrecedence checks the precedence of CID and notdef mappings,
+// within one CMap and across a usecmap chain, and that it agrees with All.
+func TestLookupPrecedence(t *testing.T) {
+	parent := &File{
+		CodeSpaceRange: charcode.Simple,
+		CIDRanges:      []Range{{First: []byte{0x40}, Last: []byte{0x4F}, Value: 100}},
+		NotdefRanges:   []Range{{First: []byte{0x00}, Last: []byte{0x1F}, Value: 1}},
+	}
+	child := &File{
+		CIDSingles: []Single{
+			{Code: []byte{0x45}, Value: 300},
+			{Code: []byte{0x45}, Value: 301},
+		},
+		CIDRanges: []Range{
+			{First: []byte{0x42}, Last: []byte{0x46}, Value: 200},
+			{First: []byte{0x44}, Last: []byte{0x48}, Value: 210},
+		},
+		NotdefSingles: []Single{{Code: []byte{0x05}, Value: 2}},
+		NotdefRanges: []Range{
+			{First: []byte{0x10}, Last: []byte{0x17}, Value: 3},
+			{First: []byte{0x14}, Last: []byte{0x1B}, Value: 4},
+		},
+		Parent: parent,
+	}
+
+	cases := []struct {
+		code        byte
+		cid, notdef cid.CID
+	}{
+		{0x41, 101, 0}, // parent range
+		{0x42, 200, 0}, // child range overrides parent
+		{0x44, 210, 0}, // later range overrides earlier
+		{0x45, 301, 0}, // later single overrides ranges and earlier single
+		{0x49, 109, 0}, // parent range
+		{0x05, 2, 2},   // child notdef single
+		{0x06, 1, 1},   // parent notdef range
+		{0x11, 3, 3},   // child notdef range overrides parent
+		{0x15, 4, 4},   // later notdef range overrides earlier
+		{0x1C, 1, 1},   // parent notdef range
+		{0x30, 0, 0},   // nothing
+	}
+	for _, c := range cases {
+		if got := child.LookupCID([]byte{c.code}); got != c.cid {
+			t.Errorf("LookupCID(%02x) = %d, want %d", c.code, got, c.cid)
+		}
+		if got := child.LookupNotdefCID([]byte{c.code}); got != c.notdef {
+			t.Errorf("LookupNotdefCID(%02x) = %d, want %d", c.code, got, c.notdef)
+		}
+	}
+
+	codec, err := child.Codec()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for code, c := range maps.Collect(child.All(codec)) {
+		if got := child.LookupCID(codec.AppendCode(nil, code)); got != c {
+			t.Errorf("code %02x: All gives CID %d, LookupCID %d", code, c, got)
+		}
+	}
+}
+
+// TestFileNil checks that the lookup methods accept a nil receiver.
+func TestFileNil(t *testing.T) {
+	var f *File
+	if c := f.LookupCID([]byte{0}); c != 0 {
+		t.Errorf("nil LookupCID gave CID %d", c)
+	}
+	if c := f.LookupNotdefCID([]byte{0}); c != 0 {
+		t.Errorf("nil LookupNotdefCID gave CID %d", c)
+	}
+	for range f.All(charcode.SimpleCodec) {
+		t.Error("nil All yielded a mapping")
+	}
+	if f.Chain() != nil {
+		t.Error("nil chain is not nil")
+	}
+}
+
+// TestChainCycle checks that a cycle of Parent links, which a file cannot
+// produce but a caller can construct, lists each CMap once.
+func TestChainCycle(t *testing.T) {
+	a := &File{CodeSpaceRange: charcode.CodeSpaceRange{{Low: []byte{0x00}, High: []byte{0x7F}}}}
+	b := &File{CodeSpaceRange: charcode.CodeSpaceRange{{Low: []byte{0x80, 0x00}, High: []byte{0xFF, 0xFF}}}}
+	a.Parent = b
+	b.Parent = a
+
+	chain := a.Chain()
+	if len(chain) != 2 || chain[0] != a || chain[1] != b {
+		t.Errorf("wrong chain %v", chain)
+	}
+	if (*File)(nil).Chain() != nil {
+		t.Error("nil chain is not nil")
+	}
+
+	codec, err := a.Codec()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, k, valid := codec.Decode([]byte{0x80, 0x01}); !valid || k != 2 {
+		t.Errorf("two-byte code: k=%d, valid=%t", k, valid)
+	}
+}
+
+// TestRangeCIDOverflow checks that the codes of a range whose CID would
+// exceed the largest CID are not mapped by that range, consistently in
+// LookupCID and All, and that the file reads back the same after writing.
+func TestRangeCIDOverflow(t *testing.T) {
+	parent := &File{
+		CodeSpaceRange: charcode.Simple,
+		CIDSingles:     []Single{{Code: []byte{0x02}, Value: 7}},
+	}
+	f := &File{
+		Name:           "Overflow",
+		ROS:            &cid.SystemInfo{Registry: "A", Ordering: "B"},
+		CodeSpaceRange: charcode.Simple,
+		CIDRanges: []Range{
+			{First: []byte{0x00}, Last: []byte{0xFF}, Value: math.MaxUint32 - 1},
+		},
+		Parent: parent,
+	}
+
+	want := map[byte]cid.CID{
+		0x00: math.MaxUint32 - 1,
+		0x01: math.MaxUint32,
+		0x02: 7, // from the parent
+		0x03: 0, // unmapped
+		0xFF: 0, // unmapped
+	}
+	for code, c := range want {
+		if got := f.LookupCID([]byte{code}); got != c {
+			t.Errorf("LookupCID(%02x) = %d, want %d", code, got, c)
+		}
+	}
+
+	codec, err := f.Codec()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := maps.Collect(f.All(codec))
+	wantAll := map[charcode.Code]cid.CID{0x00: math.MaxUint32 - 1, 0x01: math.MaxUint32, 0x02: 7}
+	if diff := cmp.Diff(wantAll, got); diff != "" {
+		t.Errorf("All (-want +got):\n%s", diff)
+	}
+
+	buf := &bytes.Buffer{}
+	if err := f.WriteTo(buf, false); err != nil {
+		t.Fatal(err)
+	}
+	f2, _, err := readCMap(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f2.Parent = parent
+	for code := range 256 {
+		c := []byte{byte(code)}
+		if a, b := f.LookupCID(c), f2.LookupCID(c); a != b {
+			t.Errorf("code %02x: CID %d before writing, %d after", code, a, b)
+		}
+	}
+}
+
+// Malformed code space ranges are dropped on read, so that the remaining
+// ranges still give a codec.
+func TestReadCMapInvalidCodeSpace(t *testing.T) {
+	data := func(cmapType int) []byte {
+		return fmt.Appendf(nil, `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /Test def
+/CMapType %d def
+3 begincodespacerange
+<00> <7F>
+<80> <20>
+<8000000000> <FF00000000>
+endcodespacerange
+1 begincidchar
+<20> 1
+endcidchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`, cmapType)
+	}
+	want := charcode.CodeSpaceRange{{Low: []byte{0x00}, High: []byte{0x7F}}}
+
+	info, _, err := readCMap(bytes.NewReader(data(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, info.CodeSpaceRange); diff != "" {
+		t.Errorf("wrong code space ranges (-want +got):\n%s", diff)
+	}
+	if _, err := info.Codec(); err != nil {
+		t.Errorf("no codec: %v", err)
+	}
+
+	tu, err := readToUnicode(bytes.NewReader(data(2)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(want, tu.CodeSpaceRange); diff != "" {
+		t.Errorf("wrong ToUnicode code space ranges (-want +got):\n%s", diff)
 	}
 }

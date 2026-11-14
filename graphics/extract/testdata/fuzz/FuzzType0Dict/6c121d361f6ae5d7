@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("%PDF-1.0\n5 0 obj<<>>stream\n/CIDInit/ProcSet findresource begin 0 %000000000\nbegincmap/CMapName/ def endcmap CMapName currentdict/CMap defineresource\nendstream\n3 0 obj<</Subtype/Type0/DescendantFonts[7 0R]/Encoding 5 0R>>\n7 0 obj<</Subtype/CIDFontType0>>\n9 0 obj<</Pages 1 0R>>\ntrailer<</Quir:E 3 0R/Root 9 0R>>")

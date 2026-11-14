@@ -99,6 +99,10 @@ func FuzzType0Dict(f *testing.F) {
 		}
 	}
 
+	for _, data := range malformedMetricsFiles(f, "CIDFontType0") {
+		f.Add(data)
+	}
+
 	f.Fuzz(func(t *testing.T, fileData []byte) {
 		// Get a "random" Type1Dict from the PDF file.
 

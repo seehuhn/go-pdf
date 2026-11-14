@@ -7,17 +7,19 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
 	"iter"
+	"math"
 	"slices"
 	"strings"
+	"sync"
 	"text/template"
 	"unicode/utf16"
 
 	"seehuhn.de/go/postscript"
-	"seehuhn.de/go/postscript/cid"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font/charcode"
@@ -28,6 +30,17 @@ import (
 // Such a CMap maps character codes to unicode strings.
 //
 // This structure closely resembles the structure of a ToUnicode CMap file.
+//
+// This library supports character codes of at most 4 bytes.  When a CMap is
+// read, code space ranges and mappings with longer codes are ignored.
+// A usecmap chain may contain at most [limits.MaxCMapChainDepth] CMaps,
+// counting the CMap itself; deeper chains can be neither read nor written.
+//
+// Lookups use an index of the mappings of each CMap in the chain, which is
+// built on first use.  The Singles, Ranges and Parent fields of a
+// ToUnicodeFile, and of every ToUnicodeFile it inherits from, must not be
+// modified once it has been used by [ToUnicodeFile.Lookup],
+// [ToUnicodeFile.All] or [ToUnicodeFile.CodeForText].
 type ToUnicodeFile struct {
 	charcode.CodeSpaceRange
 
@@ -90,10 +103,23 @@ func ExtractToUnicode(c pdf.Cursor, obj pdf.Object, _ bool) (*ToUnicodeFile, err
 
 	if parent := stmObj.Dict["UseCMap"]; parent != nil {
 		parentInfo, err := c.Decode(parent, ExtractToUnicode)
-		if pdf.IsReadError(err) {
+		if pdf.IsReadError(err) || errors.Is(err, errChainTooDeep) {
 			return nil, err
 		}
 		res.Parent = parentInfo
+	}
+
+	if res.Parent != nil && parentTooDeep(res.Parent.index()) {
+		return nil, &pdf.MalformedFileError{Err: errChainTooDeep}
+	}
+	if !toUnicodeLevelFits(res) {
+		return nil, &pdf.MalformedFileError{Err: errTooComplex}
+	}
+
+	// The check needs the index of res.  The indices of the parents are
+	// already cached, so the work for a usecmap chain stays linear.
+	if res.index().tooComplex() {
+		return nil, &pdf.MalformedFileError{Err: errTooComplex}
 	}
 
 	return res, nil
@@ -112,15 +138,15 @@ func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
 	res := &ToUnicodeFile{}
 
 	for _, entry := range codeMap.CodeSpaceRanges {
-		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+		r := charcode.Range{Low: entry.Low, High: entry.High}
+		if !r.IsValid() {
 			continue
 		}
-		res.CodeSpaceRange = append(res.CodeSpaceRange,
-			charcode.Range{Low: entry.Low, High: entry.High})
+		res.CodeSpaceRange = append(res.CodeSpaceRange, r)
 	}
 
 	for _, entry := range codeMap.BfChars {
-		if len(entry.Src) == 0 {
+		if !validCodeLength(len(entry.Src)) {
 			continue
 		}
 		s, err := toString(entry.Dst)
@@ -133,7 +159,7 @@ func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
 		})
 	}
 	for _, entry := range codeMap.BfRanges {
-		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+		if len(entry.Low) != len(entry.High) || !validCodeLength(len(entry.Low)) {
 			continue
 		}
 
@@ -178,7 +204,7 @@ func (tu *ToUnicodeFile) IsEmpty() bool {
 // MakeName returns a unique name for the ToUnicodeInfo object.
 //
 // TODO(voss): reconsider once
-// https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
+// https://github.com/pdf-association/pdf-issues/issues/344 is resolved.
 func (tu *ToUnicodeFile) MakeName() pdf.Name {
 	h := md5.New()
 	tu.writeBinary(h, 3)
@@ -243,93 +269,54 @@ func (tu *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
 	}
 }
 
+// All iterates over the codes which the ToUnicode CMap, including the CMaps
+// it inherits from, maps to text.  For every code, the iterator reports the
+// text which [ToUnicodeFile.Lookup] gives.  Each code is reported once, and
+// codes which are not valid for codec are skipped.
+//
+// The enumeration stops after [limits.MaxCMapMappings] codes have been
+// considered.  Mappings with higher precedence are considered first, so
+// that a CMap's own mappings are reported before those it inherits.
 func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, string] {
-	// collect the chain of ToUnicode files, root first
-	var chain []*ToUnicodeFile
-	for g := tu; g != nil; g = g.Parent {
-		chain = append(chain, g)
-	}
-	slices.Reverse(chain)
-
 	return func(yield func(charcode.Code, string) bool) {
-		// bound total enumeration so a wide range cannot spin or grow a
-		// consumer's map disproportionately to the input size
-		budget := limits.MaxCMapMappings
-		for _, g := range chain {
-			for _, r := range g.Ranges {
-				if len(r.Values) == 0 {
-					continue
-				}
-				for i, codeBytes := range codesInRange(r.First, r.Last) {
-					if budget <= 0 {
-						return
-					}
-					budget--
-					code, k, valid := codec.Decode(codeBytes)
-					if !valid || k != len(codeBytes) {
-						continue
-					}
-
-					if i < len(r.Values) {
-						if !yield(code, r.Values[i]) {
-							return
-						}
-					} else {
-						if !yield(code, nextString(r.Values[0], i)) {
-							return
-						}
-					}
-				}
-			}
-			for _, single := range g.Singles {
-				if budget <= 0 {
-					return
-				}
-				budget--
-				code, k, valid := codec.Decode(single.Code)
-				if !valid || k != len(single.Code) {
-					continue
-				}
-				if !yield(code, single.Value) {
-					return
-				}
-			}
+		if tu == nil {
+			return
 		}
+		tu.index().mapped(func(x *toUnicodeLevel, id, pos int, codeBytes []byte) bool {
+			code, k, valid := codec.Decode(codeBytes)
+			if !valid || k != len(codeBytes) {
+				return true
+			}
+			return yield(code, x.entries[id].text(pos))
+		})
 	}
 }
 
 // Lookup returns the unicode string for the given character code,
 // together with a flag indicating whether the code was present in the
 // ToUnicode CMap.
+//
+// A mapping in a CMap takes precedence over one in the CMap it uses.
+// Within one CMap, bfchar mappings take precedence over bfrange mappings,
+// and a later mapping takes precedence over an earlier one.  A code whose
+// position in a range exceeds math.MaxInt32 is not mapped by that range.
+//
+// The lookup uses an index which is built on first use, see
+// [ToUnicodeFile].
 func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
 	if tu == nil {
 		return "", false
 	}
-
-	for _, s := range tu.Singles {
-		if bytes.Equal(s.Code, code) {
-			return s.Value, true
-		}
+	level, id := tu.index().lookup(code)
+	if id < 0 {
+		return "", false
 	}
-
-	for _, r := range tu.Ranges {
-		if len(r.Values) == 0 {
-			continue
-		}
-		index, ok := rangeIndex(r.First, r.Last, code)
-		if !ok {
-			continue
-		}
-		if index < len(r.Values) {
-			return r.Values[index], true
-		}
-		return nextString(r.Values[0], index), true
+	e := level.entries[id]
+	if !e.isRange {
+		return e.values[0], true
 	}
-
-	if tu.Parent != nil {
-		return tu.Parent.Lookup(code)
-	}
-	return "", false
+	index, _ := rangeIndex(e.first, e.last, code)
+	return e.text(index), true
 }
 
 // CodeForText returns a character code whose text is exactly text.  If several
@@ -338,54 +325,124 @@ func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
 //
 // The search is bounded, so on malformed input some matches may be missed.
 func (tu *ToUnicodeFile) CodeForText(text string) ([]byte, bool) {
+	if tu == nil {
+		return nil, false
+	}
 	var best []byte
-	// codes already resolved by a more specific file, honoring the same
-	// child-shadows-parent precedence as Lookup
-	seen := make(map[string]struct{})
-
-	// bound the total work so a wide range cannot spin
-	budget := limits.MaxCMapMappings
-	emit := func(code []byte, value string) bool {
-		if budget <= 0 {
-			return false
-		}
-		budget--
-		key := string(code)
-		if _, dup := seen[key]; dup {
-			return true
-		}
-		seen[key] = struct{}{}
-		if value == text && (best == nil || codeLess(code, best)) {
+	tu.index().mapped(func(x *toUnicodeLevel, id, pos int, code []byte) bool {
+		if (best == nil || codeLess(code, best)) && x.entries[id].text(pos) == text {
 			best = bytes.Clone(code)
 		}
 		return true
-	}
-
-	// child first, and within a file singles before ranges, matching Lookup
-	for g := tu; g != nil; g = g.Parent {
-		for _, single := range g.Singles {
-			if !emit(single.Code, single.Value) {
-				return best, best != nil
-			}
-		}
-		for _, r := range g.Ranges {
-			if len(r.Values) == 0 {
-				continue
-			}
-			for i, codeBytes := range codesInRange(r.First, r.Last) {
-				var value string
-				if i < len(r.Values) {
-					value = r.Values[i]
-				} else {
-					value = nextString(r.Values[0], i)
-				}
-				if !emit(codeBytes, value) {
-					return best, best != nil
-				}
-			}
-		}
-	}
+	})
 	return best, best != nil
+}
+
+// toUnicodeLevel allows to look up the mappings of a single ToUnicode CMap,
+// without those it inherits.  Entries are numbered in order of precedence,
+// so that a smaller id takes precedence over a larger one.
+type toUnicodeLevel struct {
+	entries []toUnicodeEntry
+	index   *codeIndex
+}
+
+func (x *toUnicodeLevel) numEntries() int {
+	return len(x.entries)
+}
+
+func (x *toUnicodeLevel) entryCodes(id int) iter.Seq2[int, []byte] {
+	return x.entries[id].codes()
+}
+
+func (x *toUnicodeLevel) lookup(code []byte) int {
+	return x.index.lookup(code)
+}
+
+func (x *toUnicodeLevel) hasLeftover() bool {
+	return len(x.index.leftover) > 0
+}
+
+// toUnicodeEntry is a bfchar or bfrange entry of a ToUnicode CMap.
+type toUnicodeEntry struct {
+	first, last []byte
+	values      []string
+	isRange     bool
+}
+
+// codes iterates over the codes of the entry, together with their position
+// in the entry.
+func (e toUnicodeEntry) codes() iter.Seq2[int, []byte] {
+	if e.isRange {
+		return codesInRange(e.first, e.last)
+	}
+	return func(yield func(int, []byte) bool) {
+		yield(0, e.first)
+	}
+}
+
+// text returns the text for the code at the given position in the entry.
+func (e toUnicodeEntry) text(i int) string {
+	if i < len(e.values) {
+		return e.values[i]
+	}
+	return nextString(e.values[0], i)
+}
+
+// toUnicodeIndexes holds the indices of [ToUnicodeFile] objects, see
+// [cachedChainIndex].
+var toUnicodeIndexes sync.Map
+
+// index returns the index of tu and its parents.  The receiver must not be
+// nil.
+func (tu *ToUnicodeFile) index() *chainIndex[*toUnicodeLevel] {
+	return cachedChainIndex(&toUnicodeIndexes, tu, toUnicodeParent, buildToUnicodeLevel)
+}
+
+func toUnicodeParent(tu *ToUnicodeFile) *ToUnicodeFile {
+	return tu.Parent
+}
+
+// buildToUnicodeLevel builds the index for the mappings of tu, without
+// those of its parents.  This takes O(n log n) time for n entries.
+func buildToUnicodeLevel(tu *ToUnicodeFile) *toUnicodeLevel {
+	x, boxes := toUnicodeLevelBoxes(tu)
+	x.index = newCodeIndex(boxes)
+	return x
+}
+
+// toUnicodeLevelFits reports whether the index for the mappings of tu,
+// without those of its parents, has no leftover boxes, see [piecesFit].
+// This takes time linear in the number of entries.
+func toUnicodeLevelFits(tu *ToUnicodeFile) bool {
+	_, boxes := toUnicodeLevelBoxes(tu)
+	return piecesFit(boxes)
+}
+
+// toUnicodeLevelBoxes returns the entries of tu, without their index,
+// together with the boxes for the index.
+func toUnicodeLevelBoxes(tu *ToUnicodeFile) (x *toUnicodeLevel, boxes []box) {
+	x = &toUnicodeLevel{}
+	for _, s := range slices.Backward(tu.Singles) {
+		boxes = append(boxes, box{s.Code, s.Code, len(x.entries)})
+		x.entries = append(x.entries, toUnicodeEntry{
+			first:  s.Code,
+			last:   s.Code,
+			values: []string{s.Value},
+		})
+	}
+	for _, r := range slices.Backward(tu.Ranges) {
+		if len(r.Values) == 0 {
+			continue
+		}
+		boxes = indexedBoxes(boxes, r.First, r.Last, math.MaxInt32, len(x.entries))
+		x.entries = append(x.entries, toUnicodeEntry{
+			first:   r.First,
+			last:    r.Last,
+			values:  r.Values,
+			isRange: true,
+		})
+	}
+	return x, boxes
 }
 
 // codeLess reports whether character code a sorts before b, shorter codes
@@ -398,6 +455,10 @@ func codeLess(a, b []byte) bool {
 }
 
 func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
+	if err := checkWritable(tu, toUnicodeParent, toUnicodeLevelFits); err != nil {
+		return nil, err
+	}
+
 	opt := rm.Out().GetOptions()
 
 	// TODO(voss): review this once
@@ -462,7 +523,7 @@ func hexString(s string) string {
 }
 
 // TODO(voss): once https://github.com/pdf-association/pdf-issues/issues/344
-// is resoved, reconsider CIDSystemInfo.
+// is resolved, reconsider CIDSystemInfo.
 var toUnicodeTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"PN": func(s pdf.Name) string {
 		x := postscript.Name(string(s))
@@ -471,7 +532,8 @@ var toUnicodeTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": chunks[ToUnicodeSingle],
+	"CodeSpaceChunks": chunks[charcode.Range],
+	"SingleChunks":    chunks[ToUnicodeSingle],
 	"Single": func(s ToUnicodeSingle) string {
 		val := hexString(s.Value)
 		return fmt.Sprintf("<%x> %s", s.Code, val)
@@ -496,13 +558,13 @@ begincmap
 /CMapName {{PN .MakeName}} def
 /CMapType 2 def
 /CIDSystemInfo <</Registry (Adobe) /Ordering (UCS) /Supplement 0>> def
-{{with .CodeSpaceRange -}}
+{{range CodeSpaceChunks .CodeSpaceRange -}}
 {{len .}} begincodespacerange
 {{range . -}}
 {{B .Low}} {{B .High}}
 {{end -}}
-{{end -}}
 endcodespacerange
+{{end -}}
 {{range SingleChunks .Singles -}}
 {{len .}} beginbfchar
 {{range . -}}
@@ -524,12 +586,5 @@ CMapName currentdict /CMap defineresource pop
 end
 end
 `))
-
-// TODO(voss): reconsider once
-// https://github.com/pdf-association/pdf-issues/issues/344 is resoved.
-var toUnicodeROS = &cid.SystemInfo{
-	Registry: "Adobe",
-	Ordering: "UCS",
-}
 
 const brokenReplacement = "\uFFFD"

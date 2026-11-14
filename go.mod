@@ -13,7 +13,7 @@ require (
 	seehuhn.de/go/jpx v0.8.0
 	seehuhn.de/go/membudget v0.8.0
 	seehuhn.de/go/postscript v0.8.0
-	seehuhn.de/go/sfnt v0.8.0
+	seehuhn.de/go/sfnt v0.8.1-0.20261113192212-b427659d5269
 	seehuhn.de/go/xmp v0.8.0
 )
 

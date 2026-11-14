@@ -33,7 +33,7 @@ import (
 const description = `
 This file tests CMap file behavior when CID ranges span holes in the code space.
 The test font defines valid codes as 0x00-0x41 and 0x43-0xFF, excluding 0x42.
-The CMap maps range 0x41-0x43 to consecutive CIDs starting at 43 (representing the character “A”).
+The CMap maps range 0x41-0x43 to consecutive CIDs starting at 34 (representing the character “A”).
 The text contains codes 0x41 and 0x43.  There is some ambiguity:
 0x43 could be interpreted as “B” (the second valid code in the range)
 or “C” (the third element in the range).

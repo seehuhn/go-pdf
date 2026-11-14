@@ -35,10 +35,13 @@ type Reader struct {
 	//
 	// The text matrix is at the start position of the character when this
 	// callback fires; the matrix advance happens after.  For the start
-	// position use the permissive [content.State.TextRenderingMatrix]
+	// position use the permissive [graphics.State.TextRenderingMatrix]
 	// (via r.State.GState): GetTextPositionDevice panics unless every
 	// text-state parameter has been explicitly set, which a hostile or
-	// minimal content stream cannot be assumed to have done.
+	// minimal content stream cannot be assumed to have done.  The glyph
+	// itself is placed by [graphics.State.GlyphMatrix], which in vertical
+	// writing mode differs from the text position by the glyph's position
+	// vector.
 	Character func(c font.Code) error
 
 	TextEvent func(event TextEvent, arg float64)

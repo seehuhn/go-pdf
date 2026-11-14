@@ -342,6 +342,30 @@ const (
 	// stops silently once the bound is reached.
 	MaxCMapMappings = 1 << 20
 
+	// MaxCMapIndexExtraPieces caps the number of pieces beyond one per
+	// mapping entry in one lookup index of a CMap or ToUnicode CMap.  A
+	// piece is the part of an entry which lies below one combination of
+	// segment-tree nodes for the leading bytes of the code.  An entry whose
+	// leading bytes are constant, or cover 00 to FF, costs one piece, so
+	// CMaps of any size built from such entries always fit.  Other entries
+	// cost up to 14, 196 or 2,744 pieces for codes of 2, 3 or 4 bytes, so
+	// that a short range line can claim thousands of pieces; bounding the
+	// excess keeps the work for an index linear in the number of entries
+	// plus a small fixed amount.  Real CMaps need almost no extra pieces.
+	// The bound leaves room for 1,260 worst-case two-byte ranges, 84
+	// three-byte or 5 four-byte ones, or 57 ranges like
+	// <81308130> <FE39FE39>, at 287 extra pieces each.  CMaps whose
+	// entries do not fit are rejected as too complex.
+	MaxCMapIndexExtraPieces = 1 << 14
+
+	// MaxCMapChainDepth caps the number of CMaps in a usecmap chain,
+	// counting the CMap itself, so that a CMap without a parent has depth
+	// one.  Chains are read and written as one stream per CMap, and
+	// lookups consult every CMap in the chain.  The deepest predefined
+	// chain has three CMaps, and an embedded CMap extending it gives four,
+	// so 8 leaves slack; deeper chains are rejected as malformed.
+	MaxCMapChainDepth = 8
+
 	// MaxFontProgramBytes caps the decoded byte count of an embedded
 	// font program (FontFile, FontFile2, FontFile3).  Large TrueType
 	// or OpenType fonts can reach several MiB; 16 MiB allows headroom

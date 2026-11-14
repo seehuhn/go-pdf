@@ -14,11 +14,21 @@ import (
 
 // SetMapping updates a cmap File with a new mapping.
 // This replaces the CodeSpaceRange and CIDSingles/CIDRanges fields.
+// The code space range is that of codec, with overlapping ranges split
+// as for [charcode.CodeSpaceRange.Disjoint].  The File must not have been
+// used for lookups before, see [File].
 //
 // Codes which are already correctly set in a parent cmap are not included in
 // the new mapping.
-func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]cid.CID) {
-	f.CodeSpaceRange = codec.CodeSpaceRange()
+//
+// The error is [charcode.ErrTooComplex] if the code space range of codec
+// cannot be written without overlaps; f is unchanged in this case.
+func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]cid.CID) error {
+	csr, err := codec.CodeSpaceRange().Disjoint()
+	if err != nil {
+		return err
+	}
+	f.CodeSpaceRange = csr
 	f.CIDSingles = nil
 	f.CIDRanges = nil
 
@@ -81,4 +91,5 @@ func (f *File) SetMapping(codec *charcode.Codec, data map[charcode.Code]cid.CID)
 			}
 		}
 	}
+	return nil
 }

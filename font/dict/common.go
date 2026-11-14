@@ -8,6 +8,7 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/encoding"
 	"seehuhn.de/go/pdf/internal/stdmtx"
 )
@@ -100,4 +101,13 @@ func fontDescriptorIsCompatible(fd *font.Descriptor, stdInfo *stdmtx.FontData) b
 	}
 
 	return true
+}
+
+// codeKey identifies a character code together with its length in bytes.
+// The value of a [charcode.Code] alone does not determine the bytes: an
+// incomplete code at the end of a string can have the same value as a
+// longer code whose last bytes are zero.
+type codeKey struct {
+	code charcode.Code
+	n    int
 }

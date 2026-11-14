@@ -10,8 +10,10 @@ import (
 	"seehuhn.de/go/sfnt"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/cmap"
 	"seehuhn.de/go/pdf/font/dict"
+	"seehuhn.de/go/pdf/font/internal/cidtest"
 	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/graphics/extract"
 	"seehuhn.de/go/pdf/internal/debug/makefont"
@@ -103,4 +105,55 @@ func embedTrueTypeComposite(t *testing.T, v pdf.Version, fontData *sfnt.Font) *d
 		t.Fatalf("wrong font dictionary type: %T", dictObj)
 	}
 	return d
+}
+
+// TestCompositeVerticalMetrics checks the DW2 and W2 entries written for a
+// font with vertical metrics, using a predefined and a UTF-8 vertical CMap.
+// One glyph has a vertical advance of zero.
+func TestCompositeVerticalMetrics(t *testing.T) {
+	for _, c := range []*cmap.File{cmap.IdentityV, cmap.UTF8V} {
+		t.Run(c.Name, func(t *testing.T) {
+			info := makefont.TrueType()
+			cidtest.ZeroAdvance(t, info, 'w')
+			F, err := truetype.NewComposite(info, &truetype.OptionsComposite{CMap: c})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cidtest.CheckVertical(t, F, info, verticalTestText)
+		})
+	}
+}
+
+// TestCompositeHorizontalMetrics checks that horizontal writing leaves
+// out DW2 and W2, even though the font has vertical metrics.
+func TestCompositeHorizontalMetrics(t *testing.T) {
+	for _, c := range []*cmap.File{cmap.IdentityH, cmap.UTF8H} {
+		t.Run(c.Name, func(t *testing.T) {
+			F, err := truetype.NewComposite(makefont.TrueType(), &truetype.OptionsComposite{CMap: c})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cidtest.CheckHorizontal(t, F, verticalTestText)
+		})
+	}
+}
+
+// verticalTestText mixes glyphs with the two kinds of vertical metrics of
+// the makefont fonts.
+const verticalTestText = "Hello, vertical world."
+
+// TestCompositeSharedCID checks that two glyphs sharing a CID are written with the
+// metrics of the glyph the embedded font has for that CID.
+func TestCompositeSharedCID(t *testing.T) {
+	for _, wMode := range []font.WritingMode{font.Horizontal, font.Vertical} {
+		t.Run(wMode.String(), func(t *testing.T) {
+			info := makefont.TrueType()
+			f, gidToCID := cidtest.SharedCIDCMap(t, info, wMode)
+			F, err := truetype.NewComposite(info, &truetype.OptionsComposite{CMap: f, GIDToCID: gidToCID})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cidtest.CheckSharedCID(t, F, info)
+		})
+	}
 }

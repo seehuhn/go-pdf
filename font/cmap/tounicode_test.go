@@ -17,6 +17,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/internal/debug/memfile"
+	"seehuhn.de/go/postscript/cid"
 )
 
 var _ pdf.Embedder = (*ToUnicodeFile)(nil)
@@ -70,6 +71,20 @@ func TestToUnicodeRangeIter(t *testing.T) {
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("unexpected result: got %v, want %v", got, c.want)
 		}
+	}
+}
+
+// TestToUnicodeNil checks that the lookup methods accept a nil receiver.
+func TestToUnicodeNil(t *testing.T) {
+	var tu *ToUnicodeFile
+	if _, ok := tu.Lookup([]byte{0}); ok {
+		t.Error("nil Lookup found a mapping")
+	}
+	if _, ok := tu.CodeForText("A"); ok {
+		t.Error("nil CodeForText found a code")
+	}
+	for range tu.All(charcode.SimpleCodec) {
+		t.Error("nil All yielded a mapping")
 	}
 }
 
@@ -287,13 +302,13 @@ func TestExtractToUnicode(t *testing.T) {
 	}
 
 	childRef := data.Alloc()
-	cihldDict := pdf.Dict{
+	childDict := pdf.Dict{
 		"Type":          pdf.Name("CMap"),
 		"CMapName":      pdf.Name("Child"),
 		"CIDSystemInfo": rosRef,
 		"UseCMap":       parentRef,
 	}
-	stm, err = data.OpenStream(childRef, cihldDict)
+	stm, err = data.OpenStream(childRef, childDict)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,4 +577,11 @@ func TestToUnicodeTemplate(t *testing.T) {
 			t.Errorf("expected line %q not found in output", line)
 		}
 	}
+}
+
+// toUnicodeROS is the character collection of the CIDSystemInfo dictionary
+// written into ToUnicode CMap streams.
+var toUnicodeROS = &cid.SystemInfo{
+	Registry: "Adobe",
+	Ordering: "UCS",
 }

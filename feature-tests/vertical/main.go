@@ -35,9 +35,13 @@ func createDocument(fname string) error {
 		return err
 	}
 
+	// The synthetic font gives letters above the x-height a different
+	// advance height and vertical origin than the others, so that the font
+	// dictionary needs both DW2 and W2.
+	const size = 64
 	var s pdf.String
 	codec := F.Codec()
-	gg := F.Layout(nil, 10, "HELLO")
+	gg := F.Layout(nil, size, "Hello")
 	for _, g := range gg.Seq {
 		code, ok := F.Encode(g.GID, g.Text)
 		if !ok {
@@ -47,13 +51,20 @@ func createDocument(fname string) error {
 	}
 
 	page.TextBegin()
-	page.TextSetFont(F, 64)
+	page.TextSetFont(F, size)
 	page.TextFirstLine(72, 520)
 	page.TextShowRaw(s)
 	page.TextEnd()
 
+	// A red dot at the vertical origin of each glyph.  The dots step by the
+	// vertical advance the font reports for the codes, which is what the
+	// text operators above use.
 	page.SetFillColor(color.Red)
-	page.Circle(72, 520, 5)
+	y := 520.0
+	for c := range F.Codes(s) {
+		page.Circle(72, y, 3)
+		y += c.VerticalAdvance * size
+	}
 	page.Fill()
 
 	return page.Close()

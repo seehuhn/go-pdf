@@ -86,9 +86,9 @@ func TestVerticalAdvanceDirection(t *testing.T) {
 	}
 }
 
-// TestVerticalAdvanceFallback verifies that a font with no VerticalAdvance
-// (zero value) falls back to the spec default of one em downward.
-func TestVerticalAdvanceFallback(t *testing.T) {
+// TestVerticalAdvanceZero verifies that a vertical advance of zero leaves
+// the text position unchanged.
+func TestVerticalAdvanceZero(t *testing.T) {
 	r := New(nil)
 	f := &fakeFont{vertical: true, hWidth: 500, vAdvance: 0}
 	withTextState(r, f, 12, 0, 0)
@@ -97,10 +97,8 @@ func TestVerticalAdvanceFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wantTM := matrix.Translate(0, -12)
-	if r.State.GState.TextMatrix != wantTM {
-		t.Errorf("TextMatrix = %v, want %v (1 em downward)",
-			r.State.GState.TextMatrix, wantTM)
+	if r.State.GState.TextMatrix != matrix.Identity {
+		t.Errorf("TextMatrix = %v, want the identity", r.State.GState.TextMatrix)
 	}
 }
 

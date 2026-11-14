@@ -6,8 +6,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"math"
 	"os"
+	"slices"
 
 	"golang.org/x/image/font/gofont/gomono"
 
@@ -32,13 +34,15 @@ import (
 
 const description = `
 This file tests how CID values are allocated in ranges where more than just
-the last byte is differs for the first and last code.  Specifically, the
+the last byte differs between the first and last code.  Specifically, the
 test font in this file uses two-byte codes, and the range from 0x3030 to
 0x3232 is mapped to a range of CIDs starting at 34 (representing the character “A”).
 The text shown consists of three rows, using codes
 0x3030, 0x3031, 0x3032 for the top row,
 0x3130, 0x3131, 0x3132 for the middle row, and
 0x3230, 0x3231, 0x3232 for the bottom row.
+The rows read ABC, DEF, GHI if each byte of the code varies independently,
+and ABC, abc, def if the codes are counted as two-byte numbers.
 `
 
 func main() {
@@ -97,7 +101,19 @@ func createDocument(fname string) error {
 
 func makeTestFont() (font.Instance, error) {
 
-	numCID := 34 + 9
+	// the glyph shown for a code tells how the viewer read the range
+	glyphs := map[cid.CID]rune{}
+	for i, r := range "ABCDEFGHI" {
+		// every byte varies independently: CID 34 + 3*row + column
+		glyphs[cid.CID(34+i)] = r
+	}
+	for i, r := range "abcdef" {
+		// codes counted as two-byte numbers: CID 34 + 256*row + column
+		row, col := 1+i/3, i%3
+		glyphs[cid.CID(34+256*row+col)] = r
+	}
+
+	numCID := 34 + 2*256 + 3
 	cidToGID := make([]glyph.ID, numCID)
 	width := map[cid.CID]float64{}
 
@@ -115,10 +131,8 @@ func makeTestFont() (font.Instance, error) {
 	cidToGID[0] = glyph.ID(len(subsetGlyphs))
 	subsetGlyphs = append(subsetGlyphs, 0)
 	width[0] = math.Round(origFont.GlyphWidthPDF(0))
-	for r := 'A'; r < 'A'+9; r++ {
-		// CID 34 = A, ...
-		cid := cid.CID(r - 'A' + 34)
-		origGID := cmapTable.Lookup(r)
+	for _, cid := range slices.Sorted(maps.Keys(glyphs)) {
+		origGID := cmapTable.Lookup(glyphs[cid])
 		cidToGID[cid] = glyph.ID(len(subsetGlyphs))
 		width[cid] = math.Round(origFont.GlyphWidthPDF(origGID))
 		subsetGlyphs = append(subsetGlyphs, origGID)

@@ -13,7 +13,8 @@ import (
 
 // NewToUnicodeFile creates a ToUnicodeFile object.
 //
-// The only error returned is if the CodeSpaceRange is invalid.
+// An error is returned if [charcode.NewCodec] fails for the code space range:
+// if the range is invalid, or if its lookup tree would be too large.
 func NewToUnicodeFile(csr charcode.CodeSpaceRange, data map[charcode.Code]string) (*ToUnicodeFile, error) {
 	res := &ToUnicodeFile{
 		CodeSpaceRange: csr,
@@ -97,6 +98,9 @@ func NewToUnicodeFile(csr charcode.CodeSpaceRange, data map[charcode.Code]string
 	return res, nil
 }
 
+// GetMapping returns the mapping from character codes to text, for the
+// codes valid in the code space range of tu, as reported by
+// [ToUnicodeFile.All].  The error is that of [charcode.NewCodec].
 func (tu *ToUnicodeFile) GetMapping() (map[charcode.Code]string, error) {
 	codec, err := charcode.NewCodec(tu.CodeSpaceRange)
 	if err != nil {

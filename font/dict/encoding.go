@@ -11,16 +11,19 @@ import (
 )
 
 // makeCodec creates a character codec from CMap and ToUnicode information.
-// It attempts to use the union of code space ranges from both sources,
-// falling back to simpler codecs if needed.
-func makeCodec(cmap *cmap.File, toUnicode *cmap.ToUnicodeFile) *charcode.Codec {
-	// First try to use the the union of the code space ranges from the CMap
-	// and the ToUnicode cmap.  If this fails, remove code space ranges from
-	// the end one by one until we find a working codec.
+// It uses the list of code space ranges from both sources, including those a
+// CMap inherits through usecmap.
+//
+// If the list is invalid, the longest initial part of the list which forms a
+// codec is used instead.  If no such part exists, or if the lookup tree for
+// the full list would be too large, one-byte codes are used.
+func makeCodec(cm *cmap.File, toUnicode *cmap.ToUnicodeFile) *charcode.Codec {
 	var csr charcode.CodeSpaceRange
-	for _, r := range cmap.CodeSpaceRange {
-		if r.IsValid() {
-			csr = append(csr, r)
+	for _, f := range cm.Chain() {
+		for _, r := range f.CodeSpaceRange {
+			if r.IsValid() {
+				csr = append(csr, r)
+			}
 		}
 	}
 	if toUnicode != nil {
@@ -30,17 +33,43 @@ func makeCodec(cmap *cmap.File, toUnicode *cmap.ToUnicodeFile) *charcode.Codec {
 			}
 		}
 	}
-	for len(csr) > 0 {
-		codec, err := charcode.NewCodec(csr)
+
+	if len(csr) == 0 {
+		return charcode.SimpleCodec
+	}
+	codec, err := charcode.NewCodec(csr)
+	switch err {
+	case nil:
+		return codec
+	case charcode.ErrTooComplex:
+		return charcode.SimpleCodec
+	}
+
+	// A list of ranges is invalid only if one range is a prefix of a code in
+	// another, and adding ranges cannot remove such a conflict.  The valid
+	// prefixes of the list therefore form an initial segment, and a binary
+	// search finds the longest one.  A prefix with too large a lookup tree
+	// counts as invalid, which can make the search stop short of the longest
+	// working prefix, but the result stays deterministic.
+	var best *charcode.Codec
+	// invariant: csr[:lo] forms a codec or lo is 0, and csr[:hi+1] does
+	// not or hi is len(csr)
+	lo, hi := 0, len(csr)-1
+	for lo < hi {
+		mid := hi - (hi-lo)/2 // in (lo, hi]
+		codec, err := charcode.NewCodec(csr[:mid])
 		if err == nil {
-			return codec
+			best, lo = codec, mid
+		} else {
+			hi = mid - 1
 		}
-		csr = csr[:len(csr)-1]
+	}
+	if best != nil {
+		return best
 	}
 
 	// As a fallback, use one-byte codes.
-	codec, _ := charcode.NewCodec(charcode.Simple)
-	return codec
+	return charcode.SimpleCodec
 }
 
 // SimpleTextMap creates a mapping from character codes to Unicode text strings

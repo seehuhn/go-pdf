@@ -6,7 +6,16 @@ package cmap
 import (
 	"bytes"
 	"iter"
+
+	"seehuhn.de/go/pdf/font/charcode"
 )
+
+// validCodeLength reports whether a character code of n bytes is supported,
+// see [charcode.MaxCodeLength].  The CMap readers drop entries with longer codes,
+// since these can never match a decoded code.
+func validCodeLength(n int) bool {
+	return n >= 1 && n <= charcode.MaxCodeLength
+}
 
 func rangeIsValid(first, last []byte) bool {
 	if len(first) != len(last) || len(first) == 0 {

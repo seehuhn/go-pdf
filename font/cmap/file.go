@@ -7,12 +7,14 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
 	"iter"
 	"math"
 	"slices"
+	"sync"
 	"text/template"
 
 	"seehuhn.de/go/postscript"
@@ -34,6 +36,17 @@ import (
 // character identifiers (CIDs).
 //
 // This structure reflects the structure of a CMap file.
+//
+// This library supports character codes of at most 4 bytes.  When a CMap is
+// read, code space ranges and mappings with longer codes are ignored.
+// A usecmap chain may contain at most [limits.MaxCMapChainDepth] CMaps,
+// counting the CMap itself; deeper chains can be neither read nor written.
+//
+// Lookups use an index of the mappings of each CMap in the chain, which is
+// built on first use.  The CIDSingles, CIDRanges, NotdefSingles,
+// NotdefRanges and Parent fields of a File, and of every File it inherits
+// from, must not be modified once it has been used by [File.LookupCID],
+// [File.LookupNotdefCID] or [File.All].
 type File struct {
 	Name  string
 	ROS   *cid.SystemInfo
@@ -123,11 +136,24 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*File, error) {
 	// parent CMap
 	if useCMap := dict["UseCMap"]; useCMap != nil {
 		res.Parent, err = c.Decode(useCMap, Extract)
-		if pdf.IsReadError(err) {
+		if pdf.IsReadError(err) || errors.Is(err, errChainTooDeep) {
 			return nil, err
 		}
 	} else if parentName != "" {
 		res.Parent, _ = Predefined(string(parentName))
+	}
+
+	if res.Parent != nil && parentTooDeep(res.Parent.index()) {
+		return nil, &pdf.MalformedFileError{Err: errChainTooDeep}
+	}
+	if !fileLevelFits(res) {
+		return nil, &pdf.MalformedFileError{Err: errTooComplex}
+	}
+
+	// The check needs the index of res.  The indices of the parents are
+	// already cached, so the work for a usecmap chain stays linear.
+	if res.index().tooComplex() {
+		return nil, &pdf.MalformedFileError{Err: errTooComplex}
 	}
 
 	return res, nil
@@ -192,15 +218,15 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 	}
 
 	for _, entry := range codeMap.CodeSpaceRanges {
-		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+		r := charcode.Range{Low: entry.Low, High: entry.High}
+		if !r.IsValid() {
 			continue
 		}
-		res.CodeSpaceRange = append(res.CodeSpaceRange,
-			charcode.Range{Low: entry.Low, High: entry.High})
+		res.CodeSpaceRange = append(res.CodeSpaceRange, r)
 	}
 
 	for _, entry := range codeMap.CidChars {
-		if len(entry.Src) == 0 {
+		if !validCodeLength(len(entry.Src)) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
@@ -213,7 +239,7 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 		})
 	}
 	for _, entry := range codeMap.CidRanges {
-		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+		if len(entry.Low) != len(entry.High) || !validCodeLength(len(entry.Low)) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
@@ -227,7 +253,7 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 		})
 	}
 	for _, entry := range codeMap.NotdefChars {
-		if len(entry.Src) == 0 {
+		if !validCodeLength(len(entry.Src)) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
@@ -240,7 +266,7 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 		})
 	}
 	for _, entry := range codeMap.NotdefRanges {
-		if len(entry.Low) != len(entry.High) || len(entry.Low) == 0 {
+		if len(entry.Low) != len(entry.High) || !validCodeLength(len(entry.Low)) {
 			continue
 		}
 		cidVal, ok := entry.Dst.(postscript.Integer)
@@ -257,7 +283,9 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 	return res, parent, nil
 }
 
-// Clone returns a shallow copy of the CMap file.
+// Clone returns a shallow copy of the CMap file.  The copy shares the
+// slices of mappings with f, so these must be replaced rather than modified
+// in place.
 func (f *File) Clone() *File {
 	clone := *f
 	return &clone
@@ -337,57 +365,37 @@ func (f *File) writeBinary(h hash.Hash, maxGen int) {
 	}
 }
 
+// Codec returns a codec for the code space ranges of the CMap and of the
+// CMaps it inherits from.  The error is that of [charcode.NewCodec]: the
+// code space range is invalid, or its lookup tree would be too large.
 func (f *File) Codec() (*charcode.Codec, error) {
 	var cs charcode.CodeSpaceRange
-	for f != nil {
-		cs = append(cs, f.CodeSpaceRange...)
-		f = f.Parent
+	for _, g := range f.Chain() {
+		cs = append(cs, g.CodeSpaceRange...)
 	}
 	return charcode.NewCodec(cs)
 }
 
+// All iterates over the codes which the CMap, including the CMaps it
+// inherits from through usecmap, maps to CIDs.  For every code, the
+// iterator reports the CID which [File.LookupCID] gives.  Each code is
+// reported once, and codes which are not valid for codec are skipped.
+//
+// The enumeration stops after [limits.MaxCMapMappings] codes have been
+// considered.  Mappings with higher precedence are considered first, so
+// that a CMap's own mappings are reported before those it inherits.
 func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
-	// collect the chain of CMap files, root first
-	var chain []*File
-	for g := f; g != nil; g = g.Parent {
-		chain = append(chain, g)
-	}
-	slices.Reverse(chain)
-
 	return func(yield func(charcode.Code, cid.CID) bool) {
-		// bound total enumeration so a wide range cannot spin or grow a
-		// consumer's map disproportionately to the input size
-		budget := limits.MaxCMapMappings
-		for _, g := range chain {
-			for _, r := range g.CIDRanges {
-				for i, codeBytes := range codesInRange(r.First, r.Last) {
-					if budget <= 0 {
-						return
-					}
-					budget--
-					code, k, valid := codec.Decode(codeBytes)
-					if !valid || k != len(codeBytes) {
-						continue
-					}
-					if !yield(code, r.Value+cid.CID(i)) {
-						return
-					}
-				}
-			}
-			for _, single := range g.CIDSingles {
-				if budget <= 0 {
-					return
-				}
-				budget--
-				code, k, valid := codec.Decode(single.Code)
-				if !valid || k != len(single.Code) {
-					continue
-				}
-				if !yield(code, single.Value) {
-					return
-				}
-			}
+		if f == nil {
+			return
 		}
+		f.index().mapped(func(x *fileLevel, id, pos int, codeBytes []byte) bool {
+			code, k, valid := codec.Decode(codeBytes)
+			if !valid || k != len(codeBytes) {
+				return true
+			}
+			return yield(code, x.mapped[id].value+cid.CID(pos))
+		})
 	}
 }
 
@@ -419,53 +427,174 @@ func rangeIndex(first, last, code []byte) (index int, ok bool) {
 	return int(acc), true
 }
 
+// LookupCID returns the CID which the CMap, including the CMaps it inherits
+// from through usecmap, assigns to the given code.  If the code has no CID
+// mapping, the notdef mappings are consulted, as for [File.LookupNotdefCID].
+//
+// A mapping in a CMap takes precedence over one in the CMap it uses.
+// Within one CMap, single-code mappings take precedence over ranges, and a
+// later mapping takes precedence over an earlier one.  A code whose position
+// in a range exceeds math.MaxInt32, or whose CID would exceed
+// math.MaxUint32, is not mapped by that range.
+//
+// The lookup uses an index which is built on first use, see [File].
 func (f *File) LookupCID(code []byte) cid.CID {
-	for _, s := range f.CIDSingles {
-		if bytes.Equal(s.Code, code) {
-			return s.Value
-		}
+	if f == nil {
+		return 0
 	}
-
-	for _, r := range f.CIDRanges {
-		index, ok := rangeIndex(r.First, r.Last, code)
-		if !ok {
-			continue
-		}
-		return r.Value + cid.CID(index)
+	x := f.index()
+	if level, id := x.lookup(code); id >= 0 {
+		return level.mapped[id].cid(code)
 	}
-
-	if f.Parent != nil {
-		return f.Parent.LookupCID(code)
-	}
-
-	return f.LookupNotdefCID(code)
+	return lookupNotdef(x, code)
 }
 
+// LookupNotdefCID returns the CID which the notdef mappings of the CMap,
+// including those it inherits through usecmap, assign to the given code.
+// The precedence is the same as for [File.LookupCID].  If no notdef mapping
+// matches, the result is 0.
 func (f *File) LookupNotdefCID(code []byte) cid.CID {
-	for _, s := range f.NotdefSingles {
-		if bytes.Equal(s.Code, code) {
-			return s.Value
-		}
+	if f == nil {
+		return 0
 	}
+	return lookupNotdef(f.index(), code)
+}
 
-rangesLoop:
-	for _, r := range f.NotdefRanges {
-		if len(r.First) != len(code) || len(r.Last) != len(code) {
-			continue
-		}
-		for i, b := range code {
-			if b < r.First[i] || b > r.Last[i] {
-				continue rangesLoop
-			}
-		}
+// fileLevel allows to look up the mappings of a single CMap, without those
+// it inherits.  Entries are numbered in order of precedence, so that a
+// smaller id takes precedence over a larger one.
+type fileLevel struct {
+	mapped      []mappedEntry
+	mappedIndex *codeIndex
 
-		return r.Value
+	notdef      []cid.CID
+	notdefIndex *codeIndex
+}
+
+func (x *fileLevel) numEntries() int {
+	return len(x.mapped)
+}
+
+func (x *fileLevel) entryCodes(id int) iter.Seq2[int, []byte] {
+	return x.mapped[id].codes()
+}
+
+func (x *fileLevel) lookup(code []byte) int {
+	return x.mappedIndex.lookup(code)
+}
+
+func (x *fileLevel) hasLeftover() bool {
+	return len(x.mappedIndex.leftover) > 0 || len(x.notdefIndex.leftover) > 0
+}
+
+// mappedEntry is a cidchar or cidrange entry of a CMap.
+type mappedEntry struct {
+	first, last []byte
+	value       cid.CID
+	isRange     bool
+}
+
+// codes iterates over the codes of the entry, together with their position
+// in the entry.
+func (e mappedEntry) codes() iter.Seq2[int, []byte] {
+	if e.isRange {
+		return codesInRange(e.first, e.last)
 	}
+	return func(yield func(int, []byte) bool) {
+		yield(0, e.first)
+	}
+}
 
-	if f.Parent != nil {
-		return f.Parent.LookupNotdefCID(code)
+// maxRangeIndex returns the largest index, as computed by [rangeIndex], of a
+// code which a CID range starting at value maps: the index is at most
+// math.MaxInt32, and the CID must not exceed math.MaxUint32.
+func maxRangeIndex(value cid.CID) int {
+	return int(min(math.MaxInt32, math.MaxUint32-uint64(value)))
+}
+
+// cid returns the CID of a code which the index has attributed to e.
+// The index guarantees that the result does not overflow.
+func (e mappedEntry) cid(code []byte) cid.CID {
+	if !e.isRange {
+		return e.value
+	}
+	index, _ := rangeIndex(e.first, e.last, code)
+	return e.value + cid.CID(index)
+}
+
+// lookupNotdef returns the CID which the notdef mappings of the chain x
+// assign to code, or 0.
+func lookupNotdef(x *chainIndex[*fileLevel], code []byte) cid.CID {
+	y := x
+	for range x.depth {
+		if id := y.level.notdefIndex.lookup(code); id >= 0 {
+			return y.level.notdef[id]
+		}
+		y = y.parent
 	}
 	return 0
+}
+
+// fileIndexes holds the indices of [File] objects, see [cachedChainIndex].
+var fileIndexes sync.Map
+
+// index returns the index of f and its parents.  The receiver must not be
+// nil.
+func (f *File) index() *chainIndex[*fileLevel] {
+	return cachedChainIndex(&fileIndexes, f, fileParent, buildFileLevel)
+}
+
+func fileParent(f *File) *File {
+	return f.Parent
+}
+
+// buildFileLevel builds the index for the mappings of f, without those of
+// its parents.  This takes O(n log n) time for n entries.
+func buildFileLevel(f *File) *fileLevel {
+	x, mapped, notdef := fileLevelBoxes(f)
+	x.mappedIndex = newCodeIndex(mapped)
+	x.notdefIndex = newCodeIndex(notdef)
+	return x
+}
+
+// fileLevelFits reports whether the indices for the mappings of f, without
+// those of its parents, have no leftover boxes, see [piecesFit].  This
+// takes time linear in the number of entries.
+func fileLevelFits(f *File) bool {
+	_, mapped, notdef := fileLevelBoxes(f)
+	return piecesFit(mapped) && piecesFit(notdef)
+}
+
+// fileLevelBoxes returns the entries of f, without their indices, together
+// with the boxes for the CID and notdef indices.
+func fileLevelBoxes(f *File) (x *fileLevel, mapped, notdef []box) {
+	x = &fileLevel{}
+	for _, s := range slices.Backward(f.CIDSingles) {
+		id := len(x.mapped)
+		x.mapped = append(x.mapped, mappedEntry{first: s.Code, last: s.Code, value: s.Value})
+		mapped = append(mapped, box{s.Code, s.Code, id})
+	}
+	for _, r := range slices.Backward(f.CIDRanges) {
+		id := len(x.mapped)
+		x.mapped = append(x.mapped, mappedEntry{first: r.First, last: r.Last, value: r.Value, isRange: true})
+		mapped = indexedBoxes(mapped, r.First, r.Last, maxRangeIndex(r.Value), id)
+	}
+	for _, s := range slices.Backward(f.NotdefSingles) {
+		notdef = append(notdef, box{s.Code, s.Code, len(x.notdef)})
+		x.notdef = append(x.notdef, s.Value)
+	}
+	for _, r := range slices.Backward(f.NotdefRanges) {
+		notdef = append(notdef, box{r.First, r.Last, len(x.notdef)})
+		x.notdef = append(x.notdef, r.Value)
+	}
+	return x, mapped, notdef
+}
+
+// Chain returns f and the CMaps it inherits from through usecmap, starting
+// with f.  If the Parent links form a cycle, each CMap is listed once.
+// For a nil f, the result is nil.
+func (f *File) Chain() []*File {
+	return walkChain(f, fileParent)
 }
 
 func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
@@ -475,6 +604,12 @@ func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// serialisation round trip for no practical benefit.
 	if f.IsPredefined() {
 		return pdf.Name(f.Name), nil
+	}
+
+	// checked before anything is written, so that a failed Embed leaves
+	// nothing behind
+	if err := checkWritable(f, fileParent, fileLevelFits); err != nil {
+		return nil, err
 	}
 
 	ros, err := rm.EmbedFunc(font.WriteCIDSystemInfo, f.ROS)
@@ -523,7 +658,16 @@ func (f *File) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
+// WriteTo writes the CMap file to w.  The parent CMap is referenced by name.
+//
+// An error is returned if the CMap, together with the CMaps it inherits
+// from, has too many large ranges in which more than the last byte varies,
+// since such a CMap could not be read back.
 func (f *File) WriteTo(w io.Writer, pretty bool) error {
+	if err := checkWritable(f, fileParent, fileLevelFits); err != nil {
+		return err
+	}
+
 	data := templateData{
 		HeaderComment: pretty,
 		File:          f,
@@ -564,7 +708,8 @@ var cmapTmplNew = template.Must(template.New("cmap").Funcs(template.FuncMap{
 	"B": func(x []byte) string {
 		return fmt.Sprintf("<%02x>", x)
 	},
-	"SingleChunks": chunks[Single],
+	"CodeSpaceChunks": chunks[charcode.Range],
+	"SingleChunks":    chunks[Single],
 	"Single": func(s Single) string {
 		return fmt.Sprintf("<%x> %d", s.Code, s.Value)
 	},
@@ -593,13 +738,13 @@ end def
 /CMapName {{PN .Name}} def
 /CMapType 1 def
 /WMode {{printf "%d" .WMode}} def
-{{with .CodeSpaceRange -}}
+{{range CodeSpaceChunks .CodeSpaceRange -}}
 {{len .}} begincodespacerange
 {{range . -}}
 {{B .Low}} {{B .High}}
 {{end -}}
-{{end -}}
 endcodespacerange
+{{end -}}
 {{/* */ -}}
 
 {{range SingleChunks .CIDSingles -}}

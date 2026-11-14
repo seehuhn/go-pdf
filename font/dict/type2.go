@@ -342,7 +342,7 @@ func (d *CIDFontType2) MakeFont() font.Instance {
 		CIDFontType2: d,
 		codec:        codec,
 		defaultText:  defaultText,
-		cache:        make(map[charcode.Code]font.Code),
+		cache:        make(map[codeKey]font.Code),
 	}
 }
 
@@ -351,7 +351,7 @@ type t2Font struct {
 	codec       *charcode.Codec
 	defaultText map[cid.CID]string
 	mu          sync.Mutex
-	cache       map[charcode.Code]font.Code
+	cache       map[codeKey]font.Code
 }
 
 var _ font.Instance = (*t2Font)(nil)
@@ -395,7 +395,8 @@ func (f *t2Font) Codes(str pdf.String) iter.Seq[font.Code] {
 			code, k, isValid := f.codec.Decode(str)
 
 			f.mu.Lock()
-			res, seen := f.cache[code]
+			key := codeKey{code, k}
+			res, seen := f.cache[key]
 			if !seen {
 				codeBytes := str[:k]
 				if isValid {
@@ -411,17 +412,13 @@ func (f *t2Font) Codes(str pdf.String) iter.Seq[font.Code] {
 					res.Width = f.DefaultWidth / 1000
 				}
 				if vertical {
-					if vm, ok := f.VMetrics[res.CID]; ok {
-						res.VerticalAdvance = vm.DeltaY / 1000
-					} else {
-						res.VerticalAdvance = f.DefaultVMetrics.DeltaY / 1000
-					}
+					setVerticalMetrics(&res, f.VMetrics, f.DefaultVMetrics)
 				}
-				res.UseWordSpacing = k == 1 && code == 0x20
+				res.UseWordSpacing = isValid && k == 1 && code == 0x20
 				if isValid {
 					res.Text = f.lookupText(f.defaultText, res.CID, codeBytes)
 				}
-				f.cache[code] = res
+				f.cache[key] = res
 			}
 			f.mu.Unlock()
 

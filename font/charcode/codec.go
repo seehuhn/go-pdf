@@ -4,10 +4,11 @@
 package charcode
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
-	"maps"
+	"math/bits"
 	"slices"
-	"sort"
 )
 
 // Code represents a character code within a [Codec].
@@ -16,60 +17,87 @@ import (
 // the corresponding [Codec].
 type Code uint32
 
+// MaxCodeLength is the largest length, in bytes, of a character code
+// supported by this library.
+const MaxCodeLength = 4
+
 // A Codec efficiently converts between sequences of bytes and uint32 character codes.
 type Codec struct {
-	// nodes is a linearised lookup tree.  The root of the nodes is at index 0.
-	nodes []linearizedNode
-}
-
-// linearizedNode represents a node in the lookup tree of a [Codec].
-type linearizedNode struct {
-	// The current input byte is compared to bound.  If the input byte is less
-	// than or equal to bound, the input byte is consumed and the node
-	// described by child becomes the new node.  Otherwise, the lookup
-	// continues with the next node in Decoder.tree.
-	bound byte
-
-	// Child determines the next node, in case the input byte is less than or
-	// equal to bound:
+	// bound and child form a linearised lookup tree, one node per index.
+	// The root group of nodes starts at index 0.
 	//
-	// - If child equals 0, the consumed byte
-	//   is the last byte of a valid character code and the lookup stops.
-	// - If child equals 0xFFFF-k, for k∈{0,1,2,3}, the input starts
-	//   with an invalid character code.  The lookup stops and
-	//   an additional k bytes must be consumed to continue.
-	// - For all other cases, the child node is the index of the next node in
-	//   Decoder.tree.
-	child uint16
+	// The current input byte is compared to bound[i].  If the input byte is
+	// less than or equal to bound[i], the input byte is consumed and child[i]
+	// determines how to continue:
+	//
+	//   - If child[i] equals validLeaf, the consumed byte is the last byte
+	//     of a valid character code and the lookup stops.
+	//   - If child[i] equals invalidConsume(k), for k∈{0,1,2,3}, the input
+	//     starts with an invalid character code.  The lookup stops and
+	//     an additional k bytes must be consumed to continue.
+	//   - Otherwise, child[i] is the index of the first node of the group
+	//     which processes the next input byte.
+	//
+	// If the input byte is greater than bound[i], the lookup continues with
+	// node i+1.  The last node of every group has bound 0xFF.
+	//
+	// Indices are stored as int, so that they cannot overflow for any slice
+	// which can be allocated.
+	bound []byte
+	child []int
+
+	// ranges is the normalized code space range, see [normalize].
+	ranges CodeSpaceRange
 }
 
-// These constants represent special values of the child field in a [node].
+// These constants represent special values of the child field in a [Codec].
+// Real child indices are always positive, since the root group starts at
+// index 0 and every other group comes after it.
 const (
-	validLeaf       uint16 = 0x0000
-	invalidConsume3 uint16 = 0xfffc
-	invalidConsume2 uint16 = 0xfffd
-	invalidConsume1 uint16 = 0xfffe
-	invalidConsume0 uint16 = 0xffff
+	validLeaf       = 0
+	invalidConsume0 = -1
+	invalidConsume1 = -2
+	invalidConsume2 = -3
+	invalidConsume3 = -4
 )
 
-// NewCodec returns a new Decoder for the given code space range.
-// The only errors returned are if the code space range is invalid.
+// invalidConsume returns the child value for an invalid code where k more
+// bytes must be consumed.
+func invalidConsume(k int) int {
+	return -1 - k
+}
+
+// NewCodec returns a new Codec for the given code space range.
+//
+// An error is returned if the code space range is invalid, that is if one of
+// its ranges is invalid or if a code in one range is a proper prefix of a code
+// in another range.  If the lookup tree for the code space range would be
+// too large, the error is [ErrTooComplex].
 func NewCodec(ranges CodeSpaceRange) (*Codec, error) {
 	for _, r := range ranges {
 		if !r.IsValid() {
 			return nil, errInvalidCodeSpaceRange
 		}
 	}
+	ranges = normalize(ranges)
 
-	tree, _, err := newTree(ranges, 0)
+	b := newBuilder(ranges, treeBudget(len(ranges)))
+	root, err := b.build()
 	if err != nil {
 		return nil, err
 	}
-
-	c := &Codec{
-		nodes: linearize(tree),
-	}
+	c := b.linearize(root)
+	c.ranges = ranges
 	return c, nil
+}
+
+// treeBudget returns the number of construction steps allowed for the lookup
+// tree of a code space range with n ranges.  The trees of all predefined
+// CMaps need at most 156 steps in total.  Some code space ranges need trees
+// which grow with a high power of n; for these, construction fails with
+// [ErrTooComplex].
+func treeBudget(n int) int {
+	return 256*n + 4096
 }
 
 // Decode decodes the first character code of an input byte sequence.
@@ -84,7 +112,8 @@ func NewCodec(ranges CodeSpaceRange) (*Codec, error) {
 // The return value consumed is always less than or equal to the length of s.
 // If the length of s is non-zero, consumed is greater than zero.
 func (c *Codec) Decode(s []byte) (code Code, consumed int, valid bool) {
-	var cur uint16
+	bound, child := c.bound, c.child
+	cur := 0
 	for {
 		if len(s) == 0 {
 			return
@@ -100,16 +129,11 @@ func (c *Codec) Decode(s []byte) (code Code, consumed int, valid bool) {
 		// Use a linear scan to find the correct child node.  If performance
 		// ever becomes an issue, the code could be restructured to use a
 		// binary tree here.
-		var node linearizedNode
-		for {
-			node = c.nodes[cur]
-			if b <= node.bound {
-				break
-			}
+		for b > bound[cur] {
 			cur++
 		}
 
-		next := node.child
+		next := child[cur]
 		switch next {
 		case validLeaf:
 			valid = true
@@ -145,25 +169,20 @@ func (c *Codec) Decode(s []byte) (code Code, consumed int, valid bool) {
 // AppendCode converts a code to bytes and appends the bytes to the
 // given slice.
 func (c *Codec) AppendCode(s []byte, code Code) []byte {
-	// For trees generated by [newTree], cur increases with any iteration
-	// of the following loop.  Thus, the loop will always terminate.
+	// The child links form an acyclic graph in which every path has at most
+	// four links, one per code byte.  Thus, the loop will always terminate.
 
-	cur := uint16(0) // root
+	cur := 0 // root
 	for {
 		b := byte(code)
 		s = append(s, b)
 		code >>= 8
 
-		var node linearizedNode
-		for {
-			node = c.nodes[cur]
-			if b <= node.bound {
-				break
-			}
+		for b > c.bound[cur] {
 			cur++
 		}
 
-		next := node.child
+		next := c.child[cur]
 		switch next {
 		case validLeaf:
 			return s
@@ -186,180 +205,273 @@ func (c *Codec) AppendCode(s []byte, code Code) []byte {
 	}
 }
 
-// CodeSpaceRange returns a CodeSpaceRange which contains exactly the same codes
-// as the one used to create the Codec.
+// CodeSpaceRange returns the code space range used to create the Codec.
+// The ranges are sorted by length, Low and High, and duplicates are removed.
+// Two codecs return equal code space ranges if and only if they were made
+// from the same ranges, up to order and repetition.
 func (c *Codec) CodeSpaceRange() CodeSpaceRange {
-	csr := c.walk(nil, 0, nil, nil)
-
-	type candidate struct {
-		i, j, pos int
-	}
-
-	// Iteratively merge ranges, until no more merges are
-	// possible.
-	var candidates []candidate
-	for {
-		for i, r := range csr {
-			for j, s := range csr {
-				if i == j {
-					continue
-				}
-				if canMerge(r, s) {
-					pos := 0
-					for r.Low[pos] == s.Low[pos] && r.High[pos] == s.High[pos] {
-						pos++
-					}
-					candidates = append(candidates, candidate{i, j, pos})
-				}
-			}
-		}
-		if len(candidates) == 0 {
-			return csr
-		}
-
-		sort.Slice(candidates, func(i, j int) bool {
-			if candidates[i].pos != candidates[j].pos {
-				return candidates[i].pos < candidates[j].pos
-			}
-			if candidates[i].i != candidates[j].i {
-				return candidates[i].i < candidates[j].i
-			}
-			return candidates[i].j < candidates[j].j
-		})
-		i := candidates[0].i
-		j := candidates[0].j
-		csr[i].High = csr[j].High
-		csr = append(csr[:j], csr[j+1:]...)
-
-		candidates = candidates[:0]
-	}
+	return deepCopy(c.ranges)
 }
 
-// walk traverses a sub-tree, constructing a CodeSpaceRange by recursively
-// visiting nodes and appending ranges defined by the low and high byte slices.
-//
-// Parameters:
-// - csr: slice to append the ranges to
-// - cur: the root of the sub-tree
-// - low: current lower bound, from the parent nodes
-// - high: current upper bound, from the parent nodes
-//
-// Returns:
-// - CodeSpaceRange: The extended CodeSpaceRange after traversing the sub-tree.
-func (c *Codec) walk(csr CodeSpaceRange, cur uint16, low, high []byte) CodeSpaceRange {
-	var nextLow byte
-	for {
-		nextHigh := c.nodes[cur].bound
-		low2 := append(low, nextLow)
-		high2 := append(high, nextHigh)
-		switch c.nodes[cur].child {
-		case validLeaf:
-			r := Range{Low: clone(low2), High: clone(high2)}
-			csr = append(csr, r)
-		case invalidConsume0, invalidConsume1, invalidConsume2, invalidConsume3:
-			// pass
-		default:
-			csr = c.walk(csr, c.nodes[cur].child, low2, high2)
-		}
-
-		if nextHigh == 0xFF {
-			return csr
-		}
-		nextLow = nextHigh + 1
-		cur++
-	}
+// Equal reports whether c and other were made from the same code space
+// ranges, up to order and repetition.  This agrees with comparing the
+// results of [Codec.CodeSpaceRange], without copying them.
+func (c *Codec) Equal(other *Codec) bool {
+	return slices.EqualFunc(c.ranges, other.ranges, func(r, s Range) bool {
+		return compareRange(r, s) == 0
+	})
 }
 
-// We can merge r with s (in this order), if the ranges for one byte are
-// adjacent, and the ranges for all other bytes are equal.
-func canMerge(r, s Range) bool {
-	if len(r.Low) != len(s.Low) {
-		return false
+// deepCopy returns a copy of ranges which shares no storage with ranges.
+func deepCopy(ranges CodeSpaceRange) CodeSpaceRange {
+	total := 0
+	for _, r := range ranges {
+		total += len(r.Low) + len(r.High)
 	}
-
-	numAdjacent := 0
-	for i := range len(s.Low) {
-		if r.Low[i] == s.Low[i] && r.High[i] == s.High[i] {
-			continue
-		}
-
-		isAdjacent := int(r.High[i])+1 == int(s.Low[i])
-		if !isAdjacent || numAdjacent > 0 {
-			return false
-		}
-		numAdjacent++
+	buf := make([]byte, 0, total)
+	res := make(CodeSpaceRange, len(ranges))
+	for i, r := range ranges {
+		k := len(buf)
+		buf = append(buf, r.Low...)
+		buf = append(buf, r.High...)
+		res[i] = Range{Low: buf[k : k+len(r.Low) : k+len(r.Low)], High: buf[k+len(r.Low) : len(buf) : len(buf)]}
 	}
-
-	return true
-}
-
-func clone(b []byte) []byte {
-	res := make([]byte, len(b))
-	copy(res, b)
 	return res
 }
 
-// tree is an intermediate representation of the lookup tree.
-// For use in a [Codec] it is linearized into a slice of [linearizedNode].
-//
-// The map keys are the highest input byte values which correspond to a child node.
-type tree map[byte]*treeNode
-
-type treeNode struct {
-	// Desc is a string representation of the effect of the sub-tree rooted at
-	// the node.
-	//
-	// For leaf nodes with valid==false, this is {0x00, consume}.
-	//
-	// For all other nodes this is {0x01, child1, high1, child2, high2, ..., 0x02},
-	desc []byte
-
-	// children contains the child nodes of this node.
-	children tree
-
-	// For leaf nodes with valid==false, this is the number of addional bytes
-	// to consume.
-	consume int
+// normalize returns a sorted copy of ranges, with duplicates removed.
+func normalize(ranges CodeSpaceRange) CodeSpaceRange {
+	res := deepCopy(ranges)
+	slices.SortFunc(res, compareRange)
+	return slices.CompactFunc(res, func(r, s Range) bool {
+		return compareRange(r, s) == 0
+	})
 }
 
-const (
-	descInvalid byte = iota
-	descValidBegin
-	descValidEnd
-)
+// compareRange orders ranges by length, then by Low, then by High.
+func compareRange(r, s Range) int {
+	return compareSuffix(r, s, 0)
+}
 
-// newTree returns a new lookup tree for the given code space range.
-func newTree(ranges CodeSpaceRange, depth int) (tree, []byte, error) {
-	t := make(tree)
+// builder constructs the lookup tree of a [Codec] as a DAG of node groups.
+//
+// The group which processes the input byte at position depth depends only on
+// the set of ranges compatible with the bytes consumed so far, and only
+// through the suffixes Low[depth:], High[depth:] of these ranges.  The
+// builder memoises groups on this set of suffixes, so that every distinct
+// suffix set is expanded only once, and it interns groups on their contents,
+// so that every distinct group is stored only once.
+type builder struct {
+	ranges CodeSpaceRange
 
-	breaks := make(map[int]bool)
-	breaks[0] = true
-	breaks[256] = true
-	for _, r := range ranges {
-		breaks[int(r.Low[depth])] = true
-		breaks[int(r.High[depth])+1] = true
+	// rank[d][i] identifies the suffix of ranges[i] from position d:
+	// two ranges have the same rank at depth d if and only if their
+	// suffixes are equal.  Ranks follow the lexicographic order of the
+	// suffixes.  rank[d][i] is -1 if ranges[i] is not longer than d bytes.
+	rank [4][]int32
+
+	// bySuffix maps a canonical suffix set (see suffixKey) to a group id.
+	bySuffix map[string]int
+
+	// byContent maps the contents of a group (see contentKey) to a group id.
+	byContent map[string]int
+
+	// groups holds the distinct groups; group id g is stored at groups[g-1].
+	groups [][]entry
+
+	// steps counts the elementary operations of the construction.
+	// The construction is abandoned once steps exceeds budget.  Memory use
+	// is proportional to steps.
+	steps, budget int
+}
+
+// entry is a node of a group, before linearization.  The child field holds
+// one of the special child values, or a group id (always positive).
+type entry struct {
+	high  byte
+	child int
+}
+
+func newBuilder(ranges CodeSpaceRange, budget int) *builder {
+	b := &builder{
+		ranges:    ranges,
+		budget:    budget,
+		bySuffix:  make(map[string]int),
+		byContent: make(map[string]int),
 	}
-	bSlice := slices.Sorted(maps.Keys(breaks))
 
-	var childRanges CodeSpaceRange
-
-	desc := []byte{descValidBegin}
-	for j := 0; j < len(bSlice)-1; j++ {
-		low := byte(bSlice[j])
-		high := byte(bSlice[j+1] - 1)
-
-		// find all elements of ii which overlap [low, high]
-		childRanges = childRanges[:0]
-		for _, r := range ranges {
-			if r.Low[depth] <= high && r.High[depth] >= low {
-				childRanges = append(childRanges, r)
+	idx := make([]int, 0, len(ranges))
+	for d := range b.rank {
+		rank := make([]int32, len(ranges))
+		idx = idx[:0]
+		for i, r := range ranges {
+			rank[i] = -1
+			if len(r.Low) > d {
+				idx = append(idx, i)
 			}
 		}
+		slices.SortFunc(idx, func(i, j int) int {
+			return compareSuffix(ranges[i], ranges[j], d)
+		})
+		var next int32
+		for k, i := range idx {
+			if k > 0 && compareSuffix(ranges[idx[k-1]], ranges[i], d) != 0 {
+				next++
+			}
+			rank[i] = next
+		}
+		b.rank[d] = rank
+	}
 
-		// At this point we have consumed the input bytes up to depth,
-		// and we know that any of the childRanges still apply.
+	return b
+}
 
-		if len(childRanges) == 0 {
+// spend adds k to the step count, and returns [ErrTooComplex] if the budget
+// is exhausted.
+func (b *builder) spend(k int) error {
+	b.steps += k
+	if b.steps > b.budget {
+		return ErrTooComplex
+	}
+	return nil
+}
+
+// sortCost returns the number of steps charged for sorting m elements.
+func sortCost(m int) int {
+	return m * bits.Len(uint(m))
+}
+
+// compareSuffix compares the suffixes of r and s from position d.
+// Shorter suffixes come first.
+func compareSuffix(r, s Range, d int) int {
+	if len(r.Low) != len(s.Low) {
+		return len(r.Low) - len(s.Low)
+	}
+	if c := bytes.Compare(r.Low[d:], s.Low[d:]); c != 0 {
+		return c
+	}
+	return bytes.Compare(r.High[d:], s.High[d:])
+}
+
+// build constructs the lookup DAG and returns the id of the root group.
+func (b *builder) build() (int, error) {
+	if err := b.spend(len(b.ranges)); err != nil {
+		return 0, err
+	}
+	all := make([]int, len(b.ranges))
+	for i := range all {
+		all[i] = i
+	}
+	slices.SortStableFunc(all, func(i, j int) int {
+		return int(b.rank[0][i] - b.rank[0][j])
+	})
+	all = slices.CompactFunc(all, func(i, j int) bool {
+		return b.rank[0][i] == b.rank[0][j]
+	})
+	return b.group(all, 0)
+}
+
+// group returns the id of the group which processes the input byte at
+// position depth, given the set of ranges compatible with the bytes before.
+//
+// The list set contains each range suffix at most once (as given by the
+// ranks at this depth), sorted by rank.  All ranges in the set are longer
+// than depth.
+func (b *builder) group(set []int, depth int) (int, error) {
+	if err := b.spend(len(set) + 1); err != nil { // building the key
+		return 0, err
+	}
+	key := b.suffixKey(set, depth)
+	if id, ok := b.bySuffix[key]; ok {
+		return id, nil
+	}
+	if err := b.spend(sortCost(2*len(set) + 2)); err != nil { // sorting the breaks
+		return 0, err
+	}
+
+	// The breaks divide the byte values into intervals, such that every
+	// range in the set either covers an interval completely, or not at all.
+	breaks := make([]int, 0, 2*len(set)+2)
+	breaks = append(breaks, 0, 256)
+	minLen := depth + 1 // only used if the set is empty
+	for k, i := range set {
+		r := b.ranges[i]
+		breaks = append(breaks, int(r.Low[depth]), int(r.High[depth])+1)
+		if k == 0 || len(r.Low) < minLen {
+			minLen = len(r.Low)
+		}
+	}
+	slices.Sort(breaks)
+	breaks = slices.Compact(breaks)
+
+	// Visit the ranges in order of their suffix rank at the next depth, so
+	// that the child sets come out in canonical order.  Ranges which end at
+	// this depth (rank -1) come first.
+	var next []int32
+	var children []int
+	if depth+1 < len(b.rank) {
+		next = b.rank[depth+1]
+		children = slices.Clone(set)
+		slices.SortStableFunc(children, func(i, j int) int {
+			return int(next[i] - next[j])
+		})
+	} else {
+		children = set
+	}
+
+	// List the ranges which cover each interval, in the order of children.
+	// The ranges for interval j are overlap[start[j]:start[j+1]].
+	var idx [257]int
+	for j, x := range breaks {
+		idx[x] = j
+	}
+	numIntervals := len(breaks) - 1
+	start := make([]int, numIntervals+1)
+	for _, i := range children {
+		r := b.ranges[i]
+		start[idx[r.Low[depth]]]++
+		start[idx[int(r.High[depth])+1]]--
+	}
+	total, depthCount := 0, 0
+	for j := range numIntervals {
+		depthCount += start[j]
+		start[j] = total
+		total += depthCount
+	}
+	start[numIntervals] = total
+	if err := b.spend(total); err != nil {
+		return 0, err
+	}
+	overlap := make([]int, total)
+	fill := slices.Clone(start[:numIntervals])
+	for _, i := range children {
+		r := b.ranges[i]
+		for j := idx[r.Low[depth]]; j < idx[int(r.High[depth])+1]; j++ {
+			overlap[fill[j]] = i
+			fill[j]++
+		}
+	}
+
+	entries := make([]entry, 0, numIntervals)
+	var childSet []int
+	for j := range numIntervals {
+		childSet = childSet[:0]
+		numLeaves := 0
+		for _, i := range overlap[start[j]:start[j+1]] {
+			r := b.ranges[i]
+			if len(r.Low) == depth+1 {
+				numLeaves++
+				continue
+			}
+			if n := len(childSet); n > 0 && next[childSet[n-1]] == next[i] {
+				continue // same suffix as the previous range
+			}
+			childSet = append(childSet, i)
+		}
+
+		var child int
+		switch {
+		case numLeaves == 0 && len(childSet) == 0:
 			// There are no ranges which overlap [low, high],
 			// and thus byte values in [low, high] are invalid here.
 
@@ -368,132 +480,101 @@ func newTree(ranges CodeSpaceRange, depth int) (tree, []byte, error) {
 			// code, the number of input bytes consumed is the length of the
 			// shortest code which contains the longest possible prefix of the
 			// given code.
-
-			minLength := minLength(ranges)
-			alreadyConsumed := depth + 1
-
-			t[high] = &treeNode{
-				desc:    []byte{descInvalid, byte(minLength - alreadyConsumed)},
-				consume: minLength - alreadyConsumed,
-			}
-			continue
-		}
-
-		numLeaves := 0
-		for _, r := range childRanges {
-			if len(r.Low) == depth+1 {
-				numLeaves++
-			}
-		}
-		var node *treeNode
-		switch numLeaves {
-		case len(childRanges):
+			child = invalidConsume(minLen - (depth + 1))
+		case len(childSet) == 0:
 			// All ranges end with this byte, so this is a leaf.
-			node = &treeNode{
-				desc: []byte{descValidBegin, descValidEnd},
-			}
-		case 0:
+			child = validLeaf
+		case numLeaves == 0:
 			// All ranges have more bytes, so we use a sub-tree to
 			// decide which range to use, based on the following bytes.
-			cc, dd, err := newTree(childRanges, depth+1)
+			var err error
+			child, err = b.group(childSet, depth+1)
 			if err != nil {
-				return nil, nil, err
-			}
-			node = &treeNode{
-				desc:     dd,
-				children: cc,
+				return 0, err
 			}
 		default:
 			// Some ranges end with this byte, while other ranges allow for
 			// more bytes.  This is an error, since no code may be a prefix of
 			// another code.
-			return nil, nil, errInvalidCodeSpaceRange
+			return 0, errInvalidCodeSpaceRange
 		}
-
-		t[high] = node
-		desc = append(desc, node.desc...)
-		desc = append(desc, high)
+		entries = append(entries, entry{high: byte(breaks[j+1] - 1), child: child})
 	}
-	desc = append(desc, descValidEnd)
 
-	return t, desc, nil
+	content := contentKey(entries)
+	id, ok := b.byContent[content]
+	if !ok {
+		b.groups = append(b.groups, entries)
+		id = len(b.groups)
+		b.byContent[content] = id
+	}
+	b.bySuffix[key] = id
+	return id, nil
 }
 
-func minLength(csr CodeSpaceRange) int {
-	if len(csr) == 0 {
-		// In order to avoid infinite loops in the decoder, we always consume
-		// at least one byte.
-		return 1
+// suffixKey returns a canonical representation of a suffix set.
+func (b *builder) suffixKey(set []int, depth int) string {
+	rank := b.rank[depth]
+	buf := make([]byte, 1+4*len(set))
+	buf[0] = byte(depth) // ranks are only comparable within one depth
+	for k, i := range set {
+		binary.LittleEndian.PutUint32(buf[1+4*k:], uint32(rank[i]))
+	}
+	return string(buf)
+}
+
+// contentKey returns a representation of the contents of a group.
+// Two groups have the same key if and only if they describe the same
+// lookup sub-tree, since child groups are interned before their parents.
+func contentKey(entries []entry) string {
+	buf := make([]byte, 0, 9*len(entries))
+	for _, e := range entries {
+		buf = append(buf, e.high)
+		buf = binary.AppendVarint(buf, int64(e.child))
+	}
+	return string(buf)
+}
+
+// linearize converts the DAG with the given root group into a [Codec].
+//
+// Groups are laid out in depth-first order, every group after the group
+// which first refers to it.  A group shared by several parents is placed
+// once, so a child link can point to an earlier node, but the links
+// remain acyclic.
+func (b *builder) linearize(root int) *Codec {
+	c := &Codec{}
+	pos := make([]int, len(b.groups))
+	for g := range pos {
+		pos[g] = -1 // not yet placed
 	}
 
-	min := len(csr[0].Low)
-	for _, r := range csr[1:] {
-		if l := len(r.Low); l < min {
-			min = l
+	var place func(g int) int
+	place = func(g int) int {
+		entries := b.groups[g-1]
+		base := len(c.bound)
+		for _, e := range entries {
+			c.bound = append(c.bound, e.high)
+			c.child = append(c.child, validLeaf)
 		}
-	}
-	return min
-}
-
-func linearize(t tree) []linearizedNode {
-	l := newLinearizer()
-	l.AppendNodes(t)
-	return l.nodes
-}
-
-type linearizer struct {
-	nodes []linearizedNode
-	done  map[string]uint16
-}
-
-func newLinearizer() *linearizer {
-	done := make(map[string]uint16)
-
-	// register the predefined values for the child field
-	done[string([]byte{descValidBegin, descValidEnd})] = validLeaf
-	done[string([]byte{descInvalid, 0x03})] = invalidConsume3
-	done[string([]byte{descInvalid, 0x02})] = invalidConsume2
-	done[string([]byte{descInvalid, 0x01})] = invalidConsume1
-	done[string([]byte{descInvalid, 0x00})] = invalidConsume0
-
-	return &linearizer{
-		done: done,
-	}
-}
-
-func (l *linearizer) AppendNodes(t tree) uint16 {
-	bb := slices.Sorted(maps.Keys(t))
-
-	// reserve space for the child nodes
-	base := len(l.nodes)
-	for _, high := range bb {
-		l.nodes = append(l.nodes, linearizedNode{bound: high})
-	}
-
-	for i, high := range bb {
-		childNode := t[high]
-
-		idx, ok := l.done[string(childNode.desc)]
-		if ok {
-			l.nodes[base+i].child = idx
-			continue
+		for k, e := range entries {
+			child := e.child
+			if child > 0 {
+				if pos[child-1] < 0 {
+					pos[child-1] = place(child)
+				}
+				child = pos[child-1]
+			}
+			c.child[base+k] = child
 		}
-
-		childPos := l.AppendNodes(t[high].children)
-		l.nodes[base+i].child = childPos
-		l.done[string(childNode.desc)] = childPos
-
-		// Here we verify the invariant that child links always point to
-		// nodes which are later in the slice.  This ensures that the
-		// loop in [Decoder.AppendCode] always terminates.
-		if int(childPos) <= base+i {
-			panic("unreachable")
-		}
+		return base
 	}
+	pos[root-1] = place(root)
 
-	return uint16(base)
+	return c
 }
 
+// SimpleCodec is the codec for the code space range [Simple], which
+// consists of all one-byte codes.
 var SimpleCodec = must(NewCodec(Simple))
 
 func must(codec *Codec, err error) *Codec {
@@ -502,5 +583,10 @@ func must(codec *Codec, err error) *Codec {
 	}
 	return codec
 }
+
+// ErrTooComplex is returned by [NewCodec] if the lookup tree for a code
+// space range would be too large.  The limit is proportional to the number
+// of ranges.
+var ErrTooComplex = errors.New("code space range too complex")
 
 var errInvalidCodeSpaceRange = errors.New("invalid code space range")

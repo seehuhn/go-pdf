@@ -71,9 +71,9 @@ type OptionsComposite struct {
 type Composite struct {
 	cffFont *cff.Font
 
-	// unitsPerEm caches the source sfnt.Font's UnitsPerEm so Layout can scale
-	// layouter output (which is in these units) without holding the sfnt.Font.
-	unitsPerEm uint16
+	// info is the source font, which gives the units of the layouter output
+	// and the vertical metrics.
+	info *sfnt.Font
 
 	// Descriptor describes the font as designed, in PDF glyph space units.
 	// It is filled in from the font program and may be adjusted before the
@@ -131,15 +131,14 @@ func NewComposite(info *sfnt.Font, opt *OptionsComposite) (*Composite, error) {
 		return nil, err
 	}
 
-	notdefWidth := math.Round(info.GlyphWidthPDF(0))
-	gidToCID, enc, err := cidsetup.FromCMap(opt.CMap, opt.GIDToCID, info, notdefWidth)
+	gidToCID, enc, err := cidsetup.FromCMap(opt.CMap, opt.GIDToCID, info)
 	if err != nil {
 		return nil, err
 	}
 
 	f := &Composite{
-		cffFont:    cffFont,
-		unitsPerEm: info.UnitsPerEm,
+		cffFont: cffFont,
+		info:    info,
 
 		Descriptor: fontdesc.FromSFNT(info, fontBBox),
 
@@ -185,25 +184,28 @@ func (f *Composite) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 }
 
 // Encode converts a glyph ID to a character code (for use with the
-// instance's codec).  The arguments width and text are hints for choosing
-// an appropriate advance width and text representation for the character
-// code, in case a new code is allocated.
+// instance's codec).  The text argument is a hint for choosing an appropriate
+// text representation for the character code, in case a new code is
+// allocated.  The width and vertical metrics are taken from the font, for
+// the glyph which the CID of gid selects in the embedded font; where several
+// glyphs share a CID, this is the one written for it.
 //
 // The function returns the character code, and a boolean indicating
 // whether the encoding was successful.  If the function returns false, the
-// glyph ID cannot be encoded with this font instance.
+// glyph ID cannot be encoded with this font instance: the CMap has no code
+// for the glyph's CID, or no codes are left.  In particular, glyph 0 cannot
+// be encoded if the CMap has no code for CID 0.
 //
 // Use the Codec to append the character code to PDF strings.
-//
-// Encode converts a glyph ID to a character code.
 func (f *Composite) Encode(gid glyph.ID, text string) (charcode.Code, bool) {
 	cid := f.gidToCID.CID(gid, text)
 	if c, ok := f.CIDEncoder.GetCode(cid, text); ok {
 		return c, true
 	}
 
-	width := math.Round(f.cffFont.GlyphWidthPDF(gid))
-	c, err := f.CIDEncoder.Encode(cid, text, width)
+	written := f.gidToCID.GID(cid)
+	width := math.Round(f.cffFont.GlyphWidthPDF(written))
+	c, err := f.CIDEncoder.Encode(cid, text, width, cidsetup.GlyphVMetrics(f.info, written))
 	return c, err == nil
 }
 
@@ -214,7 +216,7 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 	}
 
 	// Layouter advances/offsets are in UnitsPerEm; scale uniformly to points.
-	q := ptSize / float64(f.unitsPerEm)
+	q := ptSize / float64(f.info.UnitsPerEm)
 
 	buf := f.layouter.Layout(s)
 	seq.Seq = slices.Grow(seq.Seq, len(buf))
@@ -314,14 +316,8 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 		Outlines: subsetOutlines,
 	}
 
-	// construct the font dictionary and font descriptor
-	dw := math.Round(subsetFont.GlyphWidthPDF(0))
-
-	// widths of the CIDs in use
-	ww := make(map[cid.CID]float64)
-	for _, info := range f.CIDEncoder.MappedCodes() {
-		ww[info.CID] = info.Width
-	}
+	// metrics of the CIDs in use, and the defaults
+	ww, dw, dw2, w2 := cidsetup.Metrics(f.CIDEncoder)
 
 	// determine whether the font is symbolic.  Prefer the font's own glyph
 	// name; fall back to a name derived from the Unicode text only when the
@@ -356,7 +352,8 @@ func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
 		CMap:            f.CIDEncoder.CMap(ros),
 		Width:           ww,
 		DefaultWidth:    dw,
-		DefaultVMetrics: dict.DefaultVMetricsDefault,
+		DefaultVMetrics: dw2,
+		VMetrics:        w2,
 		ToUnicode:       f.CIDEncoder.ToUnicode(),
 		FontFile:        cffglyphs.ToStream(subsetFont, glyphdata.CFF),
 	}

@@ -128,3 +128,37 @@ func TestGIDToCIDFromCMapUnknownCollection(t *testing.T) {
 		t.Errorf("got %v, want an error wrapping fs.ErrNotExist", err)
 	}
 }
+
+// TestGIDToCIDFromCMapNotdef checks that CID 0 is glyph 0 even though the
+// Japan1 collection implies U+FFFD for CID 0 and the font has a glyph for it.
+func TestGIDToCIDFromCMapNotdef(t *testing.T) {
+	info := makefont.TrueType()
+	lookup, err := info.CMapTable.GetBest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := cmap.Predefined("Adobe-Japan1-7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g2c, err := cmap.NewGIDToCIDFromCMap(f, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fffd := lookup.Lookup(0xFFFD)
+	if fffd == 0 {
+		t.Fatal("test font has no glyph for U+FFFD")
+	}
+	if got := g2c.GID(0); got != 0 {
+		t.Errorf("CID 0 selects glyph %d, want 0", got)
+	}
+	if got := g2c.CID(0, ""); got != 0 {
+		t.Errorf("glyph 0 is written as CID %d, want 0", got)
+	}
+	for c := range encodableCIDs(t, f) {
+		if g2c.GID(c) == fffd {
+			t.Errorf("CID %d selects the U+FFFD glyph", c)
+		}
+	}
+}

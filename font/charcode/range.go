@@ -19,8 +19,9 @@ type Range struct {
 	Low, High []byte
 }
 
+// IsValid reports whether r is a well-formed range of character codes.
 func (r Range) IsValid() bool {
-	if len(r.Low) != len(r.High) || len(r.Low) == 0 || len(r.Low) > 4 {
+	if len(r.Low) != len(r.High) || len(r.Low) == 0 || len(r.Low) > MaxCodeLength {
 		return false
 	}
 	for i := range r.Low {

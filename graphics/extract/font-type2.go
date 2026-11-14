@@ -105,7 +105,7 @@ func extractFontCIDType2(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType2, erro
 	if err != nil {
 		return nil, err
 	}
-	if dw, err := c.Number(cidFontDict["DW"]); err == nil {
+	if dw, err := number(c, cidFontDict["DW"]); err == nil {
 		d.DefaultWidth = dw
 	} else if pdf.IsReadError(err) {
 		return nil, err
@@ -193,11 +193,20 @@ func repairCIDType2(d *dict.CIDFontType2) {
 		d.CMap = cmap.IdentityH
 	}
 
-	if d.ROS == nil {
-		if d.CMap.ROS != nil {
-			d.ROS = d.CMap.ROS
+	repairROS(&d.ROS, &d.CMap)
+}
+
+// repairROS makes the character collection and the CMap of a CIDFont
+// consistent.  A missing character collection is taken from the CMap, or set
+// to Adobe-Identity-0.  Apart from the predefined Identity-H and Identity-V,
+// the CMap is replaced by a copy with the font's character collection if the
+// two are missing or incompatible.
+func repairROS(ros **cid.SystemInfo, cm **cmap.File) {
+	if *ros == nil {
+		if (*cm).ROS != nil {
+			*ros = (*cm).ROS
 		} else {
-			d.ROS = &cid.SystemInfo{
+			*ros = &cid.SystemInfo{
 				Registry:   "Adobe",
 				Ordering:   "Identity",
 				Supplement: 0,
@@ -205,15 +214,13 @@ func repairCIDType2(d *dict.CIDFontType2) {
 		}
 	}
 
-	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
-		!d.CMap.IsPredefined() {
-		if d.CMap.ROS == nil {
-			d.CMap = d.CMap.Clone()
-			d.CMap.ROS = d.ROS
-		} else if d.ROS.Registry != d.CMap.ROS.Registry ||
-			d.ROS.Ordering != d.CMap.ROS.Ordering {
-			d.CMap = d.CMap.Clone()
-			d.CMap.ROS = d.ROS
+	c := *cm
+	if c.Name != "Identity-H" && c.Name != "Identity-V" || !c.IsPredefined() {
+		if c.ROS == nil || (*ros).Registry != c.ROS.Registry ||
+			(*ros).Ordering != c.ROS.Ordering {
+			c = c.Clone()
+			c.ROS = *ros
+			*cm = c
 		}
 	}
 }

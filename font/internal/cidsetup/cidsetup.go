@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 // Package cidsetup derives the glyph-to-CID mapping and the encoder of a
-// composite font from the CMap it is written with.  The composite font
-// writers share this code.
+// composite font from the CMap it is written with, and the glyph metrics
+// of the CIDFont dictionary from the encoder.  The composite font writers
+// share this code.
 package cidsetup
 
 import (
 	"errors"
 	"io/fs"
+	"math"
 
 	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt"
@@ -29,7 +31,10 @@ import (
 // A non-nil gidToCID is used in place of the mapping derived from the CMap.
 // Its character collection must be the CMap's, unless the CMap leaves the
 // CIDs free.
-func FromCMap(f *cmap.File, gidToCID cmap.GIDToCID, info *sfnt.Font, notdefWidth float64) (cmap.GIDToCID, cidenc.CIDEncoder, error) {
+//
+// CID 0 is always glyph 0, and the encoder gives it the metrics of glyph 0
+// of info.  A non-nil gidToCID which breaks this rule is rejected.
+func FromCMap(f *cmap.File, gidToCID cmap.GIDToCID, info *sfnt.Font) (cmap.GIDToCID, cidenc.CIDEncoder, error) {
 	hasMappings := len(f.CIDSingles)+len(f.CIDRanges) > 0 || f.Parent != nil
 	if !hasMappings {
 		if !f.CodeSpaceRange.Equivalent(charcode.UTF8) {
@@ -38,15 +43,16 @@ func FromCMap(f *cmap.File, gidToCID cmap.GIDToCID, info *sfnt.Font, notdefWidth
 		if gidToCID == nil {
 			gidToCID = cmap.NewGIDToCIDSequential()
 		}
-		return gidToCID, cidenc.NewCompositeUtf8(notdefWidth, f.WMode), nil
+		if err := checkNotdef(gidToCID); err != nil {
+			return nil, nil, err
+		}
+		notdefWidth, notdefV := NotdefMetrics(info)
+		enc := cidenc.NewCompositeUtf8(gidToCID.ROS(), notdefWidth, notdefV, f.WMode)
+		return gidToCID, enc, nil
 	}
 
 	if f.ROS == nil {
 		return nil, nil, errors.New("CMap has no CIDSystemInfo")
-	}
-	enc, err := cidenc.NewFromCMap(f, notdefWidth)
-	if err != nil {
-		return nil, nil, err
 	}
 
 	if gidToCID != nil {
@@ -55,23 +61,49 @@ func FromCMap(f *cmap.File, gidToCID cmap.GIDToCID, info *sfnt.Font, notdefWidth
 		if !isIdentity(f.ROS) && !sameCollection(gidToCID.ROS(), f.ROS) {
 			return nil, nil, errors.New("GIDToCID and CMap use different character collections")
 		}
-		return gidToCID, enc, nil
+	} else {
+		lookup, err := info.CMapTable.GetBest()
+		if err != nil {
+			return nil, nil, err
+		}
+		gidToCID, err = cmap.NewGIDToCIDFromCMap(f, lookup)
+		if errors.Is(err, fs.ErrNotExist) && isIdentity(f.ROS) {
+			// The Identity CMaps do not fix the CIDs, so they can be
+			// allocated as glyphs are used.
+			gidToCID, err = cmap.NewGIDToCIDSequential(), nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
-	lookup, err := info.CMapTable.GetBest()
-	if err != nil {
+	if err := checkNotdef(gidToCID); err != nil {
 		return nil, nil, err
 	}
-	gidToCID, err = cmap.NewGIDToCIDFromCMap(f, lookup)
-	if errors.Is(err, fs.ErrNotExist) && isIdentity(f.ROS) {
-		// The Identity CMaps do not fix the CIDs, so they can be allocated
-		// as glyphs are used.
-		gidToCID, err = cmap.NewGIDToCIDSequential(), nil
-	}
+
+	// The font dictionary is written with the character collection of
+	// gidToCID, which decides the text a CID implies.
+	notdefWidth, notdefV := NotdefMetrics(info)
+	enc, err := cidenc.NewFromCMap(f, gidToCID.ROS(), notdefWidth, notdefV)
 	if err != nil {
 		return nil, nil, err
 	}
 	return gidToCID, enc, nil
+}
+
+// checkNotdef checks that CID 0 and glyph 0 correspond in gidToCID.
+func checkNotdef(gidToCID cmap.GIDToCID) error {
+	if gidToCID.GID(0) != 0 || gidToCID.CID(0, "") != 0 {
+		return errors.New("GIDToCID does not map CID 0 and glyph 0 to each other")
+	}
+	return nil
+}
+
+// NotdefMetrics returns the width and the vertical metrics of glyph 0 of
+// info, which is CID 0, rounded to integer PDF glyph space units, as the
+// composite font writers store glyph metrics in the encoder.
+func NotdefMetrics(info *sfnt.Font) (float64, cidenc.VMetrics) {
+	return math.Round(info.GlyphWidthPDF(0)), GlyphVMetrics(info, 0)
 }
 
 func isIdentity(ros *cid.SystemInfo) bool {

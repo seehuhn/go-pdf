@@ -10,7 +10,10 @@ import (
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/cmap"
+	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/font/truetype"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -326,5 +329,80 @@ func TestTextExtractorNoExplicitTextMatrix(t *testing.T) {
 	}
 	if err := extractor.ExtractPage(pageDict); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestTextExtractorVerticalXRange checks that the x range applies to a
+// glyph's horizontal origin, its left edge, in vertical writing mode as in
+// horizontal writing mode.  There the text position is the vertical origin,
+// to the right of it by the position vector.
+func TestTextExtractorVerticalXRange(t *testing.T) {
+	F, err := gofont.Regular.NewComposite(&truetype.OptionsComposite{CMap: cmap.IdentityV})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gg := F.Layout(nil, 20, "H")
+	code, ok := F.Encode(gg.Seq[0].GID, gg.Seq[0].Text)
+	if !ok {
+		t.Fatal("cannot encode H")
+	}
+	s := F.Codec().AppendCode(nil, code)
+	var vx float64
+	for c := range F.Codes(s) {
+		vx = c.VerticalOriginX * 20
+	}
+
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+	pageTree := pagetree.NewWriter(w, rm)
+	b := builder.New(content.Page, nil, pdf.V2_0)
+	b.TextBegin()
+	b.TextFirstLine(100, 700)
+	b.TextSetFont(F, 20)
+	b.TextShowRaw(s)
+	b.TextEnd()
+	if b.Err != nil {
+		t.Fatal(b.Err)
+	}
+	err = pageTree.AppendPage(&page.Page{
+		MediaBox:  &pdf.Rectangle{URx: 595, URy: 842},
+		Resources: b.Resources,
+		Contents:  []page.Segment{&content.Operators{Ops: b.Stream}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	treeRef, err := pageTree.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Pages = treeRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		min  float64
+		want string
+	}{
+		{100 - vx - 0.5, "H"},
+		{100 - vx + 0.5, ""},
+	} {
+		var buf bytes.Buffer
+		extractor := New(w, &buf)
+		extractor.XRangeMin = tc.min
+		_, pageDict, err := pagetree.GetPage(w, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := extractor.ExtractPage(pageDict); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.TrimSpace(buf.String()); got != tc.want {
+			t.Errorf("XRangeMin %g: extracted %q, want %q", tc.min, got, tc.want)
+		}
 	}
 }
