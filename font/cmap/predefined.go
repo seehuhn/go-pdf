@@ -8,6 +8,8 @@ import (
 	"embed"
 	"io"
 	"sync"
+
+	"seehuhn.de/go/pdf"
 )
 
 // TODO(voss): restrict the list of predefined CMaps to the ones which are
@@ -54,7 +56,7 @@ func loadPredefined(name string) (*File, error) {
 		return nil, err
 	}
 
-	c, pName, err := readCMap(fd)
+	c, pName, err := readCMap(fd, pdf.Name(name))
 	if err != nil {
 		return nil, err
 	}

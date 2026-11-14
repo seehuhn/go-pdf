@@ -919,7 +919,7 @@ end
 // TestReadCMapLongCodes checks that entries with codes longer than
 // [maxCodeLength] bytes are dropped when a CMap is read.
 func TestReadCMapLongCodes(t *testing.T) {
-	f, _, err := readCMap(strings.NewReader(longCodeCMap))
+	f, _, err := readCMap(strings.NewReader(longCodeCMap), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -940,7 +940,7 @@ func TestReadCMapLongCodes(t *testing.T) {
 	if err := f.WriteTo(buf, false); err != nil {
 		t.Fatal(err)
 	}
-	f2, _, err := readCMap(buf)
+	f2, _, err := readCMap(buf, "")
 	if err != nil {
 		t.Fatal(err)
 	}

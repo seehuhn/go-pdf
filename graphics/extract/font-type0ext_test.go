@@ -429,3 +429,72 @@ func TestType0EncodingProvenance(t *testing.T) {
 		t.Errorf("CMap written again: found %d copies in the update", n)
 	}
 }
+
+// TestType0BrokenCMaps checks that an unusable Encoding CMap is replaced
+// by Identity-H and that an unusable ToUnicode CMap is dropped, instead of
+// the whole font being discarded.
+func TestType0BrokenCMaps(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+
+	garbage := w.Alloc()
+	stm, err := w.OpenStream(garbage, pdf.Dict{"Type": pdf.Name("CMap")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte("garbage ( [ << begincodespacerange")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	cidFontRef := w.Alloc()
+	err = w.Put(cidFontRef, pdf.Dict{
+		"Type":     pdf.Name("Font"),
+		"Subtype":  pdf.Name("CIDFontType0"),
+		"BaseFont": pdf.Name("Test"),
+		"CIDSystemInfo": pdf.Dict{
+			"Registry":   pdf.String("Adobe"),
+			"Ordering":   pdf.String("Identity"),
+			"Supplement": pdf.Integer(0),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	encodings := map[string]pdf.Object{
+		"missing":            nil,
+		"unknown name":       pdf.Name("Bogus-H"),
+		"wrong type":         pdf.Integer(1),
+		"unparseable stream": garbage,
+	}
+	for name, enc := range encodings {
+		t.Run(name, func(t *testing.T) {
+			fontDict := pdf.Dict{
+				"Type":            pdf.Name("Font"),
+				"Subtype":         pdf.Name("Type0"),
+				"BaseFont":        pdf.Name("Test"),
+				"DescendantFonts": pdf.Array{cidFontRef},
+				"ToUnicode":       garbage,
+			}
+			if enc != nil {
+				fontDict["Encoding"] = enc
+			}
+			d, err := extract.Dict(pdf.NewCursor(w), fontDict, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d0, ok := d.(*dict.CIDFontType0)
+			if !ok {
+				t.Fatalf("decoded %T, want *dict.CIDFontType0", d)
+			}
+			if d0.CMap != cmap.IdentityH {
+				t.Errorf("CMap %q, want Identity-H", d0.CMap.Name)
+			}
+			if d0.ToUnicode != nil {
+				t.Error("unusable ToUnicode CMap not dropped")
+			}
+		})
+	}
+}

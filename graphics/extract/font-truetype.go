@@ -110,7 +110,10 @@ func extractFontTrueType(c pdf.Cursor, obj pdf.Object) (*dict.TrueType, error) {
 		}
 	}
 
-	d.ToUnicode, _ = c.Decode(fontDict["ToUnicode"], cmap.ExtractToUnicode)
+	d.ToUnicode, err = c.DecodeOptional(fontDict["ToUnicode"], cmap.ExtractToUnicode)
+	if err != nil {
+		return nil, err
+	}
 
 	repairTrueType(d, c.Getter())
 

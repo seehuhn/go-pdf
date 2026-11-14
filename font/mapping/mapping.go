@@ -51,7 +51,7 @@ func GetCIDTextMapping(registry, ordering string) (map[cid.CID]string, error) {
 	}
 	defer cmapFile.Close()
 
-	_, codeMap, err := postscript.ReadCMap(cmapFile)
+	_, codeMap, err := postscript.ReadCMap(cmapFile, "")
 	if err != nil {
 		return nil, err
 	}

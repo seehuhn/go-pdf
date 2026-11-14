@@ -69,7 +69,8 @@ func extractFontCIDType2(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType2, erro
 
 	// fields in the font dictionary
 
-	d.CMap, err = c.Decode(fontDict["Encoding"], cmap.Extract)
+	// a missing or malformed CMap is repaired below
+	d.CMap, err = c.DecodeOptional(fontDict["Encoding"], cmap.Extract)
 	if err != nil {
 		return nil, err
 	}

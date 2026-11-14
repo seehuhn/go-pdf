@@ -134,13 +134,9 @@ func ExtractToUnicode(c pdf.Cursor, obj pdf.Object, _ bool) (*ToUnicodeFile, err
 }
 
 func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
-	raw, codeMap, err := postscript.ReadCMap(r)
+	_, codeMap, err := postscript.ReadCMap(r, "")
 	if err != nil {
-		return nil, err
-	}
-
-	if tp, _ := raw["CMapType"].(postscript.Integer); !(tp == 0 || tp == 2) {
-		return nil, pdf.Errorf("invalid CMapType: %d", tp)
+		return nil, &pdf.MalformedFileError{Err: err}
 	}
 
 	res := &ToUnicodeFile{}

@@ -57,7 +57,10 @@ func extractFontType3(c pdf.Cursor, obj pdf.Object) (*dict.Type3, error) {
 	}
 	getSimpleWidths(d.Width[:], c, fontDict, defaultWidth)
 
-	d.ToUnicode, _ = c.Decode(fontDict["ToUnicode"], cmap.ExtractToUnicode)
+	d.ToUnicode, err = c.DecodeOptional(fontDict["ToUnicode"], cmap.ExtractToUnicode)
+	if err != nil {
+		return nil, err
+	}
 
 	// Extract CharProcs - parse each content stream
 	charProcsDict, err := c.Dict(fontDict["CharProcs"])

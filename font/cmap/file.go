@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"io/fs"
 	"iter"
 	"math"
 	"slices"
@@ -95,7 +96,13 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*File, error) {
 	var dict pdf.Dict
 	switch obj := resolved.(type) {
 	case pdf.Name:
-		return Predefined(string(obj))
+		res, err := Predefined(string(obj))
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, &pdf.MalformedFileError{Err: err}
+		} else if err != nil {
+			return nil, err
+		}
+		return res, nil
 
 	case *pdf.Stream:
 		dict = obj.Dict
@@ -116,12 +123,13 @@ func Extract(c pdf.Cursor, obj pdf.Object, _ bool) (*File, error) {
 		return nil, pdf.Errorf("invalid CMap object type: %T", obj)
 	}
 
-	res, parentName, err := readCMap(body)
+	name, _ := c.Name(dict["CMapName"])
+	res, parentName, err := readCMap(body, name)
 	if err != nil {
 		return nil, err
 	}
 
-	if name, _ := c.Name(dict["CMapName"]); name != "" {
+	if name != "" {
 		if clean := sanitizeName(string(name)); clean != "" {
 			res.Name = clean
 		}
@@ -173,15 +181,13 @@ func sanitizeName(s string) string {
 }
 
 // readCMap reads and parses a CMap from a PostScript stream.
+// If the stream defines several CMaps, the one called name is preferred,
+// see [postscript.ReadCMap].
 // It returns the parsed CMap, the parent CMap name (if any), and any error.
-func readCMap(r io.Reader) (*File, pdf.Name, error) {
-	raw, codeMap, err := postscript.ReadCMap(r)
+func readCMap(r io.Reader, name pdf.Name) (*File, pdf.Name, error) {
+	raw, codeMap, err := postscript.ReadCMap(r, postscript.Name(name))
 	if err != nil {
-		return nil, "", err
-	}
-
-	if tp, _ := raw["CMapType"].(postscript.Integer); !(tp == 0 || tp == 1) {
-		return nil, "", pdf.Errorf("invalid CMapType: %d", tp)
+		return nil, "", &pdf.MalformedFileError{Err: err}
 	}
 
 	res := &File{}
@@ -229,58 +235,76 @@ func readCMap(r io.Reader) (*File, pdf.Name, error) {
 		if !validCodeLength(len(entry.Src)) {
 			continue
 		}
-		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
+		cidVal, ok := cidValue(entry.Dst)
+		if !ok {
 			continue
 		}
 		res.CIDSingles = append(res.CIDSingles, Single{
 			Code:  entry.Src,
-			Value: cid.CID(cidVal),
+			Value: cidVal,
 		})
 	}
 	for _, entry := range codeMap.CidRanges {
 		if len(entry.Low) != len(entry.High) || !validCodeLength(len(entry.Low)) {
 			continue
 		}
-		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
+		cidVal, ok := cidValue(entry.Dst)
+		if !ok {
 			continue
 		}
 		res.CIDRanges = append(res.CIDRanges, Range{
 			First: entry.Low,
 			Last:  entry.High,
-			Value: cid.CID(cidVal),
+			Value: cidVal,
 		})
 	}
 	for _, entry := range codeMap.NotdefChars {
 		if !validCodeLength(len(entry.Src)) {
 			continue
 		}
-		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
+		cidVal, ok := cidValue(entry.Dst)
+		if !ok {
 			continue
 		}
 		res.NotdefSingles = append(res.NotdefSingles, Single{
 			Code:  entry.Src,
-			Value: cid.CID(cidVal),
+			Value: cidVal,
 		})
 	}
 	for _, entry := range codeMap.NotdefRanges {
 		if len(entry.Low) != len(entry.High) || !validCodeLength(len(entry.Low)) {
 			continue
 		}
-		cidVal, ok := entry.Dst.(postscript.Integer)
-		if !ok || cidVal < 0 || int64(cidVal) > math.MaxUint32 {
+		cidVal, ok := cidValue(entry.Dst)
+		if !ok {
 			continue
 		}
 		res.NotdefRanges = append(res.NotdefRanges, Range{
 			First: entry.Low,
 			Last:  entry.High,
-			Value: cid.CID(cidVal),
+			Value: cidVal,
 		})
 	}
 
 	return res, parent, nil
+}
+
+// cidValue returns the CID given as the destination of a CID or notdef
+// mapping.  A real value is accepted if it is a whole number.
+func cidValue(obj postscript.Object) (cid.CID, bool) {
+	var x float64
+	switch obj := obj.(type) {
+	case postscript.Integer:
+		x = float64(obj)
+	case postscript.Real:
+		x = float64(obj)
+	default:
+		return 0, false
+	}
+	if !(x >= 0 && x <= math.MaxUint32) || x != math.Trunc(x) {
+		return 0, false
+	}
+	return cid.CID(x), true
 }
 
 // Clone returns a shallow copy of the CMap file.  The copy shares the

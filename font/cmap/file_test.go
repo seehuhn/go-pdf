@@ -309,7 +309,7 @@ func TestExtractCMAP(t *testing.T) {
 // TestReadCMap tests that all fields of a CMap can be read correctly
 // from a CMAP file.
 func TestReadCMap(t *testing.T) {
-	info, parent, err := readCMap(bytes.NewReader(testCMapFull))
+	info, parent, err := readCMap(bytes.NewReader(testCMapFull), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +404,7 @@ func FuzzReadCMap(f *testing.F) {
 	f.Add(testToUniCMapFull)
 
 	f.Fuzz(func(t *testing.T, body []byte) {
-		info, _, err := readCMap(bytes.NewReader(body))
+		info, _, err := readCMap(bytes.NewReader(body), "")
 		if err != nil {
 			t.Skip(err)
 		}
@@ -415,7 +415,7 @@ func FuzzReadCMap(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		info2, _, err := readCMap(buf)
+		info2, _, err := readCMap(buf, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -769,7 +769,7 @@ CMapName currentdict /CMap defineresource pop
 end
 end
 `
-	f, _, err := readCMap(strings.NewReader(src))
+	f, _, err := readCMap(strings.NewReader(src), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -876,7 +876,7 @@ func TestRangeCIDOverflow(t *testing.T) {
 	if err := f.WriteTo(buf, false); err != nil {
 		t.Fatal(err)
 	}
-	f2, _, err := readCMap(buf)
+	f2, _, err := readCMap(buf, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -914,7 +914,7 @@ end
 	}
 	want := charcode.CodeSpaceRange{{Low: []byte{0x00}, High: []byte{0x7F}}}
 
-	info, _, err := readCMap(bytes.NewReader(data(1)))
+	info, _, err := readCMap(bytes.NewReader(data(1)), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -931,5 +931,166 @@ end
 	}
 	if diff := cmp.Diff(want, tu.CodeSpaceRange); diff != "" {
 		t.Errorf("wrong ToUnicode code space ranges (-want +got):\n%s", diff)
+	}
+}
+
+// TestReadCMapRealCID checks that CIDs written as whole-number reals are
+// kept, and that mappings to fractional reals are dropped.
+func TestReadCMapRealCID(t *testing.T) {
+	data := `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /Test def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+2 begincidchar
+<01> 1.0
+<02> 2.6
+endcidchar
+1 begincidrange
+<10> <1F> 16.0
+endcidrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`
+	info, _, err := readCMap(strings.NewReader(data), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantSingles := []Single{{Code: []byte{1}, Value: 1}}
+	if diff := cmp.Diff(wantSingles, info.CIDSingles); diff != "" {
+		t.Errorf("wrong singles (-want +got):\n%s", diff)
+	}
+	wantRanges := []Range{{First: []byte{0x10}, Last: []byte{0x1F}, Value: 16}}
+	if diff := cmp.Diff(wantRanges, info.CIDRanges); diff != "" {
+		t.Errorf("wrong ranges (-want +got):\n%s", diff)
+	}
+}
+
+// TestReadCMapType checks that the CMapType entry does not affect reading.
+func TestReadCMapType(t *testing.T) {
+	data := func(cmapType int) string {
+		return fmt.Sprintf(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /Test def
+/CMapType %d def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`, cmapType)
+	}
+	for _, tp := range []int{0, 1, 2, 7} {
+		if _, _, err := readCMap(strings.NewReader(data(tp)), ""); err != nil {
+			t.Errorf("CMapType %d: %v", tp, err)
+		}
+		if _, err := readToUnicode(strings.NewReader(data(tp))); err != nil {
+			t.Errorf("ToUnicode with CMapType %d: %v", tp, err)
+		}
+	}
+}
+
+// TestExtractMalformed checks that unusable CMaps are reported as malformed,
+// so that callers can drop or repair them.
+func TestExtractMalformed(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	ref := w.Alloc()
+	stm, err := w.OpenStream(ref, pdf.Dict{"Type": pdf.Name("CMap")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stm.Write([]byte("garbage ( [ << begincodespacerange")); err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	c := pdf.NewCursor(w)
+
+	if _, err := Extract(c, ref, false); !pdf.IsMalformed(err) {
+		t.Errorf("garbage CMap: got %v, want malformed", err)
+	}
+	if _, err := Extract(c, pdf.Name("Bogus-H"), false); !pdf.IsMalformed(err) {
+		t.Errorf("unknown predefined CMap: got %v, want malformed", err)
+	}
+	if _, err := ExtractToUnicode(c, ref, false); !pdf.IsMalformed(err) {
+		t.Errorf("garbage ToUnicode CMap: got %v, want malformed", err)
+	}
+}
+
+// TestExtractMultipleCMaps checks that, of several CMaps in one stream, the
+// one named by the stream dictionary is used.
+func TestExtractMultipleCMaps(t *testing.T) {
+	body := `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /First def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+1 begincidchar
+<01> 1
+endcidchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+12 dict begin
+begincmap
+/CMapName /Second def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+1 begincidchar
+<01> 2
+endcidchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`
+	for _, tc := range []struct {
+		name pdf.Name
+		want cid.CID
+	}{
+		{"First", 1},
+		{"Second", 2},
+		{"Missing", 2},
+	} {
+		w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+		ref := w.Alloc()
+		stm, err := w.OpenStream(ref, pdf.Dict{
+			"Type":     pdf.Name("CMap"),
+			"CMapName": tc.name,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := stm.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+		if err := stm.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		f, err := Extract(pdf.NewCursor(w), ref, false)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if got := f.LookupCID([]byte{1}); got != tc.want {
+			t.Errorf("%s: got CID %d, want %d", tc.name, got, tc.want)
+		}
 	}
 }
