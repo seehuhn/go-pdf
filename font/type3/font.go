@@ -466,6 +466,11 @@ func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 		StemV:        -1,
 		MissingWidth: f.Simple.DefaultWidth(),
 	}
+	toUnicode, err := f.Simple.ToUnicode()
+	if err != nil {
+		return nil, err
+	}
+
 	d := &dict.Type3{
 		Name:       f.Font.Name,
 		Descriptor: fd,
@@ -474,7 +479,7 @@ func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 		// FontBBox:   &pdf.Rectangle{},
 		FontMatrix: f.Font.FontMatrix,
 		Resources:  f.Font.Resources,
-		ToUnicode:  f.Simple.ToUnicode(),
+		ToUnicode:  toUnicode,
 	}
 	for c, info := range f.Simple.MappedCodes() {
 		d.Width[c] = info.Width

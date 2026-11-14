@@ -276,7 +276,7 @@ func (e *compositeUTF8) MappedCodes() iter.Seq2[charcode.Code, *Info] {
 	}
 }
 
-func (e *compositeUTF8) ToUnicode() *cmap.ToUnicodeFile {
+func (e *compositeUTF8) ToUnicode() (*cmap.ToUnicodeFile, error) {
 	e.mu.RLock()
 	m := make(map[charcode.Code]string, len(e.info))
 	for c, info := range e.info {
@@ -284,12 +284,7 @@ func (e *compositeUTF8) ToUnicode() *cmap.ToUnicodeFile {
 	}
 	e.mu.RUnlock()
 
-	toUnicode, err := cmap.NewToUnicodeFile(charcode.UTF8, m)
-	if err != nil {
-		panic("unreachable")
-	}
-
-	return toUnicode
+	return cmap.NewToUnicodeFile(charcode.UTF8, m)
 }
 
 // CID0Metrics returns the metrics of CID 0, as given to [NewCompositeUtf8].

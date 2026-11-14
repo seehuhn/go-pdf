@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"io"
 	"iter"
 	"math"
 	"slices"
@@ -104,7 +103,7 @@ func ExtractToUnicode(c pdf.Cursor, obj pdf.Object, _ bool) (*ToUnicodeFile, err
 		return nil, err
 	}
 
-	res, err := readToUnicode(bytes.NewReader(body))
+	res, err := readToUnicode(body)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +132,9 @@ func ExtractToUnicode(c pdf.Cursor, obj pdf.Object, _ bool) (*ToUnicodeFile, err
 	return res, nil
 }
 
-func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
-	_, codeMap, err := postscript.ReadCMap(r, "")
+// readToUnicode reads a ToUnicode CMap from the contents of its stream.
+func readToUnicode(body []byte) (*ToUnicodeFile, error) {
+	_, codeMap, err := postscript.ReadCMap(bytes.NewReader(body), "")
 	if err != nil {
 		return nil, &pdf.MalformedFileError{Err: err}
 	}
@@ -149,15 +149,27 @@ func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
 		res.CodeSpaceRange = append(res.CodeSpaceRange, r)
 	}
 
+	budget := textBudget(len(body))
+	res.addMappings(codeMap, &budget)
+
+	return res, nil
+}
+
+// addMappings adds the bfchar and bfrange mappings of codeMap to tu, until
+// the budget is spent.
+func (tu *ToUnicodeFile) addMappings(codeMap *postscript.CMapInfo, budget *textBudget) {
 	for _, entry := range codeMap.BfChars {
 		if !validCodeLength(len(entry.Src)) {
 			continue
+		}
+		if !budget.spend(entry.Dst) {
+			return
 		}
 		s, err := toString(entry.Dst)
 		if err != nil {
 			continue
 		}
-		res.Singles = append(res.Singles, ToUnicodeSingle{
+		tu.Singles = append(tu.Singles, ToUnicodeSingle{
 			Code:  entry.Src,
 			Value: s,
 		})
@@ -169,18 +181,24 @@ func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
 
 		switch r := entry.Dst.(type) {
 		case postscript.String:
+			if !budget.spend(r) {
+				return
+			}
 			s, err := toString(r)
 			if err != nil {
 				continue
 			}
-			res.Ranges = append(res.Ranges, ToUnicodeRange{
+			tu.Ranges = append(tu.Ranges, ToUnicodeRange{
 				First:  entry.Low,
 				Last:   entry.High,
 				Values: []string{s},
 			})
 		case postscript.Array:
-			values := make([]string, 0, len(r))
+			var values []string
 			for _, v := range r {
+				if !budget.spend(v) {
+					return
+				}
 				s, err := toString(v)
 				if err == nil {
 					values = append(values, s)
@@ -188,15 +206,33 @@ func readToUnicode(r io.Reader) (*ToUnicodeFile, error) {
 					values = append(values, brokenReplacement)
 				}
 			}
-			res.Ranges = append(res.Ranges, ToUnicodeRange{
+			tu.Ranges = append(tu.Ranges, ToUnicodeRange{
 				First:  entry.Low,
 				Last:   entry.High,
 				Values: values,
 			})
 		}
 	}
+}
 
-	return res, nil
+// textBudget bounds the work and memory used to decode the destination
+// strings of a ToUnicode CMap by the size of the CMap stream.  The PostScript
+// interpreter can push one string any number of times at constant cost, so
+// the decoded text is not otherwise bounded by the input.  A destination
+// string in hex or literal form occupies at least its own length plus one
+// byte in the stream.
+type textBudget int
+
+// spend charges the cost of decoding the destination string obj: its length
+// plus one, or one if it is not a valid destination string.  The result is
+// false, and no further string may be decoded, once the budget is exceeded.
+func (b *textBudget) spend(obj postscript.Object) bool {
+	cost := 1
+	if s, ok := obj.(postscript.String); ok && len(s) <= maxDstStringBytes {
+		cost += len(s)
+	}
+	*b -= textBudget(cost)
+	return *b >= 0
 }
 
 // IsEmpty returns true if the ToUnicodeInfo object does not contain any mappings.
@@ -389,26 +425,25 @@ func (tu *ToUnicodeFile) CodeForText(text string) ([]byte, bool) {
 // character is not a Unicode scalar value.  The position i must not be
 // negative.
 func generatedText(base string, i int) (string, bool) {
-	rr := []rune(base)
-	if len(rr) == 0 {
+	last, size := utf8.DecodeLastRuneInString(base)
+	if size == 0 {
 		return "", false
 	}
-	r := int64(rr[len(rr)-1]) + int64(i)
+	r := int64(last) + int64(i)
 	if r > utf8.MaxRune || !utf8.ValidRune(rune(r)) {
 		return "", false
 	}
-	rr[len(rr)-1] = rune(r)
-	return string(rr), true
+	return base[:len(base)-size] + string(rune(r)), true
 }
 
 // generatedPosition returns the position i at which [generatedText] gives
 // text for base.  The flag is false if there is no such position.
 func generatedPosition(base, text string) (int64, bool) {
-	rr := []rune(base)
-	if len(rr) == 0 {
+	last, lastSize := utf8.DecodeLastRuneInString(base)
+	if lastSize == 0 {
 		return 0, false
 	}
-	rest, ok := strings.CutPrefix(text, string(rr[:len(rr)-1]))
+	rest, ok := strings.CutPrefix(text, base[:len(base)-lastSize])
 	if !ok {
 		return 0, false
 	}
@@ -416,7 +451,7 @@ func generatedPosition(base, text string) (int64, bool) {
 	if size == 0 || size != len(rest) || r == utf8.RuneError && size == 1 {
 		return 0, false
 	}
-	i := int64(r) - int64(rr[len(rr)-1])
+	i := int64(r) - int64(last)
 	return i, i >= 0
 }
 
@@ -445,10 +480,9 @@ func mappedPositions(values []string) []positionRun {
 		runs = append(runs, positionRun{int(lo), int(hi)})
 	}
 
-	rr := []rune(values[0])
-	if len(rr) > 0 {
+	if last, size := utf8.DecodeLastRuneInString(values[0]); size > 0 {
 		// generated characters must avoid the surrogates U+D800 to U+DFFF
-		b := int64(rr[len(rr)-1])
+		b := int64(last)
 		add(0, 0xD7FF-b)
 		add(0xE000-b, utf8.MaxRune-b)
 	}
@@ -611,6 +645,18 @@ func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := checkWritable(tu, toUnicodeParent, toUnicodeLevelFits); err != nil {
 		return nil, err
 	}
+	for _, s := range tu.Singles {
+		if dstStringBytes(s.Value) > maxDstStringBytes {
+			return nil, errDstStringTooLong
+		}
+	}
+	for _, r := range tu.Ranges {
+		for _, v := range r.Values {
+			if dstStringBytes(v) > maxDstStringBytes {
+				return nil, errDstStringTooLong
+			}
+		}
+	}
 
 	opt := rm.Out().GetOptions()
 
@@ -650,9 +696,27 @@ func (tu *ToUnicodeFile) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	return ref, nil
 }
 
+// maxDstStringBytes is the maximum length of a destination string in a
+// ToUnicode CMap, as given by the PDF specification.
+const maxDstStringBytes = 512
+
+var errDstStringTooLong = errors.New("ToUnicode text longer than 512 bytes")
+
+// dstStringBytes returns the length of s in UTF-16, in bytes, as written by
+// [hexString].
+func dstStringBytes(s string) int {
+	n := 0
+	for _, r := range s {
+		// runes which UTF-16 cannot encode are written as U+FFFD
+		n += 2 * max(utf16.RuneLen(r), 1)
+	}
+	return n
+}
+
+// toString decodes a destination string of a ToUnicode CMap.
 func toString(obj postscript.Object) (string, error) {
 	dst, ok := obj.(postscript.String)
-	if !ok || len(dst)%2 != 0 {
+	if !ok || len(dst)%2 != 0 || len(dst) > maxDstStringBytes {
 		return "", fmt.Errorf("invalid ToUnicode CMap")
 	}
 	buf := make([]uint16, 0, len(dst)/2)

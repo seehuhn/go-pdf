@@ -355,6 +355,11 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 	// descriptor's FontName, which for a subset carry the tag
 	subsetFont.FontName = subset.Join(subsetTag, postScriptName)
 
+	toUnicode, err := f.Simple.ToUnicode()
+	if err != nil {
+		return nil, err
+	}
+
 	dict := &dict.TrueType{
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
@@ -362,7 +367,7 @@ func (f *Simple) makeDict() (*dict.TrueType, error) {
 		Descriptor:     &fd,
 		Encoding:       dictEnc,
 		FontFile:       sfntglyphs.ToStream(subsetFont, glyphdata.TrueType),
-		ToUnicode:      f.Simple.ToUnicode(),
+		ToUnicode:      toUnicode,
 	}
 	for c, info := range f.Simple.MappedCodes() {
 		dict.Width[c] = info.Width

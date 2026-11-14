@@ -470,7 +470,7 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 
 	fontData := f.psFont
 	if fontData == nil {
-		return f.makeMetricsOnlyDict(), nil
+		return f.makeMetricsOnlyDict()
 	}
 
 	// The dictionary describes the program it carries, so both the name and the
@@ -519,12 +519,17 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 	fd.IsSymbolic = f.Simple.IsSymbolic()
 	fd.MissingWidth = f.Simple.DefaultWidth()
 
+	toUnicode, err := f.Simple.ToUnicode()
+	if err != nil {
+		return nil, err
+	}
+
 	dict := &dict.Type1{
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
 		Descriptor:     &fd,
 		Encoding:       f.Simple.Encoding(),
-		ToUnicode:      f.Simple.ToUnicode(),
+		ToUnicode:      toUnicode,
 		Name:           f.Name,
 	}
 	for c, info := range f.Simple.MappedCodes() {
@@ -538,7 +543,7 @@ func (f *Instance) makeFontDict() (*dict.Type1, error) {
 
 // makeMetricsOnlyDict returns the font dictionary of an instance without
 // font program.  It carries no font data and the name has no subset tag.
-func (f *Instance) makeMetricsOnlyDict() *dict.Type1 {
+func (f *Instance) makeMetricsOnlyDict() (*dict.Type1, error) {
 	postScriptName := f.PostScriptName()
 
 	fd := *f.Descriptor
@@ -559,17 +564,22 @@ func (f *Instance) makeMetricsOnlyDict() *dict.Type1 {
 		}
 	}
 
+	toUnicode, err := f.Simple.ToUnicode()
+	if err != nil {
+		return nil, err
+	}
+
 	dict := &dict.Type1{
 		PostScriptName: postScriptName,
 		Descriptor:     &fd,
 		Encoding:       enc,
-		ToUnicode:      f.Simple.ToUnicode(),
+		ToUnicode:      toUnicode,
 		Name:           f.Name,
 	}
 	for c, info := range f.Simple.MappedCodes() {
 		dict.Width[c] = info.Width
 	}
-	return dict
+	return dict, nil
 }
 
 func clone[T any](x *T) *T {

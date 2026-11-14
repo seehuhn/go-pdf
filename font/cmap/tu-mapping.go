@@ -13,9 +13,17 @@ import (
 
 // NewToUnicodeFile creates a ToUnicodeFile object.
 //
-// An error is returned if [charcode.NewCodec] fails for the code space range:
-// if the range is invalid, or if its lookup tree would be too large.
+// An error is returned if [charcode.NewCodec] fails for the code space range,
+// that is if the range is invalid or its lookup tree would be too large.  An
+// error is also returned if a text is longer than 512 bytes in UTF-16, the
+// limit for a destination string in a ToUnicode CMap.
 func NewToUnicodeFile(csr charcode.CodeSpaceRange, data map[charcode.Code]string) (*ToUnicodeFile, error) {
+	for _, text := range data {
+		if dstStringBytes(text) > maxDstStringBytes {
+			return nil, errDstStringTooLong
+		}
+	}
+
 	res := &ToUnicodeFile{
 		CodeSpaceRange: csr,
 	}

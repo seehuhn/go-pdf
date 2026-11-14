@@ -110,8 +110,9 @@ type CIDEncoder interface {
 	Width(code charcode.Code) float64
 
 	// ToUnicode returns a ToUnicode CMap representing the text content
-	// of the mapped codes.
-	ToUnicode() *cmap.ToUnicodeFile
+	// of the mapped codes.  An error is returned if the text of a code is
+	// too long for a ToUnicode CMap, see [cmap.NewToUnicodeFile].
+	ToUnicode() (*cmap.ToUnicodeFile, error)
 }
 
 type key struct {

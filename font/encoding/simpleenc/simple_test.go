@@ -67,7 +67,9 @@ func TestNewSimpleIgnoresSubsetTag(t *testing.T) {
 		if _, err := enc.Encode(1, "a12", pointingHand, 100); err != nil {
 			t.Fatal(err)
 		}
-		if tu := enc.ToUnicode(); tu != nil {
+		if tu, err := enc.ToUnicode(); err != nil {
+			t.Fatal(err)
+		} else if tu != nil {
 			t.Errorf("%s: %q needed a ToUnicode entry, so the glyph name did not imply it",
 				name, pointingHand)
 		}
@@ -126,7 +128,7 @@ func TestConcurrentReaders(t *testing.T) {
 				_ = tab.CodesRemaining()
 				_ = tab.DefaultWidth()
 				_ = tab.Error()
-				_ = tab.ToUnicode()
+				_, _ = tab.ToUnicode()
 				_, _ = tab.GetCode(3, "C")
 			}
 		})

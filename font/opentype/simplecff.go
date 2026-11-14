@@ -263,6 +263,11 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 	fd.IsSymbolic = isSymbolic
 	fd.MissingWidth = f.Simple.DefaultWidth()
 
+	toUnicode, err := f.Simple.ToUnicode()
+	if err != nil {
+		return nil, err
+	}
+
 	fontDict := &dict.Type1{
 		PostScriptName: postScriptName,
 		SubsetTag:      subsetTag,
@@ -270,7 +275,7 @@ func (f *SimpleCFF) makeDict() (*dict.Type1, error) {
 		Descriptor:     &fd,
 		Encoding:       f.Simple.Encoding(),
 		Width:          widths,
-		ToUnicode:      f.Simple.ToUnicode(),
+		ToUnicode:      toUnicode,
 		FontFile:       cffglyphs.ToStream(subsetCFF, glyphdata.CFFSimple),
 	}
 

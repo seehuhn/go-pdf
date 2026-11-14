@@ -10,12 +10,14 @@ import (
 )
 
 // ToUnicode returns the ToUnicode CMap for the codes allocated so far, or nil
-// if every code means what its glyph name already implies.
+// if every code means what its glyph name already implies.  An error is
+// returned if the text of a code is too long for a ToUnicode CMap, see
+// [cmap.NewToUnicodeFile].
 //
 // The glyph names are read against the font name given to [NewSimple], which is
 // the same name [Simple.Encode] used: a code left out here because its text is
 // implied must be one the implication holds for.
-func (t *Simple) ToUnicode() *cmap.ToUnicodeFile {
+func (t *Simple) ToUnicode() (*cmap.ToUnicodeFile, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -29,9 +31,8 @@ func (t *Simple) ToUnicode() *cmap.ToUnicodeFile {
 	}
 
 	if len(m) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	tuInfo, _ := cmap.NewToUnicodeFile(charcode.Simple, m)
-	return tuInfo
+	return cmap.NewToUnicodeFile(charcode.Simple, m)
 }

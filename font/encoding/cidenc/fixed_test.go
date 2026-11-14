@@ -169,7 +169,10 @@ func TestFixedToUnicodeInherited(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tu := enc.ToUnicode()
+	tu, err := enc.ToUnicode()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if tu == nil {
 		t.Fatal("no ToUnicode CMap")
 	}
@@ -216,7 +219,10 @@ func TestFixedToUnicodeCodeSpace(t *testing.T) {
 				want[got] = "\ue000"
 			}
 
-			tu := enc.ToUnicode()
+			tu, err := enc.ToUnicode()
+			if err != nil {
+				t.Fatal(err)
+			}
 			if tu == nil {
 				t.Fatal("no ToUnicode CMap")
 			}
@@ -334,7 +340,10 @@ func TestFixedToUnicodeOverlap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tu := enc.ToUnicode()
+	tu, err := enc.ToUnicode()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if tu == nil {
 		t.Fatal("no ToUnicode CMap")
 	}

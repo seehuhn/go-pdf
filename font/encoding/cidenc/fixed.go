@@ -323,7 +323,7 @@ func (f *fixed) Width(code charcode.Code) float64 {
 
 // ToUnicode returns a ToUnicode CMap representing the text content
 // of the mapped codes.
-func (f *fixed) ToUnicode() *cmap.ToUnicodeFile {
+func (f *fixed) ToUnicode() (*cmap.ToUnicodeFile, error) {
 	m := make(map[charcode.Code]string)
 
 	f.mu.RLock()
@@ -345,14 +345,14 @@ func (f *fixed) ToUnicode() *cmap.ToUnicodeFile {
 	}
 
 	if len(m) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// The code space includes the ranges inherited through usecmap, as for
 	// Identity-V, and keeps them in their original order.  NewFromCMap
-	// checked that a codec for csr exists, so this cannot fail.
-	toUnicode, _ := cmap.NewToUnicodeFile(f.csr, m)
-	return toUnicode
+	// checked that a codec for csr exists, so only an over-long text can
+	// make this fail.
+	return cmap.NewToUnicodeFile(f.csr, m)
 }
 
 // CID0Metrics returns the metrics of CID 0, as given to [NewFromCMap].

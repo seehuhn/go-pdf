@@ -925,7 +925,7 @@ end
 		t.Errorf("no codec: %v", err)
 	}
 
-	tu, err := readToUnicode(bytes.NewReader(data(2)))
+	tu, err := readToUnicode(data(2))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -991,7 +991,7 @@ end
 		if _, _, err := readCMap(strings.NewReader(data(tp)), ""); err != nil {
 			t.Errorf("CMapType %d: %v", tp, err)
 		}
-		if _, err := readToUnicode(strings.NewReader(data(tp))); err != nil {
+		if _, err := readToUnicode([]byte(data(tp))); err != nil {
 			t.Errorf("ToUnicode with CMapType %d: %v", tp, err)
 		}
 	}

@@ -299,6 +299,11 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 	// descriptor's FontName, which for a subset carry the tag
 	subsetFont.FontName = subset.Join(subsetTag, postScriptName)
 
+	toUnicode, err := f.CIDEncoder.ToUnicode()
+	if err != nil {
+		return nil, err
+	}
+
 	fontDict := &dict.CIDFontType2{
 		PostScriptName:  postScriptName,
 		SubsetTag:       subsetTag,
@@ -309,7 +314,7 @@ func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
 		DefaultWidth:    dw,
 		DefaultVMetrics: dw2,
 		VMetrics:        w2,
-		ToUnicode:       f.CIDEncoder.ToUnicode(),
+		ToUnicode:       toUnicode,
 		FontFile:        sfntglyphs.ToStream(subsetFont, glyphdata.TrueType),
 	}
 	if !isIdentity {

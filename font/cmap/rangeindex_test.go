@@ -4,7 +4,6 @@
 package cmap
 
 import (
-	"bytes"
 	"testing"
 )
 
@@ -113,7 +112,7 @@ CMapName currentdict /CMap defineresource pop
 end
 end
 `)
-		tu, err := readToUnicode(bytes.NewReader(stream))
+		tu, err := readToUnicode(stream)
 		if err != nil {
 			t.Fatal(err)
 		}

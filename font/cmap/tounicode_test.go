@@ -395,7 +395,7 @@ CMapName currentdict /CMap defineresource pop
 end
 end
 `
-	tu, err := readToUnicode(strings.NewReader(src))
+	tu, err := readToUnicode([]byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +464,7 @@ func TestToUnicodeLookupUnmappedPositions(t *testing.T) {
 }
 
 func TestReadToUnicode(t *testing.T) {
-	info, err := readToUnicode(bytes.NewReader(testToUniCMapFull))
+	info, err := readToUnicode(testToUniCMapFull)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,7 +528,7 @@ func FuzzReadToUnicode(f *testing.F) {
 	f.Add(testCMapFull)
 
 	f.Fuzz(func(t *testing.T, body []byte) {
-		info, err := readToUnicode(bytes.NewReader(body))
+		info, err := readToUnicode(body)
 		if err != nil {
 			t.Skip(err)
 		}
@@ -539,7 +539,7 @@ func FuzzReadToUnicode(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		info2, err := readToUnicode(buf)
+		info2, err := readToUnicode(buf.Bytes())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -676,4 +676,123 @@ func TestToUnicodeTemplate(t *testing.T) {
 var toUnicodeROS = &cid.SystemInfo{
 	Registry: "Adobe",
 	Ordering: "UCS",
+}
+
+// TestToUnicodeDstStringLength checks that destination strings longer than
+// 512 bytes are dropped on read.
+func TestToUnicodeDstStringLength(t *testing.T) {
+	for _, n := range []int{256, 257} {
+		dst := strings.Repeat("0041", n) // n UTF-16 code units
+		src := "/CIDInit /ProcSet findresource begin\n" +
+			"12 dict begin\nbegincmap\n" +
+			"1 begincodespacerange <00> <FF> endcodespacerange\n" +
+			"1 beginbfchar <01> <" + dst + "> endbfchar\n" +
+			"1 beginbfrange <10> <12> <" + dst + "> endbfrange\n" +
+			"1 beginbfrange <20> <21> [<0042> <" + dst + ">] endbfrange\n" +
+			"endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n"
+		tu, err := readToUnicode([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		text, ok := tu.Lookup([]byte{0x01})
+		if n <= 256 && (!ok || len(text) != n) {
+			t.Errorf("n=%d: bfchar not read, got %q %t", n, text, ok)
+		} else if n > 256 && ok {
+			t.Errorf("n=%d: over-long bfchar not dropped", n)
+		}
+
+		_, ok = tu.Lookup([]byte{0x11})
+		if ok != (n <= 256) {
+			t.Errorf("n=%d: bfrange string form: mapped=%t", n, ok)
+		}
+
+		text, ok = tu.Lookup([]byte{0x21})
+		want := brokenReplacement
+		if n <= 256 {
+			want = strings.Repeat("A", n)
+		}
+		if !ok || text != want {
+			t.Errorf("n=%d: bfrange array form: got %q %t", n, text, ok)
+		}
+	}
+}
+
+// TestToUnicodeSharedStrings checks that a CMap program which pushes the same
+// string many times cannot make the decoded text larger than the input.
+func TestToUnicodeSharedStrings(t *testing.T) {
+	programs := []string{
+		// one long string as the destination of many bfchar entries
+		"/s 510 string def 0 2 508 { s exch 78 put } for /k <0041> def\n" +
+			"1 beginbfchar 2000 { k s } repeat endbfchar\n",
+		// the same, as the destination of many bfrange entries
+		"/s 510 string def 0 2 508 { s exch 78 put } for\n" +
+			"1 beginbfrange 2000 { <00> <01> s } repeat endbfrange\n",
+		// one array of long strings, used by many bfrange entries
+		"/s 510 string def 0 2 508 { s exch 78 put } for\n" +
+			"/a [ 256 { s } repeat ] def\n" +
+			"1 beginbfrange 2000 { <00> <FF> a } repeat endbfrange\n",
+	}
+	for i, prog := range programs {
+		src := "/CIDInit /ProcSet findresource begin\n" +
+			"12 dict begin\nbegincmap\n" +
+			"1 begincodespacerange <00> <FF> endcodespacerange\n" +
+			prog +
+			"endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n"
+		tu, err := readToUnicode([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		total := 0
+		for _, s := range tu.Singles {
+			total += len(s.Value) + 1
+		}
+		for _, r := range tu.Ranges {
+			for _, v := range r.Values {
+				total += len(v) + 1
+			}
+		}
+		// UTF-8 needs at most 3 bytes for 2 bytes of UTF-16
+		if limit := 3 * len(src) / 2; total > limit {
+			t.Errorf("program %d: %d bytes of text from %d bytes of input",
+				i, total, len(src))
+		}
+	}
+}
+
+// TestToUnicodeEmbedDstStringLength checks that Embed refuses destination
+// strings longer than 512 bytes.
+func TestToUnicodeEmbedDstStringLength(t *testing.T) {
+	cases := []struct {
+		text string
+		ok   bool
+	}{
+		{strings.Repeat("A", 256), true},
+		{strings.Repeat("A", 257), false},
+		{strings.Repeat("😀", 128), true}, // two UTF-16 code units each
+		{strings.Repeat("😀", 128) + "A", false},
+	}
+	for i, c := range cases {
+		single := &ToUnicodeFile{
+			CodeSpaceRange: charcode.Simple,
+			Singles:        []ToUnicodeSingle{{Code: []byte{0x01}, Value: c.text}},
+		}
+		rng := &ToUnicodeFile{
+			CodeSpaceRange: charcode.Simple,
+			Ranges: []ToUnicodeRange{{
+				First:  []byte{0x10},
+				Last:   []byte{0x11},
+				Values: []string{"B", c.text},
+			}},
+		}
+		for _, tu := range []*ToUnicodeFile{single, rng} {
+			w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+			rm := pdf.NewResourceManager(w)
+			_, err := rm.Embed(tu)
+			if (err == nil) != c.ok {
+				t.Errorf("case %d: got error %v, want ok=%t", i, err, c.ok)
+			}
+		}
+	}
 }

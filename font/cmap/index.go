@@ -654,10 +654,6 @@ func checkWritable[T any](p *T, parent func(*T) *T, fits func(*T) bool) error {
 // keyed by a weak pointer to the CMap, and are dropped once the CMap is
 // garbage collected.  The argument p must not be nil.
 func cachedChainIndex[T any, V levelIndex](cache *sync.Map, p *T, parent func(*T) *T, build func(*T) V) *chainIndex[V] {
-	if v, ok := cache.Load(weak.Make(p)); ok {
-		return v.(*chainIndex[V])
-	}
-
 	// the levels without a cached index, starting with p
 	var todo []*T
 	pos := make(map[*T]int)
@@ -674,6 +670,9 @@ func cachedChainIndex[T any, V levelIndex](cache *sync.Map, p *T, parent func(*T
 		}
 		pos[g] = len(todo)
 		todo = append(todo, g)
+	}
+	if len(todo) == 0 {
+		return tail
 	}
 
 	nodes := make([]*chainIndex[V], len(todo))

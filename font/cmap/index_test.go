@@ -977,7 +977,7 @@ end
 // TestReadToUnicodeLongCodes checks that entries with codes longer than
 // [maxCodeLength] bytes are dropped when a ToUnicode CMap is read.
 func TestReadToUnicodeLongCodes(t *testing.T) {
-	tu, err := readToUnicode(strings.NewReader(longToUnicodeCMap))
+	tu, err := readToUnicode([]byte(longToUnicodeCMap))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -994,7 +994,7 @@ func TestReadToUnicodeLongCodes(t *testing.T) {
 	if err := toUnicodeTmplNew.Execute(buf, tu); err != nil {
 		t.Fatal(err)
 	}
-	tu2, err := readToUnicode(buf)
+	tu2, err := readToUnicode(buf.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

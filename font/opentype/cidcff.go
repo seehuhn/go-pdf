@@ -303,6 +303,11 @@ func (f *CompositeCFF) makeDict() (*dict.CIDFontType0, error) {
 	fd.FontName = subset.Join(subsetTag, postScriptName)
 	fd.IsSymbolic = isSymbolic
 
+	toUnicode, err := f.CIDEncoder.ToUnicode()
+	if err != nil {
+		return nil, err
+	}
+
 	fontDict := &dict.CIDFontType0{
 		PostScriptName:  postScriptName,
 		SubsetTag:       subsetTag,
@@ -313,7 +318,7 @@ func (f *CompositeCFF) makeDict() (*dict.CIDFontType0, error) {
 		DefaultWidth:    dw,
 		DefaultVMetrics: dw2,
 		VMetrics:        w2,
-		ToUnicode:       f.CIDEncoder.ToUnicode(),
+		ToUnicode:       toUnicode,
 		FontFile:        cffglyphs.ToStream(subsetFont, glyphdata.CFF),
 	}
 

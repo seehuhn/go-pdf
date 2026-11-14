@@ -77,7 +77,7 @@ func TestConcurrentReaders(t *testing.T) {
 						_ = enc.Width(7)
 						_, _ = enc.GetCode(3, "C")
 						_ = enc.CodesRemaining()
-						_ = enc.ToUnicode()
+						_, _ = enc.ToUnicode()
 						_ = enc.CMap(&cid.SystemInfo{Registry: "Adobe", Ordering: "Identity"})
 					}
 				})

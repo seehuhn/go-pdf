@@ -4,6 +4,7 @@
 package cmap
 
 import (
+	"strings"
 	"testing"
 
 	"seehuhn.de/go/pdf/font/charcode"
@@ -111,5 +112,17 @@ func TestMakeSimpleToUnicode(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestNewToUnicodeFileLongText checks that NewToUnicodeFile refuses texts
+// longer than 512 bytes in UTF-16.
+func TestNewToUnicodeFileLongText(t *testing.T) {
+	for _, n := range []int{256, 257} {
+		data := map[charcode.Code]string{0x41: strings.Repeat("A", n)}
+		_, err := NewToUnicodeFile(charcode.Simple, data)
+		if (err == nil) != (n <= 256) {
+			t.Errorf("n=%d: got error %v", n, err)
+		}
 	}
 }
