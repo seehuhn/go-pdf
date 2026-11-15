@@ -176,7 +176,7 @@ func makeTestFont() (font.Instance, error) {
 		Descriptor:      fd,
 		ROS:             ros,
 		CMap:            cmapFile,
-		Width:           width,
+		Width:           dict.CIDMetricsFromMap(width),
 		DefaultWidth:    width[0],
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		CIDToGID:        cidToGID,

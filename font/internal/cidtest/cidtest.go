@@ -38,10 +38,10 @@ type embedded struct {
 	// cidFont is the CIDFont dictionary as written.
 	cidFont pdf.Dict
 
-	width map[cid.CID]float64
+	width dict.CIDMetrics[float64]
 	dw    float64
 	dw2   dict.DefaultVMetrics
-	w2    map[cid.CID]dict.VMetrics
+	w2    dict.CIDMetrics[dict.VMetrics]
 
 	// fontFile is the embedded font program.
 	fontFile *glyphdata.Stream
@@ -167,11 +167,11 @@ func CheckVertical(t *testing.T, F Font, info *sfnt.Font, text string) {
 		gid, _ := F.GlyphID(c.CID)
 		v := want(info, gid)
 
-		w, ok := e.width[c.CID]
+		w, ok := e.width.Get(c.CID)
 		if !ok {
 			w = e.dw
 		}
-		got, ok := e.w2[c.CID]
+		got, ok := e.w2.Get(c.CID)
 		if !ok {
 			got = dict.VMetrics{OffsX: w / 2, OffsY: e.dw2.OffsY, DeltaY: e.dw2.DeltaY}
 		}
@@ -207,7 +207,7 @@ func CheckNotdefGlyph(t *testing.T, F Font, info *sfnt.Font, text string) {
 	if e.dw != wantWidth {
 		t.Errorf("DW is %g, want %g", e.dw, wantWidth)
 	}
-	if w, ok := e.width[0]; ok && w != wantWidth {
+	if w, ok := e.width.Get(0); ok && w != wantWidth {
 		t.Errorf("CID 0 has width %g, want %g", w, wantWidth)
 	}
 
@@ -432,7 +432,7 @@ func CheckNotdef(t *testing.T, F Font) {
 
 	vertical := F.WritingMode() == font.Vertical
 	for i, g := range got {
-		w, ok := e.width[g.CID]
+		w, ok := e.width.Get(g.CID)
 		if !ok {
 			w = e.dw
 		}
@@ -442,7 +442,7 @@ func CheckNotdef(t *testing.T, F Font) {
 		if !vertical {
 			continue
 		}
-		v, ok := e.w2[g.CID]
+		v, ok := e.w2.Get(g.CID)
 		if !ok {
 			v = dict.VMetrics{OffsX: w / 2, OffsY: e.dw2.OffsY, DeltaY: e.dw2.DeltaY}
 		}

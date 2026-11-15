@@ -97,7 +97,7 @@ func extractFontCIDType0(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType0, erro
 		return nil, err
 	}
 
-	d.Width, err = decodeCompositeWidths(c, cidFontDict["W"])
+	d.Width, err = c.DecodeOptional(cidFontDict["W"], decodeCompositeWidths)
 	if err != nil {
 		return nil, err
 	}
@@ -114,11 +114,10 @@ func extractFontCIDType0(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType0, erro
 		return nil, err
 	}
 	d.DefaultVMetrics = dw2
-	w2, err := decodeVMetrics(c, cidFontDict["W2"])
+	d.VMetrics, err = c.DecodeOptional(cidFontDict["W2"], decodeVMetrics)
 	if err != nil {
 		return nil, err
 	}
-	d.VMetrics = w2
 
 	d.FontFile, err = glyphdata.ExtractFontFile(c, fdDict, "Type0")
 	if err != nil {

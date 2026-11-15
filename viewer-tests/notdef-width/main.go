@@ -333,7 +333,7 @@ func makeTestFont() (font.Instance, error) {
 		Descriptor:      fd,
 		ROS:             cmap.ROS,
 		CMap:            cmap,
-		Width:           widths,
+		Width:           dict.CIDMetricsFromMap(widths),
 		DefaultWidth:    dw,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile:        cffglyphs.ToStream(fontCFF, glyphdata.CFF),

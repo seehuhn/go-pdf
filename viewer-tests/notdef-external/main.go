@@ -281,7 +281,7 @@ func makeTestFont(name string) font.Instance {
 		Descriptor:      fd,
 		ROS:             ros,
 		CMap:            enc,
-		Width:           widths,
+		Width:           dict.CIDMetricsFromMap(widths),
 		DefaultWidth:    notdefgrid.WidthDefault,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 	}

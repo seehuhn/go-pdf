@@ -72,7 +72,7 @@ func TestCompositeCollectionCMap(t *testing.T) {
 
 	// the widths are keyed on the collection's CIDs
 	section := f.LookupCID([]byte{0x00, 0xA7})
-	if _, ok := d.Width[section]; !ok {
+	if _, ok := d.Width.Get(section); !ok {
 		t.Errorf("no width for CID %d (§)", section)
 	}
 

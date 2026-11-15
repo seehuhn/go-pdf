@@ -45,22 +45,23 @@ type CIDFontType2 struct {
 	// above, or the CMap must be one of Identity-H or Identity-V.
 	CMap *cmap.File
 
-	// Width (optional) is a map from CID values to glyph widths (in PDF glyph
-	// space units).  Only widths which are different from DefaultWidth need to
-	// be specified.
-	Width map[cid.CID]float64
+	// Width (optional) gives the glyph widths (in PDF glyph space units) as
+	// a sorted list of disjoint CID runs.  Only widths which are different
+	// from DefaultWidth need to be specified.
+	Width CIDMetrics[float64]
 
-	// DefaultWidth is the glyph width for CID values not in the Width map
+	// DefaultWidth is the glyph width for CID values not in Width
 	// (in PDF glyph space units).
 	DefaultWidth float64
 
-	// VMetrics (optional) maps CIDs to their vertical metrics.
-	// These are used when the CMap specifies vertical writing mode.
-	VMetrics map[cid.CID]VMetrics
+	// VMetrics (optional) gives the vertical metrics as a sorted list of
+	// disjoint CID runs.  These are used when the CMap specifies vertical
+	// writing mode.
+	VMetrics CIDMetrics[VMetrics]
 
 	// DefaultVMetrics contains the default vertical metrics.
 	// These are used when the CMap specifies vertical writing mode,
-	// and the CID is not in the VMetrics map.
+	// and the CID is not in VMetrics.
 	//
 	// For horizontal writing mode, set this to DefaultVMetricsDefault.
 	DefaultVMetrics DefaultVMetrics
@@ -223,7 +224,10 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	compressedObjects := []pdf.Object{fontDict, cidFontDict, fdDict}
 	compressedRefs := []pdf.Reference{ref, cidFontRef, fdRef}
 
-	ww := encodeCompositeWidths(d.Width)
+	ww, err := encodeCompositeWidths(d.Width)
+	if err != nil {
+		return nil, err
+	}
 	switch {
 	case moreThanTen(ww):
 		wwRef := w.Alloc()
@@ -240,7 +244,11 @@ func (d *CIDFontType2) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if dw2 := encodeVDefault(d.DefaultVMetrics); dw2 != nil {
 		cidFontDict["DW2"] = dw2
 	}
-	if w2 := encodeVMetrics(d.VMetrics); w2 != nil {
+	w2, err := encodeVMetrics(d.VMetrics)
+	if err != nil {
+		return nil, err
+	}
+	if w2 != nil {
 		cidFontDict["W2"] = w2
 	}
 
@@ -405,7 +413,7 @@ func (f *t2Font) Codes(str pdf.String) iter.Seq[font.Code] {
 				} else {
 					res.CID = f.CMap.LookupNotdefCID(codeBytes)
 				}
-				w, ok := f.Width[res.CID]
+				w, ok := f.Width.Get(res.CID)
 				if ok {
 					res.Width = w / 1000
 				} else {

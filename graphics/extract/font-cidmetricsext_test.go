@@ -6,6 +6,7 @@ package extract_test
 import (
 	"maps"
 	"testing"
+	"unsafe"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -32,6 +33,30 @@ type malformedMetricsCase struct {
 	name    string
 	entries pdf.Dict
 	want    cidMetrics
+	cycles  []pdf.Name // entries which are replaced by a reference cycle
+}
+
+// addCycles replaces the entries named by cycles by references to a pair of
+// objects which refer to each other.
+func addCycles(w *pdf.Writer, entries pdf.Dict, cycles []pdf.Name) (pdf.Dict, error) {
+	if len(cycles) == 0 {
+		return entries, nil
+	}
+	res := maps.Clone(entries)
+	if res == nil {
+		res = pdf.Dict{}
+	}
+	for _, key := range cycles {
+		r1, r2 := w.Alloc(), w.Alloc()
+		if err := w.Put(r1, r2); err != nil {
+			return nil, err
+		}
+		if err := w.Put(r2, r1); err != nil {
+			return nil, err
+		}
+		res[key] = r1
+	}
+	return res, nil
 }
 
 var vm1 = dict.VMetrics{DeltaY: -900, OffsX: 250, OffsY: 800}
@@ -118,6 +143,22 @@ var malformedMetricsCases = []malformedMetricsCase{
 		},
 	},
 	{
+		name:   "W is a reference cycle",
+		cycles: []pdf.Name{"W"},
+		want: cidMetrics{
+			DefaultWidth:    dict.DefaultWidthDefault,
+			DefaultVMetrics: dict.DefaultVMetricsDefault,
+		},
+	},
+	{
+		name:   "W2 is a reference cycle",
+		cycles: []pdf.Name{"W2"},
+		want: cidMetrics{
+			DefaultWidth:    dict.DefaultWidthDefault,
+			DefaultVMetrics: dict.DefaultVMetricsDefault,
+		},
+	},
+	{
 		name:    "DW not a number",
 		entries: pdf.Dict{"DW": pdf.Array{pdf.Integer(500)}},
 		want: cidMetrics{
@@ -178,8 +219,12 @@ func malformedMetricsFiles(f *testing.F, cidType pdf.Name) [][]byte {
 		if err := memfile.AddBlankPage(w); err != nil {
 			f.Fatal(err)
 		}
+		entries, err := addCycles(w, tc.entries, tc.cycles)
+		if err != nil {
+			f.Fatal(err)
+		}
 		ref := w.Alloc()
-		if err := w.Put(ref, malformedMetricsFont(cidType, tc.entries)); err != nil {
+		if err := w.Put(ref, malformedMetricsFont(cidType, entries)); err != nil {
 			f.Fatal(err)
 		}
 		w.GetMeta().Trailer["Quir:E"] = ref
@@ -199,7 +244,11 @@ func TestCIDMalformedMetrics(t *testing.T) {
 		for _, tc := range malformedMetricsCases {
 			t.Run(string(cidType)+"-"+tc.name, func(t *testing.T) {
 				w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-				fontDict := malformedMetricsFont(cidType, tc.entries)
+				entries, err := addCycles(w, tc.entries, tc.cycles)
+				if err != nil {
+					t.Fatal(err)
+				}
+				fontDict := malformedMetricsFont(cidType, entries)
 
 				x := pdf.NewExtractor(w)
 				d, err := extract.Dict(pdf.CursorAt(x, nil), fontDict, false)
@@ -210,10 +259,10 @@ func TestCIDMalformedMetrics(t *testing.T) {
 				var got cidMetrics
 				switch d := d.(type) {
 				case *dict.CIDFontType0:
-					got = cidMetrics{d.Width, d.DefaultWidth, d.VMetrics, d.DefaultVMetrics}
+					got = cidMetrics{collectMetrics(d.Width), d.DefaultWidth, collectMetrics(d.VMetrics), d.DefaultVMetrics}
 					checkRoundTripT0(t, d, pdf.V1_7)
 				case *dict.CIDFontType2:
-					got = cidMetrics{d.Width, d.DefaultWidth, d.VMetrics, d.DefaultVMetrics}
+					got = cidMetrics{collectMetrics(d.Width), d.DefaultWidth, collectMetrics(d.VMetrics), d.DefaultVMetrics}
 					checkRoundTripT2(t, d, pdf.V1_7)
 				default:
 					t.Fatalf("unexpected font type %T", d)
@@ -223,5 +272,52 @@ func TestCIDMalformedMetrics(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// collectMetrics expands m to a map, which is nil if m has no entries.
+func collectMetrics[T any](m dict.CIDMetrics[T]) map[cid.CID]T {
+	var res map[cid.CID]T
+	for c, v := range m.All() {
+		if res == nil {
+			res = make(map[cid.CID]T)
+		}
+		res[c] = v
+	}
+	return res
+}
+
+// TestCIDMetricsSharedWidths checks that font dictionaries sharing an indirect
+// W or W2 array, decoded through one extractor, share the decoded runs.
+func TestCIDMetricsSharedWidths(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	wRef, w2Ref := w.Alloc(), w.Alloc()
+	if err := w.Put(wRef, pdf.Array{pdf.Integer(1), pdf.Array{pdf.Integer(500), pdf.Integer(600)}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Put(w2Ref, pdf.Array{
+		pdf.Integer(1), pdf.Array{pdf.Integer(-900), pdf.Integer(250), pdf.Integer(800)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	entries := pdf.Dict{"W": wRef, "W2": w2Ref}
+
+	x := pdf.NewExtractor(w)
+	var d [2]*dict.CIDFontType2
+	for i := range d {
+		fd, err := extract.Dict(pdf.CursorAt(x, nil), malformedMetricsFont("CIDFontType2", entries), false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d[i] = fd.(*dict.CIDFontType2)
+	}
+	if len(d[0].Width) != 1 || len(d[0].VMetrics) != 1 {
+		t.Fatalf("unexpected metrics %v, %v", d[0].Width, d[0].VMetrics)
+	}
+	if unsafe.SliceData(d[0].Width) != unsafe.SliceData(d[1].Width) {
+		t.Error("Width slices are not shared")
+	}
+	if unsafe.SliceData(d[0].VMetrics) != unsafe.SliceData(d[1].VMetrics) {
+		t.Error("VMetrics slices are not shared")
 	}
 }

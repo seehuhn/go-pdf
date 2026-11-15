@@ -219,10 +219,10 @@ var t2Dicts = []*dict.CIDFontType2{
 		},
 		ROS:  ros,
 		CMap: cmap.IdentityH,
-		Width: map[cid.CID]float64{
+		Width: dict.CIDMetricsFromMap(map[cid.CID]float64{
 			0: 1000,
 			1: 500,
-		},
+		}),
 		DefaultWidth: 750,
 		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
@@ -243,10 +243,10 @@ var t2Dicts = []*dict.CIDFontType2{
 		},
 		ROS:  ros,
 		CMap: cmap.IdentityH,
-		Width: map[cid.CID]float64{
+		Width: dict.CIDMetricsFromMap(map[cid.CID]float64{
 			0: 1000,
 			1: 500,
-		},
+		}),
 		DefaultWidth: 750,
 		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
@@ -288,7 +288,7 @@ var t2Dicts = []*dict.CIDFontType2{
 				},
 			},
 		},
-		Width: map[cid.CID]float64{
+		Width: dict.CIDMetricsFromMap(map[cid.CID]float64{
 			0:  1000,
 			1:  100,
 			2:  200,
@@ -301,7 +301,7 @@ var t2Dicts = []*dict.CIDFontType2{
 			10: 1000,
 			11: 1100,
 			12: 1200,
-		},
+		}),
 		DefaultWidth:    900,
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile: &glyphdata.Stream{

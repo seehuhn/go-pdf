@@ -281,7 +281,7 @@ func makeTestFonts() (*testFonts, error) {
 		Descriptor:      fd,
 		ROS:             cmapData.ROS,
 		CMap:            cmapData,
-		Width:           ww,
+		Width:           dict.CIDMetricsFromMap(ww),
 		DefaultWidth:    testCFF.GlyphWidthPDF(0),
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile:        cffglyphs.ToStream(testCFF, glyphdata.CFF),

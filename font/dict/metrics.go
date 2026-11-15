@@ -4,11 +4,6 @@
 package dict
 
 import (
-	"maps"
-	"slices"
-
-	"seehuhn.de/go/postscript/cid"
-
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/encoding"
@@ -55,65 +50,29 @@ func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encodin
 	return []pdf.Object{widths}, []pdf.Reference{widthRef}
 }
 
-// encodeCompositeWidths creates a W array for a composite font from a map of CID to width values.
-// Uses the most compact representation possible.
-func encodeCompositeWidths(widthMap map[cid.CID]float64) pdf.Array {
-	cidList := slices.Sorted(maps.Keys(widthMap))
-
-	// There are two ways to encode the widths:
-	//   - elements `startCID, endCID, width` indicate a run of CIDs with the same width
-	//   - elements `startCID [w1 ... wn]` give the widths for a range of CIDs
+// encodeCompositeWidths creates a W array for a composite font.  Each run is
+// written in its own form.  The result is nil if m is empty.
+func encodeCompositeWidths(m CIDMetrics[float64]) (pdf.Array, error) {
+	if err := m.validate(); err != nil {
+		return nil, err
+	}
 	var res pdf.Array
-	var runStart, runEnd cid.CID
-	var run pdf.Array
-	var allEqual bool
-	for _, cid := range cidList {
-		w := pdf.Number(widthMap[cid])
-
-		if len(run) > 0 && cid != runEnd+1 || // forced break of run, or
-			len(run) > 2 && allEqual && w != run[0] { // can use compressed form
-			// flush previous run
-			if allEqual && len(run) > 1 {
-				res = append(res,
-					pdf.Integer(runStart),
-					pdf.Integer(runEnd),
-					run[0])
-				run = run[:0] // slice not used in output -> can re-use
-			} else {
-				res = append(res,
-					pdf.Integer(runStart),
-					run)
-				run = nil // prevent the slice from being overwritten
-			}
-		}
-
-		// now run is empty or cid == runEnd+1
-
-		if len(run) == 0 {
-			runStart = cid
-			allEqual = true
-		} else {
-			allEqual = allEqual && w == run[0]
-		}
-		runEnd = cid
-		run = append(run, w)
-	}
-
-	if len(run) > 0 {
-		// flush final run
-		if allEqual && len(run) > 1 {
+	for i := range m {
+		r := &m[i]
+		if r.Values == nil {
 			res = append(res,
-				pdf.Integer(runStart),
-				pdf.Integer(runEnd),
-				pdf.Number(widthMap[runStart]))
-		} else {
-			res = append(res,
-				pdf.Integer(runStart),
-				run)
+				pdf.Integer(r.First),
+				pdf.Integer(r.Last),
+				pdf.Number(r.Value))
+			continue
 		}
+		list := make(pdf.Array, len(r.Values))
+		for j, v := range r.Values {
+			list[j] = pdf.Number(v)
+		}
+		res = append(res, pdf.Integer(r.First), list)
 	}
-
-	return res
+	return res, nil
 }
 
 // DefaultVMetricsDefault is the value of DefaultVMetrics used, if no value is
@@ -182,8 +141,8 @@ type VMetrics struct {
 // setVerticalMetrics sets the vertical writing mode fields of c, whose CID
 // and Width are already set.  The metrics come from the W2 entry for the CID
 // if there is one, and from DW2 and half the glyph width otherwise.
-func setVerticalMetrics(c *font.Code, w2 map[cid.CID]VMetrics, dw2 DefaultVMetrics) {
-	if vm, ok := w2[c.CID]; ok {
+func setVerticalMetrics(c *font.Code, w2 CIDMetrics[VMetrics], dw2 DefaultVMetrics) {
+	if vm, ok := w2.Get(c.CID); ok {
 		c.VerticalAdvance = vm.DeltaY / 1000
 		c.VerticalOriginX = vm.OffsX / 1000
 		c.VerticalOriginY = vm.OffsY / 1000
@@ -194,78 +153,32 @@ func setVerticalMetrics(c *font.Code, w2 map[cid.CID]VMetrics, dw2 DefaultVMetri
 	c.VerticalOriginY = dw2.OffsY / 1000
 }
 
-// encodeVMetrics creates a W2 array for a composite font from a map of CID to vertical metrics.
-// Uses the most compact representation possible.
-func encodeVMetrics(metrics map[cid.CID]VMetrics) pdf.Array {
-	if metrics == nil {
-		return nil
+// encodeVMetrics creates a W2 array for a composite font.  Each run is
+// written in its own form.  The result is nil if m is empty.
+func encodeVMetrics(m CIDMetrics[VMetrics]) (pdf.Array, error) {
+	if err := m.validate(); err != nil {
+		return nil, err
 	}
-
-	res := pdf.Array{}
-
-	cids := slices.Sorted(maps.Keys(metrics))
-	for len(cids) > 0 {
-		// Try to find a range of consecutive CIDs
-		// with pairwise different metrics:
-		end := 0
-		for end < len(cids) {
-			if end > 0 && cids[end-1]+1 != cids[end] {
-				// not consecutive
-				break
-			}
-			if end+1 < len(cids) &&
-				cids[end]+1 == cids[end+1] &&
-				metrics[cids[end]] == metrics[cids[end+1]] {
-				// increasing enc would split consecutive CIDs with the same metrics
-				break
-			}
-			end++
-		}
-		if end > 0 {
-			// Individual format: cid [dy1 ox1 oy1 ...]
-			data := make(pdf.Array, 0, 3*end)
-			for i := 0; i < end; i++ {
-				cid := cids[i]
-				data = append(data,
-					pdf.Number(metrics[cid].DeltaY),
-					pdf.Number(metrics[cid].OffsX),
-					pdf.Number(metrics[cid].OffsY))
-			}
-			res = append(res, pdf.Integer(cids[0]), data)
-			cids = cids[end:]
-		}
-
-		// If we reach this point without having removed any elements from the
-		// slice cids, the loop above must have terminated during the first
-		// iteration (end == 0). This implies that all of the following are
-		// true:
-		//  - end+1 < len(cids)
-		//  - cids[end]+1 == cids[end+1]
-		//  - metrics[cids[end]] == metrics[cids[end+1]]
-		// Thus, in this case the following code will remove at least two cid
-		// values.
-
-		// Try to find a range of consecutive CIDs
-		// with identical metrics:
-		end = 1
-		for end < len(cids) {
-			if cids[end-1]+1 != cids[end] || metrics[cids[end-1]] != metrics[cids[end]] {
-				// not consecutive
-				break
-			}
-			end++
-		}
-		if end >= 2 {
-			// Range format: cid1 cid2 dy ox oy
+	var res pdf.Array
+	for i := range m {
+		r := &m[i]
+		if r.Values == nil {
 			res = append(res,
-				pdf.Integer(cids[0]),
-				pdf.Integer(cids[end-1]),
-				pdf.Number(metrics[cids[0]].DeltaY),
-				pdf.Number(metrics[cids[0]].OffsX),
-				pdf.Number(metrics[cids[0]].OffsY))
-			cids = cids[end:]
+				pdf.Integer(r.First),
+				pdf.Integer(r.Last),
+				pdf.Number(r.Value.DeltaY),
+				pdf.Number(r.Value.OffsX),
+				pdf.Number(r.Value.OffsY))
+			continue
 		}
+		list := make(pdf.Array, 0, 3*len(r.Values))
+		for _, v := range r.Values {
+			list = append(list,
+				pdf.Number(v.DeltaY),
+				pdf.Number(v.OffsX),
+				pdf.Number(v.OffsY))
+		}
+		res = append(res, pdf.Integer(r.First), list)
 	}
-
-	return res
+	return res, nil
 }

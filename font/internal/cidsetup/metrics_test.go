@@ -4,6 +4,7 @@
 package cidsetup
 
 import (
+	"maps"
 	"math"
 	"testing"
 
@@ -36,7 +37,7 @@ type glyphData struct {
 	v     cidenc.VMetrics
 }
 
-func metricsFor(t *testing.T, wMode font.WritingMode, glyphs []glyphData, notdef cidenc.VMetrics) (map[cid.CID]float64, float64, dict.DefaultVMetrics, map[cid.CID]dict.VMetrics) {
+func metricsFor(t *testing.T, wMode font.WritingMode, glyphs []glyphData, notdef cidenc.VMetrics) (dict.CIDMetrics[float64], float64, dict.DefaultVMetrics, dict.CIDMetrics[dict.VMetrics]) {
 	t.Helper()
 	enc := cidenc.NewCompositeUtf8(nil, 600, notdef, wMode)
 	for i, g := range glyphs {
@@ -63,7 +64,7 @@ func TestMetrics(t *testing.T) {
 	t.Run("horizontal", func(t *testing.T) {
 		ww, dw, dw2, w2 := metricsFor(t, font.Horizontal, glyphs, notdef)
 		wantWW := map[cid.CID]float64{1: 500, 2: 501, 3: 400, 4: 300, 5: 200}
-		if d := cmp.Diff(wantWW, ww); d != "" {
+		if d := cmp.Diff(wantWW, maps.Collect(ww.All())); d != "" {
 			t.Errorf("widths (-want +got):\n%s", d)
 		}
 		if dw != 600 {
@@ -86,7 +87,7 @@ func TestMetrics(t *testing.T) {
 			4: {OffsX: 150, OffsY: 771, DeltaY: -1000},
 			5: {OffsX: 100, OffsY: 640, DeltaY: -750},
 		}
-		if d := cmp.Diff(want, w2); d != "" {
+		if d := cmp.Diff(want, maps.Collect(w2.All())); d != "" {
 			t.Errorf("W2 (-want +got):\n%s", d)
 		}
 	})
@@ -101,7 +102,7 @@ func TestMetrics(t *testing.T) {
 			2: {OffsX: 250.5, OffsY: 771, DeltaY: -1000},
 			4: {OffsX: 150, OffsY: 771, DeltaY: -1000},
 		}
-		if d := cmp.Diff(want, w2); d != "" {
+		if d := cmp.Diff(want, maps.Collect(w2.All())); d != "" {
 			t.Errorf("W2 (-want +got):\n%s", d)
 		}
 	})
@@ -110,11 +111,11 @@ func TestMetrics(t *testing.T) {
 	t.Run("notdef used", func(t *testing.T) {
 		gg := append([]glyphData{{0, 600, notdef}}, glyphs...)
 		ww, dw, _, w2 := metricsFor(t, font.Vertical, gg, notdef)
-		if _, ok := w2[0]; ok {
-			t.Errorf("CID 0 has W2 entry %v", w2[0])
+		if v, ok := w2.Get(0); ok {
+			t.Errorf("CID 0 has W2 entry %v", v)
 		}
-		if ww[0] != 600 || dw != 600 {
-			t.Errorf("CID 0 has width %g and DW %g, want 600", ww[0], dw)
+		if w0, _ := ww.Get(0); w0 != 600 || dw != 600 {
+			t.Errorf("CID 0 has width %g and DW %g, want 600", w0, dw)
 		}
 	})
 }

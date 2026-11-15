@@ -36,7 +36,7 @@ func GlyphVMetrics(info *sfnt.Font, gid glyph.ID) cidenc.VMetrics {
 // mode, DW2 likewise holds the vertical metrics of CID 0.  Each CID in use
 // whose metrics differ from DW2 gets a W2 entry, with OffsX set to half its
 // width.
-func Metrics(enc cidenc.CIDEncoder) (map[cid.CID]float64, float64, dict.DefaultVMetrics, map[cid.CID]dict.VMetrics) {
+func Metrics(enc cidenc.CIDEncoder) (dict.CIDMetrics[float64], float64, dict.DefaultVMetrics, dict.CIDMetrics[dict.VMetrics]) {
 	ww := make(map[cid.CID]float64)
 	vv := make(map[cid.CID]cidenc.VMetrics)
 	for _, info := range enc.MappedCodes() {
@@ -46,7 +46,7 @@ func Metrics(enc cidenc.CIDEncoder) (map[cid.CID]float64, float64, dict.DefaultV
 
 	dw, notdef := enc.CID0Metrics()
 	if enc.WritingMode() != font.Vertical {
-		return ww, dw, dict.DefaultVMetricsDefault, nil
+		return dict.CIDMetricsFromMap(ww), dw, dict.DefaultVMetricsDefault, nil
 	}
 
 	def := dict.DefaultVMetrics{OffsY: notdef.OffsY, DeltaY: notdef.DeltaY}
@@ -60,5 +60,5 @@ func Metrics(enc cidenc.CIDEncoder) (map[cid.CID]float64, float64, dict.DefaultV
 		}
 		w2[c] = dict.VMetrics{OffsX: ww[c] / 2, OffsY: v.OffsY, DeltaY: v.DeltaY}
 	}
-	return ww, dw, def, w2
+	return dict.CIDMetricsFromMap(ww), dw, def, dict.CIDMetricsFromMap(w2)
 }

@@ -77,7 +77,7 @@ func TestCIDFontType0GlyphWidthToUnicode(t *testing.T) {
 		ROS:          cidTextROS,
 		CMap:         cidTextCMap(), // 0x41 -> CID 5
 		ToUnicode:    cidTextToUnicode(),
-		Width:        map[cid.CID]float64{5: 600},
+		Width:        CIDMetricsFromMap(map[cid.CID]float64{5: 600}),
 		DefaultWidth: 250,
 	}
 
@@ -115,7 +115,7 @@ func TestCIDFontType0GlyphWidthROS(t *testing.T) {
 
 	d := &CIDFontType0{
 		ROS:   &cid.SystemInfo{Registry: "Adobe", Ordering: "Japan1"},
-		Width: map[cid.CID]float64{spaceCID: 480},
+		Width: CIDMetricsFromMap(map[cid.CID]float64{spaceCID: 480}),
 	}
 
 	// no ToUnicode: text resolves through the registry/ordering mapping
@@ -151,7 +151,7 @@ func TestCIDFontType0GlyphWidthToUnicodeWins(t *testing.T) {
 			CodeSpaceRange: charcode.CodeSpaceRange{{Low: []byte{0x00}, High: []byte{0xFF}}},
 			Singles:        []cmap.ToUnicodeSingle{{Code: []byte{0x20}, Value: " "}},
 		},
-		Width: map[cid.CID]float64{tuCID: 700, rosCID: 480},
+		Width: CIDMetricsFromMap(map[cid.CID]float64{tuCID: 700, rosCID: 480}),
 	}
 
 	// ToUnicode (CID 9999, width 700) takes precedence over the ROS default
@@ -165,7 +165,7 @@ func TestCIDFontType2GlyphWidth(t *testing.T) {
 		ROS:          cidTextROS,
 		CMap:         cidTextCMap(),
 		ToUnicode:    cidTextToUnicode(),
-		Width:        map[cid.CID]float64{5: 600},
+		Width:        CIDMetricsFromMap(map[cid.CID]float64{5: 600}),
 		DefaultWidth: 250,
 	}
 

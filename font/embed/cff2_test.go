@@ -210,7 +210,7 @@ func TestEmbedCFF2Variable(t *testing.T) {
 	if len(d.Width) == 0 {
 		t.Error("empty W array")
 	}
-	for cidVal, width := range d.Width {
+	for cidVal, width := range d.Width.All() {
 		if width < 0 || width > 10000 {
 			t.Errorf("width for CID %d = %v, outside a sane range", cidVal, width)
 		}

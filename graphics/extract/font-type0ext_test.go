@@ -224,16 +224,16 @@ var t0Dicts = []*dict.CIDFontType0{
 				},
 			},
 		},
-		Width: map[cid.CID]float64{
+		Width: dict.CIDMetricsFromMap(map[cid.CID]float64{
 			0: 1000,
 			1: 500,
-		},
+		}),
 		DefaultWidth: 750,
-		VMetrics: map[cid.CID]dict.VMetrics{
+		VMetrics: dict.CIDMetricsFromMap(map[cid.CID]dict.VMetrics{
 			0: {OffsY: 800, DeltaY: -1000},
 			1: {OffsY: 880, DeltaY: -900},
 			2: {OffsY: 880, DeltaY: -900},
-		},
+		}),
 		DefaultVMetrics: dict.DefaultVMetrics{OffsY: 800, DeltaY: -800},
 		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
@@ -254,10 +254,10 @@ var t0Dicts = []*dict.CIDFontType0{
 		},
 		ROS:  ros,
 		CMap: cmap.IdentityH,
-		Width: map[cid.CID]float64{
+		Width: dict.CIDMetricsFromMap(map[cid.CID]float64{
 			0: 1000,
 			1: 500,
-		},
+		}),
 		DefaultWidth: 750,
 		ToUnicode: &cmap.ToUnicodeFile{
 			CodeSpaceRange: charcode.Simple,
@@ -299,7 +299,7 @@ var t0Dicts = []*dict.CIDFontType0{
 				},
 			},
 		},
-		Width: map[cid.CID]float64{
+		Width: dict.CIDMetricsFromMap(map[cid.CID]float64{
 			0:  1000,
 			1:  100,
 			2:  200,
@@ -312,7 +312,7 @@ var t0Dicts = []*dict.CIDFontType0{
 			10: 1000,
 			11: 1100,
 			12: 1200,
-		},
+		}),
 		DefaultWidth: 900,
 		FontFile:     nil, // No font data needed for this test
 	},

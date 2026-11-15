@@ -265,7 +265,7 @@ func (c *converter) finalizeGlyf(cf *convFont) (pdf.Reference, error) {
 		Descriptor:      &fd,
 		ROS:             cmap.NewGIDToCIDIdentity().ROS(),
 		CMap:            cmap.IdentityH,
-		Width:           ww,
+		Width:           dict.CIDMetricsFromMap(ww),
 		DefaultWidth:    math.Round(subsetFont.GlyphWidthPDF(0)),
 		DefaultVMetrics: dict.DefaultVMetricsDefault,
 		FontFile:        sfntglyphs.ToStream(subsetFont, glyphdata.TrueType),

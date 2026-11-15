@@ -385,7 +385,7 @@ types:
     introduced: '1.2'
     notes: https://github.com/pdf-association/arlington-pdf-model/issues/125
   - goName: Width
-    goType: map[cmap.CID]float64
+    goType: CIDMetrics[float64]
     pdfKey: W
     pdfType: array
     required: false
@@ -398,7 +398,7 @@ types:
     default: '[880 -1000]'
     introduced: '1.2'
   - goName: VMetrics
-    goType: map[cmap.CID]VMetrics
+    goType: CIDMetrics[VMetrics]
     pdfKey: W2
     pdfType: array
     required: false
@@ -481,7 +481,7 @@ types:
     introduced: '1.2'
     notes: https://github.com/pdf-association/arlington-pdf-model/issues/125
   - goName: Width
-    goType: map[cmap.CID]float64
+    goType: CIDMetrics[float64]
     pdfKey: W
     pdfType: array
     required: false
@@ -494,7 +494,7 @@ types:
     default: '[880 -1000]'
     introduced: '1.2'
   - goName: VMetrics
-    goType: map[cmap.CID]VMetrics
+    goType: CIDMetrics[VMetrics]
     pdfKey: W2
     pdfType: array
     required: false

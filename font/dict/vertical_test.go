@@ -36,7 +36,7 @@ func TestVerticalAdvancePopulationDefault(t *testing.T) {
 		PostScriptName:  "Test",
 		ROS:             &cid.SystemInfo{Registry: "Adobe", Ordering: "Identity", Supplement: 0},
 		CMap:            makeVerticalCMap(),
-		Width:           map[cid.CID]float64{1: 500},
+		Width:           CIDMetricsFromMap(map[cid.CID]float64{1: 500}),
 		DefaultWidth:    1000,
 		DefaultVMetrics: DefaultVMetrics{OffsY: 880, DeltaY: -1000},
 	}
@@ -59,12 +59,12 @@ func TestVerticalAdvancePopulationPerGlyph(t *testing.T) {
 		PostScriptName:  "Test",
 		ROS:             &cid.SystemInfo{Registry: "Adobe", Ordering: "Identity", Supplement: 0},
 		CMap:            makeVerticalCMap(),
-		Width:           map[cid.CID]float64{1: 500, 2: 500},
+		Width:           CIDMetricsFromMap(map[cid.CID]float64{1: 500, 2: 500}),
 		DefaultWidth:    1000,
 		DefaultVMetrics: DefaultVMetricsDefault,
-		VMetrics: map[cid.CID]VMetrics{
+		VMetrics: CIDMetricsFromMap(map[cid.CID]VMetrics{
 			2: {DeltaY: -1200, OffsX: 0, OffsY: 880},
-		},
+		}),
 	}
 
 	f := d.MakeFont()
@@ -91,11 +91,11 @@ func TestHorizontalCodeNoVerticalAdvance(t *testing.T) {
 		PostScriptName: "Test",
 		ROS:            &cid.SystemInfo{Registry: "Adobe", Ordering: "Identity", Supplement: 0},
 		CMap:           cm,
-		Width:          map[cid.CID]float64{1: 500},
+		Width:          CIDMetricsFromMap(map[cid.CID]float64{1: 500}),
 		DefaultWidth:   1000,
-		VMetrics: map[cid.CID]VMetrics{
+		VMetrics: CIDMetricsFromMap(map[cid.CID]VMetrics{
 			1: {DeltaY: -1200, OffsX: 0, OffsY: 880},
-		},
+		}),
 	}
 
 	f := d.MakeFont()
@@ -111,9 +111,9 @@ func TestHorizontalCodeNoVerticalAdvance(t *testing.T) {
 // the glyph width.  A displacement of zero is reported as zero.
 func TestVerticalCodeMetrics(t *testing.T) {
 	ros := &cid.SystemInfo{Registry: "Adobe", Ordering: "Identity", Supplement: 0}
-	width := map[cid.CID]float64{1: 600, 2: 500}
+	width := CIDMetricsFromMap(map[cid.CID]float64{1: 600, 2: 500})
 	dw2 := DefaultVMetrics{OffsY: 880, DeltaY: 0}
-	w2 := map[cid.CID]VMetrics{2: {OffsX: 250, OffsY: 772, DeltaY: 0}, 3: {OffsX: 100, OffsY: 700, DeltaY: -900}}
+	w2 := CIDMetricsFromMap(map[cid.CID]VMetrics{2: {OffsX: 250, OffsY: 772, DeltaY: 0}, 3: {OffsX: 100, OffsY: 700, DeltaY: -900}})
 	want := [][3]float64{
 		{0, 0.3, 0.88},   // CID 1: DW2, half of W
 		{0, 0.25, 0.772}, // CID 2: W2
