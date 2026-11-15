@@ -791,7 +791,21 @@ func TestParseNumber(t *testing.T) {
 		{"-3.14", pdf.Real(-3.14)},
 		{"100.", pdf.Real(100)},
 
+		// exponential and radix format
+		{"6.02E23", pdf.Real(6.02e23)},
+		{"1e5", pdf.Real(1e5)},
+		{"-1.5e-2", pdf.Real(-0.015)},
+		{"16#FFFE", pdf.Integer(0xFFFE)},
+		{"8#17", pdf.Integer(15)},
+		{"16#FFFFFFFF", pdf.Integer(-1)},
+
 		// invalid
+		{"1e999", nil},
+		{"1e", nil},
+		{"16#FG", nil},
+		{"16#100000000", nil},
+		{"1..2", nil},
+		{"1-2", nil},
 		{"", nil},
 		{"abc", nil},
 		{"+", nil},
@@ -1492,5 +1506,27 @@ func TestFormatInlineImageLength(t *testing.T) {
 				t.Errorf("%s %v: no error for wrong Length", key, val)
 			}
 		}
+	}
+}
+
+// TestScannerPostScriptNumbers checks that numbers in exponential and radix
+// format are read as operands.
+func TestScannerPostScriptNumbers(t *testing.T) {
+	got, err := collectStream(NewScanner(bytesOpener([]byte(
+		"q\n1.5E1 0 0 16#10 0 0 cm\nQ\n",
+	))))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	want := []Operator{
+		{Name: OpPushGraphicsState},
+		{Name: OpTransform, Args: []pdf.Object{
+			pdf.Real(15), pdf.Integer(0), pdf.Integer(0), pdf.Integer(16),
+			pdf.Integer(0), pdf.Integer(0),
+		}},
+		{Name: OpPopGraphicsState},
+	}
+	if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
+		t.Errorf("wrong operators (-want +got):\n%s", diff)
 	}
 }

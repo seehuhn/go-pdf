@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"testing"
 
@@ -545,8 +546,8 @@ var testCases = []struct {
 
 	{"true", Boolean(true), true},
 	{"false", Boolean(false), true},
-	{"TRUE", nil, false},
-	{"FALSE", nil, false},
+	{"TRUE", nil, true},
+	{"FALSE", nil, true},
 
 	{"0", Integer(0), true},
 	{"+0", Integer(0), true},
@@ -640,8 +641,8 @@ var testCases = []struct {
 		Name("key3"): Integer(3),
 	}, true},
 
-	{"fals", nil, false},
-	{"abc", nil, false},
+	{"fals", nil, true},
+	{"abc", nil, true},
 }
 
 func TestStreamReader(t *testing.T) {
@@ -1069,5 +1070,179 @@ func TestReadNameBraces(t *testing.T) {
 	want := Dict{"F{1}": Integer(5), "G}": Integer(6)}
 	if !Equal(got, want) {
 		t.Errorf("got %s, want %s", AsString(got), AsString(want))
+	}
+}
+
+// TestReadObjectMalformedTokens checks that a token which is not a valid
+// object costs only its own value, not the enclosing object.
+func TestReadObjectMalformedTokens(t *testing.T) {
+	tests := []struct {
+		in   string
+		want Object
+	}{
+		// exponential format
+		{"[6.02E23 1]", Array{Real(6.02e23), Integer(1)}},
+		{"[1e5 1E+5 1.0e-5 -.5e1]", Array{Real(1e5), Real(1e5), Real(1e-5), Real(-5)}},
+		{"<</A 6.02E23 /B 1>>", Dict{"A": Real(6.02e23), "B": Integer(1)}},
+		{"<</A 1e5/B 1>>", Dict{"A": Real(1e5), "B": Integer(1)}},
+		{"[1e999 2]", Array{nil, Integer(2)}},
+		{"[1e 2]", Array{nil, Integer(2)}},
+		{"[1e+ 2]", Array{nil, Integer(2)}},
+		{"[1e5e5 2]", Array{nil, Integer(2)}},
+		{"[1e5.0 2]", Array{nil, Integer(2)}},
+
+		// radix format
+		{"[16#FFFE 1]", Array{Integer(0xFFFE), Integer(1)}},
+		{"[8#1777 2#1000]", Array{Integer(0o1777), Integer(8)}},
+		{"<</A 16#fffe>>", Dict{"A": Integer(0xFFFE)}},
+		{"[16#FG 2]", Array{nil, Integer(2)}},
+		{"[37#1 2]", Array{nil, Integer(2)}},
+		{"[16#FFFFFFFF 16#80000000]", Array{Integer(-1), Integer(math.MinInt32)}},
+		{"[16#100000000 2]", Array{nil, Integer(2)}},
+		{"[-16#FF 2]", Array{nil, Integer(2)}},
+		{"[16# 2]", Array{nil, Integer(2)}},
+		{"[16#FF#1 2]", Array{nil, Integer(2)}},
+
+		// characters following a number
+		{"[1.5abc 2]", Array{nil, Integer(2)}},
+		{"[12abc 2]", Array{nil, Integer(2)}},
+		{"<</A 1.5abc /B 1>>", Dict{"B": Integer(1)}},
+		{"[1..2 3]", Array{nil, Integer(3)}},
+		{"[1-2 3]", Array{nil, Integer(3)}},
+		{"[--5 3]", Array{nil, Integer(3)}},
+		{"[1.2.3 4]", Array{nil, Integer(4)}},
+		{"[1R2 3]", Array{nil, Integer(3)}},
+		{"[1truex 2]", Array{nil, Integer(2)}},
+
+		// keywords following a number without white space
+		{"[1 0R 5]", Array{NewReference(1, 0), Integer(5)}},
+		{"<</A 1 0R/B 2>>", Dict{"A": NewReference(1, 0), "B": Integer(2)}},
+		{"[1true 2false 3null]", Array{Integer(1), Boolean(true), Integer(2), Boolean(false), Integer(3), nil}},
+		{"[1/A 2(x) 3[4]5<</B 6>>]", Array{Integer(1), Name("A"), Integer(2), String("x"),
+			Integer(3), Array{Integer(4)}, Integer(5), Dict{"B": Integer(6)}}},
+
+		// tokens which are not objects
+		{"[foo 1]", Array{nil, Integer(1)}},
+		{"[1 foo]", Array{Integer(1), nil}},
+		{"[TRUE R #]", Array{nil, nil, nil}},
+		{"[truex 1]", Array{nil, Integer(1)}},
+		{"[nullx 1]", Array{nil, Integer(1)}},
+		{"[false1 1]", Array{nil, Integer(1)}},
+		{"<</A falsehood /B 1>>", Dict{"B": Integer(1)}},
+		{"[true]", Array{Boolean(true)}},
+		{"[false/A null(x)]", Array{Boolean(false), Name("A"), nil, String("x")}},
+		{"[\x80\xff\x01 1]", Array{nil, Integer(1)}},
+		{"<</A foo /B 1>>", Dict{"B": Integer(1)}},
+		{"<</A 1 foo /B 2>>", Dict{"A": Integer(1), "B": Integer(2)}},
+		{"<</A (x) 7 /B 2>>", Dict{"A": String("x"), "B": Integer(2)}},
+		{"<<foo /A 1 bar baz>>", Dict{"A": Integer(1)}},
+		{"<</A foo bar /B 1>>", Dict{"B": Integer(1)}},
+
+		// a key without a value
+		{"<</A 1 /B >>", Dict{"A": Integer(1)}},
+		{"<</A>>", Dict{}},
+		{"<</A 1 /A >>", Dict{}},
+		{"<</A <</B >> /C 1>>", Dict{"A": Dict{}, "C": Integer(1)}},
+		{"<</A /B /C>>", Dict{"A": Name("B")}},
+		{"[<</A >> 1]", Array{Dict{}, Integer(1)}},
+
+		{"<</A 1 2 /B 3>>", Dict{"A": Integer(1), "B": Integer(3)}},
+		{"<</A 1 2.5 /B 3>>", Dict{"A": Integer(1), "B": Integer(3)}},
+		{"<</A 1 - /B 3>>", Dict{"A": Integer(1), "B": Integer(3)}},
+		{"<</A 1 2 3 R /B 3>>", Dict{"A": Integer(1), "B": Integer(3)}},
+	}
+	for _, test := range tests {
+		s := testScanner(test.in)
+		got, err := s.ReadObject()
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", test.in, err)
+			continue
+		}
+		if diff := cmp.Diff(test.want, got); diff != "" {
+			t.Errorf("%q: wrong value (-want +got):\n%s", test.in, diff)
+		}
+	}
+}
+
+// TestReadObjectStructuralKeyword checks that a keyword which ends an
+// enclosing construct is not skipped: it shows that an array or dictionary is
+// unterminated.
+func TestReadObjectStructuralKeyword(t *testing.T) {
+	for _, in := range []string{
+		"[1 endobj 2 0 obj [3] endobj",
+		"[1 endstream endobj",
+		"[1 stream\nxxx] endstream",
+		"[1 obj ]",
+		"[1 xref ]",
+		"[1 trailer ]",
+		"[1 startxref ]",
+		"[1endobjx 2]",
+		"[1 2endstream\nendobj",
+		"[1.5endobj",
+		"[16#FFendobj",
+		"[16#FF endstream",
+		"[trueendstream ]",
+		"[1trueendobj",
+		"[1Rendstream",
+		"<</A endobj >>",
+		"<</A 1 endobj >>",
+		"<</A ]>>",
+		"<</A )>>",
+		"<</A >",
+		"<</A ",
+		"<</A 1 2 ",
+		"<</A 1 2",
+		"<</A 1 ",
+		"<</A foo ",
+		"[1 foo",
+		"[1.5abc",
+		"endobj",
+	} {
+		s := testScanner(in)
+		_, err := s.ReadObject()
+		if !IsMalformed(err) {
+			t.Errorf("%q: expected malformed file error, got %v", in, err)
+		}
+	}
+}
+
+// TestReadIndirectObjectMalformedTokens checks the value of indirect objects
+// which consist of a single malformed or unseparated token.
+func TestReadIndirectObjectMalformedTokens(t *testing.T) {
+	tests := []struct {
+		in   string
+		want Object
+	}{
+		{"1 0 obj 42endobj", Integer(42)},
+		{"1 0 obj 4.5endobj", Real(4.5)},
+		{"1 0 obj 1e3endobj", Real(1000)},
+		{"1 0 obj 16#FFendobj", Integer(255)},
+		{"1 0 obj 8#17endobj", Integer(15)},
+		{"1 0 obj 36#ZZendobj2 0 obj 7 endobj", Integer(35*36 + 35)},
+		{"1 0 obj 16#endobj", nil},
+		{"1 0 obj 6.02E23 endobj", Real(6.02e23)},
+		{"1 0 obj foo endobj", nil},
+		{"1 0 obj endobj", nil},
+		{"1 0 obj\nendobj\n", nil},
+		{"1 0 obj % comment\nendobj", nil},
+		{"1 0 obj 1.5abc endobj", nil},
+		{"1 0 obj 42endobj2 0 obj 7 endobj", Integer(42)},
+		{"1 0 obj trueendobj", Boolean(true)},
+		{"1 0 obj falseendobj2 0 obj", Boolean(false)},
+		{"1 0 obj nullendobj", nil},
+		{"1 0 obj 3trueendobj2 0 obj 7 endobj", Integer(3)},
+		{"1 0 obj 1nullendobj2 0 obj 7 endobj", Integer(1)},
+		{"1 0 obj 1 0Rendobj", NewReference(1, 0)},
+	}
+	for _, test := range tests {
+		s := testScanner(test.in)
+		got, _, err := s.ReadIndirectObject()
+		if err != nil {
+			t.Errorf("%q: unexpected error: %v", test.in, err)
+			continue
+		}
+		if diff := cmp.Diff(test.want, got); diff != "" {
+			t.Errorf("%q: wrong value (-want +got):\n%s", test.in, diff)
+		}
 	}
 }

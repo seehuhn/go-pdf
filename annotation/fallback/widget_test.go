@@ -273,7 +273,7 @@ func TestDAColorOperatorNoExponent(t *testing.T) {
 
 // TestParseDA checks that a default-appearance string is tokenised as a
 // content-stream fragment: delimiters end tokens, NUL is white space,
-// comments are ignored, and only PDF number syntax gives an operand.
+// comments are ignored, and only a numeric token gives an operand.
 func TestParseDA(t *testing.T) {
 	cases := []struct {
 		name string
@@ -287,7 +287,7 @@ func TestParseDA(t *testing.T) {
 		{"comment", "/Helv 12 Tf 0 g %1 0 0 rg\n", 12, color.DeviceGray(0)},
 		{"comment between operands", "/Helv 12 Tf 0 0%x\n1 rg", 12, color.DeviceRGB{0, 0, 1}},
 		{"vertical tab is regular", "/Helv 12 Tf 0\v1 g", 12, quireInk},
-		{"exponent is no number", "/Helv 1e1 Tf 1e0 g", 0, quireInk},
+		{"exponent format", "/Helv 1e1 Tf 1e0 g", 10, color.DeviceGray(1)},
 		{"NaN is no number", "/Helv 12 Tf NaN g", 12, quireInk},
 		{"gray", "/Helv 9.5 Tf 0.5 g", 9.5, color.DeviceGray(0.5)},
 		{"cmyk", "/Helv 12 Tf 0 1 1 0 k", 12, color.DeviceCMYK{0, 1, 1, 0}},

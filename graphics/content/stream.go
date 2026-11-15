@@ -9,10 +9,10 @@ import (
 	"io"
 	"iter"
 	"math"
-	"strconv"
 
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/internal/imagedict"
+	"seehuhn.de/go/pdf/internal/number"
 )
 
 // Stream is an immutable content stream exposed in two views: an
@@ -1282,42 +1282,18 @@ func hexDigit(c byte) byte {
 
 // parseNumber tries to interpret s as a number.
 // The function returns [pdf.Integer] or [pdf.Real] in case s is a valid
-// number, and nil otherwise.
+// number, and nil otherwise.  Besides the PDF syntax for numbers, the
+// PostScript exponential format ("6.02E23") and radix format ("16#FFFE") are
+// accepted.
 func parseNumber(s []byte) pdf.Native {
-	hasDecimal := false
-	isSimple := true
-	for i, c := range s {
-		if i == 0 && (c == '+' || c == '-') {
-			continue
-		}
-		if c == '.' {
-			hasDecimal = true
-			continue
-		}
-		if c < '0' || c > '9' {
-			isSimple = false
-			break
-		}
-	}
-	if !isSimple {
+	switch kind, i, x := number.Parse(s); kind {
+	case number.Integer:
+		return pdf.Integer(i)
+	case number.Real:
+		return pdf.Real(x)
+	default:
 		return nil
 	}
-
-	str := string(s)
-
-	if !hasDecimal {
-		x, err := strconv.ParseInt(str, 10, 64)
-		if err == nil {
-			return pdf.Integer(x)
-		}
-	}
-
-	y, err := strconv.ParseFloat(str, 64)
-	if err == nil && !math.IsInf(y, 0) && !math.IsNaN(y) {
-		return pdf.Real(y)
-	}
-
-	return nil
 }
 
 // parseError marks a scanner-level content-stream parse failure.  These

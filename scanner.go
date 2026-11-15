@@ -10,6 +10,8 @@ import (
 	"io"
 	"regexp"
 	"strconv"
+
+	"seehuhn.de/go/pdf/internal/number"
 )
 
 const (
@@ -150,13 +152,21 @@ func (s *scanner) ReadIndirectObject() (_ Native, _ Reference, err error) {
 		s.encRef = ref
 	}
 
-	obj, err := s.ReadObject()
+	// an indirect object with no value is the null object
+	var obj Native
+	buf, err := s.PeekN(6)
 	if err != nil {
 		return nil, 0, err
 	}
-	err = s.SkipWhiteSpace()
-	if err != nil {
-		return nil, 0, err
+	if !bytes.Equal(buf, []byte("endobj")) {
+		obj, err = s.ReadObject()
+		if err != nil {
+			return nil, 0, err
+		}
+		err = s.SkipWhiteSpace()
+		if err != nil {
+			return nil, 0, err
+		}
 	}
 
 	if a, ok := obj.(Integer); ok {
@@ -187,7 +197,7 @@ func (s *scanner) ReadIndirectObject() (_ Native, _ Reference, err error) {
 	// keyword (including the empty prefix), the object may have been
 	// truncated, as is the case for a dictionary followed by a prefix of
 	// "stream".  A buffer shorter than the keyword means the input has ended.
-	buf, err := s.PeekN(6)
+	buf, err = s.PeekN(6)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -229,7 +239,7 @@ func (s *scanner) readReferenceTail() (Integer, error) {
 }
 
 func (s *scanner) ReadObject() (Native, error) {
-	buf, err := s.PeekN(5) // len("false") == 5
+	buf, err := s.PeekN(len("false") + len("startxref"))
 	if err != nil {
 		return nil, err
 	}
@@ -240,13 +250,13 @@ func (s *scanner) ReadObject() (Native, error) {
 		return nil, &MalformedFileError{
 			Err: errors.New("unexpected EOF while reading object"),
 		}
-	case bytes.HasPrefix(buf, []byte("null")):
+	case hasKeyword(buf, "null"):
 		s.pos += 4
 		return nil, nil
-	case bytes.HasPrefix(buf, []byte("true")):
+	case hasKeyword(buf, "true"):
 		s.pos += 4
 		return Boolean(true), nil
-	case bytes.HasPrefix(buf, []byte("false")):
+	case hasKeyword(buf, "false"):
 		s.pos += 5
 		return Boolean(false), nil
 	case buf[0] == '/':
@@ -289,9 +299,79 @@ func (s *scanner) ReadObject() (Native, error) {
 		return s.ReadArray()
 	}
 
+	// A token which is not an object has no value, but the enclosing object
+	// can still be read.
+	skipped, err := s.skipJunk()
+	if err != nil {
+		return nil, err
+	}
+	if skipped {
+		return nil, nil
+	}
+
 	return nil, &MalformedFileError{
 		Err: fmt.Errorf("unexpected character %q", buf[0]),
 	}
+}
+
+// structuralKeywords are the keywords which end an object or start a new part
+// of the file.  Where an object is expected, they show that the enclosing
+// array or dictionary is unterminated.
+var structuralKeywords = [][]byte{
+	[]byte("endobj"),
+	[]byte("endstream"),
+	[]byte("obj"),
+	[]byte("startxref"),
+	[]byte("stream"),
+	[]byte("trailer"),
+	[]byte("xref"),
+}
+
+// hasStructuralPrefix reports whether buf starts with a structural keyword.
+func hasStructuralPrefix(buf []byte) bool {
+	for _, kw := range structuralKeywords {
+		if bytes.HasPrefix(buf, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasKeyword reports whether buf starts with the token kw.  The token ends
+// where a delimiter, white space or a structural keyword follows, or where
+// the input ends.
+func hasKeyword(buf []byte, kw string) bool {
+	if !bytes.HasPrefix(buf, []byte(kw)) {
+		return false
+	}
+	rest := buf[len(kw):]
+	return len(rest) == 0 || class[rest[0]] != regular || hasStructuralPrefix(rest)
+}
+
+// skipJunk skips a run of regular characters at the current position and
+// reports whether there was one.  A run which starts with a structural
+// keyword is left in place.
+func (s *scanner) skipJunk() (bool, error) {
+	buf, err := s.PeekN(len("startxref"))
+	if err != nil {
+		return false, err
+	}
+	if len(buf) == 0 || class[buf[0]] != regular || hasStructuralPrefix(buf) {
+		return false, nil
+	}
+	err = s.skipRegular()
+	return err == nil, err
+}
+
+// skipRegular skips a run of regular characters.
+func (s *scanner) skipRegular() error {
+	err := s.ScanBytes(func(b byte) bool {
+		return class[b] == regular
+	})
+	if err == io.EOF {
+		err = nil
+	}
+	return err
 }
 
 // ReadInteger reads an integer, optionally preceded by white space.
@@ -334,15 +414,30 @@ func (s *scanner) ReadInteger() (Integer, error) {
 	return Integer(x), nil
 }
 
-// ReadNumber reads an integer or real number.  A numeric token with no PDF
-// value - one too long to record, or outside the range of float64 - yields a
-// null object: the token has been consumed in full, so the enclosing object
-// can still be read.
+// ReadNumber reads an integer or real number.  Besides the PDF syntax for
+// numbers, the PostScript exponential format ("6.02E23") and radix format
+// ("16#FFFE") are accepted.
+//
+// A numeric token with no PDF value yields a null object: the token has been
+// consumed in full, so the enclosing object can still be read.  This is the
+// case for a token which is too long to record, which is outside the range of
+// its type, or which continues with characters that are not part of a number.
+// One of the keywords "R", "true", "false" and "null", or a structural keyword
+// such as "endobj", may follow a number without white space in between.
 func (s *scanner) ReadNumber() (Native, error) {
-	hasDot := false
-	first := true
 	overflow := false
 	var res []byte
+	record := func(b byte) {
+		if len(res) < maxNameBytes {
+			res = append(res, b)
+		} else {
+			overflow = true
+		}
+	}
+
+	// decimal part
+	hasDot := false
+	first := true
 	err := s.ScanBytes(func(b byte) bool {
 		if !hasDot && b == '.' {
 			hasDot = true
@@ -354,32 +449,113 @@ func (s *scanner) ReadNumber() (Native, error) {
 			return false
 		}
 		first = false
-		if len(res) < maxNameBytes {
-			res = append(res, b)
-		} else {
-			overflow = true
-		}
+		record(b)
 		return true
 	})
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
+
+	// exponent or radix part
+	buf, err := s.PeekN(3)
+	if err != nil {
+		return nil, err
+	}
+	if n := exponentPrefix(buf); n > 0 {
+		for _, b := range buf[:n] {
+			record(b)
+		}
+		s.pos += n
+		err = s.ScanBytes(func(b byte) bool {
+			if b < '0' || b > '9' {
+				return false
+			}
+			record(b)
+			return true
+		})
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+	} else if len(buf) > 0 && buf[0] == '#' {
+		record('#')
+		s.pos++
+		err = s.scanRadixDigits(record)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// The token ends here only if a delimiter, white space or a keyword
+	// follows.
+	buf, err = s.PeekN(len("false") + len("startxref"))
+	if err != nil {
+		return nil, err
+	}
+	if len(buf) > 0 && class[buf[0]] == regular && !hasNumberSuffix(buf) && !hasStructuralPrefix(buf) {
+		err = s.skipRegular()
+		return nil, err
+	}
+
 	if overflow {
 		return nil, nil
 	}
-
-	if !hasDot {
-		if x, err := strconv.ParseInt(string(res), 10, 64); err == nil {
-			return Integer(x), nil
-		}
-		// fall through: large integer literals are returned as Real
-	}
-
-	x, err := strconv.ParseFloat(string(res), 64)
-	if err != nil {
+	switch kind, i, x := number.Parse(res); kind {
+	case number.Integer:
+		return Integer(i), nil
+	case number.Real:
+		return Real(x), nil
+	default:
 		return nil, nil
 	}
-	return Real(x), nil
+}
+
+// scanRadixDigits reads the digits of a radix number, i.e. the letters and
+// digits after "#".  The digits end before a structural keyword, since
+// letters such as those in "endobj" could otherwise be taken as digits.
+func (s *scanner) scanRadixDigits(record func(byte)) error {
+	for {
+		buf, err := s.PeekN(len("startxref"))
+		if err != nil {
+			return err
+		}
+		if len(buf) == 0 || hasStructuralPrefix(buf) {
+			return nil
+		}
+		c := buf[0]
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
+			return nil
+		}
+		record(c)
+		s.pos++
+	}
+}
+
+// exponentPrefix returns the length of the start of an exponent at the
+// beginning of buf: the letter "e" or "E", an optional sign and one digit.
+// The result is 0 if buf does not start with an exponent.
+func exponentPrefix(buf []byte) int {
+	if len(buf) < 2 || buf[0] != 'e' && buf[0] != 'E' {
+		return 0
+	}
+	n := 1
+	if buf[n] == '+' || buf[n] == '-' {
+		n++
+	}
+	if n >= len(buf) || buf[n] < '0' || buf[n] > '9' {
+		return 0
+	}
+	return n + 1
+}
+
+// hasNumberSuffix reports whether buf starts with a keyword which may follow
+// a number without white space in between.
+func hasNumberSuffix(buf []byte) bool {
+	for _, kw := range []string{"R", "true", "false", "null"} {
+		if hasKeyword(buf, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 // ReadString reads a ()-delimited string, starting after the opening bracket.
@@ -708,7 +884,8 @@ func (s *scanner) ReadArray() (array Array, err error) {
 // ReadDict reads a PDF dictionary.
 //
 // Entries whose value is null, or a token which reads as null, are omitted
-// from the result.
+// from the result, and so is a final key with no value.  A token of regular
+// characters where a key is expected is skipped.
 func (s *scanner) ReadDict() (dict Dict, err error) {
 	defer func() {
 		if err != nil {
@@ -736,6 +913,20 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 	dict = make(map[Name]Object)
 	var rawContents []byte // undecrypted hex /Contents, for signature dicts
 	for {
+		// a stray token between entries is skipped
+		var skipped bool
+		skipped, err = s.skipJunk()
+		if err != nil {
+			return nil, err
+		}
+		if skipped {
+			err = s.SkipWhiteSpace()
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+
 		var key Name
 		key, err = s.ReadName()
 		if IsMalformed(err) {
@@ -753,8 +944,19 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 		if key == "Contents" {
 			rawContents = nil // a duplicate key replaces an earlier value
 		}
+
+		// a key without a value is the same as an absent entry
+		var buf []byte
+		buf, err = s.PeekN(2)
+		if err != nil {
+			return nil, err
+		}
+		if bytes.Equal(buf, []byte(">>")) {
+			delete(dict, key)
+			break
+		}
+
 		if key == "Contents" && s.enc != nil && s.encRef != 0 {
-			buf, _ := s.PeekN(2) // errors resurface in ReadObject
 			if len(buf) == 2 && buf[0] == '<' && buf[1] != '<' {
 				s.pos++
 				rawContents, err = s.readHexBytes()
@@ -790,34 +992,35 @@ func (s *scanner) ReadDict() (dict Dict, err error) {
 			if len(buf) == 0 {
 				return nil, io.ErrUnexpectedEOF
 			}
-			if buf[0] != '/' && buf[0] != '>' {
+			if c := buf[0]; c >= '0' && c <= '9' || c == '+' || c == '-' {
+				// Anything other than the tail of a reference is a stray
+				// token, which is skipped.
 				b, err := s.ReadInteger()
-				if err != nil {
+				if err == nil {
+					err = s.SkipWhiteSpace()
+					if err != nil {
+						return nil, err
+					}
+					buf, err := s.PeekN(1)
+					if err != nil {
+						return nil, err
+					}
+					if len(buf) > 0 && buf[0] == 'R' {
+						s.pos++
+						err = s.SkipWhiteSpace()
+						if err != nil {
+							return nil, err
+						}
+						if a <= 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
+							val = nil
+						} else {
+							val = NewReference(uint32(a), uint16(b))
+						}
+					}
+				} else if !IsMalformed(err) {
 					return nil, err
-				}
-
-				err = s.SkipWhiteSpace()
-				if err != nil {
+				} else if err = s.SkipWhiteSpace(); err != nil {
 					return nil, err
-				}
-
-				buf, err := s.PeekN(1)
-				if err != nil {
-					return nil, err
-				}
-				if buf[0] != 'R' {
-					return nil, &MalformedFileError{Err: errors.New("expected /Name but found Integer")}
-				}
-				s.pos++
-				err = s.SkipWhiteSpace()
-				if err != nil {
-					return nil, err
-				}
-
-				if a <= 0 || a >= maxXRefSize || b < 0 || b > maxGeneration {
-					val = nil
-				} else {
-					val = NewReference(uint32(a), uint16(b))
 				}
 			}
 		}
