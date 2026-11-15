@@ -86,11 +86,11 @@ const (
 // value is a tagged union representing a stack element.
 type value struct {
 	tag  valueTag
-	ival int
+	ival int32
 	fval float64
 }
 
-func intVal(n int) value      { return value{tag: tagInt, ival: n} }
+func intVal(n int32) value    { return value{tag: tagInt, ival: n} }
 func realVal(f float64) value { return value{tag: tagReal, fval: f} }
 func boolVal(b bool) value {
 	v := value{tag: tagBool}
@@ -117,7 +117,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 
 		switch inst.op {
 		case opPushInt:
-			stack = append(stack, intVal(inst.ival))
+			stack = append(stack, intVal(int32(inst.ival)))
 			if len(stack) > maxStackDepth {
 				return nil, errStackOverflow
 			}
@@ -144,7 +144,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			v := &stack[len(stack)-1]
 			switch v.tag {
 			case tagInt:
-				if v.ival == math.MinInt {
+				if v.ival == math.MinInt32 {
 					*v = realVal(-float64(v.ival))
 				} else if v.ival < 0 {
 					v.ival = -v.ival
@@ -227,7 +227,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			if b.ival == 0 {
 				return nil, errDivByZero
 			}
-			if a.ival == math.MinInt && b.ival == -1 {
+			if a.ival == math.MinInt32 && b.ival == -1 {
 				return nil, errUndefinedResult
 			}
 			stack = stack[:len(stack)-1]
@@ -255,7 +255,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			v := &stack[len(stack)-1]
 			switch v.tag {
 			case tagInt:
-				if v.ival == math.MinInt {
+				if v.ival == math.MinInt32 {
 					*v = realVal(-float64(v.ival))
 				} else {
 					v.ival = -v.ival
@@ -442,10 +442,10 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			case tagReal:
 				t := math.Trunc(v.fval)
 				// the limits are powers of two and so exact as float64 values
-				if !(t >= math.MinInt && t < -math.MinInt) {
+				if !(t >= math.MinInt32 && t < -math.MinInt32) {
 					return nil, errRangeCheck
 				}
-				*v = intVal(int(t))
+				*v = intVal(int32(t))
 			default:
 				return nil, errTypeMismatch
 			}
@@ -536,7 +536,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			}
 			b := stack[len(stack)-1]
 			a := stack[len(stack)-2]
-			r, err := vmBoolOrBitwise(a, b, func(x, y bool) bool { return x && y }, func(x, y int) int { return x & y })
+			r, err := vmBoolOrBitwise(a, b, func(x, y bool) bool { return x && y }, func(x, y int32) int32 { return x & y })
 			if err != nil {
 				return nil, err
 			}
@@ -549,7 +549,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			}
 			b := stack[len(stack)-1]
 			a := stack[len(stack)-2]
-			r, err := vmBoolOrBitwise(a, b, func(x, y bool) bool { return x || y }, func(x, y int) int { return x | y })
+			r, err := vmBoolOrBitwise(a, b, func(x, y bool) bool { return x || y }, func(x, y int32) int32 { return x | y })
 			if err != nil {
 				return nil, err
 			}
@@ -562,7 +562,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			}
 			b := stack[len(stack)-1]
 			a := stack[len(stack)-2]
-			r, err := vmBoolOrBitwise(a, b, func(x, y bool) bool { return x != y }, func(x, y int) int { return x ^ y })
+			r, err := vmBoolOrBitwise(a, b, func(x, y bool) bool { return x != y }, func(x, y int32) int32 { return x ^ y })
 			if err != nil {
 				return nil, err
 			}
@@ -630,7 +630,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 				return nil, errTypeMismatch
 			}
 			stack = stack[:len(stack)-1]
-			i := idx.ival
+			i := int(idx.ival)
 			if i < 0 || i >= len(stack) {
 				return nil, fmt.Errorf("index %d out of range (stack depth %d)", i, len(stack))
 			}
@@ -647,7 +647,7 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			if top.tag != tagInt {
 				return nil, errTypeMismatch
 			}
-			n := top.ival
+			n := int(top.ival)
 			stack = stack[:len(stack)-1]
 			if n < 0 || n > len(stack) {
 				return nil, fmt.Errorf("copy count %d out of range (stack depth %d)", n, len(stack))
@@ -666,8 +666,8 @@ func execute(code []instruction, stack []value) ([]value, error) {
 			if nv.tag != tagInt || jv.tag != tagInt {
 				return nil, errTypeMismatch
 			}
-			n := nv.ival
-			j := jv.ival
+			n := int(nv.ival)
+			j := int(jv.ival)
 			stack = stack[:len(stack)-2]
 			if n < 0 || n > len(stack) {
 				return nil, fmt.Errorf("roll count %d out of range (stack depth %d)", n, len(stack))
@@ -759,7 +759,7 @@ func vmMul(a, b value) (value, error) {
 		return realResult(a.asFloat() * b.asFloat())
 	}
 	c := a.ival * b.ival
-	if (a.ival == -1 && b.ival == math.MinInt) || (a.ival != 0 && c/a.ival != b.ival) {
+	if (a.ival == -1 && b.ival == math.MinInt32) || (a.ival != 0 && c/a.ival != b.ival) {
 		return realVal(float64(a.ival) * float64(b.ival)), nil
 	}
 	return intVal(c), nil
@@ -777,7 +777,7 @@ func vmEqual(a, b value) bool {
 }
 
 // vmBoolOrBitwise dispatches and/or/xor for both bool and int operand pairs.
-func vmBoolOrBitwise(a, b value, boolFn func(bool, bool) bool, intFn func(int, int) int) (value, error) {
+func vmBoolOrBitwise(a, b value, boolFn func(bool, bool) bool, intFn func(int32, int32) int32) (value, error) {
 	if a.tag == tagBool && b.tag == tagBool {
 		return boolVal(boolFn(a.ival != 0, b.ival != 0)), nil
 	}

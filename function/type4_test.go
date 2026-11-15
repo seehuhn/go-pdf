@@ -811,28 +811,30 @@ func TestType4NumberLiterals(t *testing.T) {
 	}
 }
 
-// Integer overflow and real-to-integer conversion at the limits of int.
+// Integer overflow and real-to-integer conversion at the limits of 32-bit integers.
 func TestType4IntegerLimits(t *testing.T) {
-	minInt := strconv.Itoa(math.MinInt)
-	// MaxInt+1, the smallest integer-valued float above MaxInt
-	pastMax := -float64(math.MinInt)
-	// the largest integer-valued float which converts
-	belowMax := math.Trunc(math.Nextafter(pastMax, 0))
+	minInt := strconv.Itoa(math.MinInt32)
+	// MaxInt32+1, the smallest integer-valued float above MaxInt32
+	pastMax := -float64(math.MinInt32)
 	fmtReal := func(x float64) string { return strconv.FormatFloat(x, 'f', 1, 64) }
 	tests := []struct {
 		prog string
 		want value // zero value: an error is expected
 	}{
-		{"0 " + minInt + " sub", realVal(-float64(math.MinInt))},
-		{"-1 " + minInt + " sub", intVal(math.MaxInt)},
-		{"1 " + minInt + " sub", realVal(1 - float64(math.MinInt))},
-		{"-1 " + minInt + " mul", realVal(-float64(math.MinInt))},
-		{minInt + " -1 mul", realVal(-float64(math.MinInt))},
+		{"0 " + minInt + " sub", realVal(-float64(math.MinInt32))},
+		{"-1 " + minInt + " sub", intVal(math.MaxInt32)},
+		{"1 " + minInt + " sub", realVal(1 - float64(math.MinInt32))},
+		{"-1 " + minInt + " mul", realVal(-float64(math.MinInt32))},
+		{minInt + " -1 mul", realVal(-float64(math.MinInt32))},
+		{"2147483647 1 add", realVal(-float64(math.MinInt32))},
+		{"2147483648", realVal(-float64(math.MinInt32))},
+		{"1 31 bitshift", intVal(math.MinInt32)},
+		{"-1 -32 bitshift", intVal(-1)},
 		{minInt + " -1 idiv", value{}},
-		{minInt + " 1 idiv", intVal(math.MinInt)},
+		{minInt + " 1 idiv", intVal(math.MinInt32)},
 		{fmtReal(pastMax) + " cvi", value{}},
-		{fmtReal(-pastMax) + " cvi", intVal(math.MinInt)},
-		{fmtReal(belowMax) + " cvi", intVal(int(belowMax))},
+		{fmtReal(-pastMax) + " cvi", intVal(math.MinInt32)},
+		{fmtReal(math.MaxInt32) + " cvi", intVal(math.MaxInt32)},
 	}
 	for _, tc := range tests {
 		t.Run(tc.prog, func(t *testing.T) {

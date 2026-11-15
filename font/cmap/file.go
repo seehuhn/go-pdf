@@ -207,12 +207,8 @@ func readCMap(r io.Reader, name pdf.Name) (*File, pdf.Name, error) {
 		if ordering, _ := rosDict["Ordering"].(postscript.String); ordering != nil {
 			ros.Ordering = string(ordering)
 		}
-		if supplement, _ := rosDict["Supplement"].(postscript.Integer); supplement != 0 {
-			var sup int32
-			if supplement >= 0 && supplement <= math.MaxInt32 {
-				sup = int32(supplement)
-			}
-			ros.Supplement = sup
+		if supplement, _ := rosDict["Supplement"].(postscript.Integer); supplement > 0 {
+			ros.Supplement = int32(supplement)
 		}
 		if ros.Registry != "" || ros.Ordering != "" || ros.Supplement != 0 {
 			res.ROS = ros
