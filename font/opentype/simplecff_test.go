@@ -170,8 +170,12 @@ func TestEmbeddedCFFTakesTheDictionaryName(t *testing.T) {
 		t.Fatal(err)
 	}
 	subtable := sfntcmap.Format4{'A': 1, 'B': 2, 'C': 3}
+	cmapData, err := subtable.Encode(0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	small.CMapTable = sfntcmap.Table{
-		{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
+		{PlatformID: 3, EncodingID: 1}: cmapData,
 	}
 
 	// the wrapper is renamed, the CFF table inside it keeps the old name

@@ -88,7 +88,9 @@ func cff2FontShell(familyName string, glyphs []*cff.GlyphCFF2, widths []float64)
 	m := cmap.Format4{}
 	m['A'] = CFF2GIDBox
 	m['B'] = CFF2GIDFillerB
-	f.InstallCMap(m)
+	if err := f.InstallCMap(m); err != nil {
+		panic(err)
+	}
 
 	return f
 }

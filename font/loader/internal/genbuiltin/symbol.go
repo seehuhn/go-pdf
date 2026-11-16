@@ -151,10 +151,18 @@ func makeQuireSymbol(spec symbolSpec, data []byte) ([]byte, error) {
 		Outlines:           outlines,
 	}
 	font.CodePageRange.Set(os2.CPSymbol)
+	uniData, err := uni.Encode(0)
+	if err != nil {
+		return nil, err
+	}
+	symData, err := sym.Encode(0)
+	if err != nil {
+		return nil, err
+	}
 	font.CMapTable = cmap.Table{
-		{PlatformID: 0, EncodingID: 3}: uni.Encode(0),
-		{PlatformID: 3, EncodingID: 1}: uni.Encode(0),
-		{PlatformID: 3, EncodingID: 0}: sym.Encode(0),
+		{PlatformID: 0, EncodingID: 3}: uniData,
+		{PlatformID: 3, EncodingID: 1}: uniData,
+		{PlatformID: 3, EncodingID: 0}: symData,
 	}
 
 	buf := &bytes.Buffer{}

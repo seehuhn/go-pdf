@@ -277,13 +277,25 @@ func (fb *fontBuilder) BuildFont(enc *encInfo) (font.Instance, error) {
 	pdfWidth := math.Round(w.AsFloat(q))
 
 	if useCmap_1_0 {
-		newTTF.CMapTable[sfntcmap.Key{PlatformID: 1, EncodingID: 0}] = cmap_1_0.Encode(0)
+		data, err := cmap_1_0.Encode(0)
+		if err != nil {
+			return nil, err
+		}
+		newTTF.CMapTable[sfntcmap.Key{PlatformID: 1, EncodingID: 0}] = data
 	}
 	if useCmap_3_0 {
-		newTTF.CMapTable[sfntcmap.Key{PlatformID: 3, EncodingID: 0}] = cmap_3_0.Encode(0)
+		data, err := cmap_3_0.Encode(0)
+		if err != nil {
+			return nil, err
+		}
+		newTTF.CMapTable[sfntcmap.Key{PlatformID: 3, EncodingID: 0}] = data
 	}
 	if useCmap_3_1 {
-		newTTF.CMapTable[sfntcmap.Key{PlatformID: 3, EncodingID: 1}] = cmap_3_1.Encode(0)
+		data, err := cmap_3_1.Encode(0)
+		if err != nil {
+			return nil, err
+		}
+		newTTF.CMapTable[sfntcmap.Key{PlatformID: 3, EncodingID: 1}] = data
 	}
 
 	res := &testFont{

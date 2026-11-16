@@ -88,7 +88,9 @@ func Glyf() *sfnt.Font {
 
 	m := cmap.Format4{}
 	m['A'] = GIDRect
-	f.InstallCMap(m)
+	if err := f.InstallCMap(m); err != nil {
+		panic(err)
+	}
 
 	f.Fvar = &fvar.Table{
 		Axes: []fvar.Axis{

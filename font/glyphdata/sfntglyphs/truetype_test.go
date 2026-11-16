@@ -68,7 +68,7 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			name:     "method A: (1,0) direct",
 			symbolic: true,
 			font: ttFont(10, sfntcmap.Table{
-				{PlatformID: 1}: encFormat0(code, 1),
+				{PlatformID: 1}: encFormat0(t, code, 1),
 			}, nil),
 			cid:     cidVal,
 			wantGID: 1,
@@ -78,7 +78,7 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			name:     "method B: (3,0) with base offsets",
 			symbolic: true,
 			font: ttFont(10, sfntcmap.Table{
-				{PlatformID: 3}: encFormat4(uint16(code), 2),
+				{PlatformID: 3}: encFormat4(t, uint16(code), 2),
 			}, nil),
 			cid:     cidVal,
 			wantGID: 2,
@@ -88,7 +88,7 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			name: "method C: encoding, Mac Roman, (1,0)",
 			enc:  enc,
 			font: ttFont(10, sfntcmap.Table{
-				{PlatformID: 1}: encFormat0(226, 3), // Mac Roman code for "quotesinglbase"
+				{PlatformID: 1}: encFormat0(t, 226, 3), // Mac Roman code for "quotesinglbase"
 			}, nil),
 			cid:     cidVal,
 			wantGID: 3,
@@ -99,7 +99,7 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			symbolic: true,
 			enc:      enc,
 			font: ttFont(10, sfntcmap.Table{
-				{PlatformID: 3, EncodingID: 1}: encFormat4(8218, 4), // U+201A
+				{PlatformID: 3, EncodingID: 1}: encFormat4(t, 8218, 4), // U+201A
 			}, nil),
 			cid:     cidVal,
 			wantGID: 4,
@@ -121,8 +121,8 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			symbolic: true,
 			enc:      enc,
 			font: ttFont(10, sfntcmap.Table{
-				{PlatformID: 3}:                encFormat4(uint16(code), 2),
-				{PlatformID: 3, EncodingID: 1}: encFormat4(8218, 4),
+				{PlatformID: 3}:                encFormat4(t, uint16(code), 2),
+				{PlatformID: 3, EncodingID: 1}: encFormat4(t, 8218, 4),
 			}, nil),
 			cid:     cidVal,
 			wantGID: 4,
@@ -132,8 +132,8 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			name: "C wins over B (non-symbolic, encoding)",
 			enc:  enc,
 			font: ttFont(10, sfntcmap.Table{
-				{PlatformID: 1}: encFormat0(226, 3),
-				{PlatformID: 3}: encFormat4(uint16(code), 2),
+				{PlatformID: 1}: encFormat0(t, 226, 3),
+				{PlatformID: 3}: encFormat4(t, uint16(code), 2),
 			}, nil),
 			cid:     cidVal,
 			wantGID: 3,
@@ -143,8 +143,8 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			name:     "B wins over A (no encoding)",
 			symbolic: true,
 			font: ttFont(10, sfntcmap.Table{
-				{PlatformID: 1}: encFormat0(code, 1),
-				{PlatformID: 3}: encFormat4(uint16(code), 2),
+				{PlatformID: 1}: encFormat0(t, code, 1),
+				{PlatformID: 3}: encFormat4(t, uint16(code), 2),
 			}, nil),
 			cid:     cidVal,
 			wantGID: 2,
@@ -156,7 +156,7 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			name:     "GID out of bounds clamped to 0",
 			symbolic: true,
 			font: ttFont(5, sfntcmap.Table{
-				{PlatformID: 1}: encFormat0(code, 9), // GID 9 >= numGlyphs 5
+				{PlatformID: 1}: encFormat0(t, code, 9), // GID 9 >= numGlyphs 5
 			}, nil),
 			cid:     cidVal,
 			wantGID: 0,
@@ -207,14 +207,24 @@ func ttFont(numGlyphs int, cmaps sfntcmap.Table, names []string) *sfnt.Font {
 	}
 }
 
-func encFormat0(code byte, gid byte) []byte {
+func encFormat0(t *testing.T, code byte, gid byte) []byte {
+	t.Helper()
 	f := &sfntcmap.Format0{}
 	f.Data[code] = gid
-	return f.Encode(0)
+	data, err := f.Encode(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
-func encFormat4(code uint16, gid glyph.ID) []byte {
-	return sfntcmap.Format4{code: gid}.Encode(0)
+func encFormat4(t *testing.T, code uint16, gid glyph.ID) []byte {
+	t.Helper()
+	data, err := sfntcmap.Format4{code: gid}.Encode(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func makePostNames(gid int, name string) []string {
@@ -245,7 +255,7 @@ func TestNewTrueTypeSelectorIgnoresSubsetTag(t *testing.T) {
 
 	for _, name := range []string{"ZapfDingbats", "AAAAAA+ZapfDingbats"} {
 		font := ttFont(10, sfntcmap.Table{
-			{PlatformID: 3, EncodingID: 1}: encFormat4(pointingHand, gid),
+			{PlatformID: 3, EncodingID: 1}: encFormat4(t, pointingHand, gid),
 		}, nil)
 		font.FontName = name
 

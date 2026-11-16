@@ -240,8 +240,12 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 			}
 			subtable[uint16(code)] = toSubset[gid]
 		}
+		cmapData, err := subtable.Encode(0)
+		if err != nil {
+			return nil, err
+		}
 		subsetFont.CMapTable = sfntcmap.Table{
-			{PlatformID: 1, EncodingID: 0}: subtable.Encode(0),
+			{PlatformID: 1, EncodingID: 0}: cmapData,
 		}
 	} else {
 		// Use the encoding to map codes to names, use the Adobe Glyph List to
@@ -273,8 +277,12 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 				}
 				subtable[uint16(rr[0])] = glyph.ID(gid)
 			}
+			cmapData, err := subtable.Encode(0)
+			if err != nil {
+				return nil, err
+			}
 			subsetFont.CMapTable = sfntcmap.Table{
-				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
+				{PlatformID: 3, EncodingID: 1}: cmapData,
 			}
 		} else {
 			subtable := sfntcmap.Format12{}
@@ -286,8 +294,12 @@ func (f *SimpleGlyf) makeDict() (*dict.TrueType, error) {
 				}
 				subtable[uint32(rr[0])] = glyph.ID(gid)
 			}
+			cmapData, err := subtable.Encode(0)
+			if err != nil {
+				return nil, err
+			}
 			subsetFont.CMapTable = sfntcmap.Table{
-				{PlatformID: 3, EncodingID: 1}: subtable.Encode(0),
+				{PlatformID: 3, EncodingID: 1}: cmapData,
 			}
 		}
 	}

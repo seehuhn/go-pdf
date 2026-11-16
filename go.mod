@@ -11,10 +11,10 @@ require (
 	seehuhn.de/go/geom v0.8.0
 	seehuhn.de/go/icc v0.8.0
 	seehuhn.de/go/jpx v0.8.0
-	seehuhn.de/go/membudget v0.8.0
+	seehuhn.de/go/membudget v0.8.1-0.20261116121700-a8e6127a85af
 	seehuhn.de/go/postscript v0.8.1-0.20261115175759-cf3f9ed3facd
-	seehuhn.de/go/sfnt v0.8.1-0.20261114143742-18dffffcac52
-	seehuhn.de/go/xmp v0.8.0
+	seehuhn.de/go/sfnt v0.8.1-0.20261116154532-b73049e7f4e4
+	seehuhn.de/go/xmp v0.8.1-0.20261116130609-ccce07d6b204
 )
 
 require (

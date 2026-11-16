@@ -50,7 +50,10 @@ func main() {
 		{presentName, presentFile, true},
 		{missingName, missingFile, false},
 	} {
-		err := writeFont(f.fileName, makeGlyphs(f.name, f.present))
+		F, err := makeGlyphs(f.name, f.present)
+		if err == nil {
+			err = writeFont(f.fileName, F)
+		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
@@ -152,7 +155,7 @@ var fontCreated = time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC)
 // makeGlyphs returns a CID-keyed font with the given PostScript name.  The
 // font contains glyphs for the CIDs 0 to 3, and also for CID 4 if present
 // is set.
-func makeGlyphs(name string, present bool) *sfnt.Font {
+func makeGlyphs(name string, present bool) (*sfnt.Font, error) {
 	glyphs := []*cff.Glyph{
 		notdefgrid.CrossGlyph(250, notdefgrid.WidthCID0),   // CID 0
 		notdefgrid.CrossGlyph(750, notdefgrid.WidthNotdef), // CID 1
@@ -213,10 +216,12 @@ func makeGlyphs(name string, present bool) *sfnt.Font {
 			table[uint16('A')+uint16(c)] = glyph.ID(gid)
 		}
 	}
-	F.InstallCMap(table)
+	if err := F.InstallCMap(table); err != nil {
+		return nil, err
+	}
 	F.CodePageRange.Set(os2.CP1252)
 
-	return F
+	return F, nil
 }
 
 // ros is the character collection of all test fonts.  A font which is not

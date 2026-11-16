@@ -61,8 +61,12 @@ func makeTrueTypeFont(unitsPerEm uint16) font.Layouter {
 	}
 
 	cmapSubtable := cmap.Format4{' ': 1, 'A': 2}
+	cmapData, err := cmapSubtable.Encode(0)
+	if err != nil {
+		panic(err) // constant mapping, always fits
+	}
 	cmapTable := cmap.Table{
-		{PlatformID: 0, EncodingID: 3}: cmapSubtable.Encode(0),
+		{PlatformID: 0, EncodingID: 3}: cmapData,
 	}
 
 	// create font structure
