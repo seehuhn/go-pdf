@@ -192,8 +192,8 @@ func malformedMetricsFont(cidType pdf.Name, entries pdf.Dict) pdf.Dict {
 		"BaseFont": pdf.Name("Test"),
 		"CIDSystemInfo": pdf.Dict{
 			"Registry":   pdf.String("Adobe"),
-			"Ordering":   pdf.String("Identity"),
-			"Supplement": pdf.Integer(0),
+			"Ordering":   pdf.String("Japan1"),
+			"Supplement": pdf.Integer(6),
 		},
 	}
 	maps.Copy(cidFont, entries)
@@ -201,7 +201,7 @@ func malformedMetricsFont(cidType pdf.Name, entries pdf.Dict) pdf.Dict {
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
 		"BaseFont":        pdf.Name("Test"),
-		"Encoding":        pdf.Name("Identity-V"),
+		"Encoding":        pdf.Name("UniJIS-UTF16-V"),
 		"DescendantFonts": pdf.Array{cidFont},
 	}
 }

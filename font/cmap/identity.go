@@ -18,3 +18,10 @@ func mustPredefined(name string) *File {
 	}
 	return c
 }
+
+// IsIdentity reports whether f is the predefined Identity-H or Identity-V
+// CMap.  A modified copy of one of these is not predefined, and IsIdentity
+// returns false for it.
+func (f *File) IsIdentity() bool {
+	return f == IdentityH || f == IdentityV
+}

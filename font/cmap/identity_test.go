@@ -54,3 +54,21 @@ func TestIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestIsIdentity(t *testing.T) {
+	for _, c := range []*File{IdentityH, IdentityV} {
+		if !c.IsIdentity() {
+			t.Errorf("%s: not identity", c.Name)
+		}
+		if c.Clone().IsIdentity() {
+			t.Errorf("%s: copy reported as identity", c.Name)
+		}
+	}
+	other, err := Predefined("UniJIS-UTF16-H")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.IsIdentity() {
+		t.Error("UniJIS-UTF16-H reported as identity")
+	}
+}

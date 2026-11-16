@@ -126,6 +126,10 @@ func extractFontCIDType0(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType0, erro
 
 	repairCIDType0(d)
 
+	if err := checkExternalCollection(d.FontFile, d.CMap); err != nil {
+		return nil, err
+	}
+
 	return d, nil
 }
 
@@ -144,5 +148,5 @@ func repairCIDType0(d *dict.CIDFontType0) {
 		d.CMap = cmap.IdentityH
 	}
 
-	repairROS(&d.ROS, &d.CMap)
+	repairROS(&d.ROS, &d.CMap, d.FontFile == nil)
 }

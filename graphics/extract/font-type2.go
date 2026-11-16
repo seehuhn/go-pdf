@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"seehuhn.de/go/postscript/cid"
-
 	"seehuhn.de/go/sfnt/glyph"
 
 	"seehuhn.de/go/pdf"
@@ -168,7 +166,12 @@ func extractFontCIDType2(c pdf.Cursor, obj pdf.Object) (*dict.CIDFontType2, erro
 	repairCIDType2(d)
 
 	if d.FontFile == nil && !d.CMap.IsPredefined() {
-		return nil, errors.New("custom encoding not allowed for external font")
+		return nil, &pdf.MalformedFileError{
+			Err: errors.New("custom encoding not allowed for external font"),
+		}
+	}
+	if err := checkExternalCollection(d.FontFile, d.CMap); err != nil {
+		return nil, err
 	}
 
 	return d, nil
@@ -193,44 +196,5 @@ func repairCIDType2(d *dict.CIDFontType2) {
 		d.CMap = cmap.IdentityH
 	}
 
-	repairROS(&d.ROS, &d.CMap)
-}
-
-// repairROS makes the character collection and the CMap of a CIDFont
-// consistent.  A missing character collection is taken from the CMap, or set
-// to Adobe-Identity-0.  The predefined Identity-H and Identity-V are
-// compatible with every character collection.  If the two are otherwise
-// missing or incompatible, a predefined CMap determines the character
-// collection, since its CIDs are those of its own collection.  An embedded
-// CMap is replaced by a copy with the font's character collection.
-func repairROS(ros **cid.SystemInfo, cm **cmap.File) {
-	c := *cm
-	if *ros == nil {
-		if c.ROS != nil {
-			*ros = c.ROS
-		} else {
-			*ros = &cid.SystemInfo{
-				Registry:   "Adobe",
-				Ordering:   "Identity",
-				Supplement: 0,
-			}
-		}
-	}
-
-	predefined := c.IsPredefined()
-	if predefined && (c.Name == "Identity-H" || c.Name == "Identity-V") {
-		return
-	}
-	if c.ROS != nil && (*ros).Registry == c.ROS.Registry &&
-		(*ros).Ordering == c.ROS.Ordering {
-		return
-	}
-
-	if predefined && c.ROS != nil {
-		*ros = c.ROS
-		return
-	}
-	c = c.Clone()
-	c.ROS = *ros
-	*cm = c
+	repairROS(&d.ROS, &d.CMap, d.FontFile == nil)
 }

@@ -17,7 +17,7 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-// readVerticalFont writes a Type 0 font with the Identity-V encoding and a
+// readVerticalFont writes a Type 0 font with the UniJIS-UTF16-V encoding and a
 // CIDFontType2 descendant with widths [600 500] for CIDs 1 and 2, adds the
 // given entries to the CIDFont dictionary, and reads the font back.
 func readVerticalFont(t *testing.T, extra pdf.Dict) font.Instance {
@@ -30,8 +30,8 @@ func readVerticalFont(t *testing.T, extra pdf.Dict) font.Instance {
 		"BaseFont": pdf.Name("Test"),
 		"CIDSystemInfo": pdf.Dict{
 			"Registry":   pdf.String("Adobe"),
-			"Ordering":   pdf.String("Identity"),
-			"Supplement": pdf.Integer(0),
+			"Ordering":   pdf.String("Japan1"),
+			"Supplement": pdf.Integer(6),
 		},
 		"FontDescriptor": pdf.Dict{
 			"Type":        pdf.Name("FontDescriptor"),
@@ -57,7 +57,7 @@ func readVerticalFont(t *testing.T, extra pdf.Dict) font.Instance {
 		"Type":            pdf.Name("Font"),
 		"Subtype":         pdf.Name("Type0"),
 		"BaseFont":        pdf.Name("Test"),
-		"Encoding":        pdf.Name("Identity-V"),
+		"Encoding":        pdf.Name("UniJIS-UTF16-V"),
 		"DescendantFonts": pdf.Array{cidRef},
 	}
 	if err := w.Put(fontRef, fontDict); err != nil {
@@ -75,8 +75,9 @@ func readVerticalFont(t *testing.T, extra pdf.Dict) font.Instance {
 	return F
 }
 
-// cids12 shows CIDs 1 and 2 under the Identity-V encoding.
-var cids12 = pdf.String{0, 1, 0, 2}
+// cids12 shows CIDs 1 and 2 (U+0020 and U+0021) under the UniJIS-UTF16-V
+// encoding.
+var cids12 = pdf.String{0, 0x20, 0, 0x21}
 
 // textState returns a graphics state which shows F at size 10, starting at
 // (100, 700).

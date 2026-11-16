@@ -40,6 +40,9 @@ type CIDFontType0 struct {
 	//
 	// The CMap.ROS field must either be compatible with the ROS field
 	// above, or the CMap must be one of Identity-H or Identity-V.
+	// If the font is not embedded, CMap.ROS must be a standard character
+	// collection (see [cmap.IsStandardCollection]).  This excludes Identity-H
+	// and Identity-V.
 	CMap *cmap.File
 
 	// Width (optional) gives the glyph widths (in PDF glyph space units) as
@@ -99,8 +102,11 @@ func (d *CIDFontType0) validate() error {
 		return errors.New("missing ROS")
 	}
 
-	if d.CMap.Name != "Identity-H" && d.CMap.Name != "Identity-V" ||
-		!d.CMap.IsPredefined() {
+	if d.FontFile == nil && !cmap.IsStandardCollection(d.CMap.ROS) {
+		return errors.New("external font needs a standard character collection")
+	}
+
+	if !d.CMap.IsIdentity() {
 		if d.ROS.Registry != d.CMap.ROS.Registry ||
 			d.ROS.Ordering != d.CMap.ROS.Ordering {
 			return fmt.Errorf("ROS mismatch: %s %s != %s %s",
@@ -136,6 +142,11 @@ func (d *CIDFontType0) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	err := d.validate()
 	if err != nil {
 		return nil, err
+	}
+	if d.FontFile == nil {
+		if err := cmap.CheckCollectionVersion(w, d.ROS); err != nil {
+			return nil, err
+		}
 	}
 
 	baseFont := subset.Join(d.SubsetTag, d.PostScriptName)

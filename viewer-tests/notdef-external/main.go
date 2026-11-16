@@ -219,12 +219,12 @@ func makeGlyphs(name string, present bool) *sfnt.Font {
 	return F
 }
 
-// ros is the character collection of all test fonts.  The identity
-// collection is the one meant for fonts with their own glyph set, where a
-// viewer has no basis for replacing the font by a different one.
+// ros is the character collection of all test fonts.  A font which is not
+// embedded must use a standard character collection.  The test fonts contain
+// only the first few CIDs of Adobe-Japan1, with glyphs of their own.
 var ros = &cid.SystemInfo{
 	Registry:   "Adobe",
-	Ordering:   "Identity",
+	Ordering:   "Japan1",
 	Supplement: 0,
 }
 

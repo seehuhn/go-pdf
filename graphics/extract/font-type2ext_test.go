@@ -217,8 +217,8 @@ var t2Dicts = []*dict.CIDFontType2{
 		Descriptor: &font.Descriptor{
 			FontName: "Test",
 		},
-		ROS:  ros,
-		CMap: cmap.IdentityH,
+		ROS:  uniJISH.ROS,
+		CMap: uniJISH,
 		Width: dict.CIDMetricsFromMap(map[cid.CID]float64{
 			0: 1000,
 			1: 500,
@@ -330,8 +330,8 @@ func TestCIDDefaultWidth(t *testing.T) {
 					"BaseFont": pdf.Name("Test"),
 					"CIDSystemInfo": pdf.Dict{
 						"Registry":   pdf.String("Adobe"),
-						"Ordering":   pdf.String("Identity"),
-						"Supplement": pdf.Integer(0),
+						"Ordering":   pdf.String("Japan1"),
+						"Supplement": pdf.Integer(6),
 					},
 				}
 				if dw != nil {
@@ -341,7 +341,7 @@ func TestCIDDefaultWidth(t *testing.T) {
 					"Type":            pdf.Name("Font"),
 					"Subtype":         pdf.Name("Type0"),
 					"BaseFont":        pdf.Name("Test"),
-					"Encoding":        pdf.Name("Identity-H"),
+					"Encoding":        pdf.Name("UniJIS-UTF16-H"),
 					"DescendantFonts": pdf.Array{cidFont},
 				}
 
@@ -560,5 +560,129 @@ func TestPredefinedCMapROSMismatch(t *testing.T) {
 				t.Errorf("CMap not written by name, got %v", written["Encoding"])
 			}
 		})
+	}
+}
+
+// TestExternalCollection checks that a non-embedded CIDFont can only be read
+// with a CMap for a standard character collection.  An Identity CMap, given
+// by the file or substituted for a missing /Encoding, is repaired for a Type 0
+// CIDFont with a standard collection, but not for a Type 2 CIDFont, which
+// needs a predefined CMap.  Embedded CMaps for other collections are
+// rejected.
+func TestExternalCollection(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rm := pdf.NewResourceManager(w)
+
+	// an embedded CMap stream for each ordering, with identity mappings
+	embedCMap := func(ordering string) pdf.Object {
+		cm := &cmap.File{
+			Name:           "Test-" + ordering,
+			ROS:            &cid.SystemInfo{Registry: "Adobe", Ordering: ordering},
+			CodeSpaceRange: cmap.IdentityH.CodeSpaceRange,
+			CIDRanges: []cmap.Range{
+				{First: []byte{0x00, 0x00}, Last: []byte{0xFF, 0xFF}, Value: 0},
+			},
+		}
+		ref, err := rm.Embed(cm)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ref
+	}
+	identityStream := embedCMap("Identity")
+	japan1Stream := embedCMap("Japan1")
+	if err := rm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	encodings := []struct {
+		label    string
+		ordering string
+		enc      pdf.Object
+		ok       [2]bool // CIDFontType0, CIDFontType2
+	}{
+		{"Identity-H", "Japan1", pdf.Name("Identity-H"), [2]bool{true, false}},
+		{"Identity-V", "Japan1", pdf.Name("Identity-V"), [2]bool{true, false}},
+		{"missing", "Japan1", nil, [2]bool{true, false}},
+		{"Identity-H Adobe-Identity", "Identity", pdf.Name("Identity-H"), [2]bool{false, false}},
+		{"UniJIS-UTF16-H", "Japan1", pdf.Name("UniJIS-UTF16-H"), [2]bool{true, true}},
+		{"Adobe-Identity stream", "Identity", identityStream, [2]bool{false, false}},
+		{"Adobe-Japan1 stream", "Japan1", japan1Stream, [2]bool{true, false}},
+	}
+	for i, subtype := range []pdf.Name{"CIDFontType0", "CIDFontType2"} {
+		for _, tc := range encodings {
+			t.Run(string(subtype)+"/"+tc.label, func(t *testing.T) {
+				cidFontRef := w.Alloc()
+				err := w.Put(cidFontRef, pdf.Dict{
+					"Type":     pdf.Name("Font"),
+					"Subtype":  subtype,
+					"BaseFont": pdf.Name("Test"),
+					"CIDSystemInfo": pdf.Dict{
+						"Registry":   pdf.String("Adobe"),
+						"Ordering":   pdf.String(tc.ordering),
+						"Supplement": pdf.Integer(6),
+					},
+					"FontDescriptor": pdf.Dict{
+						"Type":     pdf.Name("FontDescriptor"),
+						"FontName": pdf.Name("Test"),
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				fontDict := pdf.Dict{
+					"Type":            pdf.Name("Font"),
+					"Subtype":         pdf.Name("Type0"),
+					"BaseFont":        pdf.Name("Test"),
+					"DescendantFonts": pdf.Array{cidFontRef},
+				}
+				if tc.enc != nil {
+					fontDict["Encoding"] = tc.enc
+				}
+				d, err := extract.Dict(pdf.NewCursor(w), fontDict, false)
+				if !tc.ok[i] {
+					if !pdf.IsMalformed(err) {
+						t.Errorf("got %v, want MalformedFileError", err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				d0, ok := d.(*dict.CIDFontType0)
+				if !ok {
+					return
+				}
+				if tc.enc == nil || tc.enc == pdf.Name("Identity-H") ||
+					tc.enc == pdf.Name("Identity-V") {
+					checkIdentityRepair(t, d0, tc.enc == pdf.Name("Identity-V"))
+				}
+				checkRoundTripT0(t, d0, pdf.V1_7)
+			})
+		}
+	}
+}
+
+// checkIdentityRepair checks that the Identity CMap of a non-embedded font
+// was replaced by one which keeps the identity mapping and writing mode, but
+// carries the font's character collection.
+func checkIdentityRepair(t *testing.T, d *dict.CIDFontType0, vertical bool) {
+	t.Helper()
+	cm := d.CMap
+	if cm.IsPredefined() {
+		t.Fatalf("CMap %s not replaced", cm.Name)
+	}
+	if cm.ROS != d.ROS {
+		t.Errorf("CMap ROS %v, want %v", cm.ROS, d.ROS)
+	}
+	if got := cm.WMode == font.Vertical; got != vertical {
+		t.Errorf("vertical=%t, want %t", got, vertical)
+	}
+	for _, code := range [][]byte{{0x00, 0x00}, {0x00, 0x20}, {0x12, 0x34}, {0xFF, 0xFF}} {
+		want := cid.CID(code[0])<<8 | cid.CID(code[1])
+		if got := cm.LookupCID(code); got != want {
+			t.Errorf("code %x: got CID %d, want %d", code, got, want)
+		}
 	}
 }

@@ -19,7 +19,9 @@ Mechanism
 The program writes "test.pdf" and the two font files "notdef-present.otf"
 (font name `Test28411P`) and "notdef-missing.otf" (font name `Test28411M`).
 Both fonts are CID-keyed and contain glyphs for the CIDs 0 to 3.  The first
-font also contains a glyph for CID 4.
+font also contains a glyph for CID 4.  Since the fonts are not embedded,
+they use a standard character collection, Adobe-Japan1, but draw glyphs of
+their own for these CIDs.
 
 The page uses the two fonts as external fonts.  The two font
 dictionaries have the same CMap and the same widths, and differ only in the

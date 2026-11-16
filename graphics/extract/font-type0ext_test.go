@@ -199,10 +199,26 @@ func checkRoundTripT0(t *testing.T, d1 *dict.CIDFontType0, v pdf.Version) {
 	}
 }
 
+// uniJISH is a predefined non-Identity CMap, usable with external fonts.
+var uniJISH = func() *cmap.File {
+	cm, err := cmap.Predefined("UniJIS-UTF16-H")
+	if err != nil {
+		panic(err)
+	}
+	return cm
+}()
+
 var ros = &cid.SystemInfo{
 	Registry:   "Quire",
 	Ordering:   "Test",
 	Supplement: 2,
+}
+
+// adobeJapan1 is a standard character collection, usable with external fonts.
+var adobeJapan1 = &cid.SystemInfo{
+	Registry:   "Adobe",
+	Ordering:   "Japan1",
+	Supplement: 6,
 }
 
 var t0Dicts = []*dict.CIDFontType0{
@@ -211,10 +227,10 @@ var t0Dicts = []*dict.CIDFontType0{
 		Descriptor: &font.Descriptor{
 			FontName: "Test",
 		},
-		ROS: ros,
+		ROS: adobeJapan1,
 		CMap: &cmap.File{
 			Name:           "Test-cmap",
-			ROS:            ros,
+			ROS:            adobeJapan1,
 			WMode:          font.Vertical,
 			CodeSpaceRange: charcode.Simple,
 			CIDSingles: []cmap.Single{
@@ -280,10 +296,10 @@ var t0Dicts = []*dict.CIDFontType0{
 		Descriptor: &font.Descriptor{
 			FontName: "Test",
 		},
-		ROS: ros,
+		ROS: adobeJapan1,
 		CMap: &cmap.File{
 			Name:           "Test-cmap",
-			ROS:            ros,
+			ROS:            adobeJapan1,
 			WMode:          font.Vertical,
 			CodeSpaceRange: charcode.Simple,
 			CIDRanges: []cmap.Range{
@@ -334,7 +350,12 @@ var t0Dicts = []*dict.CIDFontType0{
 		ROS:          ros,
 		CMap:         cmap.IdentityH,
 		DefaultWidth: 1000,
-		FontFile:     nil, // external font
+		FontFile: &glyphdata.Stream{
+			Type: glyphdata.OpenTypeCFF,
+			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
+				return nil // test stub
+			},
+		},
 	},
 }
 
@@ -347,7 +368,7 @@ func TestType0EncodingProvenance(t *testing.T) {
 
 	cm := &cmap.File{
 		Name:           "Test-cmap",
-		ROS:            ros,
+		ROS:            adobeJapan1,
 		CodeSpaceRange: charcode.Simple,
 		CIDSingles: []cmap.Single{
 			{Code: []byte{' '}, Value: 1},
@@ -367,9 +388,9 @@ func TestType0EncodingProvenance(t *testing.T) {
 		"Subtype":  pdf.Name("CIDFontType0"),
 		"BaseFont": pdf.Name("Test"),
 		"CIDSystemInfo": pdf.Dict{
-			"Registry":   pdf.String(ros.Registry),
-			"Ordering":   pdf.String(ros.Ordering),
-			"Supplement": pdf.Integer(ros.Supplement),
+			"Registry":   pdf.String(adobeJapan1.Registry),
+			"Ordering":   pdf.String(adobeJapan1.Ordering),
+			"Supplement": pdf.Integer(adobeJapan1.Supplement),
 		},
 	}
 	cidFontRef := w0.Alloc()
@@ -448,6 +469,16 @@ func TestType0BrokenCMaps(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Identity-H is only valid for embedded fonts
+	fontFileRef := w.Alloc()
+	stm, err = w.OpenStream(fontFileRef, pdf.Dict{"Subtype": pdf.Name("CIDFontType0C")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := stm.Close(); err != nil {
+		t.Fatal(err)
+	}
+
 	cidFontRef := w.Alloc()
 	err = w.Put(cidFontRef, pdf.Dict{
 		"Type":     pdf.Name("Font"),
@@ -457,6 +488,18 @@ func TestType0BrokenCMaps(t *testing.T) {
 			"Registry":   pdf.String("Adobe"),
 			"Ordering":   pdf.String("Identity"),
 			"Supplement": pdf.Integer(0),
+		},
+		"FontDescriptor": pdf.Dict{
+			"Type":        pdf.Name("FontDescriptor"),
+			"FontName":    pdf.Name("Test"),
+			"Flags":       pdf.Integer(4),
+			"FontBBox":    &pdf.Rectangle{URx: 1000, URy: 1000},
+			"ItalicAngle": pdf.Integer(0),
+			"Ascent":      pdf.Integer(800),
+			"Descent":     pdf.Integer(-200),
+			"CapHeight":   pdf.Integer(700),
+			"StemV":       pdf.Integer(80),
+			"FontFile3":   fontFileRef,
 		},
 	})
 	if err != nil {

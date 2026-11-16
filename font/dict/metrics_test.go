@@ -155,7 +155,12 @@ func TestEncodeVMetricsVerbatim(t *testing.T) {
 }
 
 func TestCIDFontInvalidMetricsEncode(t *testing.T) {
-	ros := &cid.SystemInfo{Registry: "Adobe", Ordering: "Identity", Supplement: 0}
+	// a predefined CMap, since Identity CMaps require an embedded font
+	cm, err := cmap.Predefined("UniJIS-UTF16-H")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ros := cm.ROS
 	overlap := CIDMetrics[float64]{
 		{First: 1, Last: 5, Value: 500},
 		{First: 5, Last: 6, Value: 600},
@@ -167,7 +172,7 @@ func TestCIDFontInvalidMetricsEncode(t *testing.T) {
 	tests := map[string]func(w CIDMetrics[float64], v CIDMetrics[VMetrics]) pdf.Embedder{
 		"type0": func(w CIDMetrics[float64], v CIDMetrics[VMetrics]) pdf.Embedder {
 			return &CIDFontType0{
-				PostScriptName: "Test", ROS: ros, CMap: cmap.IdentityH,
+				PostScriptName: "Test", ROS: ros, CMap: cm,
 				Descriptor:   &font.Descriptor{FontName: "Test"},
 				Width:        w,
 				DefaultWidth: DefaultWidthDefault, DefaultVMetrics: DefaultVMetricsDefault,
@@ -176,7 +181,7 @@ func TestCIDFontInvalidMetricsEncode(t *testing.T) {
 		},
 		"type2": func(w CIDMetrics[float64], v CIDMetrics[VMetrics]) pdf.Embedder {
 			return &CIDFontType2{
-				PostScriptName: "Test", ROS: ros, CMap: cmap.IdentityH,
+				PostScriptName: "Test", ROS: ros, CMap: cm,
 				Descriptor:   &font.Descriptor{FontName: "Test"},
 				Width:        w,
 				DefaultWidth: DefaultWidthDefault, DefaultVMetrics: DefaultVMetricsDefault,
