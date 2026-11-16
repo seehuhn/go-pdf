@@ -74,8 +74,8 @@ func (f Font) Face(bold, italic bool) Font {
 	return f.place().faces[style]
 }
 
-// place returns where f sits in its family, and panics if f is not one of
-// the fourteen standard fonts.
+// place returns where f sits in its family.  The font f must be one of the
+// fourteen standard fonts.
 func (f Font) place() place {
 	p, ok := places[f]
 	if !ok {

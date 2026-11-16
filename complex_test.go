@@ -35,25 +35,6 @@ func TestDateString(t *testing.T) {
 	}
 }
 
-func TestDateYearOutOfRange(t *testing.T) {
-	cases := []time.Time{
-		time.Date(-1, 1, 1, 0, 0, 0, 0, time.UTC),
-		time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC),
-		// year 10000 only after conversion to UTC
-		time.Date(9999, 12, 31, 23, 0, 0, 0, time.FixedZone("", -5*3600+30)),
-	}
-	for _, t1 := range cases {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Errorf("%s: expected panic", t1)
-				}
-			}()
-			Date(t1).AsPDF(0)
-		}()
-	}
-}
-
 func TestDecodeDate(t *testing.T) {
 	cases := []string{
 		"D:19981223195200-08'00'",

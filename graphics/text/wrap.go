@@ -15,7 +15,9 @@ import (
 
 // A LineBreaker reports where a run of text may be broken into lines.
 type LineBreaker interface {
-	// Opportunities returns the break opportunities in s, in order.
+	// Opportunities returns the break opportunities in s.  They must be in
+	// order and must not overlap, and each must lie within s on rune
+	// boundaries with Start <= End.
 	Opportunities(s string) []BreakOpportunity
 }
 
@@ -208,8 +210,8 @@ func lineParts(s string) iter.Seq2[string, int] {
 // tokenize splits s into words at the break opportunities b reports, along
 // with the gap information needed to rejoin them and the byte span of each
 // word relative to the start of the text passed to [WrapWith] (base is the
-// offset of s itself within that text).  It panics if b reports an
-// opportunity outside s or not on a rune boundary.
+// offset of s itself within that text).  The opportunities b reports must lie
+// within s, on rune boundaries.
 func tokenize(b LineBreaker, s string, base int) ([]string, []gap, []span) {
 	opps := b.Opportunities(s)
 	if len(opps) == 0 {
@@ -258,8 +260,8 @@ func tokenize(b LineBreaker, s string, base int) ([]string, []gap, []span) {
 	return words, gaps, spans
 }
 
-// checkOffset panics unless i is a valid rune boundary within s (including
-// the two ends of the string).
+// checkOffset panics unless i is a rune boundary within s (including the
+// two ends of the string).
 func checkOffset(s string, i int) {
 	if i < 0 || i > len(s) {
 		panic(fmt.Sprintf("text: break offset %d out of range for %q", i, s))

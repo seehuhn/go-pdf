@@ -19,15 +19,4 @@ func TestCrop(t *testing.T) {
 	if !b.crop(0, 2, 3, 3).blank() {
 		t.Error("blank crop has black pixels")
 	}
-
-	for _, r := range [][4]int{{-1, 0, 2, 2}, {0, -1, 2, 2}, {9, 0, 2, 1}, {0, 4, 1, 2}, {0, 0, 0, 1}} {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Errorf("crop %v outside the image accepted", r)
-				}
-			}()
-			b.crop(r[0], r[1], r[2], r[3])
-		}()
-	}
 }

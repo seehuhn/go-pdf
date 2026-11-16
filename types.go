@@ -1126,8 +1126,7 @@ func (x Reference) AsPDF(opt OutputOptions) Native {
 // positive (PDF 32000-2 §7.3.10) and less than 2^24: per §7.6.3.2 step (b),
 // only the low 3 bytes of the object number feed the per-object
 // encryption-key derivation, so this library caps object numbers at 2^24-1
-// to keep that derivation injective.  NewReference panics on out-of-range
-// input.
+// to keep that derivation injective.
 func NewReference(number uint32, generation uint16) Reference {
 	if number == 0 {
 		panic("pdf.NewReference: object number must be > 0")
@@ -1161,48 +1160,6 @@ func (x Reference) String() string {
 	return strings.Join(res, "")
 }
 
-// IsDirect returns true if the object does not contain any references to
-// indirect objects.
-//
-// If the object contains custom implementations of the [Object] interface, the
-// `IsDirect` method of these objects is called recursively.  If no `IsDirect`
-// method is present, the function panics.
-//
-// TODO(voss): remove?
-func IsDirect(obj Object) bool {
-	if obj == nil {
-		return true
-	}
-	native := obj.AsPDF(0)
-
-	switch x := native.(type) {
-	case Boolean, Integer, Real, Name, String, nil:
-		return true
-	case Reference:
-		return x == 0
-	case Array:
-		for _, elem := range x {
-			if !IsDirect(elem) {
-				return false
-			}
-		}
-		return true
-	case Dict:
-		for _, elem := range x {
-			if !IsDirect(elem) {
-				return false
-			}
-		}
-		return true
-	case *Stream:
-		return false
-	case interface{ IsDirect() bool }:
-		return x.IsDirect()
-	default:
-		panic(fmt.Sprintf("IsDirect: unknown type %T", obj))
-	}
-}
-
 // A Placeholder is a space reserved in a PDF file that can later be filled
 // with a value.  One common use case is to store the length of compressed
 // content in a PDF stream dictionary.  To create Placeholder objects,
@@ -1231,12 +1188,6 @@ func NewPlaceholder(pdf *Writer, size int) *Placeholder {
 
 func (x *Placeholder) AsPDF(opt OutputOptions) Native {
 	return x
-}
-
-// IsDirect always reports false: a placeholder stands for a value which is
-// not yet known, so it can never be treated as a direct object.
-func (x *Placeholder) IsDirect() bool {
-	return false
 }
 
 // Set fills in the value of the placeholder object.  This should be called
@@ -1302,11 +1253,10 @@ func (x *Placeholder) Set(val Native) error {
 // AsString formats a PDF object as a string, in the same way as it would be
 // written to a PDF file.
 //
-// AsString panics if obj cannot be formatted as PDF text.  This is the case
-// for direct stream objects, for content-stream operators outside a content
-// stream, for names containing a null byte, for references to object number
-// 0, and for numbers PDF cannot represent (infinities and NaN); ordinary PDF
-// objects never panic.
+// The argument must be formattable as PDF text.  Direct stream objects,
+// content-stream operators outside a content stream, names containing a null
+// byte, references to object number 0, and numbers PDF cannot represent
+// (infinities and NaN) are not valid.
 func AsString(obj Object) string {
 	buf := &bytes.Buffer{}
 	err := Format(buf, OptPretty, obj)

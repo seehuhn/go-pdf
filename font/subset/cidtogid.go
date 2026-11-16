@@ -18,8 +18,7 @@ import (
 // glyph index i, so that index is what each CID maps to.
 //
 // The CIDs must be sorted in increasing order and must not repeat, which is
-// how [Tag] expects the glyphs of a subset to be arranged.  Any other slice is
-// invalid input, and this function may panic on it.
+// how [Tag] expects the glyphs of a subset to be arranged.
 //
 // The second return value reports whether the result is the identity mapping.
 // A CIDFontType2 dictionary leaves its CIDToGID field nil in that case, and

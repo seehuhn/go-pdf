@@ -240,10 +240,34 @@ func (w *walker) newPos() int {
 // Otherwise, nil is returned.
 func (o *Object) AsDirectDict() pdf.Dict {
 	dict, ok := o.obj.(pdf.Dict)
-	if !ok || !pdf.IsDirect(dict) {
+	if !ok || !isDirect(dict) {
 		return nil
 	}
 	return dict
+}
+
+// isDirect reports whether obj contains no references to indirect objects.
+func isDirect(obj pdf.Object) bool {
+	if obj == nil {
+		return true
+	}
+	switch x := obj.AsPDF(0).(type) {
+	case pdf.Reference, *pdf.Stream, *pdf.Placeholder:
+		return false
+	case pdf.Array:
+		for _, elem := range x {
+			if !isDirect(elem) {
+				return false
+			}
+		}
+	case pdf.Dict:
+		for _, elem := range x {
+			if !isDirect(elem) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // As decodes the value wrapped by o using extract, with path for cycle

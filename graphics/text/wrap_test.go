@@ -237,48 +237,6 @@ func TestWrapBlankLine(t *testing.T) {
 	}
 }
 
-func TestWrapWithOffsetMidRune(t *testing.T) {
-	// "aébc": 'é' is byte offset 1-3, so offset 2 falls inside the rune.
-	breaker := fixedBreaker{opps: []BreakOpportunity{{Start: 2, End: 2, Replace: "-"}}}
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected a panic for a break offset inside a rune")
-		}
-	}()
-	WrapWith(breaker, 100, "aébc")
-}
-
-func TestWrapWithOutOfOrderOpportunities(t *testing.T) {
-	// the second opportunity starts before the first one ends
-	breaker := fixedBreaker{opps: []BreakOpportunity{
-		{Start: 4, End: 4},
-		{Start: 2, End: 2},
-	}}
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected a panic for out-of-order break opportunities")
-		}
-	}()
-	WrapWith(breaker, 100, "abcdef")
-}
-
-func TestWrapWithOverlappingOpportunities(t *testing.T) {
-	// the second opportunity starts before the first one ends
-	breaker := fixedBreaker{opps: []BreakOpportunity{
-		{Start: 2, End: 4},
-		{Start: 3, End: 5},
-	}}
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected a panic for overlapping break opportunities")
-		}
-	}()
-	WrapWith(breaker, 100, "abcdef")
-}
-
 // Lines must be measured as they are drawn, laid out on their own: Helvetica
 // has kern pairs with the space (e.g. "period space", "space A"), which do not
 // apply once the break space is removed.

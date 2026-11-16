@@ -437,32 +437,6 @@ func TestNearlyEqual(t *testing.T) {
 	}
 }
 
-func TestIsDirectPlaceholder(t *testing.T) {
-	w, err := NewWriter(io.Discard, V1_7, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	placeholder := NewPlaceholder(w, 16)
-
-	// must not panic
-	if IsDirect(placeholder) {
-		t.Error("placeholder reported as direct object")
-	}
-	if IsDirect(Dict{"P": placeholder}) {
-		t.Error("dict containing a placeholder reported as direct")
-	}
-}
-
-// TestIsDirectNull checks that nulls, also inside arrays and dictionaries,
-// count as direct objects.
-func TestIsDirectNull(t *testing.T) {
-	for _, obj := range []Object{nil, Array{nil}, Dict{"A": nil}} {
-		if !IsDirect(obj) {
-			t.Errorf("IsDirect(%s) = false, want true", AsString(obj))
-		}
-	}
-}
-
 // TestFormatNameNull checks that a name containing a null byte is refused.
 func TestFormatNameNull(t *testing.T) {
 	err := Format(io.Discard, 0, Name("A\x00B"))

@@ -48,17 +48,9 @@ func FromStream(stream *glyphdata.Stream) (*sfnt.Font, error) {
 //
 // The tp parameter must be one of [glyphdata.TrueType],
 // [glyphdata.OpenTypeGlyf], [glyphdata.OpenTypeCFF], or
-// [glyphdata.OpenTypeCFFSimple]. The function panics if an invalid type is
-// provided or if the font type is incompatible with the requested stream
-// type.
-//
-// A CFF2 font never reaches this function through the normal embedding
-// path (embedding always instances a variable font first, which yields
-// static CFF or glyf outlines), so a caller passing one is misusing the
-// API. Rather than panicking immediately, ToStream defers to the writer
-// for the requested tp, which cleanly rejects CFF2 outlines: this keeps
-// the caller-bug reporting uniform across all four tp values instead of
-// panicking for some and erroring for others.
+// [glyphdata.OpenTypeCFFSimple]. The font's outline kind must match tp:
+// [glyphdata.TrueType] and [glyphdata.OpenTypeGlyf] require glyf outlines,
+// and the CFF types require CFF (not CFF2) outlines.
 func ToStream(font *sfnt.Font, tp glyphdata.Type) *glyphdata.Stream {
 	switch tp {
 	case glyphdata.TrueType, glyphdata.OpenTypeGlyf, glyphdata.OpenTypeCFF, glyphdata.OpenTypeCFFSimple:
@@ -72,6 +64,7 @@ func ToStream(font *sfnt.Font, tp glyphdata.Type) *glyphdata.Stream {
 	switch {
 	case isCFF && (tp == glyphdata.TrueType || tp == glyphdata.OpenTypeGlyf):
 		panic(fmt.Sprintf("CFF font cannot be used with type %v", tp))
+	// CFF2 outlines pass here and are rejected by the writer
 	case !isCFF && !isCFF2 && (tp == glyphdata.OpenTypeCFF || tp == glyphdata.OpenTypeCFFSimple):
 		panic(fmt.Sprintf("glyf font cannot be used with type %v", tp))
 	}

@@ -35,7 +35,7 @@ const textEsc = '\x1b'
 
 // Text constructs a TextString from its arguments.  Each argument is a
 // string, a TextString, or a [language.Tag]; a tag applies to all text that
-// follows it, up to the next tag.  Any other argument type causes a panic.
+// follows it, up to the next tag.
 // Text before the first tag is in the prevailing language of the document.
 //
 // Invalid UTF-8 in a string is replaced by U+FFFD, and U+001B characters are
@@ -45,13 +45,13 @@ const textEsc = '\x1b'
 //
 // Only the base language and, if given, a two-letter region of a tag are kept,
 // since PDF text strings cannot hold more.  A tag whose base language has no
-// two-letter ISO 639-1 code causes a panic.  Note that [language.Make] and
+// two-letter ISO 639-1 code is not valid.  Note that [language.Make] and
 // [language.Parse] replace deprecated codes by their current forms (for
 // example "tl" by "fil", which has no two-letter form); [language.Raw] keeps a
 // tag as written.
 //
-// Use of [language.Und] or other tags without a base language after a language
-// has already been set causes a panic.
+// A tag without a base language, such as [language.Und], is valid only before
+// the first language tag.
 func Text(parts ...any) TextString {
 	var b textBuilder
 	tagged := false
@@ -109,7 +109,7 @@ func (b *textBuilder) result() TextString {
 }
 
 // langCode returns the marker code for tag, or "" if tag has no base
-// language.  It panics if the base language has no two-letter code.
+// language.  The base language must have a two-letter code.
 func langCode(tag language.Tag) string {
 	if base, _, _ := tag.Raw(); base.String() == "und" {
 		return ""

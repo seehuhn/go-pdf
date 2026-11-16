@@ -42,7 +42,6 @@ func FromStream(stream *glyphdata.Stream) (*cff.Font, error) {
 // ToStream creates a font file stream from CFF font data.
 //
 // The tp parameter must be either [glyphdata.CFFSimple] or [glyphdata.CFF].
-// The function panics if an invalid type is provided.
 func ToStream(font *cff.Font, tp glyphdata.Type) *glyphdata.Stream {
 	if tp != glyphdata.CFFSimple && tp != glyphdata.CFF {
 		panic(fmt.Sprintf("invalid CFF stream type: %v", tp))

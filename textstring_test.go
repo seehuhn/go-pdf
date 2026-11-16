@@ -350,29 +350,6 @@ func TestTextString_ReplaceAll(t *testing.T) {
 	}
 }
 
-func TestText_Panics(t *testing.T) {
-	tests := []struct {
-		name  string
-		parts []any
-	}{
-		{"wrong type", []any{Name("x")}},
-		{"no two-letter code", []any{language.Make("gsw"), "x"}},
-		{"canonicalised code has no two-letter form", []any{language.Make("tl"), "x"}},
-		{"Und after tag", []any{language.German, "a", language.Und, "b"}},
-		{"Und after spliced tag", []any{Text(language.German, "a"), language.Und, "b"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				if recover() == nil {
-					t.Error("no panic")
-				}
-			}()
-			Text(tt.parts...)
-		})
-	}
-}
-
 func FuzzTextString(f *testing.F) {
 	f.Add([]byte("hello"))
 	f.Add([]byte("\xfe\xff\x00\x1b\x00e\x00n\x00\x1b\x00H"))

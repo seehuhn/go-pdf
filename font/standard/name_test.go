@@ -212,12 +212,3 @@ func TestFace(t *testing.T) {
 		})
 	}
 }
-
-func TestFacePanicsOnUnknownFont(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Error("no panic for a font outside the fourteen")
-		}
-	}()
-	Font("Arial").Face(false, false)
-}

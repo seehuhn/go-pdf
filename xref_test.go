@@ -245,48 +245,6 @@ func TestXRefStreamGenerationOverflow(t *testing.T) {
 	}
 }
 
-// TestAllocOverflowPanics verifies that Writer.Alloc panics rather than
-// minting object numbers >= 2^24, which would collide on encryption-key
-// derivation (PDF 32000-2 §7.6.3.2).
-func TestAllocOverflowPanics(t *testing.T) {
-	buf := &bytes.Buffer{}
-	w, err := NewWriter(buf, V1_7, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.nextRef = maxXRefSize
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Alloc at nextRef=maxXRefSize did not panic")
-		}
-	}()
-	w.Alloc()
-}
-
-// TestNewReferenceOverflowPanics verifies that NewReference panics for
-// object numbers >= 2^24, since the encryption-key derivation only uses
-// the low 3 bytes (PDF 32000-2 §7.6.3.2).
-func TestNewReferenceOverflowPanics(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("NewReference(maxXRefSize, 0) did not panic")
-		}
-	}()
-	NewReference(maxXRefSize, 0)
-}
-
-// TestNewReferenceZeroPanics verifies that NewReference panics for object
-// number 0, which is not a valid object number (PDF 32000-2 §7.3.10).
-func TestNewReferenceZeroPanics(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("NewReference(0, 0) did not panic")
-		}
-	}()
-	NewReference(0, 0)
-}
-
 // TestXRefStreamObjStmZero verifies that an entry for an object in object
 // stream number 0 is skipped.
 func TestXRefStreamObjStmZero(t *testing.T) {

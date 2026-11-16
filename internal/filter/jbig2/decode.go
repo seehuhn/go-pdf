@@ -163,9 +163,9 @@ func (p *bitmapPool) charge(n int) error {
 }
 
 // release returns n bytes to the live counter (does not touch the
-// budget).  Releasing more than was charged signals a mismatched
-// alloc/free pair and panics: the peak/live invariant would otherwise
-// be silently broken.
+// budget).  It panics if n exceeds the bytes currently live, since a
+// mismatched alloc/free pair would otherwise break the peak/live accounting
+// unnoticed.
 func (p *bitmapPool) release(n int) {
 	if n > p.live {
 		panic(fmt.Sprintf("jbig2: bitmapPool release of %d exceeds live %d", n, p.live))

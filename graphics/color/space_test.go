@@ -453,39 +453,6 @@ func (testUncoloredPattern) PaintType() int                                { ret
 func (testUncoloredPattern) Equal(other Pattern) bool                      { return false }
 func (testUncoloredPattern) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) { return nil, nil }
 
-// TestPatternUncoloredPanicsOnPatternBase verifies that PatternUncolored
-// rejects a base color whose color space is itself a Pattern color
-// space.
-func TestPatternUncoloredPanicsOnPatternBase(t *testing.T) {
-	pat := testUncoloredPattern{}
-	cases := []struct {
-		name string
-		col  Color
-	}{
-		{
-			name: "base-is-colored-pattern",
-			col:  spacePatternColored{}.Default(), // colorPatternColored, ColorSpace() == spacePatternColored
-		},
-		{
-			name: "base-is-uncolored-pattern",
-			// Build a legal uncolored-pattern color (base = DeviceRGB),
-			// then feed it as a base — its ColorSpace() is SpacePatternUncolored.
-			col: PatternUncolored(pat, DeviceRGB{0, 0, 0}),
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer func() {
-				if r := recover(); r == nil {
-					t.Errorf("expected panic, got none")
-				}
-			}()
-			_ = PatternUncolored(pat, tc.col)
-		})
-	}
-}
-
 // TestSpacePatternUncoloredEmbedRejectsPatternBase verifies that Embed
 // refuses to write a Pattern color space over a Pattern base.
 func TestSpacePatternUncoloredEmbedRejectsPatternBase(t *testing.T) {

@@ -1214,7 +1214,7 @@ func endstreamAt(r io.ReaderAt, pos int64) bool {
 }
 
 // PeekN returns a view of the next n bytes of input from the scanner's buffer.
-// If n is larger than scannerBufSize, the function panics.
+// The argument n must not exceed scannerBufSize.
 // If an EOF is encountered before n bytes can be read, the function returns
 // the remaining bytes without an error code.
 func (s *scanner) PeekN(n int) ([]byte, error) {

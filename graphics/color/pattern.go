@@ -52,8 +52,8 @@ func (s spacePatternColored) Channels() int {
 	return 0
 }
 
-// ComponentRange panics.  Colored patterns have no numeric components, so
-// Channels returns 0 and no component index is valid.
+// No index is valid for ComponentRange: colored patterns have no numeric
+// components, so Channels returns 0.
 // This implements the [Space] interface.
 func (s spacePatternColored) ComponentRange(i int) (lo, hi float64) {
 	panic("colored pattern has no color components")
@@ -223,10 +223,8 @@ type colorPatternUncolored struct {
 // PatternUncolored returns a new PDF color which draws the given pattern
 // using the given color.
 //
-// PatternUncolored panics if p is a colored pattern (PaintType != 2), or
-// if col's color space is itself a Pattern color space (PDF 2.0
-// §8.7.3.3 forbids nesting an uncolored pattern over another Pattern
-// color space).
+// The pattern p must be an uncolored pattern (PaintType 2), and the color
+// space of col must not be a Pattern color space.
 func PatternUncolored(p Pattern, col Color) Color {
 	if p.PaintType() != 2 {
 		panic("pattern is colored")

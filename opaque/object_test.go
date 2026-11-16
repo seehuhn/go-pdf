@@ -521,6 +521,14 @@ func TestAsDirectDict(t *testing.T) {
 	if got := Direct(pdf.Dict{"A": pdf.NewReference(1, 0)}).AsDirectDict(); got != nil {
 		t.Errorf("dict with reference: got %v, want nil", got)
 	}
+	nested := pdf.Dict{"A": nil, "B": pdf.Array{nil, pdf.Dict{"C": pdf.Name("x")}}}
+	if diff := cmp.Diff(nested, Direct(nested).AsDirectDict()); diff != "" {
+		t.Errorf("nested dict (-want +got):\n%s", diff)
+	}
+	deep := pdf.Dict{"A": pdf.Array{pdf.Dict{"B": pdf.NewReference(1, 0)}}}
+	if got := Direct(deep).AsDirectDict(); got != nil {
+		t.Errorf("nested reference: got %v, want nil", got)
+	}
 	if got := Direct(pdf.Integer(1)).AsDirectDict(); got != nil {
 		t.Errorf("integer: got %v, want nil", got)
 	}

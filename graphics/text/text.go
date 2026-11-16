@@ -17,8 +17,8 @@ import (
 // Show draws text inside a single BT/ET text object.  The arguments are
 // processed in order and may be of type [M], [F], [Leading], string,
 // [pdf.String], [color.Color], [NL], [RecordPos], or the result of [Wrap]
-// or [WrapWith].  Show panics on any other argument type, or if a wrapped
-// text is shown while the current font does not implement [font.Layouter].
+// or [WrapWith].  Wrapped text requires the current font to implement
+// [font.Layouter].
 // Show does nothing if b.Err is set.
 func Show(b *builder.Builder, args ...any) {
 	if b.Err != nil {

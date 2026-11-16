@@ -56,6 +56,9 @@ func (d Date) Equal(other Date) bool {
 }
 
 // AsPDF creates a PDF String object encoding the given date and time.
+// The year must be between 0 and 9999.  If the zone offset cannot be written
+// in a PDF date, the date is converted to UTC and the limit applies to the
+// UTC year.
 func (d Date) AsPDF(opt OutputOptions) Native {
 	t := time.Time(d)
 	// PDF offsets are whole minutes below 24 hours; otherwise keep the instant
@@ -168,12 +171,6 @@ func (r *Rectangle) Dx() float64 {
 // Dy returns the height of the rectangle.
 func (r *Rectangle) Dy() float64 {
 	return r.URy - r.LLy
-}
-
-// IsDirect returns true.  This makes the [IsDirect] function work for
-// Rectangle objects.
-func (r *Rectangle) IsDirect() bool {
-	return true
 }
 
 // GetRectangle resolves references to indirect objects and makes sure the
