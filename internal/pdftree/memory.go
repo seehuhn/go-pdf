@@ -17,7 +17,7 @@ type InMemory[K cmp.Ordered, C codec[K]] struct {
 }
 
 // ExtractInMemory reads a tree from a PDF document into memory.
-// If root is nil, it returns nil.
+// If root is nil or resolves to null, it returns nil.
 func ExtractInMemory[K cmp.Ordered, C codec[K]](r pdf.Getter, root pdf.Object) (*InMemory[K, C], error) {
 	if root == nil {
 		return nil, nil
@@ -93,7 +93,7 @@ func extractFromNode[K cmp.Ordered, C codec[K]](c pdf.Cursor, node pdf.Dict, see
 }
 
 func (t *InMemory[K, C]) Lookup(key K) (pdf.Object, error) {
-	if t == nil || t.Data == nil {
+	if t.Data == nil {
 		return nil, ErrKeyNotFound
 	}
 
@@ -106,7 +106,7 @@ func (t *InMemory[K, C]) Lookup(key K) (pdf.Object, error) {
 
 func (t *InMemory[K, C]) All() iter.Seq2[K, pdf.Object] {
 	return func(yield func(K, pdf.Object) bool) {
-		if t == nil || t.Data == nil {
+		if t.Data == nil {
 			return
 		}
 

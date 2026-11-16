@@ -14,10 +14,10 @@ import (
 var ErrKeyNotFound = errors.New("key not found")
 
 // Size returns the number of entries in the tree, without reading the entire
-// tree into memory.
+// tree into memory.  A nil root is an empty tree.
 func Size[K cmp.Ordered, C codec[K]](r pdf.Getter, root pdf.Object) (int, error) {
 	tree, err := ExtractFromFile[K, C](r, root)
-	if err != nil {
+	if err != nil || tree == nil {
 		return 0, err
 	}
 	count := 0

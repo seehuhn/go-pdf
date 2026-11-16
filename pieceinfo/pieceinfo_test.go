@@ -173,19 +173,9 @@ func TestPieceInfoEmbed(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
 	rm := pdf.NewResourceManager(w)
 
-	// test with nil PieceInfo
-	var nilInfo *PieceInfo
-	result, err := rm.Embed(nilInfo)
-	if err != nil {
-		t.Errorf("Embed(nil) returned error: %v", err)
-	}
-	if result != nil {
-		t.Errorf("Embed(nil) returned non-nil result: %v", result)
-	}
-
 	// test with empty PieceInfo
 	emptyInfo := &PieceInfo{Entries: make(map[pdf.Name]Data)}
-	result, err = rm.Embed(emptyInfo)
+	result, err := rm.Embed(emptyInfo)
 	if err != nil {
 		t.Errorf("Embed(empty) returned error: %v", err)
 	}

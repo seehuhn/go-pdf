@@ -197,7 +197,7 @@ func (b *Builder) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.Vec2 {
 	// TODO(voss): make sure this is correct for vertical writing mode.
 
-	if seq == nil || len(seq.Seq) == 0 {
+	if len(seq.Seq) == 0 {
 		return nil
 	}
 	if !b.isUsable(graphics.StateTextFont | graphics.StateTextMatrix) {

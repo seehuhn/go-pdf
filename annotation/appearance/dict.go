@@ -32,6 +32,9 @@ import (
 // Dict represents an annotation appearance dictionary.
 //
 // A rollover or down appearance which is not set shows the normal appearance.
+//
+// A nil *Dict stands for an absent appearance.  The methods [Dict.Clone],
+// [Dict.HasDicts], [Dict.AnyState] and [Dict.Resolve] accept a nil receiver.
 type Dict struct {
 	// Normal is the annotation's normal appearance.
 	// This is mutually exclusive with NormalMap.
@@ -237,8 +240,6 @@ func (d *Dict) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 // appearance repeated; copying the forms would turn every repeat into an entry
 // of its own.  Use [Dict.SetNormal] to replace one, which keeps the entries
 // which repeat the normal appearance in step.
-//
-// The method is nil-safe: a nil dictionary yields nil.
 func (d *Dict) Clone() *Dict {
 	if d == nil {
 		return nil
@@ -340,8 +341,7 @@ func (d *Dict) HasDicts() bool {
 }
 
 // AnyState returns a state name which selects an appearance, or the empty
-// name if the dictionary does not give an appearance per state.  It is
-// nil-safe: a nil dictionary yields the empty name.
+// name if the dictionary does not give an appearance per state.
 //
 // This serves code which has to supply an annotation's appearance state: a
 // dictionary with an appearance per state is meaningless without one, and an

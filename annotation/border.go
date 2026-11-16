@@ -246,8 +246,11 @@ func ExtractBorder(c pdf.Cursor, obj pdf.Object, isDirect bool) (*Border, error)
 	return b, nil
 }
 
+// Embed converts the border to a PDF array.  A nil border stands for no
+// border and is written as a border of width zero.
+//
+// This implements the [pdf.Embedder] interface.
 func (b *Border) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	// the Go default value is "no border"
 	if b == nil {
 		return pdf.Array{pdf.Number(0), pdf.Number(0), pdf.Number(0)}, nil
 	}

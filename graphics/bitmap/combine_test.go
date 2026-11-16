@@ -122,8 +122,3 @@ func TestCombineClipping(t *testing.T) {
 		t.Fatal("pixel (3,4) should be white")
 	}
 }
-
-func TestCombineNil(t *testing.T) {
-	dst := New(8, 8)
-	dst.Combine(nil, 0, 0, CombOpOR) // should not panic
-}

@@ -90,6 +90,7 @@ type MediaScreenEntries struct {
 	FloatingWindow *FloatingWindowParameters
 }
 
+// isEmpty reports whether no entry is set.  A nil receiver is empty.
 func (s *MediaScreenEntries) isEmpty() bool {
 	if s == nil {
 		return true

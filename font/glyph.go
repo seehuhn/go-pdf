@@ -38,9 +38,6 @@ type GlyphSeq struct {
 
 // Reset resets the glyph sequence to an empty sequence.
 func (s *GlyphSeq) Reset() {
-	if s == nil {
-		return
-	}
 	s.Skip = 0
 	s.Seq = s.Seq[:0]
 }

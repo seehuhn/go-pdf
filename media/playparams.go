@@ -108,7 +108,7 @@ type MediaPlayEntries struct {
 	RepeatCount optional.Float64
 }
 
-// isEmpty reports whether no entry is set.
+// isEmpty reports whether no entry is set.  A nil receiver is empty.
 func (p *MediaPlayEntries) isEmpty() bool {
 	if p == nil {
 		return true

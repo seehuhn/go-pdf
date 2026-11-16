@@ -155,9 +155,6 @@ func ExtractInfo(c Cursor, obj Object, _ bool) (*Info, error) {
 
 // isEmpty reports whether info has no content that encode would write.
 func (info *Info) isEmpty() bool {
-	if info == nil {
-		return true
-	}
 	if !info.Title.IsZero() || !info.Author.IsZero() || !info.Subject.IsZero() ||
 		!info.Keywords.IsZero() || !info.Creator.IsZero() || !info.Producer.IsZero() {
 		return false

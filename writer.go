@@ -1154,7 +1154,8 @@ func (w *posWriter) Flush() error {
 // the object a value decoded through w was read from, or the reference a
 // value was stored at or reserved in this session.  It returns 0 for values
 // the file knows nothing about, for values embedded inline, and for values
-// whose object has been freed in this session.
+// whose object has been freed in this session.  It also returns 0 if v is nil
+// or a nil pointer.
 func (w *Writer) Origin(v any) Reference {
 	if v == nil {
 		return 0

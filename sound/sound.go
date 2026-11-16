@@ -310,9 +310,6 @@ const (
 // Validate is called by [Sound.Embed] to refuse writing a malformed sound.
 // External callers may use it to pre-validate a sound built in memory.
 func (s *Sound) Validate() error {
-	if s == nil {
-		return errors.New("sound: nil Sound")
-	}
 	if s.SampleRate <= 0 || math.IsNaN(s.SampleRate) || math.IsInf(s.SampleRate, 0) {
 		return errors.New("sound: SampleRate must be positive and finite")
 	}

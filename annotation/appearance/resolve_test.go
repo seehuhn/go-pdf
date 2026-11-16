@@ -328,10 +328,6 @@ func TestAppearanceToRectNothingToDraw(t *testing.T) {
 		ap   *form.Form
 	}{
 		{
-			name: "nilForm",
-			ap:   nil,
-		},
-		{
 			name: "noContent",
 			ap:   noContent,
 		},
@@ -400,9 +396,6 @@ func TestTransformedBBox(t *testing.T) {
 				f.Content = nil
 				return f
 			}(),
-		},
-		{
-			name: "nilForm",
 		},
 	}
 

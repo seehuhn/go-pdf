@@ -61,15 +61,6 @@ func TestSpaceWidthDefault(t *testing.T) {
 	}
 }
 
-func TestSpaceWidthNilDict(t *testing.T) {
-	// a font with GetDict returning nil returns the default
-	f := &mockFontWithDict{dict: nil}
-	got := SpaceWidth(f)
-	if got < 200 || got > 1000 {
-		t.Errorf("SpaceWidth out of range: %g", got)
-	}
-}
-
 func TestSpaceWidthRange(t *testing.T) {
 	// result is always in [200, 1000]
 	tests := []struct {

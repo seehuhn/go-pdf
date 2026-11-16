@@ -45,7 +45,7 @@ type Data interface {
 //
 // This implements the [pdf.Embedder] interface.
 func (p *PieceInfo) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
-	if p == nil || len(p.Entries) == 0 {
+	if len(p.Entries) == 0 {
 		return nil, nil
 	}
 

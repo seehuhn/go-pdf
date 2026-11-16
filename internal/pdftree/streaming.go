@@ -34,10 +34,6 @@ func ExtractFromFile[K cmp.Ordered, C codec[K]](r pdf.Getter, root pdf.Object) (
 // malformed are skipped, so in a malformed tree Lookup may return
 // [ErrKeyNotFound] for keys that [FromFile.All] would yield.
 func (t *FromFile[K, C]) Lookup(key K) (pdf.Object, error) {
-	if t == nil {
-		return nil, ErrKeyNotFound
-	}
-
 	node, err := t.cur.Dict(t.root)
 	if err != nil || node == nil {
 		return nil, ErrKeyNotFound
@@ -128,10 +124,6 @@ func (t *FromFile[K, C]) lookupInNode(node pdf.Dict, seen map[pdf.Reference]bool
 
 func (t *FromFile[K, C]) All() iter.Seq2[K, pdf.Object] {
 	return func(yield func(K, pdf.Object) bool) {
-		if t == nil {
-			return
-		}
-
 		node, err := t.cur.Dict(t.root)
 		if err != nil {
 			return

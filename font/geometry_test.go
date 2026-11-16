@@ -27,7 +27,6 @@ func TestBoundingBox(t *testing.T) {
 		seq  *GlyphSeq
 		want *pdf.Rectangle
 	}{
-		{"nil", nil, &pdf.Rectangle{}},
 		{"blank only", &GlyphSeq{Seq: []Glyph{{GID: 1, Advance: 3}}}, &pdf.Rectangle{}},
 		{
 			"one glyph",

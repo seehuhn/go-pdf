@@ -25,12 +25,7 @@ func SpaceWidth(f font.Instance) float64 {
 		return 280
 	}
 
-	d := fe.GetDict()
-	if d == nil {
-		return 280
-	}
-
-	return spaceWidthHeuristic(d)
+	return spaceWidthHeuristic(fe.GetDict())
 }
 
 type affine struct {

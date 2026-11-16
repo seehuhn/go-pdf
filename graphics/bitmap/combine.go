@@ -21,7 +21,7 @@ const (
 // The position specifies where src.Rect.Min maps to in b's coordinate space.
 // Pixels outside b's bounds are clipped.
 func (b *Bitmap) Combine(src *Bitmap, x, y int, op CombOp) {
-	if src == nil || src.Rect.Empty() || b.Rect.Empty() {
+	if src.Rect.Empty() || b.Rect.Empty() {
 		return
 	}
 

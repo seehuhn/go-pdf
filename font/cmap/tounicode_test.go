@@ -74,20 +74,6 @@ func TestToUnicodeRangeIter(t *testing.T) {
 	}
 }
 
-// TestToUnicodeNil checks that the lookup methods accept a nil receiver.
-func TestToUnicodeNil(t *testing.T) {
-	var tu *ToUnicodeFile
-	if _, ok := tu.Lookup([]byte{0}); ok {
-		t.Error("nil Lookup found a mapping")
-	}
-	if _, ok := tu.CodeForText("A"); ok {
-		t.Error("nil CodeForText found a code")
-	}
-	for range tu.All(charcode.SimpleCodec) {
-		t.Error("nil All yielded a mapping")
-	}
-}
-
 // TestToUnicodeLookupEmpty checks that Lookup does not panic on ranges with an
 // empty destination string or no destination values.
 func TestToUnicodeLookupEmpty(t *testing.T) {

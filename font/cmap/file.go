@@ -406,9 +406,6 @@ func (f *File) Codec() (*charcode.Codec, error) {
 // that a CMap's own mappings are reported before those it inherits.
 func (f *File) All(codec *charcode.Codec) iter.Seq2[charcode.Code, cid.CID] {
 	return func(yield func(charcode.Code, cid.CID) bool) {
-		if f == nil {
-			return
-		}
 		f.index().mapped(func(x *fileLevel, id, pos int, codeBytes []byte) bool {
 			code, k, valid := codec.Decode(codeBytes)
 			if !valid || k != len(codeBytes) {
@@ -459,9 +456,6 @@ func rangeIndex(first, last, code []byte) (index int, ok bool) {
 //
 // The lookup uses an index which is built on first use, see [File].
 func (f *File) LookupCID(code []byte) cid.CID {
-	if f == nil {
-		return 0
-	}
 	x := f.index()
 	if level, id := x.lookup(code); id >= 0 {
 		return level.mapped[id].cid(code)
@@ -474,9 +468,6 @@ func (f *File) LookupCID(code []byte) cid.CID {
 // The precedence is the same as for [File.LookupCID].  If no notdef mapping
 // matches, the result is 0.
 func (f *File) LookupNotdefCID(code []byte) cid.CID {
-	if f == nil {
-		return 0
-	}
 	return lookupNotdef(f.index(), code)
 }
 

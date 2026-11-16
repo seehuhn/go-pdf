@@ -237,8 +237,7 @@ func (b *textBudget) spend(obj postscript.Object) bool {
 
 // IsEmpty returns true if the ToUnicodeInfo object does not contain any mappings.
 func (tu *ToUnicodeFile) IsEmpty() bool {
-	return tu == nil ||
-		len(tu.Singles) == 0 && len(tu.Ranges) == 0 && tu.Parent == nil
+	return len(tu.Singles) == 0 && len(tu.Ranges) == 0 && tu.Parent == nil
 }
 
 // MakeName returns a unique name for the ToUnicodeInfo object.
@@ -319,9 +318,6 @@ func (tu *ToUnicodeFile) writeBinary(h hash.Hash, maxGen int) {
 // that a CMap's own mappings are reported before those it inherits.
 func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, string] {
 	return func(yield func(charcode.Code, string) bool) {
-		if tu == nil {
-			return
-		}
 		tu.index().mapped(func(x *toUnicodeLevel, id, pos int, codeBytes []byte) bool {
 			code, k, valid := codec.Decode(codeBytes)
 			if !valid || k != len(codeBytes) {
@@ -345,9 +341,6 @@ func (tu *ToUnicodeFile) All(codec *charcode.Codec) iter.Seq2[charcode.Code, str
 // The lookup uses an index which is built on first use, see
 // [ToUnicodeFile].
 func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
-	if tu == nil {
-		return "", false
-	}
 	level, id := tu.index().lookup(code)
 	if id < 0 {
 		return "", false
@@ -367,10 +360,6 @@ func (tu *ToUnicodeFile) Lookup(code []byte) (string, bool) {
 // The search takes time proportional to the number of mappings in the CMap,
 // not to the number of codes they cover.
 func (tu *ToUnicodeFile) CodeForText(text string) ([]byte, bool) {
-	if tu == nil {
-		return nil, false
-	}
-
 	var best []byte
 
 	// try checks the code at position pos of entry e.  It reports whether

@@ -984,6 +984,7 @@ type xRefEntry struct {
 	NextFree uint32
 }
 
+// IsFree reports whether the entry is free.  A nil entry is free.
 func (entry *xRefEntry) IsFree() bool {
 	return entry == nil || entry.Pos < 0
 }

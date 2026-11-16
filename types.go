@@ -1191,7 +1191,8 @@ func (x *Placeholder) AsPDF(opt OutputOptions) Native {
 }
 
 // Set fills in the value of the placeholder object.  This should be called
-// as soon as possible after the value becomes known.
+// as soon as possible after the value becomes known.  Set does nothing for a
+// nil placeholder.
 func (x *Placeholder) Set(val Native) error {
 	if x == nil {
 		return nil

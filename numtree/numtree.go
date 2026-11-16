@@ -26,7 +26,7 @@ var (
 var ErrKeyNotFound = pdftree.ErrKeyNotFound
 
 // ExtractInMemory reads a number tree from a PDF document into memory.
-// If root is nil, it returns nil.
+// If root is nil or resolves to null, it returns nil.
 func ExtractInMemory(r pdf.Getter, root pdf.Object) (*InMemory, error) {
 	return pdftree.ExtractInMemory[pdf.Integer, pdftree.NumCodec](r, root)
 }
@@ -47,7 +47,7 @@ func Write(w *pdf.Writer, data iter.Seq2[pdf.Integer, pdf.Object]) (pdf.Referenc
 }
 
 // Size returns the number of entries in the number tree,
-// without reading the entire tree into memory.
+// without reading the entire tree into memory.  A nil root is an empty tree.
 func Size(r pdf.Getter, root pdf.Object) (int, error) {
 	return pdftree.Size[pdf.Integer, pdftree.NumCodec](r, root)
 }

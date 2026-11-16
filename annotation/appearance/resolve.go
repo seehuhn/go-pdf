@@ -23,7 +23,7 @@ const (
 // Resolve returns the appearance form of the given kind, honouring the
 // appearance state.  Where the appearance is given per state, the result is nil
 // unless state names one of them, so that an annotation with no matching state
-// shows nothing.  Resolve is nil-safe: a nil dictionary yields nil.
+// shows nothing.
 func (d *Dict) Resolve(state pdf.Name, kind Kind) *form.Form {
 	if d == nil {
 		return nil
@@ -87,7 +87,7 @@ func XObjectToRect(ap *form.Form, rect pdf.Rectangle) (matrix.Matrix, bool) {
 // transformed box has zero width or height, in which case there is nothing
 // to draw.
 func TransformedBBox(f *form.Form) (formMatrix matrix.Matrix, box pdf.Rectangle, ok bool) {
-	if f == nil || f.Content == nil {
+	if f.Content == nil {
 		return matrix.Matrix{}, pdf.Rectangle{}, false
 	}
 

@@ -170,12 +170,12 @@ func testInMemory[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 	}
 }
 
-func TestNilTree(t *testing.T) {
-	t.Run("name", func(t *testing.T) { testNilTree(t, nameKind) })
-	t.Run("num", func(t *testing.T) { testNilTree(t, numKind) })
+func TestNilRoot(t *testing.T) {
+	t.Run("name", func(t *testing.T) { testNilRoot(t, nameKind) })
+	t.Run("num", func(t *testing.T) { testNilRoot(t, numKind) })
 }
 
-func testNilTree[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
+func testNilRoot[K cmp.Ordered, C codec[K]](t *testing.T, _ treeKind[K, C]) {
 	// a nil root yields a nil tree from both extractors
 	if got, err := ExtractInMemory[K, C](nil, nil); err != nil || got != nil {
 		t.Errorf("ExtractInMemory(nil) = %v, %v", got, err)
@@ -184,21 +184,9 @@ func testNilTree[K cmp.Ordered, C codec[K]](t *testing.T, tk treeKind[K, C]) {
 		t.Errorf("ExtractFromFile(nil) = %v, %v", got, err)
 	}
 
-	// nil tree values must behave like empty trees, not panic
-	var mem *InMemory[K, C]
-	if _, err := mem.Lookup(tk.keyAt(0)); err != ErrKeyNotFound {
-		t.Errorf("nil InMemory.Lookup = %v, want ErrKeyNotFound", err)
-	}
-	for range mem.All() {
-		t.Error("nil InMemory.All yielded an entry")
-	}
-
-	var ff *FromFile[K, C]
-	if _, err := ff.Lookup(tk.keyAt(0)); err != ErrKeyNotFound {
-		t.Errorf("nil FromFile.Lookup = %v, want ErrKeyNotFound", err)
-	}
-	for range ff.All() {
-		t.Error("nil FromFile.All yielded an entry")
+	// a nil root is an empty tree
+	if n, err := Size[K, C](nil, nil); err != nil || n != 0 {
+		t.Errorf("Size(nil) = %d, %v", n, err)
 	}
 }
 

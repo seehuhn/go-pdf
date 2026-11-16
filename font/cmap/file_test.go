@@ -789,23 +789,6 @@ end
 	}
 }
 
-// TestFileNil checks that the lookup methods accept a nil receiver.
-func TestFileNil(t *testing.T) {
-	var f *File
-	if c := f.LookupCID([]byte{0}); c != 0 {
-		t.Errorf("nil LookupCID gave CID %d", c)
-	}
-	if c := f.LookupNotdefCID([]byte{0}); c != 0 {
-		t.Errorf("nil LookupNotdefCID gave CID %d", c)
-	}
-	for range f.All(charcode.SimpleCodec) {
-		t.Error("nil All yielded a mapping")
-	}
-	if f.Chain() != nil {
-		t.Error("nil chain is not nil")
-	}
-}
-
 // TestChainCycle checks that a cycle of Parent links, which a file cannot
 // produce but a caller can construct, lists each CMap once.
 func TestChainCycle(t *testing.T) {
