@@ -39,6 +39,8 @@ type compositeUTF8 struct {
 	info        map[charcode.Code]*codeInfo
 	code        map[key]charcode.Code
 	nextPrivate rune
+	privateUsed int   // the number of private use codes in use
+	err         error // set once the private use codes are used up
 
 	// metrics holds the width and the vertical metrics of every CID in use,
 	// and of CID 0.  A CID has one set of metrics, shared by all its codes.
@@ -150,8 +152,8 @@ func (e *compositeUTF8) Encode(cidVal cid.CID, text string, width float64, v VMe
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	// all conflicts are checked before any map is written, so a rejected
-	// call leaves the encoder unchanged
+	// all conflicts are checked before any map is written, so a call
+	// rejected for a conflict leaves the encoder unchanged
 	m, hasMetrics := e.metrics[cidVal]
 	if hasMetrics && m.width != width {
 		return 0, errors.New("width already set to different value")
@@ -166,9 +168,13 @@ func (e *compositeUTF8) Encode(cidVal cid.CID, text string, width float64, v VMe
 		return code, nil
 	}
 
-	code, err := e.makeCode(text)
+	r, err := e.makeCode(text)
 	if err != nil {
 		return 0, err
+	}
+	code := runeToCode(r)
+	if isPrivate(r) {
+		e.privateUsed++
 	}
 
 	if !hasMetrics {
@@ -181,15 +187,18 @@ func (e *compositeUTF8) Encode(cidVal cid.CID, text string, width float64, v VMe
 	return code, nil
 }
 
-func (e *compositeUTF8) makeCode(text string) (charcode.Code, error) {
+// makeCode returns the code point whose UTF-8 encoding is the new code for
+// text.
+func (e *compositeUTF8) makeCode(text string) (rune, error) {
 	if rr := []rune(norm.NFC.String(text)); len(rr) == 1 {
-		code := runeToCode(rr[0])
-		if _, alreadUsed := e.info[code]; !alreadUsed {
-			return code, nil
+		if _, alreadyUsed := e.info[runeToCode(rr[0])]; !alreadyUsed {
+			return rr[0], nil
 		}
 	}
 
-	for {
+	// The remaining codes come from the three private use areas,
+	// U+E000-U+F8FF, U+F0000-U+FFFFD and U+100000-U+10FFFD.
+	for e.nextPrivate <= lastPrivate {
 		r := e.nextPrivate
 		e.nextPrivate++
 		switch e.nextPrivate {
@@ -197,14 +206,26 @@ func (e *compositeUTF8) makeCode(text string) (charcode.Code, error) {
 			e.nextPrivate = 0x0F_0000
 		case 0x0F_FFFE:
 			e.nextPrivate = 0x10_0000
-		case 0x10_FFFE:
-			return 0, ErrOverflow
 		}
-		code := runeToCode(r)
-		if _, alreadUsed := e.info[code]; !alreadUsed {
-			return code, nil
+		if _, alreadyUsed := e.info[runeToCode(r)]; !alreadyUsed {
+			return r, nil
 		}
 	}
+	e.err = font.ErrOverflow
+	return 0, font.ErrOverflow
+}
+
+// lastPrivate is the last code point of the last private use area.
+const lastPrivate = 0x10_FFFD
+
+// numPrivate is the number of code points in the private use areas.
+const numPrivate = (0xF8FF - 0xE000 + 1) + (0xF_FFFD - 0xF_0000 + 1) + (lastPrivate - 0x10_0000 + 1)
+
+// isPrivate reports whether r lies in one of the private use areas.
+func isPrivate(r rune) bool {
+	return r >= 0xE000 && r <= 0xF8FF ||
+		r >= 0xF_0000 && r <= 0xF_FFFD ||
+		r >= 0x10_0000 && r <= lastPrivate
 }
 
 func runeToCode(r rune) charcode.Code {
@@ -292,10 +313,19 @@ func (e *compositeUTF8) CID0Metrics() (float64, VMetrics) {
 	return e.cid0Width, e.cid0V
 }
 
-func (e *compositeUTF8) CodesRemaining() int {
-	const num_surrogates = 0xDFFF - 0xD800 + 1
-	const num_range = 0x10_FFFF - 0x00_0000 + 1
+// Error implements the [CIDEncoder] interface.
+func (e *compositeUTF8) Error() error {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return num_range - num_surrogates - len(e.info)
+	return e.err
+}
+
+// CodesRemaining implements the [CIDEncoder] interface.  It returns the
+// number of unused codes in the private use areas.  A text consisting of a
+// single code point whose code is unused can be encoded even when no private
+// use codes are left.
+func (e *compositeUTF8) CodesRemaining() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return numPrivate - e.privateUsed
 }

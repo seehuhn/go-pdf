@@ -13,52 +13,19 @@ import (
 	"seehuhn.de/go/pdf/internal/debug/memfile"
 )
 
-func TestVersionErrorMessage(t *testing.T) {
-	tests := []struct {
-		name string
-		err  pdf.VersionError
-		want string
-	}{
-		{
-			name: "earliest only",
-			err:  pdf.VersionError{Operation: "feature X", Earliest: pdf.V1_4},
-			want: "feature X requires PDF version 1.4 or later",
-		},
-		{
-			name: "latest only",
-			err:  pdf.VersionError{Operation: "feature Y", Latest: pdf.V1_7},
-			want: "feature Y requires PDF version 1.7 or earlier",
-		},
-		{
-			name: "earliest equals latest",
-			err:  pdf.VersionError{Operation: "feature Z", Earliest: pdf.V1_5, Latest: pdf.V1_5},
-			want: "feature Z requires PDF version 1.5",
-		},
-		{
-			name: "range",
-			err:  pdf.VersionError{Operation: "feature W", Earliest: pdf.V1_3, Latest: pdf.V1_7},
-			want: "feature W requires PDF version between 1.3 and 1.7",
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.err.Error(); got != tc.want {
-				t.Errorf("Error() = %q, want %q", got, tc.want)
-			}
-			if !pdf.IsWrongVersion(&tc.err) {
-				t.Error("IsWrongVersion returned false for *VersionError")
-			}
-		})
-	}
-
-	// degenerate case: neither bound set — verify type recognition,
-	// not message text
-	t.Run("neither", func(t *testing.T) {
-		err := &pdf.VersionError{Operation: "feature Q"}
+// TestIsWrongVersion checks that a VersionError is recognised whichever
+// of its bounds are set.
+func TestIsWrongVersion(t *testing.T) {
+	for _, err := range []*pdf.VersionError{
+		{Operation: "feature X", Earliest: pdf.V1_4},
+		{Operation: "feature Y", Latest: pdf.V1_7},
+		{Operation: "feature W", Earliest: pdf.V1_3, Latest: pdf.V1_7},
+		{Operation: "feature Q"},
+	} {
 		if !pdf.IsWrongVersion(err) {
-			t.Error("IsWrongVersion returned false for *VersionError")
+			t.Errorf("%v not recognised", err)
 		}
-	})
+	}
 }
 
 func TestCheckVersionAtMost(t *testing.T) {

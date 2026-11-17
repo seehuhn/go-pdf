@@ -4,13 +4,16 @@
 package cidenc
 
 import (
+	"errors"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/charcode"
+	"seehuhn.de/go/postscript/cid"
 )
 
 func TestUTF8CS(t *testing.T) {
@@ -106,19 +109,19 @@ func TestUTF8EncodeConflict(t *testing.T) {
 	}
 	remaining := enc.CodesRemaining()
 
-	if _, err := enc.Encode(5, "B", 700, vm); err == nil {
+	if _, err := enc.Encode(5, "BC", 700, vm); err == nil {
 		t.Error("conflicting width was accepted")
 	}
-	if _, err := enc.Encode(5, "B", 600, VMetrics{OffsY: 800, DeltaY: -1000}); err == nil {
+	if _, err := enc.Encode(5, "BC", 600, VMetrics{OffsY: 800, DeltaY: -1000}); err == nil {
 		t.Error("conflicting advance was accepted")
 	}
 	if _, err := enc.Encode(5, "A", 700, vm); err == nil {
 		t.Error("conflicting width for a repeat was accepted")
 	}
-	if _, err := enc.Encode(0, "x", 600, cid0V); err == nil {
+	if _, err := enc.Encode(0, "xy", 600, cid0V); err == nil {
 		t.Error("conflicting width for CID 0 was accepted")
 	}
-	if _, err := enc.Encode(0, "x", 500, vm); err == nil {
+	if _, err := enc.Encode(0, "xy", 500, vm); err == nil {
 		t.Error("conflicting vertical metrics for CID 0 were accepted")
 	}
 	if got := enc.CodesRemaining(); got != remaining {
@@ -148,5 +151,73 @@ func TestUTF8EncodeHorizontalVMetrics(t *testing.T) {
 	}
 	if _, err := enc.Encode(0, "x", 500, VMetrics{OffsY: 1, DeltaY: 2}); err != nil {
 		t.Errorf("CID 0: %v", err)
+	}
+}
+
+// TestUTF8CodesRemaining checks that only texts which need a private use code
+// reduce the number of codes remaining.
+func TestUTF8CodesRemaining(t *testing.T) {
+	enc := NewCompositeUtf8(nil, 500, VMetrics{}, font.Horizontal)
+	before := enc.CodesRemaining()
+
+	steps := []struct {
+		cid  cid.CID
+		text string
+		used int
+	}{
+		{1, "A", 0},      // the code of U+0041
+		{1, "AB", 1},     // a private use code
+		{2, "A", 1},      // U+0041 is taken, so a private use code
+		{3, "\uE123", 1}, // the code of U+E123, a private use code point
+		{1, "AB", 0},     // already encoded
+	}
+	for _, s := range steps {
+		if _, err := enc.Encode(s.cid, s.text, 500, VMetrics{}); err != nil {
+			t.Fatal(err)
+		}
+		after := enc.CodesRemaining()
+		if before-after != s.used {
+			t.Errorf("Encode(%d, %q) used %d codes, want %d", s.cid, s.text, before-after, s.used)
+		}
+		before = after
+	}
+}
+
+// TestUTF8Overflow checks that the UTF-8 encoder allocates exactly the
+// number of codes it reports as remaining, and that it then refuses and
+// reports further allocations.
+func TestUTF8Overflow(t *testing.T) {
+	enc := NewCompositeUtf8(nil, 500, VMetrics{}, font.Horizontal)
+
+	// every text of several runes needs a code which counts as remaining
+	remaining := enc.CodesRemaining()
+	seen := make(map[charcode.Code]bool, remaining)
+	for i := range remaining {
+		code, err := enc.Encode(1, "x"+strconv.Itoa(i), 500, VMetrics{})
+		if err != nil {
+			t.Fatalf("text %d of %d: %v", i, remaining, err)
+		}
+		if seen[code] {
+			t.Fatalf("code %#x allocated twice", code)
+		}
+		seen[code] = true
+	}
+	if n := enc.CodesRemaining(); n != 0 {
+		t.Errorf("%d codes remaining after %d texts", n, remaining)
+	}
+	if err := enc.Error(); err != nil {
+		t.Errorf("Error() = %v before overflow", err)
+	}
+
+	if _, err := enc.Encode(1, "overflow", 500, VMetrics{}); !errors.Is(err, font.ErrOverflow) {
+		t.Fatalf("got %v, want font.ErrOverflow", err)
+	}
+	if !errors.Is(enc.Error(), font.ErrOverflow) {
+		t.Errorf("Error() = %v, want font.ErrOverflow", enc.Error())
+	}
+
+	// a text of one unused rune still has a code of its own
+	if _, err := enc.Encode(2, "A", 500, VMetrics{}); err != nil {
+		t.Errorf("single rune refused: %v", err)
 	}
 }

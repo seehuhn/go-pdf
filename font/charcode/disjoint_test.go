@@ -4,6 +4,7 @@
 package charcode
 
 import (
+	"errors"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -87,7 +88,7 @@ func TestDisjointTooComplex(t *testing.T) {
 	allocs := func(k int) float64 {
 		csr := crosses(k)
 		return testing.AllocsPerRun(3, func() {
-			if _, err := csr.Disjoint(); err != ErrTooComplex {
+			if _, err := csr.Disjoint(); !errors.Is(err, ErrTooComplex) {
 				t.Fatalf("%d ranges: got error %v, want ErrTooComplex", len(csr), err)
 			}
 		})

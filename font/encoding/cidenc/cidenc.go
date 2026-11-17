@@ -4,7 +4,6 @@
 package cidenc
 
 import (
-	"errors"
 	"iter"
 
 	"seehuhn.de/go/pdf"
@@ -91,8 +90,14 @@ type CIDEncoder interface {
 	// CID which has not been encoded.
 	CID0Metrics() (width float64, v VMetrics)
 
-	// CodesRemaining returns the number of unallocated codes.
+	// CodesRemaining returns the number of codes which can still be
+	// allocated, whatever the text.  An encoder may allocate further codes
+	// for particular texts.
 	CodesRemaining() int
+
+	// Error returns [font.ErrOverflow] if Encode has failed because no
+	// further code could be allocated, and nil otherwise.
+	Error() error
 
 	// CMap returns a CMap object which describes the mapping
 	// from character codes to CIDs.
@@ -126,7 +131,3 @@ type codeInfo struct {
 	VMetrics VMetrics // PDF glyph space units
 	Text     string
 }
-
-// ErrOverflow is returned by [CIDEncoder.Encode] once no further codes can be
-// allocated.
-var ErrOverflow = errors.New("too many glyphs")

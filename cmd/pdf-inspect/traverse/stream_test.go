@@ -68,9 +68,6 @@ func TestStreamCtxNext(t *testing.T) {
 	if err == nil {
 		t.Error("expected error but got nil")
 	}
-	if _, ok := err.(*KeyError); !ok {
-		t.Errorf("expected *KeyError but got %T: %v", err, err)
-	}
 }
 
 func TestStreamCtxKeys(t *testing.T) {

@@ -4,6 +4,7 @@
 package graphics
 
 import (
+	"math/bits"
 	"slices"
 
 	"seehuhn.de/go/geom/matrix"
@@ -353,9 +354,7 @@ func (s *State) ApplyTo(other *State) {
 
 // GetTextPositionDevice returns the current text position in device coordinates.
 func (s *State) GetTextPositionDevice() (float64, float64) {
-	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
-		panic(err)
-	}
+	s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise)
 	M := s.glyphScale()
 	M = M.Mul(s.TextMatrix)
 	M = M.Mul(s.CTM)
@@ -383,9 +382,7 @@ func (s *State) glyphScale() matrix.Matrix {
 
 // GetTextPositionUser returns the current text position in user coordinates.
 func (s *State) GetTextPositionUser() (float64, float64) {
-	if err := s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise); err != nil {
-		panic(err)
-	}
+	s.mustBeSet(StateTextFont | StateTextMatrix | StateTextHorizontalScaling | StateTextRise)
 	M := s.glyphScale()
 	M = M.Mul(s.TextMatrix)
 	return M[4], M[5]
@@ -464,10 +461,9 @@ func (s *State) ApplyTextKern(delta float64) {
 	}
 }
 
-func (s *State) mustBeSet(bits Bits) error {
-	missing := ^s.Set & bits
-	if missing == 0 {
-		return nil
+// mustBeSet panics if any of the given state parameters is not set.
+func (s *State) mustBeSet(params Bits) {
+	if missing := ^s.Set & params; missing != 0 {
+		panic(names[bits.TrailingZeros64(uint64(missing))] + " not set")
 	}
-	return ErrMissing(missing)
 }

@@ -4,6 +4,7 @@
 package font
 
 import (
+	"errors"
 	"fmt"
 	"iter"
 
@@ -85,7 +86,8 @@ type Layouter interface {
 	Encode(gid glyph.ID, text string) (charcode.Code, bool)
 
 	// CodesRemaining returns the number of character codes that can still be
-	// allocated in this font instance.
+	// allocated in this font instance, whatever the text.  Some fonts can
+	// allocate further codes for particular texts.
 	CodesRemaining() int
 
 	// Layout appends a string to a glyph sequence.  The string is typeset at
@@ -101,6 +103,10 @@ type Layouter interface {
 	// IsBlank reports whether the glyph with the given ID is a blank glyph.
 	IsBlank(gid glyph.ID) bool
 }
+
+// ErrOverflow is returned when a font instance has no character code left
+// for a further glyph.  A simple font has room for 256 codes.
+var ErrOverflow = errors.New("too many glyphs")
 
 // WritingMode is the "writing mode" of a PDF font (horizontal or vertical).
 type WritingMode int

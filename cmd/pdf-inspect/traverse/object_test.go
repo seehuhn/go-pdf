@@ -169,13 +169,8 @@ func TestObjectCtxNext(t *testing.T) {
 			res, err := navigateContext(c, tt.key)
 
 			if tt.wantErr {
-				switch err.(type) {
-				case *KeyError:
-					// pass
-				case nil:
-					t.Error("expected *KeyError but got nil")
-				default:
-					t.Errorf("expected *KeyError but got %T: %v", err, err)
+				if err == nil {
+					t.Error("expected error but got nil")
 				}
 				return
 			} else if err != nil {

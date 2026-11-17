@@ -5,7 +5,6 @@ package graphics
 
 import (
 	"fmt"
-	"math/bits"
 	"strings"
 )
 
@@ -111,12 +110,4 @@ var names = []string{
 	"StateHalftoneOrigin",
 	"StateFlatnessTolerance",
 	"StateSmoothnessTolerance",
-}
-
-// ErrMissing is returned when a required state parameter is not set.
-type ErrMissing Bits
-
-func (e ErrMissing) Error() string {
-	k := bits.TrailingZeros64(uint64(e))
-	return names[k] + " not set"
 }

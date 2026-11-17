@@ -5,6 +5,7 @@ package truetype
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"math"
 	"slices"
@@ -227,6 +228,10 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 
 // makeDict creates the PDF font dictionary for this font.
 func (f *Composite) makeDict() (*dict.CIDFontType2, error) {
+	if err := f.CIDEncoder.Error(); err != nil {
+		return nil, fmt.Errorf("font %q: %w", f.PostScriptName(), err)
+	}
+
 	origFont := f.info
 	srcTag, postScriptName := subset.Split(fontname.ForSFNT(origFont))
 

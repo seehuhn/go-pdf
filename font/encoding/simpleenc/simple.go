@@ -4,7 +4,6 @@
 package simpleenc
 
 import (
-	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -201,8 +200,8 @@ func (t *Simple) Encode(gid glyph.ID, baseGlyphName, text string, width float64)
 	}
 
 	if len(t.info) >= 256 {
-		t.err = ErrOverflow
-		return 0, ErrOverflow
+		t.err = font.ErrOverflow
+		return 0, font.ErrOverflow
 	}
 
 	glyphName := t.makeGlyphName(gid, baseGlyphName, text)
@@ -320,8 +319,8 @@ func (t *Simple) GlyphName(gid glyph.ID) string {
 }
 
 // Error returns the first error that occurred during encoding.
-// The only possible error is ErrOverflow, if more than 256 distinct glyphs
-// are used.
+// The only possible error is [font.ErrOverflow], if more than 256 distinct
+// glyphs are used.
 func (t *Simple) Error() error {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
@@ -415,9 +414,6 @@ func (t *Simple) CodesRemaining() int {
 func (t *Simple) Codec() *charcode.Codec {
 	return charcode.SimpleCodec
 }
-
-// ErrOverflow is returned by [Simple.Encode] once all 256 codes are in use.
-var ErrOverflow = errors.New("too many glyphs")
 
 // GlyphID returns the glyph a CID selects, for the CID scheme of simple
 // fonts: CID 0 is the notdef glyph and CID c+1 is the glyph of code c.  ok is

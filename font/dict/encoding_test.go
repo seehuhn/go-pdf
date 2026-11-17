@@ -4,6 +4,7 @@
 package dict
 
 import (
+	"errors"
 	"testing"
 
 	"seehuhn.de/go/pdf"
@@ -200,7 +201,7 @@ func slabs(k int) charcode.CodeSpaceRange {
 // be too large gives one-byte codes, with work linear in the number of
 // ranges.
 func TestMakeCodecTooComplex(t *testing.T) {
-	if _, err := charcode.NewCodec(slabs(64)); err != charcode.ErrTooComplex {
+	if _, err := charcode.NewCodec(slabs(64)); !errors.Is(err, charcode.ErrTooComplex) {
 		t.Fatalf("got error %v, want ErrTooComplex", err)
 	}
 

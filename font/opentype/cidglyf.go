@@ -5,6 +5,7 @@ package opentype
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"math"
 	"slices"
@@ -185,6 +186,10 @@ func (f *CompositeGlyf) Layout(seq *font.GlyphSeq, ptSize float64, s string) *fo
 
 // makeDict creates the PDF font dictionary for this font.
 func (f *CompositeGlyf) makeDict() (*dict.CIDFontType2, error) {
+	if err := f.CIDEncoder.Error(); err != nil {
+		return nil, fmt.Errorf("font %q: %w", f.PostScriptName(), err)
+	}
+
 	origFont := f.info
 	srcTag, postScriptName := subset.Split(fontname.ForSFNT(origFont))
 

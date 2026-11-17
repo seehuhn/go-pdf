@@ -365,3 +365,9 @@ func (f *fixed) CID0Metrics() (float64, VMetrics) {
 func (f *fixed) CodesRemaining() int {
 	return 0
 }
+
+// Error implements the [CIDEncoder] interface.  A fixed CMap allocates no
+// codes, so there is no overflow.
+func (f *fixed) Error() error {
+	return nil
+}

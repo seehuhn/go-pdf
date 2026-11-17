@@ -4,7 +4,9 @@
 package truetype_test
 
 import (
+	"errors"
 	"math"
+	"strconv"
 	"testing"
 
 	"seehuhn.de/go/sfnt"
@@ -155,5 +157,41 @@ func TestCompositeSharedCID(t *testing.T) {
 			}
 			cidtest.CheckSharedCID(t, F, info)
 		})
+	}
+}
+
+// TestCompositeOverflow checks that a font which has run out of character
+// codes cannot be written.
+func TestCompositeOverflow(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w)
+
+	F, err := truetype.NewComposite(makefont.TrueType(), &truetype.OptionsComposite{CMap: cmap.UTF8H})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rm.Embed(F); err != nil {
+		t.Fatal(err)
+	}
+
+	// every text of several runes needs a code which counts as remaining
+	gid := F.Layout(nil, 12, "A").Seq[0].GID
+	remaining := F.CodesRemaining()
+	numOK := 0
+	for i := range remaining + 1 {
+		if _, ok := F.Encode(gid, "x"+strconv.Itoa(i)); !ok {
+			break
+		}
+		numOK++
+	}
+	if numOK != remaining {
+		t.Fatalf("%d texts encoded, want %d", numOK, remaining)
+	}
+	if n := F.CodesRemaining(); n != 0 {
+		t.Errorf("%d codes remaining after overflow", n)
+	}
+
+	if err := rm.Close(); !errors.Is(err, font.ErrOverflow) {
+		t.Errorf("got %v, want font.ErrOverflow", err)
 	}
 }

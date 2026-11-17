@@ -147,9 +147,8 @@ func TestGlyphSets(t *testing.T) {
 			t.Errorf("GlyphsWinAnsi missing %q", r)
 		}
 	}
-	winRunes := []rune(font.GlyphsWinAnsi)
 	seen := make(map[rune]bool)
-	for _, r := range winRunes {
+	for _, r := range font.GlyphsWinAnsi {
 		if seen[r] {
 			t.Errorf("GlyphsWinAnsi has duplicate rune %q", r)
 		}

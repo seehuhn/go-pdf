@@ -5,6 +5,7 @@ package cff
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"math"
 	"slices"
@@ -239,6 +240,10 @@ func (f *Composite) Layout(seq *font.GlyphSeq, ptSize float64, s string) *font.G
 
 // makeDict creates the PDF font dictionary for this font.
 func (f *Composite) makeDict() (*dict.CIDFontType0, error) {
+	if err := f.CIDEncoder.Error(); err != nil {
+		return nil, fmt.Errorf("font %q: %w", f.PostScriptName(), err)
+	}
+
 	origOutlines := f.cffFont.Outlines
 	srcTag, postScriptName := subset.Split(f.PostScriptName())
 

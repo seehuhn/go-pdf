@@ -35,6 +35,8 @@
 
 package jpeg
 
+import "math"
+
 // bytesPerProgBlock is the size in bytes of one entry in the
 // per-component progressive coefficient buffer ([blockSize]int32).
 const bytesPerProgBlock = blockSize * 4
@@ -75,6 +77,17 @@ func (d *decoder) pixelPlaneBytes(mxx, storeMyy int) int64 {
 	return cost
 }
 
+// charge charges n bytes to the budget of the stream and reports whether
+// the charge succeeded.  A size which does not fit an int exceeds every
+// budget.  When the charge succeeds, n fits an int, and so does every
+// factor of it, such as the block count.
+func (d *decoder) charge(n int64) bool {
+	if n > math.MaxInt {
+		return false
+	}
+	return d.budget.Charge(int(n)) == nil
+}
+
 // makeImg allocates the destination pixel planes.  When d.streaming is
 // true only one MCU stripe is allocated (the storeMyy override below
 // reduces the buffer height); otherwise full-image planes are
@@ -89,7 +102,7 @@ func (d *decoder) makeImg(mxx, myy int) error {
 		storeMyy = 1
 	}
 
-	if err := d.budget.Charge(int(d.pixelPlaneBytes(mxx, storeMyy))); err != nil {
+	if !d.charge(d.pixelPlaneBytes(mxx, storeMyy)) {
 		return FormatError("pixel-plane allocation exceeds budget")
 	}
 
@@ -262,7 +275,7 @@ func (d *decoder) processSOS(n int) error {
 			compIndex := scan[i].compIndex
 			if d.progCoeffs[compIndex] == nil {
 				nBlocks := int64(mxx) * int64(myy) * int64(d.comp[compIndex].h) * int64(d.comp[compIndex].v)
-				if err := d.budget.Charge(int(nBlocks) * bytesPerProgBlock); err != nil {
+				if !d.charge(nBlocks * bytesPerProgBlock) {
 					return FormatError("progressive coefficient buffer exceeds budget")
 				}
 				d.progCoeffs[compIndex] = make([]block, nBlocks)

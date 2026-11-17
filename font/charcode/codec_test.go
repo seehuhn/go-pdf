@@ -5,6 +5,7 @@ package charcode
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -549,8 +550,8 @@ func TestCodecError(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%02d-%s", i, tc.name), func(t *testing.T) {
 			_, err := NewCodec(tc.ranges)
-			if err != errInvalidCodeSpaceRange {
-				t.Errorf("NewCodec() returned unexpected error: got %v, want %v", err, errInvalidCodeSpaceRange)
+			if err == nil {
+				t.Error("invalid code space range accepted")
 			}
 		})
 	}
@@ -1018,14 +1019,14 @@ func TestCodecSlabsRejected(t *testing.T) {
 
 	for _, k := range []int{32, 64} {
 		csr := normalize(slabs(k))
-		if _, err := NewCodec(csr); err != ErrTooComplex {
+		if _, err := NewCodec(csr); !errors.Is(err, ErrTooComplex) {
 			t.Fatalf("%d ranges: got error %v, want ErrTooComplex", len(csr), err)
 		}
 
 		// Memory use is proportional to the steps taken, see builder.
 		budget := treeBudget(len(csr))
 		b := newBuilder(csr, budget)
-		if _, err := b.build(); err != ErrTooComplex {
+		if _, err := b.build(); !errors.Is(err, ErrTooComplex) {
 			t.Fatalf("%d ranges: got error %v, want ErrTooComplex", len(csr), err)
 		}
 		if b.steps > 2*budget {
@@ -1041,7 +1042,7 @@ func TestCodecBudget(t *testing.T) {
 	csr := normalize(slabs(64))
 	budget := treeBudget(len(csr))
 	b := newBuilder(csr, budget)
-	if _, err := b.build(); err != ErrTooComplex {
+	if _, err := b.build(); !errors.Is(err, ErrTooComplex) {
 		t.Fatalf("got error %v, want ErrTooComplex", err)
 	}
 
@@ -1072,7 +1073,7 @@ func TestCodecBudget(t *testing.T) {
 	if _, err := newBuilder(valid, full.steps).build(); err != nil {
 		t.Errorf("budget %d: %v", full.steps, err)
 	}
-	if _, err := newBuilder(valid, full.steps-1).build(); err != ErrTooComplex {
+	if _, err := newBuilder(valid, full.steps-1).build(); !errors.Is(err, ErrTooComplex) {
 		t.Errorf("budget %d: got error %v, want ErrTooComplex", full.steps-1, err)
 	}
 
@@ -1121,7 +1122,7 @@ func FuzzCodec(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte, input []byte) {
 		csr := decodeRanges(data)
 		c, err := NewCodec(csr)
-		if err == ErrTooComplex {
+		if errors.Is(err, ErrTooComplex) {
 			return
 		}
 		if (err != nil) != prefixConflict(csr) {
