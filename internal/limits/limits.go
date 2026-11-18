@@ -444,4 +444,13 @@ const (
 	// A label longer than this is never useful for display; 1024
 	// leaves vast headroom over any real alphabetic-labelled document.
 	MaxPageLabelLength = 1024
+
+	// MaxPageLabelPrefixLength caps the number of characters in the prefix
+	// /P of a page label range (PDF 32000-2 §12.4.2).  Every label of the
+	// range repeats the prefix, so a long prefix over many pages multiplies
+	// the cost of formatting, displaying and searching labels.  Real
+	// prefixes are words such as "Appendix A-"; together with
+	// [MaxPageLabelLength] the cap bounds a formatted label at 2048
+	// characters.
+	MaxPageLabelPrefixLength = 1024
 )

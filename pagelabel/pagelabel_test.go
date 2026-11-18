@@ -304,6 +304,52 @@ func TestNewStartTooLarge(t *testing.T) {
 	}
 }
 
+// TestPrefixAtLimit checks that a prefix of the maximal length can be
+// written and read back.
+func TestPrefixAtLimit(t *testing.T) {
+	prefix := pdf.Text(strings.Repeat("ä", limits.MaxPageLabelPrefixLength))
+	labels, err := New(Entry{0, Range{Decimal, prefix, 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels2 := writeAndRead(t, labels)
+	if diff := cmp.Diff(labels.Ranges, labels2.Ranges); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// TestNewPrefixTooLong checks that a prefix beyond the length limit is
+// rejected.
+func TestNewPrefixTooLong(t *testing.T) {
+	prefix := pdf.Text(strings.Repeat("x", limits.MaxPageLabelPrefixLength+1))
+	if _, err := New(Entry{0, Range{Decimal, prefix, 1}}); err == nil {
+		t.Error("prefix beyond the length limit accepted")
+	}
+}
+
+// TestExtractPrefixTooLong checks that a file with a prefix beyond the
+// length limit can be read, and that the result survives a write-read cycle.
+func TestExtractPrefixTooLong(t *testing.T) {
+	obj := pdf.Dict{
+		"Nums": pdf.Array{
+			pdf.Integer(0), pdf.Dict{
+				"S": pdf.Name("D"),
+				"P": pdf.String(strings.Repeat("x", limits.MaxPageLabelPrefixLength+1)),
+			},
+		},
+	}
+
+	labels, err := Extract(mock.Getter, obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	labels2 := writeAndRead(t, labels)
+	if diff := cmp.Diff(labels.Ranges, labels2.Ranges); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
 // TestExtractNegativeKey checks that a key which is not a valid page index
 // is dropped, so that the ranges stay sorted and can be fed back into New.
 func TestExtractNegativeKey(t *testing.T) {

@@ -15,8 +15,10 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/numtree"
 )
 
@@ -69,6 +71,7 @@ type Range struct {
 	Style Style
 
 	// Prefix is the label prefix prepended to the numeric portion.
+	// It has at most 1024 characters.
 	Prefix pdf.TextString
 
 	// Start is the value of the numeric portion for the first page in the
@@ -197,8 +200,17 @@ func (l *Labels) validate() error {
 		if int(e.Style) >= len(styleToPDFName) {
 			return fmt.Errorf("invalid numbering style %d at page %d", e.Style, e.FirstPage)
 		}
+		if !validPrefix(e.Prefix) {
+			return fmt.Errorf("prefix of labelling range at page %d is too long", e.FirstPage)
+		}
 	}
 	return nil
+}
+
+// validPrefix reports whether p is short enough to be the prefix of a
+// labelling range.
+func validPrefix(p pdf.TextString) bool {
+	return utf8.RuneCountInString(p.String()) <= limits.MaxPageLabelPrefixLength
 }
 
 // Extract reads page labels from a PDF PageLabels number tree object.
@@ -247,7 +259,7 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 		}
 
 		p, err := c.TextString(dict["P"])
-		if err == nil {
+		if err == nil && validPrefix(p) {
 			lr.Prefix = p
 		}
 
