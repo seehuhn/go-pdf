@@ -140,24 +140,13 @@ const (
 // subset made from the font can still be named.
 //
 // A subset is named by prefixing a tag to the name of the font it was made
-// from, and both the font program and the dictionaries describing it carry
-// that tagged name.  A name which leaves no room for the tag would therefore
-// name the font in a file it cannot be embedded in, so it is clipped here
-// instead, where the untagged name is settled and every use of it still agrees.
-// The prefix which survives still tells the font apart from most others; names
-// long enough for this to happen do not occur in practice.
-//
-// Clipping a name the font itself gave is not the same as clipping one this
-// library made up, since a shortened name stands for a different font.  It is
-// done anyway because the alternative is a font which cannot be embedded at
-// all, and because such names do not occur in practice.
+// from, so the untagged name must leave room for the tag.
 //
 // Whole characters are kept: a font name may be written in UTF-8, so cutting at
 // an arbitrary byte could leave a partial character behind.
 //
-// A maxLen below zero leaves room for nothing and yields the empty string.
+// The argument maxLen must not be negative.
 func ClipName(name string, maxLen int) string {
-	maxLen = max(maxLen, 0)
 	if len(name) <= maxLen {
 		return name
 	}

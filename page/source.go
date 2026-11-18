@@ -108,8 +108,7 @@ type Source struct {
 }
 
 // RawBytes returns a reader over the segment's decoded content-stream
-// bytes.  Used by [Page.NewIter] to feed Source segments into the
-// page's combined content-stream scanner.
+// bytes.
 func (s *Source) RawBytes() (io.ReadCloser, error) {
 	return pdf.CursorAt(s.x, nil).StreamReader(s.stream)
 }

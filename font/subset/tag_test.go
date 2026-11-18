@@ -220,15 +220,14 @@ func TestClipNameKeepsNonUTF8(t *testing.T) {
 	}
 }
 
-// A budget of a few bytes leaves less room than a character needs, and one
-// below zero leaves room for nothing at all.  Both are answered with a name,
-// short or empty, rather than with a panic.
+// A budget of a few bytes leaves less room than a character needs.  It is
+// answered with a name which fits, short or empty.
 func TestClipNameTinyBudget(t *testing.T) {
 	for _, name := range []string{"", "x", "xx", "宋体", "\xff\xff", "x宋"} {
-		for maxLen := -2; maxLen <= 5; maxLen++ {
+		for maxLen := 0; maxLen <= 5; maxLen++ {
 			got := ClipName(name, maxLen)
 
-			if len(got) > max(maxLen, 0) {
+			if len(got) > maxLen {
 				t.Errorf("ClipName(%q, %d) = %q, which is %d bytes",
 					name, maxLen, got, len(got))
 			}

@@ -17,10 +17,10 @@ import (
 // FromStream extracts a Type 1 font from a font file stream.
 //
 // The stream must have type [glyphdata.Type1].
-// Returns an error if the stream is nil, has the wrong type, or contains
+// Returns an error if the stream has the wrong type or contains
 // invalid Type 1 data.
 func FromStream(stream *glyphdata.Stream) (*type1.Font, error) {
-	if stream == nil || stream.Type != glyphdata.Type1 {
+	if stream.Type != glyphdata.Type1 {
 		return nil, fmt.Errorf("expected Type1 stream")
 	}
 

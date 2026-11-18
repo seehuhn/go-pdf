@@ -135,10 +135,6 @@ func (g *Globals) AddPatternDict(patterns []*bitmap.Bitmap, opts *PatternDictOpt
 
 // Embed writes the globals stream to the PDF output and returns a
 // reference to it.  The Globals is frozen after this call.
-//
-// Embed is the entry point used by the PDF writer's resource manager.
-// Users do not normally call it directly; instead, [Image] calls it
-// during its own Embed method.
 func (g *Globals) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out(), "JBIG2Decode filter", pdf.V1_4); err != nil {
 		return nil, err

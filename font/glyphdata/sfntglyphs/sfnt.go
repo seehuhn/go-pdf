@@ -20,13 +20,13 @@ import (
 //
 // The stream must have type [glyphdata.TrueType], [glyphdata.OpenTypeGlyf],
 // [glyphdata.OpenTypeCFF], or [glyphdata.OpenTypeCFFSimple].
-// Returns an error if the stream is nil, has the wrong type, or contains
+// Returns an error if the stream has the wrong type or contains
 // invalid font data.
 func FromStream(stream *glyphdata.Stream) (*sfnt.Font, error) {
-	if stream == nil || (stream.Type != glyphdata.TrueType &&
+	if stream.Type != glyphdata.TrueType &&
 		stream.Type != glyphdata.OpenTypeGlyf &&
 		stream.Type != glyphdata.OpenTypeCFF &&
-		stream.Type != glyphdata.OpenTypeCFFSimple) {
+		stream.Type != glyphdata.OpenTypeCFFSimple {
 		return nil, fmt.Errorf("expected OpenType/TrueType stream")
 	}
 

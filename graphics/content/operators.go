@@ -67,9 +67,6 @@ func (mi *operatorsIter) Err() error { return nil }
 // and later syntax.  Use [WriteStream] to write the operators for a specific
 // output file.
 //
-// The reader serialises operators lazily: peak transient memory is
-// bounded by the largest single operator's serialised size.
-//
 // This is used to implement both the [Stream]
 // and the [seehuhn.de/go/pdf/page.Segment] interfaces.
 func (m *Operators) RawBytes() (io.ReadCloser, error) {

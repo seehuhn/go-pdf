@@ -295,11 +295,3 @@ func TestKernMatchesGlyphs(t *testing.T) {
 		}
 	}
 }
-
-// TestNewUnknownFont checks that a name which is not one of the 14 standard
-// fonts, and so has nothing to share, reports the missing data as an error.
-func TestNewUnknownFont(t *testing.T) {
-	if _, err := Font("NoSuchFont").New(); err == nil {
-		t.Error("expected an error for an unknown font")
-	}
-}

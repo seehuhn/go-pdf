@@ -104,11 +104,8 @@ func ReadGlyphMetrics(s Stream) (GlyphMetrics, bool) {
 // RepairGlyph reads s up to the operator it chooses, or all of s if there is
 // none.  The result reads s again each time it is iterated.
 func RepairGlyph(s Stream) Stream {
-	switch s := s.(type) {
-	case nil:
-		return &repairedGlyph{inner: &Operators{}, metrics: defaultGlyphMetrics()}
-	case *repairedGlyph:
-		return s
+	if r, ok := s.(*repairedGlyph); ok {
+		return r
 	}
 
 	g := &repairedGlyph{inner: s, metrics: defaultGlyphMetrics()}

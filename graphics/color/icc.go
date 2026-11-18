@@ -198,12 +198,8 @@ func minPDFVersion(v icc.Version) pdf.Version {
 
 // Transform returns the cached bidirectional transform for the profile and
 // the rendering intent ri, or nil if the profile cannot be turned into a
-// transform.  A rendering intent outside the four defined values is treated
-// as [icc.RelativeColorimetric].
+// transform.
 func (s *SpaceICCBased) Transform(ri icc.RenderingIntent) *icc.Transform {
-	if ri > icc.AbsoluteColorimetric {
-		ri = icc.RelativeColorimetric
-	}
 	e := &s.xf[ri]
 	e.once.Do(func() {
 		e.t, _ = icc.NewTransform(s.Profile, ri)

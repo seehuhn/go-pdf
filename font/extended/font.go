@@ -56,8 +56,6 @@
 package extended
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -142,10 +140,6 @@ var standardFonts = [...]standard.Font{
 	QuireDingbats:        standard.ZapfDingbats,
 }
 
-func (f Font) valid() bool {
-	return f >= 0 && int(f) < len(postScriptNames)
-}
-
 // String returns the PostScript name of the font.
 func (f Font) String() string {
 	return f.PostScriptName()
@@ -155,44 +149,29 @@ func (f Font) String() string {
 // "extended.QuireSansRegular".  This implements [fmt.GoStringer], so that the
 // %#v verb prints the name of the constant.
 func (f Font) GoString() string {
-	if !f.valid() {
-		return fmt.Sprintf("extended.Font(%d)", int(f))
-	}
 	return "extended." + strings.ReplaceAll(postScriptNames[f], "-", "")
 }
 
 // PostScriptName returns the PostScript name of the font, for example
 // "QuireSans-Regular".
 func (f Font) PostScriptName() string {
-	if !f.valid() {
-		return ""
-	}
 	return postScriptNames[f]
 }
 
 // Standard returns the standard PDF font which f extends.
-// It returns the empty string if f is not one of the constants of this package.
 func (f Font) Standard() standard.Font {
-	if !f.valid() {
-		return ""
-	}
 	return standardFonts[f]
 }
 
 // New returns a font instance for f, embedded as described by opt.
 // If opt is nil, a simple font with the default layout features is returned.
 //
-// The bundled font file is parsed at most once per process.  The instance
-// belongs to a single document.
+// The instance belongs to a single document.
 //
-// An error is returned if f is not one of the constants of this package, if
-// opt.Variations is not empty (the fonts are static), or if the font data
-// bundled with this package cannot be loaded.  Callers that treat the last
-// case as an invariant may wrap the call in [font.Must].
+// An error is returned if opt.Variations is not empty (the fonts are static),
+// or if the font data bundled with this package cannot be loaded.  Callers
+// that treat the last case as an invariant may wrap the call in [font.Must].
 func (f Font) New(opt *embed.Options) (font.Layouter, error) {
-	if !f.valid() {
-		return nil, errors.New("extended: unknown font")
-	}
 	info, err := parsed[f]()
 	if err != nil {
 		return nil, err

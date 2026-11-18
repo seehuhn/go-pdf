@@ -18,10 +18,10 @@ import (
 // FromStream extracts a CFF font from a font file stream.
 //
 // The stream must have type [glyphdata.CFF] or [glyphdata.CFFSimple].
-// Returns an error if the stream is nil, has the wrong type, or contains
+// Returns an error if the stream has the wrong type or contains
 // invalid CFF data.
 func FromStream(stream *glyphdata.Stream) (*cff.Font, error) {
-	if stream == nil || (stream.Type != glyphdata.CFF && stream.Type != glyphdata.CFFSimple) {
+	if stream.Type != glyphdata.CFF && stream.Type != glyphdata.CFFSimple {
 		return nil, fmt.Errorf("expected CFF stream")
 	}
 

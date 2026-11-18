@@ -186,9 +186,6 @@ func TestDeviceCMYKBlackPoint(t *testing.T) {
 			t.Errorf("%v: destination black point %v, want %v", ri, got, xf.DestinationBlackPoint())
 		}
 	}
-	if cmykXform(icc.RenderingIntent(99)) != cmykXform(icc.RelativeColorimetric) {
-		t.Error("out-of-range intent is not relative colorimetric")
-	}
 }
 
 func TestICCBasedTransformCache(t *testing.T) {
@@ -204,9 +201,6 @@ func TestICCBasedTransformCache(t *testing.T) {
 		if s.Transform(ri) != t1 {
 			t.Errorf("%v: transform not cached", ri)
 		}
-	}
-	if s.Transform(icc.RenderingIntent(99)) != s.Transform(icc.RelativeColorimetric) {
-		t.Error("out-of-range intent is not relative colorimetric")
 	}
 }
 

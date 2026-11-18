@@ -253,16 +253,6 @@ func TestStandard(t *testing.T) {
 	}
 }
 
-// TestStandardUnknownFont checks that a Font value this package does not name
-// has no standard counterpart.
-func TestStandardUnknownFont(t *testing.T) {
-	for _, f := range []Font{-1, Font(len(All))} {
-		if got := f.Standard(); got != "" {
-			t.Errorf("font %d: Standard()=%q", int(f), got)
-		}
-	}
-}
-
 func TestPostScriptName(t *testing.T) {
 	seen := make(map[string]bool)
 	for _, f := range All {
@@ -306,11 +296,9 @@ func TestGoString(t *testing.T) {
 		QuireMonoBoldItalic:  "extended.QuireMonoBoldItalic",
 		QuireSymbol:          "extended.QuireSymbol",
 		QuireDingbats:        "extended.QuireDingbats",
-		Font(-1):             "extended.Font(-1)",
-		Font(len(All)):       fmt.Sprintf("extended.Font(%d)", len(All)),
 	}
-	if len(want) != len(All)+2 {
-		t.Fatalf("test table has %d entries, want %d", len(want), len(All)+2)
+	if len(want) != len(All) {
+		t.Fatalf("test table has %d entries, want %d", len(want), len(All))
 	}
 	for f, name := range want {
 		if got := fmt.Sprintf("%#v", f); got != name {
@@ -411,19 +399,6 @@ func TestNewVariations(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("expected an error for variations of a static font")
-	}
-}
-
-// TestNewUnknownFont checks that a Font value this package does not name
-// is reported as an error.
-func TestNewUnknownFont(t *testing.T) {
-	for _, f := range []Font{-1, Font(len(All))} {
-		if _, err := f.New(nil); err == nil {
-			t.Errorf("expected an error for font %d", int(f))
-		}
-		if name := f.PostScriptName(); name != "" {
-			t.Errorf("font %d has name %q", int(f), name)
-		}
 	}
 }
 

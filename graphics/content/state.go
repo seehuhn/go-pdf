@@ -311,13 +311,11 @@ func (s *State) InCompatibilitySection() bool {
 }
 
 // CheckOperatorAllowed verifies that the given operator can be used in
-// the current state.  Used by [seehuhn.de/go/pdf/graphics/content/builder.Builder]
-// to reject construction-time errors; permissive consumers (e.g. the
-// reader) skip this check by calling [State.ApplyStateChanges] directly.
+// the current state.  Unknown operators are allowed.
 func (s *State) CheckOperatorAllowed(name OpName) error {
 	info, ok := operators[name]
 	if !ok {
-		return nil // unknown operator (allowed in BX/EX sections)
+		return nil // unknown operator
 	}
 
 	if s.CurrentObject&info.Allowed == 0 {

@@ -87,9 +87,6 @@ func TestOnStateFallback(t *testing.T) {
 	if got := r.OnState(0); got != "0" {
 		t.Errorf("default: OnState(0) = %q, want 0", got)
 	}
-	if got := r.OnState(5); got != "" {
-		t.Errorf("out of range: OnState(5) = %q, want empty", got)
-	}
 }
 
 func radioWith(flags FieldFlags, names ...pdf.Name) (*ButtonField, []*fakeWidget) {

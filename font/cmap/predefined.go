@@ -26,8 +26,7 @@ var (
 )
 
 // Predefined returns a predefined CMap by name.
-// It caches the result to avoid loading the same CMap multiple times.
-// The returned CMap must not be modified.
+// The returned CMap is shared between calls and must not be modified.
 // Returns an error if the named CMap is not found in the predefined directory.
 func Predefined(name string) (*File, error) {
 	predefinedMu.Lock()

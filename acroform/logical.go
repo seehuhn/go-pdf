@@ -273,14 +273,11 @@ func (lf *LogicalField) SetState(v pdf.Name) error {
 // clicked widget are selected together.
 //
 // Toggle returns an error and changes nothing if the fields are not check
-// boxes or radio buttons, or if w is nil or belongs to none of the fields.
+// boxes or radio buttons, or if w belongs to none of the fields.
 func (lf *LogicalField) Toggle(w Widget) error {
 	fields, err := typedFields[*ButtonField](lf)
 	if err != nil {
 		return err
-	}
-	if w == nil {
-		return errors.New("nil widget")
 	}
 	for k, f := range fields {
 		i := slices.Index(f.Widgets, w)

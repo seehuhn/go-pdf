@@ -43,11 +43,9 @@ import (
 // A usecmap chain may contain at most [limits.MaxCMapChainDepth] CMaps,
 // counting the CMap itself; deeper chains can be neither read nor written.
 //
-// Lookups use an index of the mappings of each CMap in the chain, which is
-// built on first use.  The CIDSingles, CIDRanges, NotdefSingles,
-// NotdefRanges and Parent fields of a File, and of every File it inherits
-// from, must not be modified once it has been used by [File.LookupCID],
-// [File.LookupNotdefCID] or [File.All].
+// The CIDSingles, CIDRanges, NotdefSingles, NotdefRanges and Parent fields of
+// a File, and of every File it inherits from, must not be modified once it has
+// been used by [File.LookupCID], [File.LookupNotdefCID] or [File.All].
 type File struct {
 	Name  string
 	ROS   *cid.SystemInfo
@@ -603,7 +601,6 @@ func fileLevelBoxes(f *File) (x *fileLevel, mapped, notdef []box) {
 
 // Chain returns f and the CMaps it inherits from through usecmap, starting
 // with f.  If the Parent links form a cycle, each CMap is listed once.
-// For a nil f, the result is nil.
 func (f *File) Chain() []*File {
 	return walkChain(f, fileParent)
 }

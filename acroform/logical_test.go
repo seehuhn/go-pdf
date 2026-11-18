@@ -409,9 +409,6 @@ func TestLogicalFieldToggleForeignWidget(t *testing.T) {
 	if err := g.Toggle(wo[0]); err == nil {
 		t.Error("foreign widget accepted")
 	}
-	if err := g.Toggle(nil); err == nil {
-		t.Error("nil widget accepted")
-	}
 	checkUnchanged(t, before, f1, f2)
 	checkStates(t, ws1, "Off", "Off")
 	checkStates(t, ws2, "Off")
@@ -464,26 +461,4 @@ func TestLogicalFieldEmpty(t *testing.T) {
 	if err := g.SetEditText("x"); err == nil {
 		t.Error("empty logical field accepted edit text")
 	}
-}
-
-func TestLogicalFieldNilWidget(t *testing.T) {
-	f, ws := radioWith(0, "A", "B")
-	f.Widgets = []Widget{ws[0], nil, ws[1]}
-	g := NewLogicalField("r", f)
-
-	if err := g.Toggle(ws[1]); err != nil {
-		t.Fatal(err)
-	}
-	if f.State != "B" {
-		t.Errorf("state %q, want B", f.State)
-	}
-	checkStates(t, ws, "Off", "B")
-
-	if err := g.SetState("A"); err != nil {
-		t.Fatal(err)
-	}
-	if f.State != "A" {
-		t.Errorf("state %q, want A", f.State)
-	}
-	checkStates(t, ws, "A", "Off")
 }

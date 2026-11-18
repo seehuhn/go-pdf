@@ -58,12 +58,9 @@ func (f Font) PostScriptName() string {
 // The instance is built from Adobe's metrics for the font and has no font
 // program: a PDF file which uses it relies on the viewer to supply the glyphs.
 //
-// The font data bundled with this package is immutable, so each of the 14
-// fonts is read and parsed at most once per process and the instances handed
-// out are clones sharing that data; see [type1.Instance.Clone].  An instance
-// allocates character codes of its own and so belongs to a single document, but
-// the data behind it does not: a caller must leave the shared data alone, since
-// a change to it reaches every other instance of the same font.
+// An instance allocates character codes of its own and so belongs to a single
+// document.  The font data behind the instance is shared with other instances
+// of the same font and must not be modified.
 //
 // An error is returned if the font data bundled with this package cannot be
 // loaded; this indicates a broken installation and should not happen for any

@@ -33,10 +33,8 @@ type streamData struct {
 // Pixels returns the fully decoded pixel data from the stream.  The
 // read is capped at the per-image budget computed from the dict's
 // declared /Width, /Height, /BitsPerComponent and /ColorSpace, with
-// any extra bytes the filter produces silently discarded.  Discarding
-// is what viewers do when the filter (notably DCTDecode) emits more
-// bytes than the dict declares, see viewer-tests/image/jpeg-mismatch;
-// the short-read case is handled by [normalizeData] padding.
+// any extra bytes the filter produces silently discarded.  A short
+// read is handled by [normalizeData] padding.
 //
 // For JPXDecode images, Pixels returns the JPEG 2000 data.
 func (s *streamData) Pixels() ([]byte, error) {

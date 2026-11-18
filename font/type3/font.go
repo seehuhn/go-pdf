@@ -193,9 +193,7 @@ func (g *Glyph) errEmpty() error {
 }
 
 // Width returns the glyph's advance width in glyph coordinate units.
-// The width is extracted from the first operator (d0 or d1).  This
-// iterates the content stream — type3.Font.New caches per-glyph
-// widths so callers should not need to invoke this on a hot path.
+// The width is extracted from the first operator (d0 or d1).
 func (g *Glyph) Width() float64 {
 	w, _, _ := g.extract()
 	return w
@@ -204,8 +202,6 @@ func (g *Glyph) Width() float64 {
 // BBox returns the glyph's bounding box in glyph coordinate units.
 // For d1 glyphs, the bounding box is taken from the operator arguments.
 // For d0 glyphs, the bounding box is computed from path control points.
-// This iterates the content stream — type3.Font.New caches per-glyph
-// bounding boxes so callers should not need to invoke this on a hot path.
 func (g *Glyph) BBox() rect.Rect {
 	_, b, _ := g.extract()
 	return b

@@ -6,18 +6,13 @@ package bitmap
 import (
 	"image"
 	"image/color"
+	"image/draw"
 )
 
 var (
 	_ image.Image = (*Bitmap)(nil)
-	_ drawImage   = (*Bitmap)(nil)
+	_ draw.Image  = (*Bitmap)(nil)
 )
-
-// drawImage is the interface for a settable image, matching [draw.Image].
-type drawImage interface {
-	image.Image
-	Set(x, y int, c color.Color)
-}
 
 // colorModel converts any color to black or white.
 // Colors with luminance >= 50% become white (0), others become black (1).

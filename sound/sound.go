@@ -306,9 +306,6 @@ const (
 // treated as Raw on write), and that Data is non-nil.  When Encoding
 // is [EncodingMuLaw] or [EncodingALaw], BitsPerSample must be 8: those
 // are 8-bit-by-definition G.711 codecs.
-//
-// Validate is called by [Sound.Embed] to refuse writing a malformed sound.
-// External callers may use it to pre-validate a sound built in memory.
 func (s *Sound) Validate() error {
 	if s.SampleRate <= 0 || math.IsNaN(s.SampleRate) || math.IsInf(s.SampleRate, 0) {
 		return errors.New("sound: SampleRate must be positive and finite")

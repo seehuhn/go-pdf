@@ -151,14 +151,6 @@ func TestRepairGlyph(t *testing.T) {
 	}
 }
 
-func TestRepairGlyphNil(t *testing.T) {
-	out := RepairGlyph(nil)
-	m, ok := ReadGlyphMetrics(out)
-	if !ok || m.Width != 0 {
-		t.Errorf("got %v, %t", m, ok)
-	}
-}
-
 func TestRepairGlyphInlineImage(t *testing.T) {
 	data := "0 0 m\nBI /W 1 /H 1 /BPC 8 /CS /G ID \x80\nEI\nf\n"
 	out := RepairGlyph(scanBytes(data))

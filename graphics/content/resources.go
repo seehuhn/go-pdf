@@ -70,9 +70,7 @@ var _ pdf.Embedder = (*Resources)(nil)
 // dictionary directly when [Resources.SingleUse] is set, or an indirect
 // reference otherwise.
 //
-// Each category is embedded in sorted key order.  Embedding allocates object
-// numbers, so iterating the maps directly would give a different file on every
-// run.
+// The output is deterministic: each category is embedded in sorted key order.
 func (r *Resources) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) {
 	// validate PDF version constraints
 	if len(r.Shading) > 0 {

@@ -801,9 +801,6 @@ func TestChainCycle(t *testing.T) {
 	if len(chain) != 2 || chain[0] != a || chain[1] != b {
 		t.Errorf("wrong chain %v", chain)
 	}
-	if (*File)(nil).Chain() != nil {
-		t.Error("nil chain is not nil")
-	}
 
 	codec, err := a.Codec()
 	if err != nil {

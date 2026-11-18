@@ -335,15 +335,11 @@ var cmykXforms [4]struct {
 }
 
 // cmykXform returns the cached bidirectional transform for the built-in CMYK
-// profile under the rendering intent ri.  A rendering intent outside the
-// four defined values is treated as [icc.RelativeColorimetric].
+// profile under the rendering intent ri.
 //
 // The profile is part of the icc package and converts in both directions
 // under every intent, so a failure here is a broken build and panics.
 func cmykXform(ri icc.RenderingIntent) *icc.Transform {
-	if ri > icc.AbsoluteColorimetric {
-		ri = icc.RelativeColorimetric
-	}
 	e := &cmykXforms[ri]
 	e.once.Do(func() {
 		p, err := icc.Decode(icc.CMYKProfile)

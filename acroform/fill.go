@@ -14,16 +14,9 @@ import (
 )
 
 // OnState returns the on-state name of the i-th button of a check box or
-// radio button field, or the empty string if i is out of range.  See
-// [ButtonField.OnStates] for how the name is found.
-//
-// For a radio button whose widget names no on-state, OnState takes time
-// linear in the number of buttons.  Use [ButtonField.OnStates] to obtain the
-// names of all buttons.
+// radio button field.  The index i must be a valid index into the result of
+// [ButtonField.OnStates], which also describes how the name is found.
 func (f *ButtonField) OnState(i int) pdf.Name {
-	if i < 0 || i >= f.numOnStates() {
-		return ""
-	}
 	if name := f.widgetOnState(i); name != "" {
 		return name
 	}
@@ -87,7 +80,7 @@ func (f *ButtonField) OnStates() []pdf.Name {
 // itself, through its normal appearance or its current appearance state, or
 // the empty string if it names none.
 func (f *ButtonField) widgetOnState(i int) pdf.Name {
-	if i >= len(f.Widgets) || f.Widgets[i] == nil {
+	if i >= len(f.Widgets) {
 		return ""
 	}
 	w := f.Widgets[i]
@@ -126,7 +119,6 @@ func (f *ButtonField) numOnStates() int {
 }
 
 // toggle performs a click on widget i of a check box or radio button field.
-// f.Widgets[i] must be a non-nil widget.
 func (f *ButtonField) toggle(i int) {
 	states := f.OnStates()
 	on := states[i]
@@ -150,9 +142,6 @@ func (f *ButtonField) toggle(i int) {
 	f.State = on
 	unison := f.Flags&FieldRadiosInUnison != 0
 	for j, w := range f.Widgets {
-		if w == nil {
-			continue
-		}
 		if j == i || (unison && states[j] == on) {
 			w.SetAppearanceState(on)
 		} else {
@@ -175,9 +164,6 @@ func (f *ButtonField) setValue(v pdf.Name) {
 	states := f.OnStates()
 	f.State = v
 	for j, w := range f.Widgets {
-		if w == nil {
-			continue
-		}
 		if v != "Off" && states[j] == v {
 			w.SetAppearanceState(v)
 		} else {
