@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"seehuhn.de/go/pdf"
-	"seehuhn.de/go/pdf/internal/limits"
 	"seehuhn.de/go/pdf/numtree"
 )
 
@@ -74,30 +73,76 @@ type Range struct {
 
 	// Start is the value of the numeric portion for the first page in the
 	// range.  Subsequent pages are numbered sequentially from this value.
-	// Must be >= 1.  Default is 1.
+	// Valid values are 1 to 2³¹ − 1.  Default is 1.
 	Start int
 }
+
+// maxStart is the largest valid start value.  The PDF specification sets
+// no upper bound for /St, but PDF 1.7 (Annex C) gives 2³¹ − 1 as the largest
+// integer value, and PDF 2.0 (Annex C) advises that integers can often be
+// expressed within 32 bits.  The bound also keeps the values of the numeric
+// portion far from the limits of int.
+const maxStart = math.MaxInt32
 
 // Format returns the label string for a page at the given offset within this
 // range (0 = first page of the range).
 func (r *Range) Format(offset int) string {
-	n := r.Start + offset
-	var numeric string
-	switch r.Style {
-	case None:
-		return r.Prefix.String()
+	return r.Prefix.String() + r.Style.Format(r.Start+offset)
+}
+
+// Format returns the numeric portion of a page label for the value n.
+// For [None] the result is empty.  The Roman and alphabetic styles cover
+// the values from 1 up to a fixed maximum for each style; outside this range
+// the result is the decimal representation of n.
+func (s Style) Format(n int) string {
+	switch s {
 	case Decimal:
-		numeric = formatDecimal(n)
+		return formatDecimal(n)
 	case UpperRoman:
-		numeric = strings.ToUpper(formatRoman(n))
+		return strings.ToUpper(formatRoman(n))
 	case LowerRoman:
-		numeric = formatRoman(n)
+		return formatRoman(n)
 	case UpperAlpha:
-		numeric = strings.ToUpper(formatAlpha(n))
+		return strings.ToUpper(formatAlpha(n))
 	case LowerAlpha:
-		numeric = formatAlpha(n)
+		return formatAlpha(n)
 	}
-	return r.Prefix.String() + numeric
+	return ""
+}
+
+// Parse reads the numeric portion of a page label, as written by
+// [Style.Format], and returns its value.  Letter case is ignored.
+// If str is not a label of this style, the result is (0, false).
+// For [None] the only valid input is the empty string, which gives the
+// value 0.
+//
+// Parsing is lenient: some non-canonical Roman numerals are accepted, and
+// decimal input may carry a sign and leading zeros.  Decimal strings are
+// accepted by [Decimal], and by the other styles for the values where
+// [Style.Format] falls back to decimal.  Letters are accepted by the
+// alphabetic styles only for the values which [Style.Format] writes as
+// letters.
+func (s Style) Parse(str string) (int, bool) {
+	switch s {
+	case None:
+		return 0, str == ""
+	case Decimal:
+		return parseDecimal(str)
+	case UpperRoman, LowerRoman:
+		if n, ok := parseRoman(str); ok {
+			return n, true
+		}
+		return parseDecimalOutside(str, maxRomanValue)
+	case UpperAlpha, LowerAlpha:
+		if n, ok := parseAlpha(str); ok {
+			if n > maxAlphaValue {
+				return 0, false
+			}
+			return n, true
+		}
+		return parseDecimalOutside(str, maxAlphaValue)
+	}
+	return 0, false
 }
 
 // Entry is a labelling range together with the page where it starts.
@@ -146,7 +191,7 @@ func (l *Labels) validate() error {
 		if i > 0 && e.FirstPage <= l.Ranges[i-1].FirstPage {
 			return fmt.Errorf("labelling ranges out of order: %d after %d", e.FirstPage, l.Ranges[i-1].FirstPage)
 		}
-		if e.Start < 1 {
+		if e.Start < 1 || e.Start > maxStart {
 			return fmt.Errorf("labelling range at page %d has start value %d", e.FirstPage, e.Start)
 		}
 		if int(e.Style) >= len(styleToPDFName) {
@@ -207,8 +252,8 @@ func Extract(r pdf.Getter, obj pdf.Object) (*Labels, error) {
 		}
 
 		st, err := pdf.Optional(c.Integer(dict["St"]))
-		if err == nil && st >= 1 {
-			lr.Start = int(min(st, limits.MaxPageLabelStart))
+		if err == nil && st >= 1 && st <= maxStart {
+			lr.Start = int(st)
 		}
 
 		l.Ranges = append(l.Ranges, lr)

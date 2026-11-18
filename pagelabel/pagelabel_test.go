@@ -4,6 +4,7 @@
 package pagelabel
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -14,101 +15,115 @@ import (
 	"seehuhn.de/go/pdf/internal/limits"
 )
 
-func TestFormatDecimal(t *testing.T) {
-	tests := []struct {
-		n    int
-		want string
-	}{
-		{1, "1"},
-		{10, "10"},
-		{999, "999"},
+func TestStyleParseInvertsFormat(t *testing.T) {
+	values := []int{-3, 0, 4000, 5000,
+		maxAlphaValue, maxAlphaValue + 1, 260_000_000}
+	for n := 1; n <= maxRomanValue; n++ {
+		values = append(values, n)
 	}
-	for _, tc := range tests {
-		got := formatDecimal(tc.n)
-		if got != tc.want {
-			t.Errorf("formatDecimal(%d) = %q, want %q", tc.n, got, tc.want)
+	for _, style := range []Style{Decimal, UpperRoman, LowerRoman, UpperAlpha, LowerAlpha} {
+		for _, n := range values {
+			str := style.Format(n)
+			got, ok := style.Parse(str)
+			if !ok || got != n {
+				t.Errorf("style %d: Parse(%q) = (%d, %t), want (%d, true)",
+					style, str, got, ok, n)
+			}
 		}
 	}
 }
 
-func TestFormatRoman(t *testing.T) {
+func TestStyleParseNone(t *testing.T) {
+	if _, ok := None.Parse(""); !ok {
+		t.Error("None rejects the empty string")
+	}
+	if _, ok := None.Parse("1"); ok {
+		t.Error("None accepts a non-empty string")
+	}
+}
+
+func TestStyleParseIgnoresCase(t *testing.T) {
 	tests := []struct {
-		n    int
-		want string
+		style Style
+		str   string
+		want  int
 	}{
-		{1, "i"},
-		{2, "ii"},
-		{3, "iii"},
-		{4, "iv"},
-		{5, "v"},
-		{9, "ix"},
-		{10, "x"},
-		{14, "xiv"},
-		{40, "xl"},
-		{49, "xlix"},
-		{90, "xc"},
-		{99, "xcix"},
-		{400, "cd"},
-		{500, "d"},
-		{900, "cm"},
-		{1000, "m"},
-		{1994, "mcmxciv"},
-		{3999, "mmmcmxcix"},
-		{0, "0"},         // below range: decimal fallback
-		{4000, "4000"},   // above range: decimal fallback
-		{12000, "12000"}, // above range: decimal fallback
+		{LowerRoman, "MCMxlIX", 1949},
+		{UpperRoman, "iv", 4},
+		{LowerAlpha, "BB", 28},
+		{UpperAlpha, "bb", 28},
 	}
 	for _, tc := range tests {
-		got := formatRoman(tc.n)
-		if got != tc.want {
-			t.Errorf("formatRoman(%d) = %q, want %q", tc.n, got, tc.want)
+		got, ok := tc.style.Parse(tc.str)
+		if !ok || got != tc.want {
+			t.Errorf("Parse(%q) = (%d, %t), want (%d, true)", tc.str, got, ok, tc.want)
 		}
 	}
 }
 
-func TestFormatAlpha(t *testing.T) {
+func TestStyleParseRejects(t *testing.T) {
 	tests := []struct {
-		n    int
-		want string
+		style Style
+		str   string
 	}{
-		{1, "a"},
-		{2, "b"},
-		{26, "z"},
-		{27, "aa"},
-		{28, "bb"},
-		{52, "zz"},
-		{53, "aaa"},
-		{78, "zzz"},
+		{Decimal, ""},
+		{Decimal, "x"},
+		{LowerRoman, ""},
+		{LowerRoman, "ivx1"},
+		{LowerRoman, "5"}, // Format never gives this
+		{LowerAlpha, ""},
+		{LowerAlpha, "ab"},
+		{LowerAlpha, "a1"},
+		{LowerAlpha, "5"}, // Format never gives this
+		{LowerAlpha, strings.Repeat("a", limits.MaxPageLabelLength+1)},
+		{Decimal, "99999999999999999999"}, // overflows int
 	}
 	for _, tc := range tests {
-		got := formatAlpha(tc.n)
-		if got != tc.want {
-			t.Errorf("formatAlpha(%d) = %q, want %q", tc.n, got, tc.want)
+		if n, ok := tc.style.Parse(tc.str); n != 0 || ok {
+			t.Errorf("style %d: Parse(%.20q) = (%d, %t), want (0, false)",
+				tc.style, tc.str, n, ok)
 		}
 	}
 }
 
-// TestFormatAlphaCap guards against the page-label amplification attack: a
-// large value must not produce a string longer than the cap.  At the boundary
-// the formatter switches from repeated letters to a decimal fallback.
-func TestFormatAlphaCap(t *testing.T) {
-	limit := limits.MaxPageLabelLength
-
-	// largest value still rendered as repeated letters (repeat == limit)
-	maxAlpha := limit * 26
-	if got := formatAlpha(maxAlpha); got != strings.Repeat("z", limit) {
-		t.Errorf("formatAlpha(%d) = %d chars, want %d 'z'", maxAlpha, len(got), limit)
+func TestStyleParseRomanNonCanonical(t *testing.T) {
+	accept := []struct {
+		str  string
+		want int
+	}{
+		{"iiii", 4},
+		{"ic", 99},
+		{"im", 999},
+		{"viiii", 9},
+		{"mmmm", 4000},
 	}
-
-	// one past the boundary: decimal fallback
-	if got := formatAlpha(maxAlpha + 1); got != formatDecimal(maxAlpha+1) {
-		t.Errorf("formatAlpha(%d) = %q, want decimal fallback", maxAlpha+1, got)
+	for _, tc := range accept {
+		if n, ok := LowerRoman.Parse(tc.str); !ok || n != tc.want {
+			t.Errorf("Parse(%q) = (%d, %t), want (%d, true)", tc.str, n, ok, tc.want)
+		}
 	}
+	for _, str := range []string{"iic", "iix", "ivx", "xxc", "vix", "ivi", "cmc", "xcx"} {
+		if n, ok := LowerRoman.Parse(str); ok {
+			t.Errorf("Parse(%q) = %d, want failure", str, n)
+		}
+	}
+}
 
-	// a hostile /St value must not allocate a multi-megabyte string
-	huge := 260_000_000
-	if got := formatAlpha(huge); got != formatDecimal(huge) || len(got) > 16 {
-		t.Errorf("formatAlpha(%d) produced %d bytes; amplification not bounded", huge, len(got))
+func TestStyleParseLenientDecimal(t *testing.T) {
+	tests := []struct {
+		style Style
+		str   string
+		want  int
+	}{
+		{Decimal, "+007", 7},
+		{Decimal, "-0", 0},
+		{LowerRoman, "0004000", 4000},
+		{UpperAlpha, "+0", 0},
+	}
+	for _, tc := range tests {
+		if n, ok := tc.style.Parse(tc.str); !ok || n != tc.want {
+			t.Errorf("Parse(%q) = (%d, %t), want (%d, true)", tc.str, n, ok, tc.want)
+		}
 	}
 }
 
@@ -237,9 +252,29 @@ func TestExtract(t *testing.T) {
 	}
 }
 
-// TestExtractClampStart checks that a hostile /St value is clamped on read,
-// so neither the stored value nor the formatted label grows without bound.
-func TestExtractClampStart(t *testing.T) {
+// TestExtractLargeStart checks that start values up to 2³¹ − 1 are kept.
+func TestExtractLargeStart(t *testing.T) {
+	for _, st := range []int{1_500_000_000, maxStart} {
+		obj := pdf.Dict{
+			"Nums": pdf.Array{
+				pdf.Integer(0),
+				pdf.Dict{"S": pdf.Name("a"), "St": pdf.Integer(st)},
+			},
+		}
+
+		labels, err := Extract(mock.Getter, obj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := labels.Ranges[0].Start; got != st {
+			t.Errorf("Start = %d, want %d", got, st)
+		}
+	}
+}
+
+// TestExtractStartTooLarge checks that a file with a start value beyond
+// 2³¹ − 1 can be read, and that the result survives a write-read cycle.
+func TestExtractStartTooLarge(t *testing.T) {
 	obj := pdf.Dict{
 		"Nums": pdf.Array{
 			pdf.Integer(0),
@@ -252,14 +287,20 @@ func TestExtractClampStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rng := labels.Ranges[0]
-	if rng.Start != limits.MaxPageLabelStart {
-		t.Errorf("Start = %d, want clamped to %d", rng.Start, limits.MaxPageLabelStart)
+	labels2 := writeAndRead(t, labels)
+	if diff := cmp.Diff(labels.Ranges, labels2.Ranges); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
 	}
+}
 
-	// the formatted label must be bounded, not a multi-gigabyte string
-	if got := labels.Format(0); len(got) > 32 {
-		t.Errorf("Format(0) produced %d bytes; amplification not bounded", len(got))
+// TestNewStartTooLarge checks that a start value beyond 2³¹ − 1 is rejected.
+func TestNewStartTooLarge(t *testing.T) {
+	start := int64(maxStart) + 1
+	if start > math.MaxInt {
+		t.Skip("int cannot hold the start value")
+	}
+	if _, err := New(Entry{0, Range{Decimal, pdf.Text(""), int(start)}}); err == nil {
+		t.Error("start value beyond 2³¹ − 1 accepted")
 	}
 }
 
@@ -295,15 +336,32 @@ func TestExtractNegativeKey(t *testing.T) {
 	}
 }
 
-// TestRoundTripClampedStart checks that a clamped start value survives
-// Extract → Embed → Extract unchanged, so read/write parity holds.
-func TestRoundTripClampedStart(t *testing.T) {
-	labels, err := New(
-		Entry{0, Range{LowerAlpha, pdf.Text(""), limits.MaxPageLabelStart}},
-	)
+// TestRoundTripLargeStart checks that the largest valid start value survives
+// a write-read cycle.
+func TestRoundTripLargeStart(t *testing.T) {
+	labels, err := New(Entry{0, Range{LowerAlpha, pdf.Text(""), maxStart}})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	labels2 := writeAndRead(t, labels)
+	if diff := cmp.Diff(labels.Ranges, labels2.Ranges); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+func TestRoundTrip(t *testing.T) {
+	labels := newTestLabels(t)
+
+	labels2 := writeAndRead(t, labels)
+	if diff := cmp.Diff(labels.Ranges, labels2.Ranges); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// writeAndRead embeds labels in a new PDF file and reads them back.
+func writeAndRead(t *testing.T, labels *Labels) *Labels {
+	t.Helper()
 
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	rm := pdf.NewResourceManager(w)
@@ -318,45 +376,12 @@ func TestRoundTripClampedStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	labels2, err := Extract(w, ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r2 := labels2.Ranges[0]
-	if r2.Start != limits.MaxPageLabelStart {
-		t.Errorf("round trip: Start = %d, want %d", r2.Start, limits.MaxPageLabelStart)
-	}
-}
-
-func TestRoundTrip(t *testing.T) {
-	labels := newTestLabels(t)
-
-	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
-
-	rm := pdf.NewResourceManager(w)
-	ref, err := rm.Embed(labels)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = rm.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = w.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// the writer can be used as a getter after closing
 	labels2, err := Extract(w, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if diff := cmp.Diff(labels.Ranges, labels2.Ranges); diff != "" {
-		t.Errorf("round trip failed (-want +got):\n%s", diff)
-	}
+	return labels2
 }
 
 func TestRangeAt(t *testing.T) {
