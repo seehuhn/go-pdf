@@ -5,6 +5,7 @@ package pdf
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"math"
 	"path/filepath"
@@ -67,6 +68,37 @@ func TestFormatNonFinite(t *testing.T) {
 	}
 }
 
+// parseString parses a string from the given buffer.  The buffer must include
+// the surrounding parentheses or angle brackets.
+func parseString(buf []byte) (String, error) {
+	scanner := newScanner(bytes.NewReader(buf), nil, nil)
+	b, _ := scanner.PeekN(1)
+	if len(b) < 1 {
+		return nil, errInvalidString
+	}
+	var s String
+	var err error
+	switch b[0] {
+	case '(':
+		scanner.pos++
+		s, err = scanner.ReadString()
+	case '<':
+		scanner.pos++
+		s, err = scanner.ReadHexString()
+	default:
+		err = errInvalidString
+	}
+	if err != nil {
+		return nil, err
+	}
+	if scanner.CurrentPos() != int64(len(buf)) {
+		return nil, errInvalidString
+	}
+	return s, nil
+}
+
+var errInvalidString = errors.New("malformed PDF string")
+
 func TestStringParse(t *testing.T) {
 	type testCase struct {
 		in  string
@@ -102,7 +134,7 @@ func TestStringParse(t *testing.T) {
 		{"<68656C7>", String("help")},
 	}
 	for i, test := range cases {
-		out, err := ParseString([]byte(test.in))
+		out, err := parseString([]byte(test.in))
 		if err != nil {
 			t.Errorf("%d %q: %s", i, test.in, err)
 		} else if !bytes.Equal(out, test.out) {
@@ -153,7 +185,7 @@ func FuzzString(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		s1 := String(data)
 		enc := AsString(s1)
-		s2, err := ParseString([]byte(enc))
+		s2, err := parseString([]byte(enc))
 		if err != nil {
 			t.Error(err)
 		} else if !bytes.Equal(s1, s2) {

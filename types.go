@@ -802,37 +802,6 @@ func (x String) AsPDF(opt OutputOptions) Native {
 	return x
 }
 
-// ParseString parses a string from the given buffer.  The buffer must include
-// the surrounding parentheses or angle brackets.
-func ParseString(buf []byte) (String, error) {
-	scanner := newScanner(bytes.NewReader(buf), nil, nil)
-	b, _ := scanner.PeekN(1)
-	if len(b) < 1 {
-		return nil, errInvalidString
-	}
-	var s String
-	var err error
-	switch b[0] {
-	case '(':
-		scanner.pos++
-		s, err = scanner.ReadString()
-	case '<':
-		scanner.pos++
-		s, err = scanner.ReadHexString()
-	default:
-		err = errInvalidString
-	}
-	if err != nil {
-		return nil, err
-	}
-	if scanner.CurrentPos() != int64(len(buf)) {
-		return nil, errInvalidString
-	}
-	return s, nil
-}
-
-var errInvalidString = errors.New("malformed PDF string")
-
 // errNonFiniteNumber reports an attempt to write an infinity or a NaN, neither
 // of which PDF can represent.
 var errNonFiniteNumber = errors.New("number has no PDF representation")
@@ -859,26 +828,6 @@ func (x Name) isSecondClassName() bool {
 func (x Name) isThirdClassName() bool {
 	return len(x) >= 2 && x[0] == 'X' && x[1] == 'X'
 }
-
-// ParseName parses a PDF name from the given buffer.  The buffer must include
-// the leading slash.
-func ParseName(buf []byte) (Name, error) {
-	scanner := newScanner(bytes.NewReader(buf), nil, nil)
-	b, _ := scanner.PeekN(1)
-	if len(b) < 1 || b[0] != '/' {
-		return "", errInvalidName
-	}
-	n, err := scanner.ReadName()
-	if err != nil {
-		return "", err
-	}
-	if scanner.CurrentPos() != int64(len(buf)) {
-		return "", errInvalidString
-	}
-	return n, nil
-}
-
-var errInvalidName = errors.New("malformed PDF name")
 
 // Operator represents a PDF content stream operator.
 type Operator string

@@ -471,28 +471,6 @@ func resolveJBIG2Globals(r Getter, path *CycleCheck, f *FilterJBIG2) error {
 	return nil
 }
 
-// IsTagged returns true, if the PDF file is "tagged".
-func IsTagged(pdf *Writer) bool {
-	catalog := pdf.GetMeta().Catalog
-	var markInfo Dict
-	switch mi := catalog.MarkInfo.(type) {
-	case Dict:
-		markInfo = mi
-	case Reference:
-		// the user may have stored the dictionary as an indirect object
-		obj, err := pdf.Get(mi, true)
-		if err != nil {
-			return false
-		}
-		markInfo, _ = obj.(Dict)
-	}
-	if markInfo == nil {
-		return false
-	}
-	marked, _ := markInfo["Marked"].(Boolean)
-	return bool(marked)
-}
-
 // GetVersion returns the PDF version used in a PDF file.
 func GetVersion(pdf interface{ GetMeta() *MetaInfo }) Version {
 	return pdf.GetMeta().Version

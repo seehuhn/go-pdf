@@ -444,15 +444,6 @@ func TestExtractPatternUncoloredRejectsPatternBase(t *testing.T) {
 	}
 }
 
-// testUncoloredPattern is a minimal Pattern with PaintType=2 used to
-// exercise PatternUncolored's input validation.
-type testUncoloredPattern struct{}
-
-func (testUncoloredPattern) PatternType() int                              { return 1 }
-func (testUncoloredPattern) PaintType() int                                { return 2 }
-func (testUncoloredPattern) Equal(other Pattern) bool                      { return false }
-func (testUncoloredPattern) Embed(rm *pdf.EmbedHelper) (pdf.Native, error) { return nil, nil }
-
 // TestSpacePatternUncoloredEmbedRejectsPatternBase verifies that Embed
 // refuses to write a Pattern color space over a Pattern base.
 func TestSpacePatternUncoloredEmbedRejectsPatternBase(t *testing.T) {

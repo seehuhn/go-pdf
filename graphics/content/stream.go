@@ -1233,21 +1233,6 @@ func (s *scanner) SkipByte() {
 	s.ReadByte()
 }
 
-// SkipString consumes pat from the input. It returns parseError if the next
-// bytes do not match pat, or the underlying read error if input is exhausted
-// before pat can be checked.
-func (s *scanner) SkipString(pat string) error {
-	buf := s.PeekN(len(pat))
-	if string(buf) == pat {
-		s.SkipN(len(pat))
-		return nil
-	}
-	if len(buf) < len(pat) && s.err != nil {
-		return s.err
-	}
-	return parseError{}
-}
-
 // refill reads more data from the underlying reader into the buffer.
 // This is the only place where the underlying reader is called.
 func (s *scanner) refill() error {
