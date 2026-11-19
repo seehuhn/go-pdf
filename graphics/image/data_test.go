@@ -9,6 +9,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -612,9 +613,110 @@ func TestDecodeLUT8MatchesReadSamples(t *testing.T) {
 	}
 }
 
+// TestUnpackRowsMatchesReadSamples checks that the table-driven decoding of
+// packed samples reproduces readSamples exactly.
+func TestUnpackRowsMatchesReadSamples(t *testing.T) {
+	decodes := map[int][]float64{
+		1: {1, 0},
+		3: {0.25, 0.75, -1, 1, 1, -1},
+		4: {0, 1, 1, 0, 0, 100, -100, 100},
+		5: {0, 1, 0, 2, 0, 3, 0, 4, 0, 5},
+	}
+	for _, bpc := range []int{1, 2, 4} {
+		for ncomp, decode := range decodes {
+			// widths which end a row inside a byte, and on a byte boundary
+			for _, width := range []int{1, 7, 8, 13, 16} {
+				const height = 3
+				rowSamples := width * ncomp
+				rowBytes := (rowSamples*bpc + 7) / 8
+				data := make([]byte, rowBytes*height)
+				for i := range data {
+					data[i] = byte(i*37 + 11)
+				}
+
+				got := make([]float32, rowSamples*height)
+				unpackRows(got, data, width, height, ncomp, bpc, decode)
+
+				want := make([]float32, rowSamples*height)
+				for y := range height {
+					for x := range width {
+						readSamples(data, width, ncomp, bpc, x, y, decode,
+							want[(y*width+x)*ncomp:][:ncomp])
+					}
+				}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("bpc=%d ncomp=%d width=%d: mismatch (-want +got):\n%s",
+						bpc, ncomp, width, diff)
+				}
+			}
+		}
+	}
+}
+
+// TestDataLoadPacked checks that Load decodes packed 1-, 2- and 4-bit
+// samples as readSamples does, for images large enough to take the
+// table-driven path.
+func TestDataLoadPacked(t *testing.T) {
+	spaces := []color.Space{
+		color.SpaceDeviceGray,
+		color.SpaceDeviceRGB,
+		color.SpaceDeviceCMYK,
+	}
+	// an odd width, so that rows end inside a byte wherever a pixel does
+	// not fill whole bytes
+	const width, height = 67, 40
+	for _, bpc := range []int{1, 2, 4} {
+		for _, cs := range spaces {
+			ncomp := cs.Channels()
+			data := make([]byte, expectedDataSize(width, ncomp, bpc, height))
+			for i := range data {
+				data[i] = byte(i*37 + 11)
+			}
+			decode := make([]float64, 2*ncomp)
+			for c := range ncomp {
+				decode[2*c] = 1
+				decode[2*c+1] = float64(-c)
+			}
+			dict := &Dict{
+				Width:            width,
+				Height:           height,
+				ColorSpace:       cs,
+				BitsPerComponent: bpc,
+				Decode:           decode,
+				Data: &FlateSource{
+					Width:            width,
+					Colors:           ncomp,
+					BitsPerComponent: bpc,
+					WriteData: func(w io.Writer) error {
+						_, err := w.Write(data)
+						return err
+					},
+				},
+			}
+
+			got, err := dict.Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			want := make([]float32, width*height*ncomp)
+			for y := range height {
+				for x := range width {
+					readSamples(data, width, ncomp, bpc, x, y, decode,
+						want[(y*width+x)*ncomp:][:ncomp])
+				}
+			}
+			if diff := cmp.Diff(want, got.Pix); diff != "" {
+				t.Errorf("bpc=%d ncomp=%d: mismatch (-want +got):\n%s",
+					bpc, ncomp, diff)
+			}
+		}
+	}
+}
+
 // BenchmarkLoad measures sample decoding across the supported bit depths.
-// The 8-bit cases exercise the table-driven fast path in Load, the others
-// the general readSamples loop.
+// The 8-bit cases and the packed 1-, 2- and 4-bit cases exercise the
+// table-driven paths in Load, the 16-bit case the general readSamples loop.
 func BenchmarkLoad(b *testing.B) {
 	cases := []struct {
 		name string
@@ -622,7 +724,11 @@ func BenchmarkLoad(b *testing.B) {
 		bpc  int
 	}{
 		{"Gray1", color.SpaceDeviceGray, 1},
+		{"Gray2", color.SpaceDeviceGray, 2},
 		{"Gray4", color.SpaceDeviceGray, 4},
+		{"RGB1", color.SpaceDeviceRGB, 1},
+		{"RGB4", color.SpaceDeviceRGB, 4},
+		{"CMYK2", color.SpaceDeviceCMYK, 2},
 		{"Gray8", color.SpaceDeviceGray, 8},
 		{"RGB8", color.SpaceDeviceRGB, 8},
 		{"RGB16", color.SpaceDeviceRGB, 16},

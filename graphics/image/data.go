@@ -302,6 +302,11 @@ func (d *Dict) LoadReduced(reduce int) (*Data, error) {
 				pix[i+c] = lut[c][data[i+c]]
 			}
 		}
+	} else if bpc < 8 && len(data) >= expectedDataSize(width, ncomp, bpc, height) &&
+		len(pix) >= unpackTableSize(ncomp, bpc) {
+		// packed samples are decoded a byte at a time; for images smaller
+		// than the tables, building them would cost more than it saves
+		unpackRows(pix, data, width, height, ncomp, bpc, decode)
 	} else {
 		for y := range height {
 			for x := range width {
@@ -340,6 +345,69 @@ func decodeLUT8(ncomp int, decode []float64) [][256]float32 {
 		}
 	}
 	return lut
+}
+
+// unpackTableSize returns the total number of entries in the tables
+// [unpackRows] builds for the given number of channels and bit depth.
+func unpackTableSize(ncomp, bpc int) int {
+	spb := 8 / bpc
+	a, b := ncomp, spb
+	for b != 0 {
+		a, b = b, a%b
+	}
+	ntab := ncomp / a // channels on which a byte can start
+	return ntab * 256 * spb
+}
+
+// unpackRows decodes packed 1-, 2- or 4-bit image data, laid out as for
+// [readSamples], into pix.  The result agrees bit for bit with readSamples.
+//
+// One table lookup decodes all samples of a data byte.  Which channels the
+// samples of a byte belong to depends on the channel of its first sample,
+// so there is one table for each such channel which occurs.
+func unpackRows(pix []float32, data []byte, width, height, ncomp, bpc int, decode []float64) {
+	spb := 8 / bpc // samples per byte
+	mask := 1<<bpc - 1
+
+	// vals[c<<bpc | v] is the decoded value of sample value v in channel c
+	vals := make([]float32, ncomp<<bpc)
+	for c := range ncomp {
+		lo, hi := decode[2*c], decode[2*c+1]
+		for v := range mask + 1 {
+			vals[c<<bpc|v] = float32(lo + float64(v)/float64(mask)*(hi-lo))
+		}
+	}
+
+	// tables[c] decodes a byte whose first sample belongs to channel c
+	tables := make([][]float32, ncomp)
+	for c := 0; tables[c] == nil; c = (c + spb) % ncomp {
+		tab := make([]float32, 256*spb)
+		for b := range 256 {
+			for i := range spb {
+				v := (b >> ((spb - 1 - i) * bpc)) & mask
+				ch := (c + i) % ncomp
+				tab[b*spb+i] = vals[ch<<bpc|v]
+			}
+		}
+		tables[c] = tab
+	}
+
+	rowSamples := width * ncomp
+	rowBytes := (rowSamples*bpc + 7) / 8
+	fullBytes := rowSamples / spb
+	for y := range height {
+		row := pix[y*rowSamples:][:rowSamples]
+		src := data[y*rowBytes:][:rowBytes]
+		c := 0
+		for j, b := range src[:fullBytes] {
+			copy(row[j*spb:], tables[c][int(b)*spb:][:spb])
+			c = (c + spb) % ncomp
+		}
+		if rest := row[fullBytes*spb:]; len(rest) > 0 {
+			// the last byte of the row is only partly used
+			copy(rest, tables[c][int(src[fullBytes])*spb:])
+		}
+	}
 }
 
 // readSamples reads n color component values for pixel (x, y) from raw image
