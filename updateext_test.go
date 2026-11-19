@@ -242,12 +242,12 @@ var prevPat = regexp.MustCompile(`/Prev\s+(\d+)`)
 // lastStartXRef returns the value following the last startxref keyword.
 func lastStartXRef(t testing.TB, data []byte) int64 {
 	t.Helper()
-	i := bytes.LastIndex(data, []byte("startxref"))
-	if i < 0 {
+	_, after, found := bytes.CutLast(data, []byte("startxref"))
+	if !found {
 		t.Fatal("no startxref keyword")
 	}
 	var pos int64
-	if _, err := fmt.Sscanf(string(data[i+9:]), "\n%d", &pos); err != nil {
+	if _, err := fmt.Sscanf(string(after), "\n%d", &pos); err != nil {
 		t.Fatal(err)
 	}
 	return pos
@@ -990,6 +990,220 @@ func TestUpdaterToGetNewObjectBeforeClose(t *testing.T) {
 	}
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestUpdaterGetPlaintextMetadata checks that an updater reads back a
+// catalog metadata stream it wrote outside document encryption, in a file
+// with /EncryptMetadata false.
+func TestUpdaterGetPlaintextMetadata(t *testing.T) {
+	const padTo = 2048
+	newPadded := func(t *testing.T, title string) *pdf.MetadataStream {
+		t.Helper()
+		m := newMetadata(t, title)
+		m.Data.PadToLength = padTo
+		m.Plaintext = true
+		return m
+	}
+
+	w0, f := memfile.NewPDFWriter(t, pdf.V2_0, &pdf.WriterOptions{
+		UserPassword:     "u",
+		DocumentMetadata: newPadded(t, "one"),
+	})
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+	base := bytes.Clone(f.Data)
+
+	open := func(t *testing.T, data []byte) *pdf.Reader {
+		t.Helper()
+		r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)),
+			&pdf.ReaderOptions{Password: "u"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	metaRef := func(t *testing.T, r *pdf.Reader) pdf.Reference {
+		t.Helper()
+		cat, err := pdf.NewCursor(r).Dict(r.GetMeta().Trailer["Root"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		ref, ok := cat["Metadata"].(pdf.Reference)
+		if !ok {
+			t.Fatal("catalog has no Metadata reference")
+		}
+		return ref
+	}
+	newUpdater := func(t *testing.T) (*pdf.Writer, *memfile.MemFile) {
+		t.Helper()
+		dst := memfile.New()
+		u, err := pdf.NewUpdaterTo(bytes.NewReader(base), int64(len(base)), dst,
+			&pdf.UpdateOptions{Password: "u"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u, dst
+	}
+
+	t.Run("PutAtOriginalRef", func(t *testing.T) {
+		mref := metaRef(t, open(t, base))
+		u, _ := newUpdater(t)
+		const body = "<?xpacket begin='' id='W5M0MpCehiHzreSzNTczkc9d'?>replaced<?xpacket end='w'?>"
+		stm := pdf.NewStream(pdf.Dict{
+			"Type":    pdf.Name("Metadata"),
+			"Subtype": pdf.Name("XML"),
+		}, []byte(body))
+		if err := u.Put(mref, stm); err != nil {
+			t.Fatal(err)
+		}
+
+		obj, err := pdf.NewCursor(u).Stream(mref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rc, err := pdf.DecodeStream(u, nil, obj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := io.ReadAll(rc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != body {
+			t.Errorf("read back wrong: got %q, want %q", got, body)
+		}
+		if err := u.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("DictString", func(t *testing.T) {
+		mref := metaRef(t, open(t, base))
+		u, dst := newUpdater(t)
+		const note = "hello"
+		stm := pdf.NewStream(pdf.Dict{
+			"Type":    pdf.Name("Metadata"),
+			"Subtype": pdf.Name("XML"),
+			"Note":    pdf.String(note),
+		}, []byte("<?xpacket begin='' id='W5M0MpCehiHzreSzNTczkc9d'?><?xpacket end='w'?>"))
+		if err := u.Put(mref, stm); err != nil {
+			t.Fatal(err)
+		}
+
+		check := func(t *testing.T, g pdf.Getter) {
+			t.Helper()
+			obj, err := pdf.NewCursor(g).Stream(mref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := pdf.NewCursor(g).String(obj.Dict["Note"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != note {
+				t.Errorf("wrong dictionary string: got %q, want %q", got, note)
+			}
+		}
+		check(t, u)
+		if err := u.Close(); err != nil {
+			t.Fatal(err)
+		}
+		check(t, open(t, dst.Data))
+	})
+
+	t.Run("ReplacedCatalogMetadata", func(t *testing.T) {
+		u, dst := newUpdater(t)
+		cat := *u.GetMeta().Catalog
+		cat.Metadata = newPadded(t, "two")
+		u.GetMeta().Catalog = &cat
+		if err := u.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		r := open(t, dst.Data)
+		want := r.GetMeta().Catalog.Metadata
+		got, err := pdf.ExtractMetadataStream(pdf.NewCursor(u), metaRef(t, r), false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !got.Equal(want) || got.Plaintext != want.Plaintext ||
+			got.Data.PadToLength != want.Data.PadToLength {
+			t.Error("read from updater differs from read from file")
+		}
+		if got.Data.PadToLength != padTo {
+			t.Errorf("PadToLength = %d, want %d", got.Data.PadToLength, padTo)
+		}
+	})
+}
+
+// TestPlaintextMetadataReferenceChain checks that a catalog metadata stream
+// which is reached through a chain of references is read outside document
+// encryption, in a file with /EncryptMetadata false.
+func TestPlaintextMetadataReferenceChain(t *testing.T) {
+	m := newMetadata(t, "chained")
+	m.Plaintext = true
+	w0, f := memfile.NewPDFWriter(t, pdf.V2_0, &pdf.WriterOptions{
+		UserPassword:     "u",
+		DocumentMetadata: m,
+	})
+	if err := w0.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// redirect the catalog entry through an object holding a reference
+	u, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{Password: "u"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootRef := u.GetMeta().Trailer["Root"].(pdf.Reference)
+	catalog, err := pdf.NewCursor(u).Dict(rootRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	streamRef := catalog["Metadata"].(pdf.Reference)
+	link := u.Alloc()
+	if err := u.Put(link, streamRef); err != nil {
+		t.Fatal(err)
+	}
+	catalog["Metadata"] = link
+	if err := u.Put(rootRef, catalog); err != nil {
+		t.Fatal(err)
+	}
+	if err := u.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	ropt := &pdf.ReaderOptions{Password: "u"}
+	r, err := pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), ropt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := r.GetMeta().Catalog.Metadata
+	if !got.Equal(m) {
+		t.Fatal("metadata not read through the reference chain")
+	}
+
+	// a replacement written by an updater must stay readable
+	u, err = pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{Password: "u"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m2 := newMetadata(t, "replaced")
+	m2.Plaintext = true
+	cat := *u.GetMeta().Catalog
+	cat.Metadata = m2
+	u.GetMeta().Catalog = &cat
+	if err := u.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r, err = pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), ropt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.GetMeta().Catalog.Metadata; !got.Equal(m2) {
+		t.Error("replaced metadata not read back")
 	}
 }
 
@@ -1819,7 +2033,8 @@ func handmadeBase(t testing.TB, size int, rows []string) []byte {
 	buf.WriteString("0000000000 65535 f\r\n")
 	fmt.Fprintf(buf, "%010d 00000 n\r\n%010d 00000 n\r\n%010d 00003 n\r\n", o1, o2, o3)
 	for _, row := range rows {
-		buf.WriteString(row + "\r\n")
+		buf.WriteString(row)
+		buf.WriteString("\r\n")
 	}
 	fmt.Fprintf(buf, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", size, xref)
 	return buf.Bytes()

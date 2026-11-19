@@ -43,14 +43,18 @@ type MetadataStream struct {
 // caused by malformed XMP data are returned as [*MalformedFileError]
 // so callers can use [Optional] / [Cursor.DecodeOptional] to swallow
 // them.
-func ExtractMetadataStream(c Cursor, ref Object, _ bool) (*MetadataStream, error) {
+func ExtractMetadataStream(c Cursor, ref Object, isDirect bool) (*MetadataStream, error) {
 	if ref == nil {
 		return nil, &MalformedFileError{
 			Err: errors.New("missing metadata stream"),
 		}
 	}
 
-	stream, err := c.Stream(ref)
+	resolved, path, err := resolvePath(c.x.R, c.path, ref, true)
+	if err != nil {
+		return nil, err
+	}
+	stream, err := as[*Stream](resolved)
 	if err != nil {
 		return nil, err
 	}
@@ -72,34 +76,39 @@ func ExtractMetadataStream(c Cursor, ref Object, _ bool) (*MetadataStream, error
 		return nil, err
 	}
 
-	// inspect the on-disk filter chain so we can preserve plaintext
-	// semantics on rewrite and reset PadToLength when the source was
-	// Flate-wrapped (the on-disk length the xmp parser observed is the
-	// decoded length, not the stored length, so it's not a meaningful
-	// pad target on rewrite).
+	// Inspect the on-disk filter chain so we can preserve plaintext
+	// semantics on rewrite.  The xmp parser observed the decoded bytes;
+	// unless these are also the bytes on disk, the packet length is not
+	// a meaningful pad target and PadToLength is reset.
+	// The stream is stored under the last reference followed, either
+	// above or, when called via [Cursor.Decode], by the caller.
+	encrypted := c.Getter().GetMeta().Encryption != nil
+	_, isRef := ref.(Reference)
+	if encrypted && (isRef || !isDirect) && path != nil {
+		if g, ok := c.Getter().(exemptGetter); ok && g.isUnencrypted(path.Ref) {
+			encrypted = false
+		}
+	}
+
 	plaintext := false
 	if filters, ferr := c.Filters(stream.Dict); ferr == nil {
-		// the bytes on disk are raw XMP iff:
-		//   - in an unencrypted file: there are no filters at all
-		//   - in an encrypted file: the chain is exactly /Crypt /Identity,
-		//     which bypasses document encryption without transforming
-		//     the data; any additional filter (e.g. /FlateDecode) means
-		//     the on-disk bytes are not raw XMP.
-		// the catalog /EncryptMetadata=false case is handled by the
-		// reader after extraction (it sets Plaintext on the typed value).
-		if c.Getter().GetMeta().Encryption == nil {
-			plaintext = len(filters) == 0
-		} else if len(filters) == 1 {
+		// The bytes on disk are raw XMP if there are no filters and
+		// document encryption does not apply (unencrypted file, or the
+		// catalog stream with /EncryptMetadata false), or if the chain is
+		// exactly /Crypt /Identity, which neither transforms the data nor
+		// applies encryption.
+		// For the catalog stream with /EncryptMetadata false, the reader
+		// sets Plaintext after extraction even when the bytes are
+		// filtered, so that a rewrite keeps the policy.
+		switch len(filters) {
+		case 0:
+			plaintext = !encrypted
+		case 1:
 			_, plaintext = filters[0].(FilterCryptIdentity)
 		}
-		if packet.PadToLength > 0 {
-			for _, f := range filters {
-				if _, ok := f.(FilterFlate); ok {
-					packet.PadToLength = 0
-					break
-				}
-			}
-		}
+	}
+	if !plaintext {
+		packet.PadToLength = 0
 	}
 
 	return &MetadataStream{Data: packet, Plaintext: plaintext}, nil
@@ -122,19 +131,18 @@ func (s *MetadataStream) Embed(rm *EmbedHelper) (Native, error) {
 		"Subtype": Name("XML"),
 	}
 
-	// refIsPlaintext is set by the writer for the catalog metadata stream
-	// when DocumentMetadata.Plaintext is true; in that case OpenStream
-	// skips encryption and no per-stream filter is needed.  Other
-	// plaintext streams need /Filter /Crypt /Identity to bypass document
-	// encryption.
+	// w.unencrypted holds the catalog metadata stream when
+	// /EncryptMetadata is false; OpenStream then skips encryption and no
+	// per-stream filter is needed.  Other plaintext streams need
+	// /Filter /Crypt /Identity to bypass document encryption.
 	var filters []Filter
-	if s.Plaintext && w.isEncrypted() && !w.refIsPlaintext[ref] {
+	if s.Plaintext && w.isEncrypted() && !w.unencrypted[ref] {
 		if err := CheckVersion(w, "plaintext metadata stream", V1_5); err != nil {
 			return nil, err
 		}
 		filters = append(filters, FilterCryptIdentity{})
 	}
-	if !s.Plaintext && !w.refIsPlaintext[ref] {
+	if !s.Plaintext && !w.unencrypted[ref] {
 		filters = append(filters, FilterFlate{})
 	}
 

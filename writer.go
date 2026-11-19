@@ -125,10 +125,10 @@ type Writer struct {
 	// committed stream.
 	documentMetadata *MetadataStream
 
-	// refIsPlaintext lists references for which OpenStream must skip the
-	// document-level encryption wrap.  Currently used only for the
-	// catalog metadata stream when /EncryptMetadata=false is in effect.
-	refIsPlaintext map[Reference]bool
+	// unencrypted lists references whose objects are stored outside
+	// document encryption: the catalog metadata stream when
+	// /EncryptMetadata is false.
+	unencrypted map[Reference]bool
 
 	// rm is the Writer-owned ResourceManager used for any embedding
 	// driven by the Writer itself: the eager NewWriter-time embed of
@@ -373,7 +373,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 		outputOptions: outOpt,
 
 		documentMetadata: opt.DocumentMetadata,
-		refIsPlaintext:   map[Reference]bool{},
+		unencrypted:      map[Reference]bool{},
 	}
 	pdf.rm = NewResourceManager(pdf)
 
@@ -396,7 +396,7 @@ func NewWriter(w io.Writer, v Version, opt *WriterOptions) (*Writer, error) {
 	if opt.DocumentMetadata != nil {
 		metaRef := pdf.Alloc()
 		if unencryptedMetadata {
-			pdf.refIsPlaintext[metaRef] = true
+			pdf.unencrypted[metaRef] = true
 		}
 		e := &EmbedHelper{rm: pdf.rm}
 		if _, err := e.EmbedAt(metaRef, opt.DocumentMetadata); err != nil {
@@ -521,6 +521,14 @@ func (w *Writer) GetMeta() *MetaInfo {
 	return &w.meta
 }
 
+func (w *Writer) isUnencrypted(ref Reference) bool {
+	if w.base != nil && w.xref[ref.Number()] == nil {
+		// not written in this session, so read from the original
+		return w.base.isUnencrypted(ref)
+	}
+	return w.unencrypted[ref]
+}
+
 func (w *Writer) GetOptions() OutputOptions {
 	return w.outputOptions
 }
@@ -592,10 +600,10 @@ func (w *Writer) get(ref Reference, canObjStm, scalarOnly bool) (obj Native, err
 		}
 	}()
 
-	s, err := w.scannerFrom(entry.Pos, canObjStm)
-	if err != nil {
+	if _, err := r.Seek(entry.Pos, io.SeekStart); err != nil {
 		return nil, err
 	}
+	s := w.objectScanner(r, entry.Pos, canObjStm)
 	s.scalarOnly = scalarOnly
 
 	obj, fileRef, err := s.ReadIndirectObject()
@@ -621,21 +629,17 @@ func (g writerLengthGetter) Get(ref Reference, canObjStm bool) (Native, error) {
 	return g.Writer.get(ref, canObjStm, true)
 }
 
-func (w *Writer) scannerFrom(pos int64, canObjStm bool) (*scanner, error) {
-	r := w.origW.(io.ReadSeeker)
+// objectScanner returns a scanner which reads from src, an object stored at
+// file position pos in the output.
+func (w *Writer) objectScanner(src io.Reader, pos int64, canObjStm bool) *scanner {
 	getInt := safeGetInteger(writerLengthGetter{w}, canObjStm)
-	s := newScanner(r, getInt, w.w.enc)
+	s := newScanner(src, getInt, w.w.enc)
+	s.unencrypted = w.unencrypted
 	if ra, ok := w.origW.(io.ReaderAt); ok {
 		s.fileReader = ra
 	}
-
-	_, err := r.Seek(pos, io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
 	s.filePos = pos
-
-	return s, nil
+	return s
 }
 
 // Put writes an indirect object to the PDF file, using the given reference.
@@ -685,7 +689,7 @@ func (w *Writer) Put(ref Reference, obj Object) error {
 		if err != nil {
 			return fmt.Errorf("Writer.Put: %w", err)
 		}
-		w.w.ref = ref
+		w.w.startObject(ref, w.unencrypted[ref])
 
 		_, err = fmt.Fprintf(w.w, "%d %d obj\n", ref.Number(), ref.Generation())
 		if err != nil {
@@ -928,7 +932,7 @@ func (w *Writer) openStream(ref Reference, dict Dict, embeddedFile bool, filters
 		if cryptName != "" && cryptName != "Identity" {
 			return nil, fmt.Errorf("OpenStream: crypt filter %s in unencrypted file", cryptName)
 		}
-	case w.refIsPlaintext[ref]:
+	case w.unencrypted[ref]:
 		// catalog metadata stream with /EncryptMetadata false
 	case cryptName == "Identity":
 		// stored as plaintext
@@ -989,7 +993,7 @@ func (w *Writer) openStream(ref Reference, dict Dict, embeddedFile bool, filters
 	if err != nil {
 		return nil, fmt.Errorf("Writer.OpenStream: %w", err)
 	}
-	w.w.ref = ref
+	w.w.startObject(ref, w.unencrypted[ref])
 
 	var streamBody io.WriteCloser = &streamWriter{
 		parent:     w,
@@ -1137,7 +1141,17 @@ type posWriter struct {
 	// This is needed to derive the key when strings or streams are encrypted.
 	ref Reference
 
+	// plain is set if the object at ref is stored outside document
+	// encryption, so that its strings are written as they are.
+	plain bool
+
 	enc *encryptInfo
+}
+
+// startObject records the top-level object which is written next.
+func (w *posWriter) startObject(ref Reference, plain bool) {
+	w.ref = ref
+	w.plain = plain
 }
 
 func (w *posWriter) Write(p []byte) (int, error) {

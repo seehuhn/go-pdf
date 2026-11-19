@@ -173,16 +173,16 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 			enc: base.enc,
 			pos: size,
 		},
-		origW:          dst,
-		nextRef:        uint32(next),
-		xref:           make(map[uint32]*xRefEntry),
-		objects:        make(map[any]Native),
-		reserved:       make(map[any]*ResourceManager),
-		objstms:        newObjstmCache(),
-		outputOptions:  outOpt,
-		refIsPlaintext: map[Reference]bool{},
-		base:           base,
-		headerOffset:   base.headerOffset,
+		origW:         dst,
+		nextRef:       uint32(next),
+		xref:          make(map[uint32]*xRefEntry),
+		objects:       make(map[any]Native),
+		reserved:      make(map[any]*ResourceManager),
+		objstms:       newObjstmCache(),
+		outputOptions: outOpt,
+		unencrypted:   map[Reference]bool{},
+		base:          base,
+		headerOffset:  base.headerOffset,
 	}
 	w.rm = NewResourceManager(w)
 
@@ -198,17 +198,17 @@ func newUpdater(src io.ReaderAt, size int64, dst io.Writer, opt *UpdateOptions) 
 		ref := path.Ref
 		w.recordOrigin(w.baseCatalog, ref)
 		if dict, ok := catalogObj.(Dict); ok {
-			if mref, ok := dict["Metadata"].(Reference); ok {
-				if m := w.baseCatalog.Metadata; m != nil {
-					w.recordOrigin(m, mref)
-				}
-				// the base Reader reads this stream as plaintext, so a
-				// replacement written at the same reference must be too
-				if base.enc != nil && base.enc.sec.unencryptedMetadata {
-					w.refIsPlaintext[mref] = true
+			if m := w.baseCatalog.Metadata; m != nil {
+				if _, mpath, err := resolvePath(base, nil, dict["Metadata"], true); err == nil && mpath != nil {
+					w.recordOrigin(m, mpath.Ref)
 				}
 			}
 		}
+	}
+	// the base Reader reads this stream as plaintext, so a replacement
+	// written at the same reference must be too
+	if base.exemptMetadata != 0 {
+		w.unencrypted[base.exemptMetadata] = true
 	}
 	if _, path, err := resolvePath(base, nil, base.meta.Trailer["Info"], true); err == nil && path != nil && w.baseInfo != nil {
 		w.recordOrigin(w.baseInfo, path.Ref)
@@ -282,10 +282,8 @@ func (w *Writer) getUpdate(ref Reference, canObjStm, scalarOnly bool) (Native, e
 		return nil, err
 	}
 
-	getInt := safeGetInteger(writerLengthGetter{w}, canObjStm)
-	s := newScanner(io.NewSectionReader(ra, entry.Pos, w.w.pos-entry.Pos), getInt, w.w.enc)
-	s.fileReader = ra
-	s.filePos = entry.Pos
+	src := io.NewSectionReader(ra, entry.Pos, w.w.pos-entry.Pos)
+	s := w.objectScanner(src, entry.Pos, canObjStm)
 	s.scalarOnly = scalarOnly
 
 	obj, fileRef, err := s.ReadIndirectObject()
@@ -309,7 +307,7 @@ func (w *Writer) closeUpdate() (Dict, error) {
 	if m := w.meta.Catalog.Metadata; m != nil && w.Origin(m) == 0 {
 		ref := w.Alloc()
 		if w.w.enc != nil && w.w.enc.sec.unencryptedMetadata {
-			w.refIsPlaintext[ref] = true
+			w.unencrypted[ref] = true
 		}
 		e := &EmbedHelper{rm: w.rm}
 		if _, err := e.EmbedAt(ref, m); err != nil {

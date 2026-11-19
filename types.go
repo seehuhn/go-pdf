@@ -549,7 +549,7 @@ func formatString(w io.Writer, s String, opt OutputOptions) error {
 
 	pretty := opt.HasAny(OptPretty)
 	if wenc, ok := w.(*posWriter); ok {
-		if wenc.enc != nil {
+		if wenc.enc != nil && !wenc.plain {
 			enc, err := wenc.enc.EncryptBytes(wenc.ref, l)
 			if err != nil {
 				return err

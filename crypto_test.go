@@ -473,6 +473,62 @@ func TestEncryptStream(t *testing.T) {
 	}
 }
 
+// TestDecryptStreamReadProgress checks that every Read on a decrypted AES
+// stream either returns data or an error, including when the last
+// ciphertext block consists of padding only.
+func TestDecryptStreamReadProgress(t *testing.T) {
+	id := []byte("0123456789ABCDEF")
+	ref := NewReference(1, 2)
+	sec, err := createStdSecHandler(id, "secret", "supersecret", PermAll, 128, 4, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc := encryptInfo{
+		stmF: &cryptFilter{Cipher: cipherAES, Length: 128},
+		sec:  sec,
+	}
+
+	for msgLen := range 49 {
+		for _, bufSize := range []int{1, 7, 16, 100} {
+			msg := bytes.Repeat([]byte{'x'}, msgLen)
+
+			buf := &bytes.Buffer{}
+			w, err := enc.encryptStream(enc.stmF, ref, withDummyClose{buf})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := w.Write(msg); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			r, err := enc.decryptStream(enc.stmF, ref, buf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var res []byte
+			p := make([]byte, bufSize)
+			for {
+				n, err := r.Read(p)
+				res = append(res, p[:n]...)
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					t.Fatal(err)
+				}
+				if n == 0 {
+					t.Fatalf("len %d, buf %d: Read returned (0, nil)", msgLen, bufSize)
+				}
+			}
+			if !bytes.Equal(res, msg) {
+				t.Errorf("len %d, buf %d: round trip failed", msgLen, bufSize)
+			}
+		}
+	}
+}
+
 // TestDecryptBytesRejectsBadAESPadding is a regression test for the padding
 // oracle in DecryptBytes: the AES branch must reject any ciphertext whose last
 // plaintext block does not end in valid PKCS#7 padding, not just any byte in

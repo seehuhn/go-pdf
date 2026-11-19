@@ -31,6 +31,14 @@ type Getter interface {
 	Get(ref Reference, canObjStm bool) (Native, error)
 }
 
+// exemptGetter is implemented by getters which store some objects outside
+// document encryption.
+type exemptGetter interface {
+	// isUnencrypted reports whether the object at ref is stored outside
+	// document encryption.
+	isUnencrypted(ref Reference) bool
+}
+
 // Resolve resolves references to indirect objects.
 //
 // If obj is a [Reference], the function reads the corresponding object from

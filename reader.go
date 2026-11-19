@@ -57,6 +57,10 @@ type Reader struct {
 	enc         *encryptInfo       // read-only after construction
 	unencrypted map[Reference]bool // read-only after construction
 
+	// exemptMetadata is the reference of the catalog metadata stream, if
+	// /EncryptMetadata false places it outside document encryption.
+	exemptMetadata Reference
+
 	// objstms caches decoded object streams, so that resolving the many
 	// objects inside one ObjStm does not re-run its filter chain for every
 	// lookup.  Methods of the cache are safe for concurrent use, matching
@@ -220,13 +224,12 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 		return Wrap(err, "document catalog")
 	}
 
-	// mark the catalog metadata stream as exempt from document-level
-	// encryption when /EncryptMetadata is false — the spec exempts it
-	// from default StmF encryption in that case.  Must happen before
+	// With /EncryptMetadata false, the catalog metadata stream is stored
+	// outside document encryption.  This must be recorded before
 	// DecodeCatalog reads the stream below.
-	if metaRef, ok := catalogDict["Metadata"].(Reference); ok && metaRef != 0 {
-		if r.enc != nil && r.enc.sec.unencryptedMetadata {
-			r.unencrypted[metaRef] = true
+	if r.enc != nil && r.enc.sec.unencryptedMetadata {
+		if err := r.markExemptMetadata(catalogDict["Metadata"]); err != nil {
+			return err
 		}
 	}
 
@@ -289,6 +292,43 @@ func (r *Reader) Close() error {
 // This implements the [Getter] interface.
 func (r *Reader) GetMeta() *MetaInfo {
 	return &r.meta
+}
+
+func (r *Reader) isUnencrypted(ref Reference) bool {
+	return r.unencrypted[ref]
+}
+
+// markExemptMetadata records that the metadata stream obj leads to is stored
+// outside document encryption.  The stream is stored under the last
+// reference of a chain such as "1 0 obj 2 0 R endobj", so the chain is
+// followed.  An object which holds only a reference reads the same with and
+// without encryption, so each object can be read as exempt before it is
+// known whether it ends the chain.
+func (r *Reader) markExemptMetadata(obj Object) error {
+	var path *CycleCheck
+	for {
+		ref, ok := obj.(Reference)
+		if !ok {
+			return nil
+		}
+		var err error
+		path, err = path.step(ref)
+		if err != nil {
+			return nil
+		}
+
+		r.unencrypted[ref] = true
+		next, err := r.Get(ref, true)
+		if IsReadError(err) {
+			return err
+		}
+		if _, isRef := next.(Reference); !isRef {
+			r.exemptMetadata = ref
+			return nil
+		}
+		delete(r.unencrypted, ref)
+		obj = next
+	}
 }
 
 // XRefOffsets returns the byte offsets of the file's cross-reference

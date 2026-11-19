@@ -1523,6 +1523,10 @@ func (r *decryptReader) Read(p []byte) (int, error) {
 				return 0, &MalformedFileError{Err: err}
 			}
 			r.ready = unpadded
+			if len(r.ready) == 0 {
+				// the last block was all padding
+				return 0, io.EOF
+			}
 		}
 	}
 

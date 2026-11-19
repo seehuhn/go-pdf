@@ -599,3 +599,269 @@ func TestMetadataPlaintextRequiresVersion(t *testing.T) {
 		}
 	})
 }
+
+// TestMetadataPaddedEncryptedStream checks that a padded XMP packet in an
+// encrypted, unfiltered stream can be read and written back.  The bytes on
+// disk are ciphertext, so the padding is not usable for in-place editing.
+func TestMetadataPaddedEncryptedStream(t *testing.T) {
+	packet := xmp.NewPacket()
+	dc := &xmp.DublinCore{}
+	dc.Title.Set(language.Und, "Encrypted Padded")
+	if err := packet.Set(dc); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	packet.PadToLength = 2048
+
+	w1, mf := memfile.NewPDFWriter(t, pdf.V2_0, &pdf.WriterOptions{UserPassword: "u"})
+	ref := w1.Alloc()
+	body, err := w1.OpenStream(ref, pdf.Dict{
+		"Type":    pdf.Name("Metadata"),
+		"Subtype": pdf.Name("XML"),
+	})
+	if err != nil {
+		t.Fatalf("OpenStream: %v", err)
+	}
+	if err := packet.Write(body, nil); err != nil {
+		t.Fatalf("write packet: %v", err)
+	}
+	if err := body.Close(); err != nil {
+		t.Fatalf("close stream: %v", err)
+	}
+
+	if err := w1.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	r, err := pdf.NewReader(bytes.NewReader(mf.Data), int64(len(mf.Data)),
+		&pdf.ReaderOptions{Password: "u"})
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+
+	m1, err := pdf.ExtractMetadataStream(pdf.NewCursor(r), ref, false)
+	if err != nil {
+		t.Fatalf("extract: %v", err)
+	}
+
+	w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+	rm := pdf.NewResourceManager(w2)
+	ref2, err := rm.Embed(m1)
+	if err != nil {
+		t.Fatalf("embed: %v", err)
+	}
+	if err := rm.Close(); err != nil {
+		t.Fatalf("rm close: %v", err)
+	}
+
+	m2, err := pdf.ExtractMetadataStream(pdf.NewCursor(w2), ref2, false)
+	if err != nil {
+		t.Fatalf("extract after write: %v", err)
+	}
+	if !m1.Equal(m2) || m1.Plaintext != m2.Plaintext {
+		t.Error("round trip failed")
+	}
+}
+
+// TestMetadataPaddedExemptCatalog checks that the padding of the catalog
+// metadata stream survives when /EncryptMetadata is false: the stream is
+// stored raw on disk, so the padding stays usable for in-place editing.
+func TestMetadataPaddedExemptCatalog(t *testing.T) {
+	const padTo = 2048
+
+	packet := xmp.NewPacket()
+	dc := &xmp.DublinCore{}
+	dc.Title.Set(language.Und, "Exempt Padded")
+	if err := packet.Set(dc); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	packet.PadToLength = padTo
+
+	opt := &pdf.WriterOptions{
+		UserPassword:     "u",
+		DocumentMetadata: &pdf.MetadataStream{Data: packet, Plaintext: true},
+	}
+	w1, mf := memfile.NewPDFWriter(t, pdf.V2_0, opt)
+	if err := w1.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	r1, err := pdf.NewReader(bytes.NewReader(mf.Data), int64(len(mf.Data)),
+		&pdf.ReaderOptions{Password: "u"})
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+
+	m1 := r1.GetMeta().Catalog.Metadata
+	if m1 == nil {
+		t.Fatal("no catalog metadata")
+	}
+	if !m1.Plaintext || m1.Data.PadToLength != padTo {
+		t.Errorf("read: got Plaintext=%t, PadToLength=%d, want true, %d",
+			m1.Plaintext, m1.Data.PadToLength, padTo)
+	}
+
+	t.Run("Writer", func(t *testing.T) {
+		catalog, err := pdf.NewCursor(r1).Dict(r1.GetMeta().Trailer["Root"])
+		if err != nil {
+			t.Fatalf("catalog: %v", err)
+		}
+		m, err := pdf.ExtractMetadataStream(pdf.NewCursor(w1), catalog["Metadata"], false)
+		if err != nil {
+			t.Fatalf("extract from writer: %v", err)
+		}
+		if !m.Equal(m1) || m.Data.PadToLength != padTo {
+			t.Error("read from writer differs from read from file")
+		}
+	})
+
+	t.Run("Updater", func(t *testing.T) {
+		catalog, err := pdf.NewCursor(r1).Dict(r1.GetMeta().Trailer["Root"])
+		if err != nil {
+			t.Fatalf("catalog: %v", err)
+		}
+		u, err := pdf.NewUpdaterTo(bytes.NewReader(mf.Data), int64(len(mf.Data)),
+			&bytes.Buffer{}, &pdf.UpdateOptions{Password: "u"})
+		if err != nil {
+			t.Fatalf("NewUpdaterTo: %v", err)
+		}
+		m, err := pdf.ExtractMetadataStream(pdf.NewCursor(u), catalog["Metadata"], false)
+		if err != nil {
+			t.Fatalf("extract from updater: %v", err)
+		}
+		if !m.Equal(m1) || m.Data.PadToLength != padTo {
+			t.Error("read from updater differs from read from file")
+		}
+	})
+
+	t.Run("RoundTrip", func(t *testing.T) {
+		opt := &pdf.WriterOptions{UserPassword: "u", DocumentMetadata: m1}
+		w2, mf2 := memfile.NewPDFWriter(t, pdf.V2_0, opt)
+		if err := w2.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		r2, err := pdf.NewReader(bytes.NewReader(mf2.Data), int64(len(mf2.Data)),
+			&pdf.ReaderOptions{Password: "u"})
+		if err != nil {
+			t.Fatalf("NewReader: %v", err)
+		}
+		m2 := r2.GetMeta().Catalog.Metadata
+		if !m1.Equal(m2) || m2.Plaintext != m1.Plaintext ||
+			m2.Data.PadToLength != m1.Data.PadToLength {
+			t.Error("round trip failed")
+		}
+	})
+}
+
+// TestMetadataCryptIdentityPlaintext checks that a stream whose only filter
+// is /Crypt /Identity reads as plaintext, with its padding kept, where
+// document encryption does not apply.
+func TestMetadataCryptIdentityPlaintext(t *testing.T) {
+	const padTo = 2048
+	newPacket := func(t *testing.T, title string) *xmp.Packet {
+		t.Helper()
+		packet := xmp.NewPacket()
+		dc := &xmp.DublinCore{}
+		dc.Title.Set(language.Und, title)
+		if err := packet.Set(dc); err != nil {
+			t.Fatalf("set: %v", err)
+		}
+		packet.PadToLength = padTo
+		return packet
+	}
+	writeStream := func(t *testing.T, w *pdf.Writer, ref pdf.Reference, packet *xmp.Packet) {
+		t.Helper()
+		body, err := w.OpenStream(ref, pdf.Dict{
+			"Type":    pdf.Name("Metadata"),
+			"Subtype": pdf.Name("XML"),
+		}, pdf.FilterCryptIdentity{})
+		if err != nil {
+			t.Fatalf("OpenStream: %v", err)
+		}
+		if err := packet.Write(body, nil); err != nil {
+			t.Fatalf("write packet: %v", err)
+		}
+		if err := body.Close(); err != nil {
+			t.Fatalf("close stream: %v", err)
+		}
+	}
+	check := func(t *testing.T, m1, m2 *pdf.MetadataStream) {
+		t.Helper()
+		if !m1.Plaintext || m1.Data.PadToLength != padTo {
+			t.Errorf("read: got Plaintext=%t, PadToLength=%d, want true, %d",
+				m1.Plaintext, m1.Data.PadToLength, padTo)
+		}
+		if !m1.Equal(m2) || m1.Plaintext != m2.Plaintext ||
+			m1.Data.PadToLength != m2.Data.PadToLength {
+			t.Error("round trip failed")
+		}
+	}
+
+	t.Run("Unencrypted", func(t *testing.T) {
+		w1, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+		ref := w1.Alloc()
+		writeStream(t, w1, ref, newPacket(t, "unencrypted"))
+		m1, err := pdf.ExtractMetadataStream(pdf.NewCursor(w1), ref, false)
+		if err != nil {
+			t.Fatalf("extract: %v", err)
+		}
+
+		w2, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+		rm := pdf.NewResourceManager(w2)
+		ref2, err := rm.Embed(m1)
+		if err != nil {
+			t.Fatalf("embed: %v", err)
+		}
+		if err := rm.Close(); err != nil {
+			t.Fatalf("rm close: %v", err)
+		}
+		m2, err := pdf.ExtractMetadataStream(pdf.NewCursor(w2), ref2, false)
+		if err != nil {
+			t.Fatalf("extract after write: %v", err)
+		}
+		check(t, m1, m2)
+	})
+
+	t.Run("ExemptCatalog", func(t *testing.T) {
+		opt := &pdf.WriterOptions{
+			UserPassword:     "u",
+			DocumentMetadata: &pdf.MetadataStream{Data: newPacket(t, "base"), Plaintext: true},
+		}
+		w0, f := memfile.NewPDFWriter(t, pdf.V2_0, opt)
+		if err := w0.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		ropt := &pdf.ReaderOptions{Password: "u"}
+		r0, err := pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), ropt)
+		if err != nil {
+			t.Fatalf("NewReader: %v", err)
+		}
+		catalog, err := pdf.NewCursor(r0).Dict(r0.GetMeta().Trailer["Root"])
+		if err != nil {
+			t.Fatalf("catalog: %v", err)
+		}
+		mref := catalog["Metadata"].(pdf.Reference)
+
+		u, err := pdf.NewUpdater(f, int64(len(f.Data)), &pdf.UpdateOptions{Password: "u"})
+		if err != nil {
+			t.Fatalf("NewUpdater: %v", err)
+		}
+		writeStream(t, u, mref, newPacket(t, "replaced"))
+		if err := u.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		r1, err := pdf.NewReader(bytes.NewReader(f.Data), int64(len(f.Data)), ropt)
+		if err != nil {
+			t.Fatalf("NewReader: %v", err)
+		}
+		m1 := r1.GetMeta().Catalog.Metadata
+
+		w2, f2 := memfile.NewPDFWriter(t, pdf.V2_0,
+			&pdf.WriterOptions{UserPassword: "u", DocumentMetadata: m1})
+		if err := w2.Close(); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+		r2, err := pdf.NewReader(bytes.NewReader(f2.Data), int64(len(f2.Data)), ropt)
+		if err != nil {
+			t.Fatalf("NewReader: %v", err)
+		}
+		check(t, m1, r2.GetMeta().Catalog.Metadata)
+	})
+}
