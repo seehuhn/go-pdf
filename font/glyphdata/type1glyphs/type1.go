@@ -6,6 +6,7 @@
 package type1glyphs
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -21,24 +22,27 @@ import (
 // invalid Type 1 data.
 func FromStream(stream *glyphdata.Stream) (*type1.Font, error) {
 	if stream.Type != glyphdata.Type1 {
-		return nil, fmt.Errorf("expected Type1 stream")
+		return nil, errors.New("expected Type1 stream")
 	}
 
+	// The parser may stop before the end of the stream.  Closing the read
+	// end then makes the writer fail, so that the goroutine always ends.
 	r, w := io.Pipe()
-	var t1Font *type1.Font
-	var parseErr error
-
+	done := make(chan struct{})
 	go func() {
-		defer w.Close()
+		defer close(done)
 		err := stream.WriteTo(w, nil)
 		if err != nil {
-			w.CloseWithError(fmt.Errorf("extracting font data: %w", err))
+			err = fmt.Errorf("extracting font data: %w", err)
 		}
+		w.CloseWithError(err)
 	}()
 
-	t1Font, parseErr = type1.Read(r)
-	if parseErr != nil {
-		return nil, fmt.Errorf("parsing Type1 font: %w", parseErr)
+	t1Font, err := type1.Read(r)
+	r.Close()
+	<-done
+	if err != nil {
+		return nil, fmt.Errorf("parsing Type1 font: %w", err)
 	}
 
 	return t1Font, nil
