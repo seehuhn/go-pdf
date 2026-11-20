@@ -87,18 +87,21 @@ func ToStream(font *sfnt.Font, tp glyphdata.Type) *glyphdata.Stream {
 }
 
 // StripForEmbedding returns a copy of the font without the tables a PDF font
-// file has no use for: the character map and the OpenType layout tables.
+// file has no use for: the character map, the OpenType layout tables and
+// the "MATH" table.
 //
 // A PDF font dictionary carries the mapping from character codes to glyphs
 // itself, and PDF processors do not perform layout, so the "cmap", "GDEF",
-// "GSUB" and "GPOS" tables only add to the file size.  A caller which needs a
-// character map in the embedded program, as symbolic simple fonts do, installs
-// its own afterwards.
+// "GSUB", "GPOS" and "MATH" tables only add to the file size.  Without them,
+// subsetting adds no glyphs which only layout could reach.  A caller which
+// needs a character map in the embedded program, as symbolic simple fonts
+// do, installs its own afterwards.
 func StripForEmbedding(f *sfnt.Font) *sfnt.Font {
 	stripped := f.Clone()
 	stripped.CMapTable = nil
 	stripped.Gdef = nil
 	stripped.Gsub = nil
 	stripped.Gpos = nil
+	stripped.Math = nil
 	return stripped
 }
