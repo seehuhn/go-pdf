@@ -4,7 +4,6 @@
 package image
 
 import (
-	"errors"
 	"image"
 	gocolor "image/color"
 	"image/draw"
@@ -247,7 +246,43 @@ func clampInt(v, lo, hi int) int {
 //
 // Load is equivalent to LoadReduced(0).
 func (d *Dict) Load() (*Data, error) {
-	return d.LoadReduced(0)
+	if d.Data != nil && d.Data.IsJPX() {
+		return d.loadJPX(0)
+	}
+
+	r, err := d.Rows()
+	if err != nil {
+		return nil, err
+	}
+	width, height := r.Width, r.Height
+	ncomp := r.CS.Channels()
+	stride := width * ncomp
+	pix := make([]float32, stride*height)
+	var keyMask *image.Alpha
+	if r.key != nil {
+		keyMask = image.NewAlpha(image.Rect(0, 0, width, height))
+	}
+
+	// the rows are decoded in place
+	err = r.decodeRows(func(y int) Row {
+		row := Row{Pix: pix[y*stride:][:stride]}
+		if keyMask != nil {
+			row.Key = keyMask.Pix[y*keyMask.Stride:][:width]
+		}
+		return row
+	}, func(int, Row) bool { return true })
+	if err != nil {
+		return nil, err
+	}
+
+	return &Data{
+		Pix:     pix,
+		Stride:  stride,
+		Rect:    image.Rect(0, 0, width, height),
+		CS:      r.CS,
+		NComp:   ncomp,
+		KeyMask: keyMask,
+	}, nil
 }
 
 // LoadReduced is like [Dict.Load], but decodes JPXDecode images at
@@ -263,74 +298,7 @@ func (d *Dict) LoadReduced(reduce int) (*Data, error) {
 	if d.Data != nil && d.Data.IsJPX() {
 		return d.loadJPX(reduce)
 	}
-	cs := d.ColorSpace
-	if cs == nil {
-		return nil, errors.New("missing ColorSpace")
-	}
-	if d.BitsPerComponent == 0 {
-		return nil, errors.New("missing BitsPerComponent")
-	}
-	ncomp := cs.Channels()
-	if ncomp == 0 {
-		return nil, errors.New("pattern color spaces are not valid for images")
-	}
-
-	// a Decode array shorter than 2*ncomp would make readSamples index out of
-	// range; fall back to the default, as the read path in ExtractDict does
-	decode := d.Decode
-	if len(decode) < 2*ncomp {
-		decode = DefaultDecode(cs, d.BitsPerComponent)
-	}
-
-	data, err := d.Data.Pixels()
-	if err != nil {
-		return nil, err
-	}
-	data = normalizeData(data, expectedDataSize(d.Width, ncomp, d.BitsPerComponent, d.Height))
-
-	width, height := d.Width, d.Height
-	bpc := d.BitsPerComponent
-	pix := make([]float32, width*height*ncomp)
-	vals := make([]float32, ncomp)
-
-	if bpc == 8 && len(data) >= len(pix) {
-		// 8-bit samples are byte-aligned and contiguous, so decoding each
-		// one is a table lookup
-		lut := decodeLUT8(ncomp, decode)
-		for i := 0; i < len(pix); i += ncomp {
-			for c := range ncomp {
-				pix[i+c] = lut[c][data[i+c]]
-			}
-		}
-	} else if bpc < 8 && len(data) >= expectedDataSize(width, ncomp, bpc, height) &&
-		len(pix) >= unpackTableSize(ncomp, bpc) {
-		// packed samples are decoded a byte at a time; for images smaller
-		// than the tables, building them would cost more than it saves
-		unpackRows(pix, data, width, height, ncomp, bpc, decode)
-	} else {
-		for y := range height {
-			for x := range width {
-				readSamples(data, width, ncomp, bpc, x, y, decode, vals)
-				offset := (y*width + x) * ncomp
-				copy(pix[offset:], vals)
-			}
-		}
-	}
-
-	var keyMask *image.Alpha
-	if len(d.MaskColors) == 2*ncomp {
-		keyMask = rawColorKey(data, width, height, ncomp, bpc, d.MaskColors)
-	}
-
-	stride := width * ncomp
-	return &Data{
-		Pix:     pix,
-		Stride:  stride,
-		Rect:    image.Rect(0, 0, width, height),
-		CS:      cs,
-		NComp:   ncomp,
-		KeyMask: keyMask,
-	}, nil
+	return d.Load()
 }
 
 // decodeLUT8 tabulates the decoded component value of every 8-bit sample
@@ -347,8 +315,8 @@ func decodeLUT8(ncomp int, decode []float64) [][256]float32 {
 	return lut
 }
 
-// unpackTableSize returns the total number of entries in the tables
-// [unpackRows] builds for the given number of channels and bit depth.
+// unpackTableSize returns the total number of entries in the tables an
+// [unpacker] holds for the given number of channels and bit depth.
 func unpackTableSize(ncomp, bpc int) int {
 	spb := 8 / bpc
 	a, b := ncomp, spb
@@ -359,14 +327,24 @@ func unpackTableSize(ncomp, bpc int) int {
 	return ntab * 256 * spb
 }
 
-// unpackRows decodes packed 1-, 2- or 4-bit image data, laid out as for
-// [readSamples], into pix.  The result agrees bit for bit with readSamples.
+// An unpacker decodes rows of packed 1-, 2- or 4-bit samples, laid out as
+// for [readSamples].  The result agrees bit for bit with readSamples.
 //
 // One table lookup decodes all samples of a data byte.  Which channels the
 // samples of a byte belong to depends on the channel of its first sample,
 // so there is one table for each such channel which occurs.
-func unpackRows(pix []float32, data []byte, width, height, ncomp, bpc int, decode []float64) {
-	spb := 8 / bpc // samples per byte
+type unpacker struct {
+	// tables[c] decodes a byte whose first sample belongs to channel c
+	tables [][]float32
+
+	spb   int // samples per byte
+	ncomp int
+}
+
+// newUnpacker returns an unpacker for the given number of channels, bit
+// depth and Decode array.
+func newUnpacker(ncomp, bpc int, decode []float64) *unpacker {
+	spb := 8 / bpc
 	mask := 1<<bpc - 1
 
 	// vals[c<<bpc | v] is the decoded value of sample value v in channel c
@@ -378,7 +356,6 @@ func unpackRows(pix []float32, data []byte, width, height, ncomp, bpc int, decod
 		}
 	}
 
-	// tables[c] decodes a byte whose first sample belongs to channel c
 	tables := make([][]float32, ncomp)
 	for c := 0; tables[c] == nil; c = (c + spb) % ncomp {
 		tab := make([]float32, 256*spb)
@@ -391,22 +368,22 @@ func unpackRows(pix []float32, data []byte, width, height, ncomp, bpc int, decod
 		}
 		tables[c] = tab
 	}
+	return &unpacker{tables: tables, spb: spb, ncomp: ncomp}
+}
 
-	rowSamples := width * ncomp
-	rowBytes := (rowSamples*bpc + 7) / 8
-	fullBytes := rowSamples / spb
-	for y := range height {
-		row := pix[y*rowSamples:][:rowSamples]
-		src := data[y*rowBytes:][:rowBytes]
-		c := 0
-		for j, b := range src[:fullBytes] {
-			copy(row[j*spb:], tables[c][int(b)*spb:][:spb])
-			c = (c + spb) % ncomp
-		}
-		if rest := row[fullBytes*spb:]; len(rest) > 0 {
-			// the last byte of the row is only partly used
-			copy(rest, tables[c][int(src[fullBytes])*spb:])
-		}
+// row decodes the samples of one row from src into dst, which has one
+// entry per sample.
+func (u *unpacker) row(dst []float32, src []byte) {
+	spb := u.spb
+	fullBytes := len(dst) / spb
+	c := 0
+	for j, b := range src[:fullBytes] {
+		copy(dst[j*spb:], u.tables[c][int(b)*spb:][:spb])
+		c = (c + spb) % u.ncomp
+	}
+	if rest := dst[fullBytes*spb:]; len(rest) > 0 {
+		// the last byte of the row is only partly used
+		copy(rest, u.tables[c][int(src[fullBytes])*spb:])
 	}
 }
 

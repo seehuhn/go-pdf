@@ -613,9 +613,9 @@ func TestDecodeLUT8MatchesReadSamples(t *testing.T) {
 	}
 }
 
-// TestUnpackRowsMatchesReadSamples checks that the table-driven decoding of
+// TestUnpackerMatchesReadSamples checks that the table-driven decoding of
 // packed samples reproduces readSamples exactly.
-func TestUnpackRowsMatchesReadSamples(t *testing.T) {
+func TestUnpackerMatchesReadSamples(t *testing.T) {
 	decodes := map[int][]float64{
 		1: {1, 0},
 		3: {0.25, 0.75, -1, 1, 1, -1},
@@ -635,7 +635,10 @@ func TestUnpackRowsMatchesReadSamples(t *testing.T) {
 				}
 
 				got := make([]float32, rowSamples*height)
-				unpackRows(got, data, width, height, ncomp, bpc, decode)
+				u := newUnpacker(ncomp, bpc, decode)
+				for y := range height {
+					u.row(got[y*rowSamples:][:rowSamples], data[y*rowBytes:][:rowBytes])
+				}
 
 				want := make([]float32, rowSamples*height)
 				for y := range height {

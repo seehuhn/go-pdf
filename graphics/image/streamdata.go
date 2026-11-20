@@ -34,10 +34,20 @@ type streamData struct {
 // read is capped at the per-image budget computed from the dict's
 // declared /Width, /Height, /BitsPerComponent and /ColorSpace, with
 // any extra bytes the filter produces silently discarded.  A short
-// read is handled by [normalizeData] padding.
+// read is handled by the callers, which count missing samples as 0.
 //
 // For JPXDecode images, Pixels returns the JPEG 2000 data.
 func (s *streamData) Pixels() ([]byte, error) {
+	r, err := s.pixelReader()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return io.ReadAll(r)
+}
+
+// pixelReader returns a reader for the data which Pixels returns.
+func (s *streamData) pixelReader() (io.ReadCloser, error) {
 	var r io.ReadCloser
 	var err error
 	if s.jpx != nil {
@@ -48,8 +58,14 @@ func (s *streamData) Pixels() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
-	return io.ReadAll(io.LimitReader(r, s.maxBytes))
+	return &cappedReader{Reader: io.LimitReader(r, s.maxBytes), Closer: r}, nil
+}
+
+// cappedReader reads a capped number of bytes from a stream, and closes the
+// stream.
+type cappedReader struct {
+	io.Reader
+	io.Closer
 }
 
 // IsJPX implements [graphics.ImageData].
