@@ -33,8 +33,11 @@ type streamData struct {
 // Pixels returns the fully decoded pixel data from the stream.  The
 // read is capped at the per-image budget computed from the dict's
 // declared /Width, /Height, /BitsPerComponent and /ColorSpace, with
-// any extra bytes the filter produces silently discarded.  A short
-// read is handled by the callers, which count missing samples as 0.
+// any extra bytes the filter produces silently discarded.  If the
+// stream data is malformed partway through, for example a truncated
+// compressed stream, Pixels returns the bytes decoded before the fault.
+// A short read is handled by the callers, which count missing samples
+// as 0.
 //
 // For JPXDecode images, Pixels returns the JPEG 2000 data.
 func (s *streamData) Pixels() ([]byte, error) {
@@ -58,14 +61,29 @@ func (s *streamData) pixelReader() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &cappedReader{Reader: io.LimitReader(r, s.maxBytes), Closer: r}, nil
+	return &lenientReader{r: io.LimitReader(r, s.maxBytes), Closer: r}, nil
 }
 
-// cappedReader reads a capped number of bytes from a stream, and closes the
-// stream.
-type cappedReader struct {
-	io.Reader
+// lenientReader reads a capped number of bytes from a decoded stream, and
+// closes the stream.  The data ends at the first malformed-content error,
+// which includes a filter exceeding its working-memory budget.  Errors of
+// the underlying byte source are passed on.
+type lenientReader struct {
+	r io.Reader
 	io.Closer
+	done bool
+}
+
+func (l *lenientReader) Read(p []byte) (int, error) {
+	if l.done {
+		return 0, io.EOF
+	}
+	n, err := l.r.Read(p)
+	if pdf.IsMalformed(err) {
+		l.done = true
+		err = io.EOF
+	}
+	return n, err
 }
 
 // IsJPX implements [graphics.ImageData].

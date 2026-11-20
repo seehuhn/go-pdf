@@ -7,7 +7,10 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/hex"
+	"errors"
+	"io"
 	"testing"
+	"testing/iotest"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -186,5 +189,176 @@ func TestJPXStreamAbbreviations(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, res.Dict); diff != "" {
 		t.Errorf("wrong stream dict (-want +got):\n%s", diff)
+	}
+}
+
+// truncatedFlate returns the first half of the Flate-compressed data.
+func truncatedFlate(data []byte) []byte {
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	zw.Write(data)
+	zw.Close()
+	return buf.Bytes()[:buf.Len()/2]
+}
+
+// patternBytes returns n bytes which do not compress well.
+func patternBytes(n int) []byte {
+	data := make([]byte, n)
+	for i := range data {
+		data[i] = byte(i*i*31 + i*7)
+	}
+	return data
+}
+
+// TestTruncatedImageStream checks that an image whose compressed stream is
+// cut short can be read, and that a read-write-read cycle is stable.
+func TestTruncatedImageStream(t *testing.T) {
+	const width, height = 32, 32
+	c, ref := writeImageStream(t, pdf.V1_7, pdf.Dict{
+		"Width":            pdf.Integer(width),
+		"Height":           pdf.Integer(height),
+		"ColorSpace":       pdf.Name("DeviceGray"),
+		"BitsPerComponent": pdf.Integer(8),
+		"Filter":           pdf.Name("FlateDecode"),
+	}, truncatedFlate(patternBytes(width*height)))
+	d1, err := ExtractDict(c, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data1, err := d1.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := d1.Rows()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for range r.All() {
+		n++
+	}
+	if err := r.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if n != height {
+		t.Errorf("got %d rows, want %d", n, height)
+	}
+
+	d2, err := roundTrip(t, pdf.V1_7, d1, ExtractDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data2, err := d2.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(data1.Pix, data2.Pix); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// TestTruncatedMaskStream checks that stencil masks and soft masks whose
+// compressed stream is cut short can be read, and that a read-write-read
+// cycle is stable.
+func TestTruncatedMaskStream(t *testing.T) {
+	const width, height = 64, 32
+
+	t.Run("Mask", func(t *testing.T) {
+		c, ref := writeImageStream(t, pdf.V1_7, pdf.Dict{
+			"Width":     pdf.Integer(width),
+			"Height":    pdf.Integer(height),
+			"ImageMask": pdf.Boolean(true),
+			"Filter":    pdf.Name("FlateDecode"),
+		}, truncatedFlate(patternBytes(width/8*height)))
+		m1, err := ExtractMask(c, ref, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a1, err := m1.LoadAlpha()
+		if err != nil {
+			t.Fatal(err)
+		}
+		m2, err := roundTrip(t, pdf.V1_7, m1, ExtractMask)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a2, err := m2.LoadAlpha()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(a1, a2); diff != "" {
+			t.Errorf("round trip failed (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("SoftMask", func(t *testing.T) {
+		c, ref := writeImageStream(t, pdf.V1_7, pdf.Dict{
+			"Width":            pdf.Integer(width),
+			"Height":           pdf.Integer(height),
+			"ColorSpace":       pdf.Name("DeviceGray"),
+			"BitsPerComponent": pdf.Integer(8),
+			"Filter":           pdf.Name("FlateDecode"),
+		}, truncatedFlate(patternBytes(width*height)))
+		sm1, err := ExtractSoftMask(c, ref, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a1, err := sm1.LoadAlpha()
+		if err != nil {
+			t.Fatal(err)
+		}
+		sm2, err := roundTrip(t, pdf.V1_7, sm1, ExtractSoftMask)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a2, err := sm2.LoadAlpha()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(a1, a2); diff != "" {
+			t.Errorf("round trip failed (-want +got):\n%s", diff)
+		}
+	})
+}
+
+// TestTruncatedJPXFilterChain checks that a JPXDecode image whose outer
+// Flate stream is cut short, so that the JPEG 2000 decoder sees a partial
+// codestream, can be read, and that a read-write-read cycle is stable.
+func TestTruncatedJPXFilterChain(t *testing.T) {
+	src := jpxTestImage(32, 32, []int{8, 8, 8}, 7)
+	c, ref := writeImageStream(t, pdf.V2_0, pdf.Dict{
+		"Width":  pdf.Integer(32),
+		"Height": pdf.Integer(32),
+		"Filter": pdf.Array{pdf.Name("FlateDecode"), pdf.Name("JPXDecode")},
+	}, truncatedFlate(encodeJPX(t, src)))
+	d1, err := ExtractDict(c, ref, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data1, err := d1.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d2, err := roundTrip(t, pdf.V2_0, d1, ExtractDict)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data2, err := d2.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(data1.Pix, data2.Pix); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// TestLenientReaderPassesSourceErrors checks that an error which does not
+// report malformed content ends the read with that error.
+func TestLenientReaderPassesSourceErrors(t *testing.T) {
+	ioErr := errors.New("disk on fire")
+	r := &lenientReader{r: iotest.ErrReader(ioErr), Closer: io.NopCloser(nil)}
+	if _, err := io.ReadAll(r); err != ioErr {
+		t.Errorf("got error %v, want %v", err, ioErr)
 	}
 }
