@@ -42,7 +42,7 @@
 // for any contexts left open.  [seehuhn.de/go/pdf/reader.Reader] does
 // exactly this.
 //
-// The one Builder bypass is the [OpRawContent] pseudo-operator and any
-// Builder method that emits it directly: bytes injected this way are
-// written verbatim and not validated.
+// The one Builder bypass is the [OpRawContent] pseudo-operator, appended
+// to the Builder's Stream directly: its bytes are written verbatim and not
+// validated.
 package content

@@ -33,9 +33,9 @@ import (
 // reset-then-build pattern); [Must] makes the common error-free path a
 // one-liner: builder.Must(b.Harvest()).
 //
-// [Builder.RawContent] is the one bypass: bytes written through it are
-// inserted verbatim and not validated.  Callers using RawContent are
-// responsible for their content's correctness.
+// The [content.OpRawContent] pseudo-operator is the one bypass: its bytes
+// are written verbatim and not validated.  Callers which append it to
+// Stream are responsible for the correctness of its content.
 type Builder struct {
 	contentType content.Type
 	version     pdf.Version

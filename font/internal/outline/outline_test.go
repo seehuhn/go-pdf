@@ -49,7 +49,12 @@ func TestTextSpace(t *testing.T) {
 				if numSegments(p) == 0 { // blank glyph
 					continue
 				}
-				got, want := p.BBox(), bboxes[gid]
+				// a glyf box covers the control points, a CFF box the curves
+				got, _ := p.BBox()
+				want := bboxes[gid]
+				if name != "glyf" {
+					got, _ = p.TightBBox()
+				}
 				for _, d := range []float64{
 					got.LLx - want.LLx/1000, got.LLy - want.LLy/1000,
 					got.URx - want.URx/1000, got.URy - want.URy/1000,
@@ -84,7 +89,9 @@ func TestCFFMatchesSFNT(t *testing.T) {
 				if numSegments(viaSFNT) == 0 {
 					continue
 				}
-				if got, want := viaCFF.BBox(), viaSFNT.BBox(); got != want {
+				got, _ := viaCFF.BBox()
+				want, _ := viaSFNT.BBox()
+				if got != want {
 					t.Errorf("glyph %d: bbox %v via CFF, %v via SFNT", gid, got, want)
 				}
 			}
@@ -110,10 +117,10 @@ func TestFDMatrix(t *testing.T) {
 	if int(gid) >= f.NumGlyphs() {
 		t.Fatal("test font has no glyph with an outline")
 	}
-	before := CFF(f, gid).BBox()
+	before, _ := CFF(f, gid).BBox()
 
 	f.FontMatrices[0] = matrix.Matrix{2, 0, 0, 2, 0, 0}
-	after := CFF(f, gid).BBox()
+	after, _ := CFF(f, gid).BBox()
 
 	for _, d := range []float64{
 		after.LLx - 2*before.LLx, after.LLy - 2*before.LLy,

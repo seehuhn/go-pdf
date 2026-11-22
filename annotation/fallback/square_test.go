@@ -132,8 +132,9 @@ func inkBounds(t *testing.T, a annotation.Annotation) pdf.Rectangle {
 				c1 := vec.Vec2{X: args[0], Y: args[1]}
 				c2 := vec.Vec2{X: args[2], Y: args[3]}
 				end := vec.Vec2{X: args[4], Y: args[5]}
-				for _, t := range cubicExtrema(cur, c1, c2, end) {
-					points = append(points, path.EvalCubic(cur, c1, c2, end, t))
+				curve := path.Cubic{cur, c1, c2, end}
+				for _, t := range curve.Extrema() {
+					points = append(points, curve.At(t))
 				}
 				points = append(points, end)
 			default:

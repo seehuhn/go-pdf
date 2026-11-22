@@ -54,83 +54,6 @@ func cloudSize(vertices []vec.Vec2, perimeter float64) float64 {
 	return math.Sqrt((4 * area / perimeter) * math.Sqrt(area))
 }
 
-// pathExtent returns the rectangle the points of a path lie in.
-//
-// It is not [path.Path.BBox], which includes the control points of a curve:
-// a cloud's bulges reach only about three quarters as far as the control
-// points which shape them, which is too coarse to fit a cloud into a
-// rectangle with.
-func pathExtent(p path.Path) pdf.Rectangle {
-	ext := pdf.Rectangle{
-		LLx: math.Inf(1), LLy: math.Inf(1),
-		URx: math.Inf(-1), URy: math.Inf(-1),
-	}
-	add := func(pt vec.Vec2) {
-		ext.LLx = min(ext.LLx, pt.X)
-		ext.LLy = min(ext.LLy, pt.Y)
-		ext.URx = max(ext.URx, pt.X)
-		ext.URy = max(ext.URy, pt.Y)
-	}
-
-	var cur vec.Vec2
-	for cmd, pts := range p {
-		switch cmd {
-		case path.CmdCubeTo:
-			for _, t := range cubicExtrema(cur, pts[0], pts[1], pts[2]) {
-				add(path.EvalCubic(cur, pts[0], pts[1], pts[2], t))
-			}
-			add(pts[2])
-		default:
-			// a command whose shape this does not know contributes its
-			// points as they stand, control points included
-			for _, pt := range pts {
-				add(pt)
-			}
-		}
-		if n := len(pts); n > 0 {
-			cur = pts[n-1]
-		}
-	}
-	return ext
-}
-
-// cubicExtrema returns the parameters in (0, 1) at which a cubic Bezier
-// curve turns round in x or in y, which is where it reaches furthest.
-func cubicExtrema(p0, c1, c2, p3 vec.Vec2) []float64 {
-	var ts []float64
-	for _, v := range [][4]float64{
-		{p0.X, c1.X, c2.X, p3.X},
-		{p0.Y, c1.Y, c2.Y, p3.Y},
-	} {
-		// the derivative of the curve, divided by three
-		a := -v[0] + 3*v[1] - 3*v[2] + v[3]
-		b := 2 * (v[0] - 2*v[1] + v[2])
-		c := -v[0] + v[1]
-
-		if math.Abs(a) < 1e-12 {
-			if b != 0 {
-				ts = appendIfInside(ts, -c/b)
-			}
-			continue
-		}
-		disc := b*b - 4*a*c
-		if disc < 0 {
-			continue
-		}
-		root := math.Sqrt(disc)
-		ts = appendIfInside(ts, (-b+root)/(2*a))
-		ts = appendIfInside(ts, (-b-root)/(2*a))
-	}
-	return ts
-}
-
-func appendIfInside(ts []float64, t float64) []float64 {
-	if t > 0 && t < 1 {
-		return append(ts, t)
-	}
-	return ts
-}
-
 // cloudOutline holds precomputed cloud border geometry.
 type cloudOutline struct {
 	points  []vec.Vec2 // equidistant boundary points (CCW)
@@ -352,7 +275,11 @@ func (co *cloudOutline) stroke() path.Path {
 // precision.
 func drawPath(b *builder.Builder, p path.Path) pdf.Rectangle {
 	b.DrawPath(p, 2)
-	return pathExtent(p)
+	// the curves, not the control points: a cloud's bulges reach only about
+	// three quarters as far as the control points which shape them, which
+	// is too coarse to fit a cloud into a rectangle with
+	ext, _ := p.TightBBox()
+	return pdf.RectangleFromRect(ext)
 }
 
 // fillPath draws the closed fill path and returns the bounding box.
@@ -451,7 +378,7 @@ func (co *cloudOutline) trimToCloud(outside, inside vec.Vec2) vec.Vec2 {
 func flattenCubic(p0, cp1, cp2, p3 vec.Vec2, n int, consider func(a, b vec.Vec2)) {
 	prev := p0
 	for i := 1; i <= n; i++ {
-		pt := path.EvalCubic(p0, cp1, cp2, p3, float64(i)/float64(n))
+		pt := path.Cubic{p0, cp1, cp2, p3}.At(float64(i) / float64(n))
 		consider(prev, pt)
 		prev = pt
 	}

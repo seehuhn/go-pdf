@@ -4,7 +4,6 @@
 package font_test
 
 import (
-	"math"
 	"sync"
 	"testing"
 	"time"
@@ -131,14 +130,19 @@ func checkText(t *testing.T, o font.Outliner, l font.Layouter, s string) {
 			t.Errorf("%q: glyph %d has an empty outline", s, gid)
 			continue
 		}
-		// the outline is the glyph's own: it spans the extent the font
-		// reports for the glyph, in text space
-		got, ext := p.BBox(), geom.GlyphExtents[gid]
-		for _, d := range []float64{got.LLx - ext.LLx, got.LLy - ext.LLy, got.URx - ext.URx, got.URy - ext.URy} {
-			if math.Abs(d) > 1e-3 {
-				t.Errorf("%q: glyph %d outline bbox %v, want %v", s, gid, got, ext)
-				break
-			}
+		// The outline is the glyph's own: the extent the font reports for
+		// the glyph, in text space, lies between the box of the curves and
+		// the box of the control points.  Fonts differ in which of the two
+		// they report.
+		tight, _ := p.TightBBox()
+		loose, _ := p.BBox()
+		ext := geom.GlyphExtents[gid]
+		const eps = 1e-3
+		if ext.LLx > tight.LLx+eps || ext.LLy > tight.LLy+eps ||
+			ext.URx < tight.URx-eps || ext.URy < tight.URy-eps ||
+			ext.LLx < loose.LLx-eps || ext.LLy < loose.LLy-eps ||
+			ext.URx > loose.URx+eps || ext.URy > loose.URy+eps {
+			t.Errorf("%q: glyph %d extent %v, want between %v and %v", s, gid, ext, tight, loose)
 		}
 	}
 	if i != len(seq.Seq) {
@@ -204,7 +208,7 @@ func TestOutlinerConcurrentReaders(t *testing.T) {
 							}
 							glyphs[c] = gid
 
-							bbox := o.Outline(gid).BBox()
+							bbox, _ := o.Outline(gid).BBox()
 							if prev, seen := boxes[gid]; seen && prev != bbox {
 								t.Errorf("outline of glyph %d was %v, now %v", gid, prev, bbox)
 							}

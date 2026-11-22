@@ -140,12 +140,12 @@ func TestCloudOutlineRectangle(t *testing.T) {
 
 	want := rect.Rect{LLx: 0, LLy: 0, URx: 100, URy: 60}
 
-	fillBBox := fill.BBox()
+	fillBBox, _ := fill.BBox()
 	if !fillBBox.Covers(want) {
 		t.Errorf("fill bbox %v does not contain rectangle %v", fillBBox, want)
 	}
 
-	strokeBBox := stroke.BBox()
+	strokeBBox, _ := stroke.BBox()
 	if !strokeBBox.Covers(want) {
 		t.Errorf("stroke bbox %v does not contain rectangle %v", strokeBBox, want)
 	}
