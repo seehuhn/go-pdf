@@ -284,14 +284,14 @@ func Format(w io.Writer, opt OutputOptions, objects ...Object) error {
 					return err
 				}
 			}
-			_, err = doFormat(w, obj, opt, false)
+			_, err = doFormat(w, obj, opt, sepNone)
 			if err != nil {
 				return err
 			}
 		}
 	} else {
 		// Avoid spaces between objects as much as possible.
-		needSep := false
+		needSep := sepNone
 		for _, obj := range objects {
 			needSep, err = doFormat(w, obj, opt, needSep)
 			if err != nil {
@@ -302,14 +302,28 @@ func Format(w io.Writer, opt OutputOptions, objects ...Object) error {
 	return nil
 }
 
-// doFormat writes the textual representation of a single object, with optional
-// leading white space.
-//
-// The argument `needSep` indicates whether the function should write a
-// separator before the object, in case the output starts with an alphanumeric
-// character. The first return value indicates whether a separator is needed
-// after the object, if the following object starts with a regular character.
-func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, error) {
+// separator records which tokens need white space before them, so that
+// they do not merge with the preceding token.
+type separator uint8
+
+const (
+	// sepNone means that no token needs a separator.
+	sepNone separator = iota
+
+	// sepRegular means that a token starting with a regular character needs
+	// a separator.
+	sepRegular
+
+	// sepName means that every token, names included, needs a separator.
+	// This is used after the empty name, since "//" is read as a single
+	// token by PostScript-style readers.
+	sepName
+)
+
+// doFormat writes the textual representation of a single object, with
+// leading white space where needSep requires it.  The returned separator
+// applies to the object written next.
+func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep separator) (separator, error) {
 	var native Native
 	if obj != nil {
 		native = obj.AsPDF(opt)
@@ -317,92 +331,101 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 
 	switch x := native.(type) {
 	case nil:
-		if needSep {
+		if needSep != sepNone {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
-				return false, err
+				return sepNone, err
 			}
 		}
 		_, err := io.WriteString(w, "null")
-		return true, err
+		return sepRegular, err
 
 	case Array:
 		if x == nil {
-			if needSep {
+			if needSep != sepNone {
 				_, err := io.WriteString(w, " ")
 				if err != nil {
-					return false, err
+					return sepNone, err
 				}
 			}
 			_, err := io.WriteString(w, "null")
-			return true, err
+			return sepRegular, err
 		}
 
 		_, err := io.WriteString(w, "[")
 		if err != nil {
-			return false, err
+			return sepNone, err
 		}
 		err = Format(w, opt, x...)
 		if err != nil {
-			return false, err
+			return sepNone, err
 		}
 		_, err = io.WriteString(w, "]")
-		return false, err
+		return sepNone, err
 
 	case Boolean:
-		if needSep {
+		if needSep != sepNone {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
-				return false, err
+				return sepNone, err
 			}
 		}
 		if x {
 			_, err := io.WriteString(w, "true")
-			return true, err
+			return sepRegular, err
 		} else {
 			_, err := io.WriteString(w, "false")
-			return true, err
+			return sepRegular, err
 		}
 
 	case Dict:
 		err := formatDict(w, opt, x)
-		return false, err
+		return sepNone, err
 
 	case Integer:
-		if needSep {
+		if needSep != sepNone {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
-				return false, err
+				return sepNone, err
 			}
 		}
 		s := strconv.FormatInt(int64(x), 10)
 		_, err := io.WriteString(w, s)
-		return true, err
+		return sepRegular, err
 
 	case Name:
-		return true, formatName(w, x, opt)
+		if needSep == sepName {
+			_, err := io.WriteString(w, " ")
+			if err != nil {
+				return sepNone, err
+			}
+		}
+		if x == "" {
+			return sepName, formatName(w, x, opt)
+		}
+		return sepRegular, formatName(w, x, opt)
 
 	case Operator:
 		if !opt.HasAny(OptContentStream) {
-			return false, errors.New("operator outside content stream")
+			return sepNone, errors.New("operator outside content stream")
 		}
-		if needSep {
+		if needSep != sepNone {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
-				return false, err
+				return sepNone, err
 			}
 		}
 		_, err := io.WriteString(w, string(x))
-		return true, err
+		return sepRegular, err
 
 	case Real:
 		if math.IsInf(float64(x), 0) || math.IsNaN(float64(x)) {
-			return false, errNonFiniteNumber
+			return sepNone, errNonFiniteNumber
 		}
-		if needSep {
+		if needSep != sepNone {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
-				return false, err
+				return sepNone, err
 			}
 		}
 		s := strconv.FormatFloat(float64(x), 'f', -1, 64)
@@ -410,33 +433,33 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 			s = s + "."
 		}
 		_, err := io.WriteString(w, s)
-		return true, err
+		return sepRegular, err
 
 	case Reference:
 		if x.Number() == 0 {
-			return false, errors.New("reference to object number 0")
+			return sepNone, errors.New("reference to object number 0")
 		}
-		if needSep {
+		if needSep != sepNone {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
-				return false, err
+				return sepNone, err
 			}
 		}
 		_, err := fmt.Fprintf(w, "%d %d R", x.Number(), x.Generation())
-		return true, err
+		return sepRegular, err
 
 	case *Stream:
-		return true, errors.New("direct stream objects are not allowed")
+		return sepNone, errors.New("direct stream objects are not allowed")
 
 	case String:
 		err := formatString(w, x, opt)
-		return false, err
+		return sepNone, err
 
 	case *Placeholder:
-		if needSep {
+		if needSep != sepNone {
 			_, err := io.WriteString(w, " ")
 			if err != nil {
-				return false, err
+				return sepNone, err
 			}
 		}
 
@@ -444,7 +467,7 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		// file.
 		if x.value != nil {
 			_, err := w.Write(x.value)
-			return true, err
+			return x.sep, err
 		}
 
 		// method 2: If we can seek, write whitespace now and replace this with
@@ -452,14 +475,14 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 		if _, ok := x.pdf.origW.(io.WriteSeeker); ok {
 			x.pos = append(x.pos, x.pdf.w.pos)
 			_, err := w.Write(bytes.Repeat([]byte{' '}, x.size))
-			return true, err
+			return sepRegular, err
 		}
 
 		// method 3: If all else fails, use an indirect reference.
 		if x.ref == 0 {
 			x.ref = x.pdf.Alloc()
 		}
-		return doFormat(w, x.ref, opt, false)
+		return doFormat(w, x.ref, opt, sepNone)
 
 	default:
 		panic(fmt.Sprintf("Format: invalid PDF object type %T", x))
@@ -477,10 +500,10 @@ func doFormat(w io.Writer, obj Object, opt OutputOptions, needSep bool) (bool, e
 // Since the reader accepts braces in names in all versions, a name read
 // from a PDF 1.0 or 1.1 file cannot always be written back to such a file.
 func formatName(w io.Writer, name Name, opt OutputOptions) error {
-	l := []byte(name)
-	if bytes.IndexByte(l, 0) >= 0 {
-		return errors.New("name contains a null byte")
+	if err := name.Validate(); err != nil {
+		return err
 	}
+	l := []byte(name)
 
 	noEscapes := opt.HasAny(optNoNameEscapes)
 	var funny []int
@@ -690,12 +713,11 @@ func formatSignatureContents(w io.Writer, s String) error {
 
 // formatDictValue writes a dictionary value.  If sigContents is set, a
 // String value is written as an unencrypted hex string.
-func formatDictValue(w io.Writer, opt OutputOptions, sigContents bool, val Object, needSep bool) error {
+func formatDictValue(w io.Writer, opt OutputOptions, sigContents bool, val Object, needSep separator) (separator, error) {
 	if str, ok := val.(String); ok && sigContents {
-		return formatSignatureContents(w, str)
+		return sepNone, formatSignatureContents(w, str)
 	}
-	_, err := doFormat(w, val, opt, needSep)
-	return err
+	return doFormat(w, val, opt, needSep)
 }
 
 func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
@@ -726,7 +748,7 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 			if err != nil {
 				return err
 			}
-			err = formatDictValue(w, opt, sig && name == "Contents", val, false)
+			_, err = formatDictValue(w, opt, sig && name == "Contents", val, sepNone)
 			if err != nil {
 				return err
 			}
@@ -737,17 +759,18 @@ func formatDict(w io.Writer, opt OutputOptions, dict Dict) error {
 		}
 	} else {
 		var lastOperator Operator
+		needSep := sepNone
 		for _, name := range keys {
 			val := dict[name]
 			if val == nil {
 				continue
 			}
 
-			err := formatName(w, name, opt)
+			needSep, err = doFormat(w, name, opt, needSep)
 			if err != nil {
 				return err
 			}
-			err = formatDictValue(w, opt, sig && name == "Contents", val, true)
+			needSep, err = formatDictValue(w, opt, sig && name == "Contents", val, needSep)
 			if err != nil {
 				return err
 			}
@@ -807,12 +830,23 @@ func (x String) AsPDF(opt OutputOptions) Native {
 var errNonFiniteNumber = errors.New("number has no PDF representation")
 
 // Name represents a name object in a PDF file.
+//
+// The name must not contain NUL bytes.
 type Name string
 
 func (x Name) isNative() {}
 
 func (x Name) AsPDF(opt OutputOptions) Native {
 	return x
+}
+
+// Validate returns an error if the name contains a NUL byte, which no PDF
+// version can represent.
+func (x Name) Validate() error {
+	if strings.IndexByte(string(x), 0) >= 0 {
+		return errors.New("name contains a NUL byte")
+	}
+	return nil
 }
 
 func (x Name) isSecondClassName() bool {
@@ -1115,6 +1149,7 @@ func (x Reference) String() string {
 // use the [Writer.NewPlaceholder] method.
 type Placeholder struct {
 	value []byte
+	sep   separator
 	size  int
 
 	pdf *Writer
@@ -1126,8 +1161,9 @@ func (x *Placeholder) isNative() {}
 
 // NewPlaceholder creates a new placeholder for a value which is not yet known.
 // The argument size must be an upper bound to the length of the replacement
-// text.  Once the value becomes known, it can be filled in using the
-// [Placeholder.Set] method.
+// text.  For the empty name, whose text "/" must be followed by a space,
+// size must be at least 2.  Once the value becomes known, it can be filled
+// in using the [Placeholder.Set] method.
 func NewPlaceholder(pdf *Writer, size int) *Placeholder {
 	return &Placeholder{
 		size: size,
@@ -1161,14 +1197,18 @@ func (x *Placeholder) Set(val Native) error {
 
 	// format the value
 	buf := &bytes.Buffer{}
-	_, err := doFormat(buf, val, 0, false)
+	sep, err := doFormat(buf, val, 0, sepNone)
 	if err != nil {
 		return fmt.Errorf("Placeholder.Set: %w", err)
-	} else if buf.Len() > x.size {
+	}
+	// Text already written in place keeps the padding as its separator,
+	// so the empty name needs at least one padding space.
+	if buf.Len() > x.size || sep == sepName && len(x.pos) > 0 && buf.Len() == x.size {
 		return errors.New("Placeholder: replacement text too long")
 	}
 	x.value = make([]byte, buf.Len())
 	copy(x.value, buf.Bytes())
+	x.sep = sep
 
 	if len(x.pos) == 0 {
 		return nil

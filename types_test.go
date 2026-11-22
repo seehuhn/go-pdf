@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -368,6 +369,79 @@ func TestPlaceholder(t *testing.T) {
 	}
 }
 
+// TestPlaceholderEmptyName checks that a placeholder holding the empty name
+// is separated from a following name, both when the value is set before the
+// placeholder is written and when it is filled in afterwards.
+func TestPlaceholderEmptyName(t *testing.T) {
+	cases := []struct {
+		size     int
+		setFirst bool
+		wantErr  bool
+	}{
+		{size: 1, setFirst: true},
+		{size: 1, wantErr: true},
+		{size: 2},
+	}
+	for _, c := range cases {
+		tmpFile := filepath.Join(t.TempDir(), "test.pdf")
+		w, err := Create(tmpFile, V1_7, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.GetMeta().Catalog.Pages = w.Alloc() // pretend we have pages
+
+		p := NewPlaceholder(w, c.size)
+		if c.setFirst {
+			if err := p.Set(Name("")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		ref := w.Alloc()
+		if err := w.Put(ref, Array{p, Name("B")}); err != nil {
+			t.Fatal(err)
+		}
+		if !c.setFirst {
+			err := p.Set(Name(""))
+			if c.wantErr {
+				if err == nil {
+					t.Errorf("size %d: expected error, got nil", c.size)
+				}
+				if err := w.Close(); err != nil {
+					t.Fatal(err)
+				}
+				continue
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		data, err := os.ReadFile(tmpFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(data, []byte("//")) {
+			t.Errorf("size %d: output contains \"//\"", c.size)
+		}
+		r, err := Open(tmpFile, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := NewCursor(r).Array(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := Array{Name(""), Name("B")}
+		if !Equal(got, want) {
+			t.Errorf("size %d: got %s, want %s", c.size, AsString(got), AsString(want))
+		}
+		r.Close()
+	}
+}
+
 func TestEqual(t *testing.T) {
 	objects := []Object{
 		nil,
@@ -469,8 +543,8 @@ func TestNearlyEqual(t *testing.T) {
 	}
 }
 
-// TestFormatNameNull checks that a name containing a null byte is refused.
-func TestFormatNameNull(t *testing.T) {
+// TestFormatNameNUL checks that a name containing a NUL byte is refused.
+func TestFormatNameNUL(t *testing.T) {
 	err := Format(io.Discard, 0, Name("A\x00B"))
 	if err == nil {
 		t.Error("expected error, got nil")
@@ -478,6 +552,67 @@ func TestFormatNameNull(t *testing.T) {
 	err = Format(io.Discard, 0, Dict{"A\x00B": Integer(1)})
 	if err == nil {
 		t.Error("expected error for dict key, got nil")
+	}
+}
+
+func TestNameValidate(t *testing.T) {
+	for _, name := range []Name{"", "A", "A#00B", "\xff"} {
+		if err := name.Validate(); err != nil {
+			t.Errorf("%q: unexpected error: %v", name, err)
+		}
+	}
+	if err := Name("A\x00B").Validate(); err == nil {
+		t.Error("expected error for NUL byte, got nil")
+	}
+}
+
+// TestFormatEmptyName checks that the empty name is separated from a
+// following name or regular token, that no white space is added beyond
+// this, and that the objects read back unchanged.
+func TestFormatEmptyName(t *testing.T) {
+	cases := [][]Object{
+		{Array{Integer(65), Name(""), Name("B")}},
+		{Array{Name(""), Name(""), Name("")}},
+		{Array{Name(""), Integer(1)}},
+		{Array{Name(""), NewReference(1, 0)}},
+		{Array{Name(""), Boolean(true), Name(""), nil}},
+		{Array{Name(""), Array{}, Name(""), String("x"), Name(""), Dict{}}},
+		{Dict{"": Name("B")}},
+		{Dict{"": Integer(1)}},
+		{Dict{"A": Name(""), "B": Name("")}},
+		{Name("")},
+		{Name(""), Name("x")},
+		{Name(""), Integer(1)},
+	}
+	for _, objs := range cases {
+		buf := &bytes.Buffer{}
+		if err := Format(buf, 0, objs...); err != nil {
+			t.Fatal(err)
+		}
+		out := buf.String()
+		if strings.Contains(out, "//") {
+			t.Errorf("%q contains \"//\"", out)
+		}
+		if strings.Contains(out, "  ") {
+			t.Errorf("%q contains a double space", out)
+		}
+		if strings.TrimSpace(out) != out {
+			t.Errorf("%q has leading or trailing white space", out)
+		}
+
+		s := testScanner(out + " ")
+		for _, want := range objs {
+			if err := s.SkipWhiteSpace(); err != nil {
+				t.Fatalf("%q: %v", out, err)
+			}
+			got, err := s.ReadObject()
+			if err != nil {
+				t.Fatalf("%q: %v", out, err)
+			}
+			if !Equal(got, want) {
+				t.Errorf("%q reads as %s, want %s", out, AsString(got), AsString(want))
+			}
+		}
 	}
 }
 

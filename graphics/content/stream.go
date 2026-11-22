@@ -1118,7 +1118,7 @@ func (s *scanner) tryHex() (byte, bool) {
 	if high == 255 || low == 255 {
 		return 0, false
 	}
-	// a name cannot contain a null byte, so "#00" stays literal
+	// a name cannot contain a NUL byte, so "#00" stays literal
 	if high == 0 && low == 0 {
 		return 0, false
 	}

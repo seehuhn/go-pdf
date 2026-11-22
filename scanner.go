@@ -788,7 +788,7 @@ func (s *scanner) tryHex() (byte, bool) {
 	if hi == 255 || lo == 255 {
 		return 0, false
 	}
-	// a name cannot contain a null byte, so "#00" stays literal
+	// a name cannot contain a NUL byte, so "#00" stays literal
 	if hi == 0 && lo == 0 {
 		return 0, false
 	}
