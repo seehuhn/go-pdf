@@ -58,7 +58,7 @@ var (
 // fallback.
 func ExtractSimple(c pdf.Cursor, obj pdf.Object, nonSymbolicExt bool) (Simple, error) {
 	obj, err := c.Resolve(obj)
-	if err != nil {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 
@@ -77,14 +77,19 @@ func ExtractSimple(c pdf.Cursor, obj pdf.Object, nonSymbolicExt bool) (Simple, e
 	if dict == nil {
 		return Builtin, nil
 	}
-	if err := c.CheckDictType(dict, "Encoding"); err != nil {
-		return Builtin, err
+	if err := c.CheckDictType(dict, "Encoding"); pdf.IsReadError(err) {
+		return nil, err
+	} else if err != nil {
+		return Builtin, nil
 	}
 
 	// If we reach this point, we have found an encoding dictionary.
 
 	var baseEnc Simple
-	baseEncName, _ := c.Name(dict["BaseEncoding"])
+	baseEncName, err := c.Name(dict["BaseEncoding"])
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
 	switch baseEncName {
 	case "WinAnsiEncoding":
 		baseEnc = WinAnsi
@@ -101,11 +106,15 @@ func ExtractSimple(c pdf.Cursor, obj pdf.Object, nonSymbolicExt bool) (Simple, e
 	}
 
 	differences := make(map[byte]string)
-	if diffArray, _ := c.Array(dict["Differences"]); diffArray != nil {
+	diffArray, err := c.Array(dict["Differences"])
+	if pdf.IsReadError(err) {
+		return nil, err
+	}
+	if diffArray != nil {
 		currentCode := pdf.Integer(-1)
 		for _, item := range diffArray {
 			item, err = c.Resolve(item)
-			if err != nil {
+			if pdf.IsReadError(err) {
 				return nil, err
 			}
 
@@ -304,15 +313,16 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 }
 
 // ExtractType3 extracts the encoding from the /Encoding entry of a Type3
-// font dictionary.
+// font dictionary.  Any name, including the empty name, can be the glyph name
+// for a code.
 func ExtractType3(c pdf.Cursor, obj pdf.Object, _ bool) (Simple, error) {
 	dict, err := c.DictTyped(obj, "Encoding")
-	if err != nil {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 
 	diffArray, err := c.Array(dict["Differences"])
-	if err != nil {
+	if pdf.IsReadError(err) {
 		return nil, err
 	}
 
@@ -321,7 +331,7 @@ func ExtractType3(c pdf.Cursor, obj pdf.Object, _ bool) (Simple, error) {
 	currentCode := pdf.Integer(-1)
 	for _, item := range diffArray {
 		item, err = c.Resolve(item)
-		if err != nil {
+		if pdf.IsReadError(err) {
 			return nil, err
 		}
 
@@ -330,16 +340,10 @@ func ExtractType3(c pdf.Cursor, obj pdf.Object, _ bool) (Simple, error) {
 			currentCode = item
 
 		case pdf.Name:
-			if currentCode >= 0 && currentCode < 256 && item != "" {
+			if currentCode >= 0 && currentCode < 256 {
 				differences[byte(currentCode)] = string(item)
 				currentCode++
 			}
-		}
-	}
-
-	if len(differences) == 0 {
-		return nil, &pdf.MalformedFileError{
-			Err: errors.New("missing /Differences array"),
 		}
 	}
 
@@ -351,7 +355,7 @@ func ExtractType3(c pdf.Cursor, obj pdf.Object, _ bool) (Simple, error) {
 
 // AsPDFType3 returns the /Encoding entry for Type3 font dictionary.
 func (e Simple) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
-	var differences pdf.Array
+	differences := pdf.Array{}
 
 	lastDiff := 999
 	for code := range 256 {

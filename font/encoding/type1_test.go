@@ -8,18 +8,9 @@ import (
 	"testing"
 
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/internal/debug/mock"
 	"seehuhn.de/go/postscript/type1/names"
 )
-
-type MockGetter struct{}
-
-func (m *MockGetter) Get(ref pdf.Reference, canObjStm bool) (pdf.Native, error) {
-	return nil, nil
-}
-
-func (m *MockGetter) GetMeta() *pdf.MetaInfo {
-	return nil
-}
 
 func TestType1Encoding(t *testing.T) {
 	type mapping struct {
@@ -139,10 +130,9 @@ func TestType1Encoding(t *testing.T) {
 			},
 		},
 	}
-	r := &MockGetter{}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			enc, err := ExtractSimple(pdf.NewCursor(r), c.encoding, c.nonSymbolicExt)
+			enc, err := ExtractSimple(pdf.NewCursor(mock.Getter), c.encoding, c.nonSymbolicExt)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -213,7 +203,7 @@ func TestType1RoundTrip(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				enc2, err := ExtractSimple(pdf.NewCursor(&MockGetter{}), obj, nonSymbolicExt)
+				enc2, err := ExtractSimple(pdf.NewCursor(mock.Getter), obj, nonSymbolicExt)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -252,5 +242,155 @@ func TestUseBuiltin(t *testing.T) {
 	s := names.ToUnicode(UseBuiltin, "")
 	if s != "" {
 		t.Errorf("UseBuiltin should not be a valid glyph name, got %q", s)
+	}
+}
+
+// TestType3EmptyName checks that the empty name in a Type 3 Differences
+// array is a glyph name, and that the names after it keep their codes.
+func TestType3EmptyName(t *testing.T) {
+	obj := pdf.Dict{
+		"Differences": pdf.Array{pdf.Integer(65), pdf.Name(""), pdf.Name("B")},
+	}
+	enc, err := ExtractType3(pdf.NewCursor(mock.Getter), obj, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		code byte
+		name string
+		ok   bool
+	}{
+		{65, "", true},
+		{66, "B", true},
+		{67, "", false},
+	}
+	for _, c := range cases {
+		if name, ok := enc(c.code); name != c.name || ok != c.ok {
+			t.Errorf("code %d: got (%q, %t), want (%q, %t)", c.code, name, ok, c.name, c.ok)
+		}
+	}
+}
+
+// TestType3NoNames checks that a Differences array which names no glyphs
+// gives an encoding which maps no codes.
+func TestType3NoNames(t *testing.T) {
+	obj := pdf.Dict{"Differences": pdf.Array{pdf.Integer(65)}}
+	enc, err := ExtractType3(pdf.NewCursor(mock.Getter), obj, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for code := range 256 {
+		if _, ok := enc(byte(code)); ok {
+			t.Errorf("code %d is mapped", code)
+		}
+	}
+}
+
+// TestType3RoundTrip checks that a Type 3 encoding read from a dictionary,
+// written with AsPDFType3 and read again, maps every code the same way.
+func TestType3RoundTrip(t *testing.T) {
+	cases := []pdf.Object{
+		pdf.Dict{"Differences": pdf.Array{pdf.Integer(65), pdf.Name(""), pdf.Name("B")}},
+		pdf.Dict{"Differences": pdf.Array{
+			pdf.Integer(0), pdf.Name("a"), pdf.Name("b"),
+			pdf.Integer(254), pdf.Name("y"), pdf.Name("z"), pdf.Name("dropped"),
+		}},
+		pdf.Dict{"Differences": pdf.Array{pdf.Integer(65)}},
+
+		// malformed: Encoding and Differences are required for Type 3 fonts
+		nil,
+		pdf.Dict{},
+		pdf.Dict{"Differences": pdf.Integer(1)},
+		pdf.Name("WinAnsiEncoding"),
+		pdf.Array{pdf.Integer(65), pdf.Name("A")},
+		pdf.Dict{
+			"Type":        pdf.Name("Font"),
+			"Differences": pdf.Array{pdf.Integer(65), pdf.Name("A")},
+		},
+	}
+	for _, obj := range cases {
+		c := pdf.NewCursor(mock.Getter)
+		enc1, err := ExtractType3(c, obj, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		written, err := enc1.AsPDFType3(0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		enc2, err := ExtractType3(c, written, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for code := range 256 {
+			name1, ok1 := enc1(byte(code))
+			name2, ok2 := enc2(byte(code))
+			if name1 != name2 || ok1 != ok2 {
+				t.Errorf("%v: code %d: got (%q, %t), want (%q, %t)",
+					obj, code, name2, ok2, name1, ok1)
+			}
+		}
+	}
+}
+
+// TestSimpleMalformedRoundTrip checks that a malformed /Encoding entry of a
+// simple font can be read, and that a read-write-read cycle via AsPDFSimple
+// maps every code the same way.
+func TestSimpleMalformedRoundTrip(t *testing.T) {
+	cases := []pdf.Object{
+		pdf.Dict{
+			"Type":        pdf.Name("Font"),
+			"Differences": pdf.Array{pdf.Integer(65), pdf.Name("B")},
+		},
+		pdf.Dict{
+			"Type":         pdf.Name("Font"),
+			"BaseEncoding": pdf.Name("WinAnsiEncoding"),
+		},
+		pdf.Name("NoSuchEncoding"),
+		pdf.Array{pdf.Integer(65), pdf.Name("B")},
+		pdf.Dict{"Differences": pdf.Integer(1)},
+	}
+	for _, obj := range cases {
+		for _, nonSymbolicExt := range []bool{false, true} {
+			c := pdf.NewCursor(mock.Getter)
+			enc1, err := ExtractSimple(c, obj, nonSymbolicExt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			written, err := enc1.AsPDFSimple(nonSymbolicExt, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			enc2, err := ExtractSimple(c, written, nonSymbolicExt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for code := range 256 {
+				name1, ok1 := enc1(byte(code))
+				name2, ok2 := enc2(byte(code))
+				if name1 != name2 || ok1 != ok2 {
+					t.Errorf("%v, %t: code %d: got (%q, %t), want (%q, %t)",
+						obj, nonSymbolicExt, code, name2, ok2, name1, ok1)
+				}
+			}
+		}
+	}
+}
+
+// TestType3WriteEmpty checks that an encoding which maps no codes is written
+// with an empty, non-null Differences array.
+func TestType3WriteEmpty(t *testing.T) {
+	var enc Simple = func(byte) (string, bool) { return "", false }
+	obj, err := enc.AsPDFType3(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dict, ok := obj.(pdf.Dict)
+	if !ok {
+		t.Fatalf("got %T, want pdf.Dict", obj)
+	}
+	diff, ok := dict["Differences"].(pdf.Array)
+	if !ok || diff == nil || len(diff) != 0 {
+		t.Errorf("got Differences %#v, want empty array", dict["Differences"])
 	}
 }
