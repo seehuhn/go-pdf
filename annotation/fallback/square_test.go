@@ -5,17 +5,14 @@ package fallback
 
 import (
 	"slices"
-	"strconv"
-	"strings"
 	"testing"
 
-	"seehuhn.de/go/geom/path"
-	"seehuhn.de/go/geom/vec"
-
+	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/appearance"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
 )
 
 // shapeCases returns a square and a circle with the given margins, both
@@ -102,57 +99,43 @@ func TestShapeLeavesTheRectangleAlone(t *testing.T) {
 	}
 }
 
-// pathOperands gives, for each path operator, how many operands it takes.
-var pathOperands = map[string]int{"m": 2, "l": 2, "c": 6, "v": 4, "y": 4, "re": 4}
-
-// inkBounds returns the bounding box of the path an annotation's normal
-// appearance draws, control points included.  It is where the ink goes,
-// before the pen the path is stroked with is taken into account.
+// inkBounds returns the bounding box of the paths an annotation's normal
+// appearance paints, in form space.  Curves count by the points they pass
+// through, not by their control points.  It is where the ink goes, before
+// the pen the paths are stroked with is taken into account.
 func inkBounds(t *testing.T, a annotation.Annotation) pdf.Rectangle {
 	t.Helper()
 
-	var points []vec.Vec2
-	var nums []float64
-	var cur vec.Vec2
-	for tok := range strings.FieldsSeq(string(appearanceStream(t, a))) {
-		if v, err := strconv.ParseFloat(tok, 64); err == nil {
-			nums = append(nums, v)
+	ap := annotation.Resolve(a.GetCommon(), appearance.Normal)
+	if ap == nil || ap.Content == nil {
+		t.Fatal("the annotation has no normal appearance")
+	}
+	st := content.NewState(content.Form, ap.Res)
+	var ext rect.Rect
+	found := false
+	it := ap.Content.NewIter()
+	for name, args := range it.All() {
+		if err := st.ApplyStateChanges(name, args); err != nil {
+			t.Fatal(err)
+		}
+		pp, ok := content.PathPainting(name)
+		if !ok || !(pp.Fill || pp.Stroke) {
 			continue
 		}
-		if n, ok := pathOperands[tok]; ok && len(nums) >= n {
-			args := nums[len(nums)-n:]
-			switch tok {
-			case "re":
-				points = append(points,
-					vec.Vec2{X: args[0], Y: args[1]},
-					vec.Vec2{X: args[0] + args[2], Y: args[1] + args[3]})
-			case "c":
-				// the curve itself, not the control points which shape it:
-				// a cloud's bulges stay well inside those
-				c1 := vec.Vec2{X: args[0], Y: args[1]}
-				c2 := vec.Vec2{X: args[2], Y: args[3]}
-				end := vec.Vec2{X: args[4], Y: args[5]}
-				curve := path.Cubic{cur, c1, c2, end}
-				for _, t := range curve.Extrema() {
-					points = append(points, curve.At(t))
-				}
-				points = append(points, end)
-			default:
-				for i := 0; i+1 < n; i += 2 {
-					points = append(points, vec.Vec2{X: args[i], Y: args[i+1]})
-				}
-			}
-			if len(points) > 0 {
-				cur = points[len(points)-1]
-			}
+		r, ok := st.PaintedPath().Iter().Transform(st.GState.CTM).TightBBox()
+		if !ok {
+			continue
 		}
-		nums = nums[:0]
+		ext.Extend(r)
+		found = true
 	}
-
-	if len(points) == 0 {
+	if err := it.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !found {
 		t.Fatal("the appearance draws no path")
 	}
-	return pdf.RectangleFromPoints(points...)
+	return pdf.RectangleFromRect(ext)
 }
 
 // bboxOf returns the bounding box of an annotation's normal appearance.

@@ -275,9 +275,7 @@ func (co *cloudOutline) stroke() path.Path {
 // precision.
 func drawPath(b *builder.Builder, p path.Path) pdf.Rectangle {
 	b.DrawPath(p, 2)
-	// the curves, not the control points: a cloud's bulges reach only about
-	// three quarters as far as the control points which shape them, which
-	// is too coarse to fit a cloud into a rectangle with
+	// the curves, not the control points: those reach a third further than the bulges
 	ext, _ := p.TightBBox()
 	return pdf.RectangleFromRect(ext)
 }
