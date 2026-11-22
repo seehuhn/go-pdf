@@ -122,8 +122,8 @@ func glyphNameMappingSimple(fi *dict.FontInfoSimple) map[cid.CID]string {
 
 	m := make(map[cid.CID]string)
 	for code := range 256 {
-		name := fi.Encoding(byte(code))
-		if name == "" {
+		name, ok := fi.Encoding(byte(code))
+		if !ok {
 			continue
 		}
 		if name == encoding.UseBuiltin {

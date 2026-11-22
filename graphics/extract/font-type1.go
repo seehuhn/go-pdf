@@ -129,7 +129,7 @@ func standardDescriptor(psName string, stdInfo *stdmtx.FontData) *font.Descripto
 // enc leaves to it.
 func standardWidths(ww []float64, enc encoding.Simple, stdInfo *stdmtx.FontData) {
 	for c := range 256 {
-		name := enc(byte(c))
+		name, _ := enc(byte(c))
 		if name == encoding.UseBuiltin {
 			name = stdInfo.Encoding[c]
 		}

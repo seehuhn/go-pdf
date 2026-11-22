@@ -37,8 +37,8 @@ func moreThanTen(a pdf.Array) bool {
 // encoding.
 func widthsAreCompatible(ww []float64, enc encoding.Simple, info *stdmtx.FontData) bool {
 	for code := range 256 {
-		glyphName := enc(byte(code))
-		if glyphName == "" {
+		glyphName, ok := enc(byte(code))
+		if !ok {
 			continue
 		}
 		if glyphName == encoding.UseBuiltin {

@@ -291,7 +291,7 @@ func TestSimpleTextMapWideToUnicode(t *testing.T) {
 			},
 		},
 	}
-	enc := func(byte) string { return "" }
+	enc := func(byte) (string, bool) { return "", false }
 
 	textMap := SimpleTextMap("", enc, toUnicode)
 	for code := range 256 {

@@ -136,11 +136,11 @@ func TestType1Embedding(t *testing.T) {
 // encoding is found for a standard font which is not embedded, and only there.
 func TestType1BuiltinText(t *testing.T) {
 	builtinAt := func(code byte) encoding.Simple {
-		return func(c byte) string {
+		return func(c byte) (string, bool) {
 			if c == code {
-				return encoding.UseBuiltin
+				return encoding.UseBuiltin, true
 			}
-			return ""
+			return "", false
 		}
 	}
 	cases := []struct {

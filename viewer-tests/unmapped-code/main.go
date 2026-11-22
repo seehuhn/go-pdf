@@ -153,18 +153,18 @@ func makeTestFont() (font.Instance, error) {
 
 	F.Encoding = psenc.StandardEncoding[:]
 
-	enc := func(code byte) string {
+	enc := func(code byte) (string, bool) {
 		switch code {
 		case ' ':
-			return "space"
+			return "space", true
 		case 'A':
-			return "AEacute"
+			return "AEacute", true
 		case 'B':
-			return "does.not.exist"
+			return "does.not.exist", true
 		case 0o335:
-			return "Yacute"
+			return "Yacute", true
 		default:
-			return ""
+			return "", false
 		}
 	}
 

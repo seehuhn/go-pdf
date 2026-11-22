@@ -54,7 +54,7 @@ func NewTrueTypeSelector(font *sfnt.Font, symbolic bool, enc encoding.Simple) fu
 		code := byte(c - 1)
 		var name string
 		if enc != nil {
-			name = enc(code)
+			name, _ = enc(code)
 		}
 
 		// A lookup which finds no entry reports GID 0, indistinguishable

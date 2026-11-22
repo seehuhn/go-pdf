@@ -269,7 +269,7 @@ func (d *Type3) GlyphWidth(text string) (float64, bool) {
 	textMap := SimpleTextMap("", d.Encoding, d.ToUnicode)
 	for c := range 256 {
 		code := byte(c)
-		if d.Encoding(code) != "" && textMap[code] == text {
+		if _, ok := d.Encoding(code); ok && textMap[code] == text {
 			return d.Width[code] * d.FontMatrix[0], true
 		}
 	}
@@ -347,7 +347,7 @@ func (f *t3Font) Codes(s pdf.String) iter.Seq[font.Code] {
 	return func(yield func(font.Code) bool) {
 		var res font.Code
 		for _, code := range s {
-			if f.Dict.Encoding(code) == "" {
+			if _, ok := f.Dict.Encoding(code); !ok {
 				res.CID = 0
 			} else {
 				res.CID = cid.CID(code) + 1

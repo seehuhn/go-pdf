@@ -50,7 +50,10 @@ func standardFallback(f standard.Font) font.Instance {
 		Descriptor:     standardDescriptor(psName, stdInfo),
 		// the font's built-in encoding, spelled out so that codes map to
 		// glyph names, and through them to text, without the font program
-		Encoding: func(code byte) string { return stdInfo.Encoding[code] },
+		Encoding: func(code byte) (string, bool) {
+			name := stdInfo.Encoding[code]
+			return name, name != ""
+		},
 	}
 	standardWidths(d.Width[:], d.Encoding, stdInfo)
 	return d.MakeFont()

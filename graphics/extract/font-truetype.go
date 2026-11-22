@@ -102,7 +102,8 @@ func extractFontTrueType(c pdf.Cursor, obj pdf.Object) (*dict.TrueType, error) {
 	}
 	if !getSimpleWidths(d.Width[:], c, fontDict, defaultWidth) && stdInfo != nil {
 		for c := range 256 {
-			w, ok := stdInfo.Width[enc(byte(c))]
+			name, _ := enc(byte(c))
+			w, ok := stdInfo.Width[name]
 			if !ok {
 				w = stdInfo.Width[".notdef"]
 			}

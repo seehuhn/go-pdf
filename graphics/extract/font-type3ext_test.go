@@ -58,10 +58,12 @@ func TestType3RoundTrip(t *testing.T) {
 				text2 := dict.SimpleTextMap("", d2.Encoding, d2.ToUnicode)
 				for i := range 256 {
 					code := byte(i)
-					if d1.Encoding(code) != "" {
-						if d1.Encoding(code) != d2.Encoding(code) {
-							t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(code), d2.Encoding(code))
-						}
+					name1, ok1 := d1.Encoding(code)
+					name2, ok2 := d2.Encoding(code)
+					if name1 != name2 || ok1 != ok2 {
+						t.Errorf("encoding[%d]: (%q, %t) != (%q, %t)", code, name1, ok1, name2, ok2)
+					}
+					if ok1 {
 						if text1[code] != text2[code] {
 							t.Errorf("text[%d]: %q != %q", code, text1[code], text2[code])
 						}
@@ -192,10 +194,12 @@ func FuzzType3Dict(f *testing.F) {
 		text2 := dict.SimpleTextMap("", d2.Encoding, d2.ToUnicode)
 		for i := range 256 {
 			code := byte(i)
-			if d1.Encoding(code) != "" {
-				if d1.Encoding(code) != d2.Encoding(code) {
-					t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(code), d2.Encoding(code))
-				}
+			name1, ok1 := d1.Encoding(code)
+			name2, ok2 := d2.Encoding(code)
+			if name1 != name2 || ok1 != ok2 {
+				t.Errorf("encoding[%d]: (%q, %t) != (%q, %t)", code, name1, ok1, name2, ok2)
+			}
+			if ok1 {
 				if text1[code] != text2[code] {
 					t.Errorf("text[%d]: %q != %q", code, text1[code], text2[code])
 				}
@@ -298,14 +302,14 @@ var type3Dicts = []*dict.Type3{
 	// Basic font with minimal glyphs
 	{
 		Name: "Minimal",
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			switch code {
 			case 65:
-				return "A"
+				return "A", true
 			case 66:
-				return "B"
+				return "B", true
 			default:
-				return ""
+				return "", false
 			}
 		},
 		Width:      makeTestWidth(65, 500.0, 66, 250.0),
@@ -315,18 +319,18 @@ var type3Dicts = []*dict.Type3{
 	// Font with various drawing operations
 	{
 		Name: "Drawing",
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			switch code {
 			case 65:
-				return "A"
+				return "A", true
 			case 66:
-				return "B"
+				return "B", true
 			case 67:
-				return "C"
+				return "C", true
 			case 68:
-				return "D"
+				return "D", true
 			default:
-				return ""
+				return "", false
 			}
 		},
 		Width:      makeTestWidth(65, 500.0, 66, 600.0, 67, 500.0, 68, 500.0),
@@ -337,12 +341,12 @@ var type3Dicts = []*dict.Type3{
 	// Font with d1 (uncolored) glyphs
 	{
 		Name: "Uncolored",
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			switch code {
 			case 65:
-				return "A"
+				return "A", true
 			default:
-				return ""
+				return "", false
 			}
 		},
 		Width:      makeTestWidth(65, 500.0),
@@ -361,12 +365,12 @@ var type3Dicts = []*dict.Type3{
 			CapHeight:  700,
 			StemV:      80,
 		},
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			switch code {
 			case 65:
-				return "A"
+				return "A", true
 			default:
-				return ""
+				return "", false
 			}
 		},
 		Width:      makeTestWidth(65, 500.0),
@@ -393,11 +397,11 @@ func TestType3VersionRepair(t *testing.T) {
 		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
 		Resources:  res,
 	}
-	d1.Encoding = func(code byte) string {
+	d1.Encoding = func(code byte) (string, bool) {
 		if code == 'A' {
-			return "A"
+			return "A", true
 		}
-		return ""
+		return "", false
 	}
 	d1.Width['A'] = 500
 

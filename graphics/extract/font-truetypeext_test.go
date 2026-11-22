@@ -173,9 +173,12 @@ func checkRoundTripTT(t *testing.T, d1 *dict.TrueType, v pdf.Version) {
 	text2 := dict.SimpleTextMap(d2.PostScriptName, d2.Encoding, d2.ToUnicode)
 	for i := range 256 {
 		code := byte(i)
-		if d1.Encoding(code) != "" {
-			if d1.Encoding(code) != d2.Encoding(code) {
-				t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(code), d2.Encoding(code))
+		name1, ok1 := d1.Encoding(code)
+		name2, ok2 := d2.Encoding(code)
+		// unmapped codes may gain names implied by the base encoding
+		if ok1 {
+			if name2 != name1 || !ok2 {
+				t.Errorf("encoding[%d]: (%q, true) != (%q, %t)", code, name1, name2, ok2)
 			}
 			if text1[code] != text2[code] {
 				t.Errorf("text[%d]: %q != %q", code, text1[code], text2[code])
@@ -224,12 +227,12 @@ var ttDicts = []*dict.TrueType{
 			StemV:       75,
 			StemH:       25,
 		},
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			switch code {
 			case 65:
-				return "A"
+				return "A", true
 			default:
-				return ""
+				return "", false
 			}
 		},
 		Width: makeTestWidth(65, 100.0),
@@ -247,8 +250,11 @@ var ttDicts = []*dict.TrueType{
 			FontBBox:     rect.Rect{LLx: 10, LLy: 20, URx: 30, URy: 40},
 			MissingWidth: 666,
 		},
-		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
-		Width:    makeConstWidth(666),
+		Encoding: func(c byte) (string, bool) {
+			name := pdfenc.Standard.Encoding[c]
+			return name, name != ""
+		},
+		Width: makeConstWidth(666),
 		FontFile: &glyphdata.Stream{
 			Type: glyphdata.OpenTypeGlyf,
 			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {

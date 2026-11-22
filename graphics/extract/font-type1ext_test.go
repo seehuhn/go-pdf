@@ -97,8 +97,8 @@ func TestType1StandardTrim(t *testing.T) {
 				d2 := readType1(t, w2, ref2)
 				var enc1, enc2 [256]string
 				for code := range 256 {
-					enc1[code] = d1.Encoding(byte(code))
-					enc2[code] = d2.Encoding(byte(code))
+					enc1[code], _ = d1.Encoding(byte(code))
+					enc2[code], _ = d2.Encoding(byte(code))
 				}
 				if diff := cmp.Diff(enc1, enc2); diff != "" {
 					t.Errorf("encoding round trip failed (-want +got):\n%s", diff)
@@ -277,11 +277,11 @@ func TestMMType1RoundTripSubtype(t *testing.T) {
 			Descent:   -50,
 			CapHeight: 150,
 		},
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			if code == 65 {
-				return "A"
+				return "A", true
 			}
-			return ""
+			return "", false
 		},
 		Width: makeTestWidth(65, 600.0),
 	}
@@ -386,9 +386,12 @@ func checkRoundTripT1(t *testing.T, d1 *dict.Type1, v pdf.Version) {
 	text2 := dict.SimpleTextMap(d2.PostScriptName, d2.Encoding, d2.ToUnicode)
 	for i := range 256 {
 		code := byte(i)
-		if d1.Encoding(code) != "" {
-			if d1.Encoding(code) != d2.Encoding(code) {
-				t.Errorf("glyphName[%d]: %q != %q", code, d1.Encoding(code), d2.Encoding(code))
+		name1, ok1 := d1.Encoding(code)
+		name2, ok2 := d2.Encoding(code)
+		// unmapped codes may gain names implied by the base encoding
+		if ok1 {
+			if name2 != name1 || !ok2 {
+				t.Errorf("encoding[%d]: (%q, true) != (%q, %t)", code, name1, name2, ok2)
 			}
 			if text1[code] != text2[code] {
 				t.Errorf("text[%d]: %q != %q", code, text1[code], text2[code])
@@ -449,12 +452,12 @@ var t1Dicts = []*dict.Type1{
 			StemV:       75,
 			StemH:       25,
 		},
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			switch code {
 			case 65:
-				return "A"
+				return "A", true
 			default:
-				return ""
+				return "", false
 			}
 		},
 		Width: makeTestWidth(65, 100.0),
@@ -477,12 +480,12 @@ var t1Dicts = []*dict.Type1{
 			Descent:   -50,
 			CapHeight: 150,
 		},
-		Encoding: func(code byte) string {
+		Encoding: func(code byte) (string, bool) {
 			switch code {
 			case 65:
-				return "A"
+				return "A", true
 			default:
-				return ""
+				return "", false
 			}
 		},
 		Width: makeTestWidth(65, 600.0),
@@ -507,8 +510,11 @@ var t1Dicts = []*dict.Type1{
 			CapHeight:    150,
 			MissingWidth: 199,
 		},
-		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
-		Width:    makeConstWidth(199),
+		Encoding: func(c byte) (string, bool) {
+			name := pdfenc.Standard.Encoding[c]
+			return name, name != ""
+		},
+		Width: makeConstWidth(199),
 		FontFile: &glyphdata.Stream{
 			Type: glyphdata.Type1,
 			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
@@ -533,8 +539,11 @@ var t1Dicts = []*dict.Type1{
 			CapHeight:    150,
 			MissingWidth: 199,
 		},
-		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
-		Width:    makeConstWidth(199),
+		Encoding: func(c byte) (string, bool) {
+			name := pdfenc.Standard.Encoding[c]
+			return name, name != ""
+		},
+		Width: makeConstWidth(199),
 		FontFile: &glyphdata.Stream{
 			Type: glyphdata.CFFSimple,
 			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
@@ -559,8 +568,11 @@ var t1Dicts = []*dict.Type1{
 			CapHeight:    150,
 			MissingWidth: 199,
 		},
-		Encoding: func(c byte) string { return pdfenc.Standard.Encoding[c] },
-		Width:    makeConstWidth(199),
+		Encoding: func(c byte) (string, bool) {
+			name := pdfenc.Standard.Encoding[c]
+			return name, name != ""
+		},
+		Width: makeConstWidth(199),
 		FontFile: &glyphdata.Stream{
 			Type: glyphdata.OpenTypeCFFSimple,
 			WriteTo: func(w io.Writer, length *glyphdata.Lengths) error {
@@ -635,8 +647,9 @@ func makeTestDictStandard(fontName string) *dict.Type1 {
 	d := &dict.Type1{
 		PostScriptName: fontName,
 		Descriptor:     fd,
-		Encoding: func(code byte) string {
-			return enc[code]
+		Encoding: func(code byte) (string, bool) {
+			name := enc[code]
+			return name, name != ""
 		},
 	}
 	for _, g := range gg {

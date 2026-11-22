@@ -26,8 +26,9 @@ func TestNewTrueTypeSelector(t *testing.T) {
 	const code byte = 130
 	const cidVal = cid.CID(code) + 1
 
-	enc := encoding.Simple(func(c byte) string {
-		return pdfenc.WinAnsi.Encoding[c]
+	enc := encoding.Simple(func(c byte) (string, bool) {
+		name := pdfenc.WinAnsi.Encoding[c]
+		return name, name != ""
 	})
 
 	tests := []struct {
@@ -182,8 +183,9 @@ func TestNewTrueTypeSelector(t *testing.T) {
 // perform an unchecked type assertion on font.Outlines.
 func TestNewTrueTypeSelectorCFF2NoPanic(t *testing.T) {
 	font := makeCFF2Font()
-	enc := encoding.Simple(func(c byte) string {
-		return pdfenc.WinAnsi.Encoding[c]
+	enc := encoding.Simple(func(c byte) (string, bool) {
+		name := pdfenc.WinAnsi.Encoding[c]
+		return name, name != ""
 	})
 
 	sel := NewTrueTypeSelector(font, true, enc)
@@ -246,11 +248,11 @@ func TestNewTrueTypeSelectorIgnoresSubsetTag(t *testing.T) {
 	const gid = glyph.ID(7)
 	const code byte = 130
 
-	enc := encoding.Simple(func(c byte) string {
+	enc := encoding.Simple(func(c byte) (string, bool) {
 		if c == code {
-			return "a12"
+			return "a12", true
 		}
-		return ""
+		return "", false
 	})
 
 	for _, name := range []string{"ZapfDingbats", "AAAAAA+ZapfDingbats"} {

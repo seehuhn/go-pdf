@@ -25,10 +25,16 @@ func setSimpleWidths(w *pdf.Writer, fontDict pdf.Dict, ww []float64, enc encodin
 	// The firstChar < lastChar condition ensures firstChar <= lastChar,
 	// creating a one-element array when all chars have default width.
 	firstChar, lastChar := 0, 255
-	for lastChar > 0 && (enc(byte(lastChar)) == "" || ww[lastChar] == defaultWidth) {
+	for lastChar > 0 {
+		if _, ok := enc(byte(lastChar)); ok && ww[lastChar] != defaultWidth {
+			break
+		}
 		lastChar--
 	}
-	for firstChar < lastChar && (enc(byte(firstChar)) == "" || ww[firstChar] == defaultWidth) {
+	for firstChar < lastChar {
+		if _, ok := enc(byte(firstChar)); ok && ww[firstChar] != defaultWidth {
+			break
+		}
 		firstChar++
 	}
 

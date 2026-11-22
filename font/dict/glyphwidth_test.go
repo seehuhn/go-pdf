@@ -19,11 +19,11 @@ import (
 
 // encodeAt returns an encoding that names the given codes as "A".
 func encodeAt(codes ...byte) encoding.Simple {
-	return func(code byte) string {
+	return func(code byte) (string, bool) {
 		if slices.Contains(codes, code) {
-			return "A"
+			return "A", true
 		}
-		return ""
+		return "", false
 	}
 }
 

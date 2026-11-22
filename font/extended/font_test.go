@@ -511,7 +511,8 @@ func TestLigatures(t *testing.T) {
 					text, ok = tt.ToUnicode.Lookup([]byte{code})
 				}
 				if !ok {
-					text = names.ToUnicode(tt.Encoding(code), "")
+					name, _ := tt.Encoding(code)
+					text = names.ToUnicode(name, "")
 				}
 				if text != want[i] {
 					t.Errorf("code %d: text %q, want %q", code, text, want[i])
@@ -588,7 +589,7 @@ func TestSimpleSymbolGlyphs(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			name := d1.Encoding(byte(code))
+			name, _ := d1.Encoding(byte(code))
 			if name == encoding.UseBuiltin {
 				name = program.Outlines.BuiltinEncoding()[code]
 			}

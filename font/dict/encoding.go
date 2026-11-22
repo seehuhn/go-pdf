@@ -78,7 +78,7 @@ func makeCodec(cm *cmap.File, toUnicode *cmap.ToUnicodeFile) *charcode.Codec {
 func SimpleTextMap(postScriptName string, encoding encoding.Simple, toUnicode *cmap.ToUnicodeFile) map[byte]string {
 	textMap := make(map[byte]string)
 	for code := range 256 {
-		glyphName := encoding(byte(code))
+		glyphName, _ := encoding(byte(code))
 		text := names.ToUnicode(glyphName, postScriptName)
 		if text != "" {
 			textMap[byte(code)] = text

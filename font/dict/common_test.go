@@ -12,7 +12,7 @@ import (
 )
 
 func TestWidthsAreCompatibleBuiltin(t *testing.T) {
-	builtin := func(byte) string { return encoding.UseBuiltin }
+	builtin := func(byte) (string, bool) { return encoding.UseBuiltin, true }
 	for _, name := range []string{"Courier", "Helvetica", "Symbol", "ZapfDingbats"} {
 		info := stdmtx.Metrics[name]
 

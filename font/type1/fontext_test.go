@@ -525,7 +525,7 @@ func embeddedGlyphs(t *testing.T, fontDict *dict.Type1) []string {
 func encodingVector(fontDict *dict.Type1) []string {
 	names := make([]string, 256)
 	for c := range names {
-		names[c] = fontDict.Encoding(byte(c))
+		names[c], _ = fontDict.Encoding(byte(c))
 	}
 	return names
 }

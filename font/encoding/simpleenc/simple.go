@@ -350,7 +350,10 @@ func (t *Simple) Encoding() encoding.Simple {
 	for k, c := range t.code {
 		enc[c] = t.glyphName[k.gid]
 	}
-	return func(c byte) string { return enc[c] }
+	return func(c byte) (string, bool) {
+		name, ok := enc[c]
+		return name, ok
+	}
 }
 
 // DefaultWidth returns a good value for the MissingWidth entry in the font

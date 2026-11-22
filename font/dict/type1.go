@@ -216,12 +216,12 @@ func (d *Type1) textEncoding() encoding.Simple {
 	if d.FontFile != nil || info == nil {
 		return d.Encoding
 	}
-	return func(c byte) string {
-		name := d.Encoding(c)
+	return func(c byte) (string, bool) {
+		name, _ := d.Encoding(c)
 		if name == encoding.UseBuiltin {
 			name = info.Encoding[c]
 		}
-		return name
+		return name, name != ""
 	}
 }
 
@@ -230,7 +230,7 @@ func (d *Type1) GlyphWidth(text string) (float64, bool) {
 	textMap := SimpleTextMap(d.PostScriptName, d.textEncoding(), d.ToUnicode)
 	for c := range 256 {
 		code := byte(c)
-		if d.Encoding(code) != "" && textMap[code] == text {
+		if _, ok := d.Encoding(code); ok && textMap[code] == text {
 			return d.Width[code] / 1000, true
 		}
 	}
@@ -311,7 +311,7 @@ func (f *t1Font) Codes(s pdf.String) iter.Seq[font.Code] {
 	return func(yield func(font.Code) bool) {
 		var res font.Code
 		for _, code := range s {
-			if f.Dict.Encoding(code) == "" {
+			if _, ok := f.Dict.Encoding(code); !ok {
 				res.CID = 0
 			} else {
 				res.CID = cid.CID(code) + 1

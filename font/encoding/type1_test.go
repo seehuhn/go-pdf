@@ -150,7 +150,7 @@ func TestType1Encoding(t *testing.T) {
 				t.Fatal("expected encoding, got nil")
 			}
 			for _, m := range c.mappings {
-				if got := enc(m.code); got != m.value {
+				if got, _ := enc(m.code); got != m.value {
 					t.Errorf("encoding mismatch at %d: got %q, want %q", m.code, got, m.value)
 				}
 			}
@@ -165,38 +165,38 @@ func TestType1RoundTrip(t *testing.T) {
 		MacRoman,
 		MacExpert,
 		Standard,
-		func(code byte) string {
+		func(code byte) (string, bool) {
 			switch code {
 			case 30:
-				return "Gandalf"
+				return "Gandalf", true
 			case 31:
-				return "Elrond"
+				return "Elrond", true
 			case 32:
-				return "Galadriel"
+				return "Galadriel", true
 			case 100:
-				return "Gimli"
+				return "Gimli", true
 			case 101:
-				return "Frodo"
+				return "Frodo", true
 			case 102:
-				return "Sam"
+				return "Sam", true
 			default:
 				return WinAnsi(code)
 			}
 		},
-		func(code byte) string {
+		func(code byte) (string, bool) {
 			switch code {
 			case 0:
-				return "Gandalf"
+				return "Gandalf", true
 			case 2:
-				return "Elrond"
+				return "Elrond", true
 			case 4:
-				return "Galadriel"
+				return "Galadriel", true
 			case 126:
-				return "Gimli"
+				return "Gimli", true
 			case 128:
-				return "Frodo"
+				return "Frodo", true
 			case 130:
-				return "Sam"
+				return "Sam", true
 			default:
 				return Builtin(code)
 			}
@@ -218,13 +218,31 @@ func TestType1RoundTrip(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				// unmapped codes may gain names implied by the base encoding
 				for code := range 256 {
-					if got, want := enc1(byte(code)), enc2(byte(code)); got != want {
-						t.Errorf("encoding mismatch at %d: got %q, want %q", code, got, want)
+					want, ok1 := enc1(byte(code))
+					got, ok2 := enc2(byte(code))
+					if ok1 && (got != want || !ok2) {
+						t.Errorf("encoding mismatch at %d: got (%q, %t), want (%q, true)", code, got, ok2, want)
 						break
 					}
 				}
 			})
+		}
+	}
+}
+
+// TestType1EmptyName checks that AsPDFSimple rejects the empty glyph name.
+func TestType1EmptyName(t *testing.T) {
+	enc := Simple(func(code byte) (string, bool) {
+		if code == 65 {
+			return "", true
+		}
+		return WinAnsi(code)
+	})
+	for _, baseIsStd := range []bool{true, false} {
+		if _, err := enc.AsPDFSimple(baseIsStd, 0); err == nil {
+			t.Errorf("baseIsStd=%t: expected error for empty glyph name", baseIsStd)
 		}
 	}
 }

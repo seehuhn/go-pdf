@@ -13,28 +13,37 @@ import (
 
 // Simple represents the encoding of a simple font.
 // This is a map which gives the glyph name for each code point.
-// The empty string indicates unused codes.
+// The second result is false for codes the encoding leaves unmapped,
+// for which the name is the empty string.
+// The empty name is a glyph name only in Type 3 encodings.
 // The special value [UseBuiltin] indicates that the corresponding glyph from
 // the built-in encoding should be used.
-type Simple func(code byte) string
+type Simple func(code byte) (string, bool)
 
-const UseBuiltin = "@"
+// UseBuiltin is the name a [Simple] encoding gives for a code which uses the
+// glyph of the font's built-in encoding.  It contains a NUL byte, which no
+// PDF name can contain, so it differs from every glyph name.
+const UseBuiltin = "\000builtin"
 
 var (
-	Builtin Simple = func(code byte) string {
-		return UseBuiltin
+	Builtin Simple = func(code byte) (string, bool) {
+		return UseBuiltin, true
 	}
-	WinAnsi Simple = func(code byte) string {
-		return pdfenc.WinAnsi.Encoding[code]
+	WinAnsi Simple = func(code byte) (string, bool) {
+		name := pdfenc.WinAnsi.Encoding[code]
+		return name, name != ""
 	}
-	MacRoman Simple = func(code byte) string {
-		return pdfenc.MacRoman.Encoding[code]
+	MacRoman Simple = func(code byte) (string, bool) {
+		name := pdfenc.MacRoman.Encoding[code]
+		return name, name != ""
 	}
-	MacExpert Simple = func(code byte) string {
-		return pdfenc.MacExpert.Encoding[code]
+	MacExpert Simple = func(code byte) (string, bool) {
+		name := pdfenc.MacExpert.Encoding[code]
+		return name, name != ""
 	}
-	Standard Simple = func(code byte) string {
-		return pdfenc.Standard.Encoding[code]
+	Standard Simple = func(code byte) (string, bool) {
+		name := pdfenc.Standard.Encoding[code]
+		return name, name != ""
 	}
 )
 
@@ -121,9 +130,9 @@ func ExtractSimple(c pdf.Cursor, obj pdf.Object, nonSymbolicExt bool) (Simple, e
 		return baseEnc, nil
 	}
 
-	return func(code byte) string {
+	return func(code byte) (string, bool) {
 		if glyphName, ok := differences[code]; ok {
-			return glyphName
+			return glyphName, true
 		}
 		return baseEnc(code)
 	}, nil
@@ -137,6 +146,7 @@ func ExtractSimple(c pdf.Cursor, obj pdf.Object, nonSymbolicExt bool) (Simple, e
 // built-in encoding. The flag should be set if the font is non-symbolic and is
 // not be embedded in the PDF file. If the flag is set, the built-in encoding
 // must either be used for all mapped codes, or not at all.
+// No code may be mapped to the empty name.
 //
 // The resulting PDF object describes an encoding which maps all characters
 // mapped by e to the given glyph name, but it may also imply glyph names for
@@ -148,10 +158,16 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 		differences pdf.Array
 	}
 
+	for code := range 256 {
+		if name, ok := e(byte(code)); ok && name == "" {
+			return nil, errInvalidEncoding
+		}
+	}
+
 	// First check whether we can use the built-in encoding.
 	canUseBuiltin := true
 	for code := range 256 {
-		if e(byte(code)) != "" && e(byte(code)) != UseBuiltin {
+		if name, ok := e(byte(code)); ok && name != UseBuiltin {
 			canUseBuiltin = false
 			break
 		}
@@ -164,7 +180,7 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 	// use a named encoding.
 	noBuiltin := true
 	for code := range 256 {
-		if e(byte(code)) == UseBuiltin {
+		if name, _ := e(byte(code)); name == UseBuiltin {
 			noBuiltin = false
 			break
 		}
@@ -178,7 +194,7 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 	candidateLoop:
 		for _, cand := range candidates {
 			for code := range 256 {
-				if glyphName := e(byte(code)); glyphName != "" && glyphName != cand.enc[code] {
+				if glyphName, ok := e(byte(code)); ok && glyphName != cand.enc[code] {
 					// we got a conflict, try the next candidate
 					continue candidateLoop
 				}
@@ -208,8 +224,8 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 		for _, cand := range candidates {
 			lastDiff := 999
 			for code := range 256 {
-				glyphName := e(byte(code))
-				if glyphName == "" || glyphName == cand.enc[code] {
+				glyphName, ok := e(byte(code))
+				if !ok || glyphName == cand.enc[code] {
 					continue
 				}
 
@@ -232,8 +248,8 @@ func (e Simple) AsPDFSimple(baseIsStd bool, opt pdf.OutputOptions) (pdf.Object, 
 		var diff pdf.Array
 		lastDiff := 999
 		for code := range 256 {
-			glyphName := e(byte(code))
-			if glyphName == "" || glyphName == UseBuiltin {
+			glyphName, ok := e(byte(code))
+			if !ok || glyphName == UseBuiltin {
 				continue
 			}
 
@@ -327,8 +343,9 @@ func ExtractType3(c pdf.Cursor, obj pdf.Object, _ bool) (Simple, error) {
 		}
 	}
 
-	return func(code byte) string {
-		return differences[code]
+	return func(code byte) (string, bool) {
+		name, ok := differences[code]
+		return name, ok
 	}, nil
 }
 
@@ -338,8 +355,8 @@ func (e Simple) AsPDFType3(opt pdf.OutputOptions) (pdf.Object, error) {
 
 	lastDiff := 999
 	for code := range 256 {
-		glyphName := e(byte(code))
-		if glyphName == "" {
+		glyphName, ok := e(byte(code))
+		if !ok {
 			continue
 		}
 

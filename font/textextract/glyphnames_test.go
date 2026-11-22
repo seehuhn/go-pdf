@@ -60,11 +60,11 @@ func TestGlyphNameMappingSimpleCFFBuiltin(t *testing.T) {
 	encDiff := map[byte]string{
 		'X': "X", // a code with a /Differences override
 	}
-	enc := encoding.Simple(func(code byte) string {
+	enc := encoding.Simple(func(code byte) (string, bool) {
 		if name, ok := encDiff[code]; ok {
-			return name
+			return name, name != ""
 		}
-		return encoding.UseBuiltin
+		return encoding.UseBuiltin, true
 	})
 
 	f := &mockFontInfoSimple{
@@ -150,7 +150,7 @@ func TestGlyphNameMappingGlyfEmbeddedCFF2NoPanic(t *testing.T) {
 func TestGlyphNameMappingSimpleCFF2NoPanic(t *testing.T) {
 	stream := makeCFF2Stream(t, glyphdata.OpenTypeGlyf)
 
-	enc := encoding.Simple(func(byte) string { return encoding.UseBuiltin })
+	enc := encoding.Simple(func(byte) (string, bool) { return encoding.UseBuiltin, true })
 	f := &mockFontInfoSimple{
 		fontInfo: &dict.FontInfoSimple{
 			PostScriptName: "Test",

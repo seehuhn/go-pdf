@@ -555,12 +555,12 @@ func (f *Instance) makeMetricsOnlyDict() (*dict.Type1, error) {
 	if f.builtin != nil {
 		// codes which agree with the built-in encoding need no /Encoding entry
 		allocated := enc
-		enc = func(c byte) string {
-			name := allocated(c)
-			if name != "" && name == f.builtin.Encoding[c] {
-				return encoding.UseBuiltin
+		enc = func(c byte) (string, bool) {
+			name, ok := allocated(c)
+			if ok && name == f.builtin.Encoding[c] {
+				return encoding.UseBuiltin, true
 			}
-			return name
+			return name, ok
 		}
 	}
 
