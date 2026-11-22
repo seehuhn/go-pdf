@@ -4,6 +4,8 @@
 package font
 
 import (
+	"math"
+
 	"seehuhn.de/go/geom/rect"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/sfnt/glyph"
@@ -24,6 +26,10 @@ type Geometry struct {
 	UnderlinePosition  float64 // text space units
 	UnderlineThickness float64 // text space units
 
+	// GlyphExtents holds, for each glyph, a rectangle which contains the
+	// glyph's ink.  It is the zero rectangle for a blank glyph, and infinite
+	// on all four sides for a Type 3 glyph whose ink has no bound of
+	// reasonable size; see [Geometry.IsUnbounded].
 	GlyphExtents []rect.Rect // indexed by GID, text space units
 
 	Widths []float64 // indexed by GID, text space units
@@ -36,6 +42,8 @@ func (g *Geometry) GetGeometry() *Geometry {
 
 // BoundingBox returns the bounding box of a glyph sequence,
 // assuming that it is typeset at point (0, 0) using the given font size.
+// The box is infinite on all four sides if the extent of one of the glyphs
+// is.
 func (g *Geometry) BoundingBox(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
 	res := &pdf.Rectangle{}
 	if len(gg.Seq) == 0 {
@@ -44,8 +52,13 @@ func (g *Geometry) BoundingBox(fontSize float64, gg *GlyphSeq) *pdf.Rectangle {
 
 	xPos := gg.Skip
 	for _, glyph := range gg.Seq {
-		bbox := g.GlyphExtents[glyph.GID]
-		if !bbox.IsZero() {
+		if g.IsUnbounded(glyph.GID) {
+			return &pdf.Rectangle{
+				LLx: math.Inf(-1), LLy: math.Inf(-1),
+				URx: math.Inf(+1), URy: math.Inf(+1),
+			}
+		}
+		if bbox := g.GlyphExtents[glyph.GID]; !bbox.IsZero() {
 			res.Extend(&pdf.Rectangle{
 				LLx: bbox.LLx*fontSize + xPos,
 				LLy: bbox.LLy*fontSize + glyph.Rise,
@@ -83,4 +96,12 @@ func (g *Geometry) IsFixedPitch() bool {
 // IsBlank reports whether the glyph is blank.
 func (g *Geometry) IsBlank(gid glyph.ID) bool {
 	return g.GlyphExtents[gid].IsZero()
+}
+
+// IsUnbounded reports whether the ink of the glyph has no bound of
+// reasonable size.  This happens for Type 3 glyphs, for example where a
+// glyph strokes a path without setting the line width, so that the width is
+// that of the text which shows the glyph.
+func (g *Geometry) IsUnbounded(gid glyph.ID) bool {
+	return math.IsInf(g.GlyphExtents[gid].LLx, -1)
 }

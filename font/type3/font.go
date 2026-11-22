@@ -23,7 +23,6 @@ import (
 	"seehuhn.de/go/pdf/font/charcode"
 	"seehuhn.de/go/pdf/font/dict"
 	"seehuhn.de/go/pdf/font/encoding/simpleenc"
-	"seehuhn.de/go/pdf/font/glyphdata"
 	"seehuhn.de/go/pdf/font/internal/fontgeom"
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -33,7 +32,9 @@ import (
 type Font struct {
 	// Glyphs is a list of glyphs in the font.
 	// An empty glyph without a name must be included at index 0,
-	// to replace the ".notdef" glyph.
+	// to replace the ".notdef" glyph.  The other glyphs must have distinct
+	// names which contain no NUL byte.  Any other name is allowed, including
+	// the empty name and ".notdef".
 	Glyphs []*Glyph
 
 	// Resources (optional; PDF 1.2) holds named resources shared by all glyph
@@ -82,12 +83,13 @@ type Font struct {
 
 // Glyph represents a single glyph in a Type 3 font.
 type Glyph struct {
-	// Name is the PostScript name of the glyph.
+	// Name is the name of the glyph, which keys its procedure in the
+	// font's CharProcs dictionary.  See [Font.Glyphs] for the names allowed.
 	Name string
 
 	// Content is the glyph's content stream.
-	// It must start with either the d0 or d1 operator.  Only the unnamed
-	// glyph 0 may have a nil or empty content stream.
+	// It must start with either the d0 or d1 operator.  Only glyph 0 may
+	// have a nil or empty content stream.
 	// Use [content/builder.Builder] to construct content streams; its
 	// [content/builder.Builder.Build] / [content/builder.Builder.Harvest]
 	// methods return a [*content.Operators] that satisfies [content.Stream].
@@ -101,92 +103,79 @@ type Glyph struct {
 }
 
 // extract iterates the glyph's content stream once and returns its
-// advance width, bounding box, and any validation error.  For glyphs
-// loaded from PDF files, Content may be backed by a file stream;
-// this method ensures the stream is read at most once per glyph.
-func (g *Glyph) extract() (width float64, bbox rect.Rect, err error) {
+// advance width, the rectangle its ink lies in, and any validation error.
+// res is the resource dictionary the content stream uses; nil stands for
+// resources inherited from the page.  An empty content stream is an error
+// unless isNotdef is set.  For glyphs loaded from PDF files,
+// Content may be backed by a file stream; this method ensures the stream is
+// read at most once per glyph.
+//
+// The rectangle of a d1 glyph is the box its d1 operator gives, which
+// confines the glyph.  For other glyphs, including d1 glyphs whose box has
+// no interior, it contains all ink the content stream can paint, whatever
+// the graphics state it is invoked with; it is infinite where the ink has no
+// bound, and zero where there is none.
+func (g *Glyph) extract(res *content.Resources, isNotdef bool) (width float64, bbox rect.Rect, err error) {
 	if g.Content == nil {
-		return 0, rect.Rect{}, g.errEmpty()
+		return 0, rect.Rect{}, errEmpty(isNotdef)
 	}
 
 	it := g.Content.NewIter()
-	first := true
-	// d0 path-bbox accumulator
-	pathBBox := rect.Rect{
-		LLx: math.Inf(+1),
-		LLy: math.Inf(+1),
-		URx: math.Inf(-1),
-		URy: math.Inf(-1),
-	}
-	hasPoints := false
-	addPoint := func(x, y float64) {
-		hasPoints = true
-		pathBBox.Add(x, y)
-	}
+	var ink *inkBounds
 	for name, args := range it.All() {
-		if first {
-			if name == content.OpRawContent {
-				continue
-			}
-			first = false
-			m, ok := content.ParseGlyphMetrics(name, args)
-			if !ok {
-				return 0, rect.Rect{}, errors.New("glyph must start with a valid d0 or d1 operator")
-			}
-			width, bbox = m.Width, m.BBox
-			if m.Uncolored {
-				// d1: bbox came from the args; the remaining content
-				// has no metric significance, so stop reading.
-				return width, bbox, nil
+		if ink != nil {
+			ink.apply(name, args)
+			if ink.done() {
+				break
 			}
 			continue
 		}
-		switch name {
-		case content.OpMoveTo, content.OpLineTo:
-			if len(args) >= 2 {
-				x, _ := getNumber(args[0])
-				y, _ := getNumber(args[1])
-				addPoint(x, y)
-			}
-		case content.OpCurveTo:
-			for i := 0; i+1 < len(args) && i < 6; i += 2 {
-				x, _ := getNumber(args[i])
-				y, _ := getNumber(args[i+1])
-				addPoint(x, y)
-			}
-		case content.OpCurveToV, content.OpCurveToY:
-			for i := 0; i+1 < len(args) && i < 4; i += 2 {
-				x, _ := getNumber(args[i])
-				y, _ := getNumber(args[i+1])
-				addPoint(x, y)
-			}
-		case content.OpRectangle:
-			if len(args) >= 4 {
-				x, _ := getNumber(args[0])
-				y, _ := getNumber(args[1])
-				w, _ := getNumber(args[2])
-				h, _ := getNumber(args[3])
-				addPoint(x, y)
-				addPoint(x+w, y+h)
-			}
+		if name == content.OpRawContent {
+			continue
 		}
+		m, ok := content.ParseGlyphMetrics(name, args)
+		if !ok {
+			return 0, rect.Rect{}, errors.New("glyph must start with a valid d0 or d1 operator")
+		}
+		if m.HasBBox() {
+			// the remaining content has no metric significance
+			return m.Width, m.BBox, nil
+		}
+		width = m.Width
+		ink = newInkBounds(res)
+		ink.apply(name, args)
 	}
 	if err := it.Err(); err != nil {
 		return 0, rect.Rect{}, err
 	}
-	if first {
-		return 0, rect.Rect{}, g.errEmpty()
+	if ink == nil {
+		return 0, rect.Rect{}, errEmpty(isNotdef)
 	}
-	if hasPoints {
-		bbox = pathBBox
+	return width, ink.result(), nil
+}
+
+// maxReach is the distance from the origin, in text space units, beyond
+// which a glyph extent is treated as unbounded.  Ornaments and swashes
+// reach a few em, while a box far larger than this would only spoil the
+// layout of the text around it.
+const maxReach = 100
+
+// withinReach reports whether r lies within [maxReach] of the origin.  This
+// fails for a box which is not finite, as huge box coordinates or font
+// matrix entries can give.
+func withinReach(r rect.Rect) bool {
+	for _, x := range []float64{r.LLx, r.LLy, r.URx, r.URy} {
+		if !(math.Abs(x) <= maxReach) {
+			return false
+		}
 	}
-	return width, bbox, nil
+	return true
 }
 
 // errEmpty returns the error for a glyph without any operators.
-// Only the unnamed glyph 0 may be empty.
-func (g *Glyph) errEmpty() error {
-	if g.Name == "" {
+// Only glyph 0 may be empty.
+func errEmpty(isNotdef bool) error {
+	if isNotdef {
 		return nil
 	}
 	return errors.New("empty glyph procedure")
@@ -195,16 +184,8 @@ func (g *Glyph) errEmpty() error {
 // Width returns the glyph's advance width in glyph coordinate units.
 // The width is extracted from the first operator (d0 or d1).
 func (g *Glyph) Width() float64 {
-	w, _, _ := g.extract()
-	return w
-}
-
-// BBox returns the glyph's bounding box in glyph coordinate units.
-// For d1 glyphs, the bounding box is taken from the operator arguments.
-// For d0 glyphs, the bounding box is computed from path control points.
-func (g *Glyph) BBox() rect.Rect {
-	_, b, _ := g.extract()
-	return b
+	m, _ := content.ReadGlyphMetrics(g.Content)
+	return m.Width
 }
 
 // getNumber extracts a float64 from a pdf.Object.
@@ -235,12 +216,25 @@ type instance struct {
 	// not have to re-iterate the glyph content stream.
 	rawWidths []float64
 
+	// charProcs holds the glyph procedure of every named glyph, indexed by
+	// glyph name.
+	charProcs map[pdf.Name]*dict.CharProc
+
 	*font.Geometry
 
 	*simpleenc.Simple
 }
 
 // New creates a new Type 3 font instance from a font definition.
+//
+// The glyph extents in the instance's geometry are the bounding boxes of
+// the d1 operators.  For a glyph which starts with d0, or with a d1 operator
+// whose box has no interior, the extent is a rectangle which contains all
+// ink the glyph can paint, whatever graphics state the text is shown with.
+// It is infinite where the ink has no bound, for example for a shading
+// painted without a clipping path, or a stroke whose line width the glyph
+// does not set.  An extent which reaches far beyond the glyph's em square
+// is infinite, too, since no layout can make use of it.
 func (f *Font) New() (font.Layouter, error) {
 	if len(f.Glyphs) == 0 || f.Glyphs[0].Name != "" {
 		return nil, errors.New("invalid glyph 0")
@@ -251,8 +245,27 @@ func (f *Font) New() (font.Layouter, error) {
 	// that may be backed by file streams.
 	rawWidths := make([]float64, len(f.Glyphs))
 	rawBBoxes := make([]rect.Rect, len(f.Glyphs))
+	charProcs := make(map[pdf.Name]*dict.CharProc, len(f.Glyphs))
 	for i, g := range f.Glyphs {
-		w, bbox, err := g.extract()
+		if i > 0 {
+			name := pdf.Name(g.Name)
+			if err := name.Validate(); err != nil {
+				return nil, fmt.Errorf("glyph %d: %w", i, err)
+			}
+			if _, dup := charProcs[name]; dup {
+				return nil, fmt.Errorf("glyph %d: duplicate name %q", i, g.Name)
+			}
+			charProcs[name] = &dict.CharProc{
+				Content:   g.Content,
+				Resources: g.Resources,
+			}
+		}
+
+		res := g.Resources
+		if res == nil {
+			res = f.Resources
+		}
+		w, bbox, err := g.extract(res, i == 0)
 		if err != nil {
 			return nil, fmt.Errorf("glyph %d (%q): %w", i, g.Name, err)
 		}
@@ -274,9 +287,14 @@ func (f *Font) New() (font.Layouter, error) {
 	ww := make([]float64, len(f.Glyphs))
 	for i := range f.Glyphs {
 		// transform bounding box from glyph space to text space
-		bbox := rawBBoxes[i]
-		if !bbox.IsZero() {
+		switch bbox := rawBBoxes[i]; {
+		case isInfinite(bbox):
+			ee[i] = infiniteRect
+		case !bbox.IsZero():
 			ee[i] = bbox.Transform(f.FontMatrix)
+			if !withinReach(ee[i]) {
+				ee[i] = infiniteRect
+			}
 		}
 		ww[i] = rawWidths[i] * qh
 	}
@@ -314,7 +332,7 @@ func (f *Font) New() (font.Layouter, error) {
 	// Type 3 fonts are always simple fonts.  The encoder records widths in
 	// the units of the Widths array, which for Type 3 fonts is glyph space.
 	notdefWidth := math.Round(rawWidths[0])
-	simple := simpleenc.NewSimple(
+	simple := simpleenc.NewSimpleType3(
 		notdefWidth,
 		f.PostScriptName,
 		&pdfenc.WinAnsi,
@@ -324,6 +342,7 @@ func (f *Font) New() (font.Layouter, error) {
 		Font:      f,
 		CMap:      cmap,
 		rawWidths: rawWidths,
+		charProcs: charProcs,
 		Geometry:  geom,
 		Simple:    simple,
 	}
@@ -375,13 +394,16 @@ func (f *instance) Codes(s pdf.String) iter.Seq[font.Code] {
 	}
 }
 
-// FontInfo returns information about the font file.
+// FontInfo returns a [*dict.FontInfoType3] describing the font.  CharProcs
+// holds every named glyph of the font, while Encoding covers the character
+// codes assigned so far.  The CharProcs map is shared between calls and must
+// not be modified.
 func (f *instance) FontInfo() any {
-	return &dict.FontInfoSimple{
-		PostScriptName: f.Font.PostScriptName,
-		FontFile:       &glyphdata.Stream{},
-		Encoding:       f.Simple.Encoding(),
-		IsSymbolic:     f.Simple.IsSymbolic(),
+	return &dict.FontInfoType3{
+		CharProcs:  f.charProcs,
+		FontMatrix: f.Font.FontMatrix,
+		Resources:  f.Font.Resources,
+		Encoding:   f.Simple.Encoding(),
 	}
 }
 
@@ -423,22 +445,6 @@ func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 		return nil, fmt.Errorf("Type3 font: %w", err)
 	}
 
-	glyphs := f.Simple.Glyphs()
-
-	// Build CharProc entries from the font's glyphs.
-	// The actual stream writing is handled by dict.Type3.Embed().
-	charProcs := make(map[pdf.Name]*dict.CharProc)
-	for _, gid := range glyphs {
-		g := f.Font.Glyphs[gid]
-		if g.Name == "" {
-			continue
-		}
-		charProcs[pdf.Name(g.Name)] = &dict.CharProc{
-			Content:   g.Content,
-			Resources: g.Resources,
-		}
-	}
-
 	italicAngle := math.Round(f.Font.ItalicAngle*10) / 10
 
 	fd := &font.Descriptor{
@@ -467,12 +473,20 @@ func (f *instance) makeFontDict(_ *pdf.EmbedHelper) (*dict.Type3, error) {
 		return nil, err
 	}
 
+	// only the glyphs which have been assigned codes are embedded
+	charProcs := make(map[pdf.Name]*dict.CharProc)
+	for _, gid := range f.Simple.Glyphs() {
+		if gid != 0 {
+			name := pdf.Name(f.Font.Glyphs[gid].Name)
+			charProcs[name] = f.charProcs[name]
+		}
+	}
+
 	d := &dict.Type3{
 		Name:       f.Font.Name,
 		Descriptor: fd,
 		Encoding:   f.Simple.Encoding(),
 		CharProcs:  charProcs,
-		// FontBBox:   &pdf.Rectangle{},
 		FontMatrix: f.Font.FontMatrix,
 		Resources:  f.Font.Resources,
 		ToUnicode:  toUnicode,
@@ -494,8 +508,9 @@ func measureHeight(byName map[string]int, extents []rect.Rect, chars string) flo
 		if !ok {
 			continue
 		}
-		if h := extents[i].URy; h > 0 { // the test also rejects NaN
-			return h
+		// an extent without bound says nothing about the height
+		if ext := extents[i]; ext.URy > 0 && !isInfinite(ext) { // the test also rejects NaN
+			return ext.URy
 		}
 	}
 	return 0

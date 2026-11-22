@@ -297,7 +297,8 @@ func (g *Generator) layoutCaption(a *annotation.Line, main []vec.Vec2, lw float6
 			URx: seq.TotalWidth(),
 			URy: fontGeom.Ascent * captionFontSize,
 		}
-		if ink := fontGeom.BoundingBox(captionFontSize, seq); ink != nil && !ink.IsZero() {
+		// ink without bound leaves the box to the font metrics
+		if ink := fontGeom.BoundingBox(captionFontSize, seq); !ink.IsZero() && !math.IsInf(ink.LLx, -1) {
 			box.Extend(ink)
 		}
 		box = box.Grow(captionSlack * captionFontSize)

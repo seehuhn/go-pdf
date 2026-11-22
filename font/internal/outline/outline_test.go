@@ -50,11 +50,11 @@ func TestTextSpace(t *testing.T) {
 					continue
 				}
 				// a glyf box covers the control points, a CFF box the curves
-				got, _ := p.BBox()
-				want := bboxes[gid]
-				if name != "glyf" {
-					got, _ = p.TightBBox()
+				got, _ := p.TightBBox()
+				if name == "glyf" {
+					got, _ = p.BBox()
 				}
+				want := bboxes[gid]
 				for _, d := range []float64{
 					got.LLx - want.LLx/1000, got.LLy - want.LLy/1000,
 					got.URx - want.URx/1000, got.URy - want.URy/1000,

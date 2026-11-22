@@ -162,6 +162,11 @@ func TestNewInvalidGlyphs(t *testing.T) {
 		{"read error", []*Glyph{{}, {Name: "A", Content: unreadable}}, false},
 		{"no glyph 0", nil, false},
 		{"named glyph 0", []*Glyph{{Name: "A", Content: valid}}, false},
+		{"duplicate name", []*Glyph{{}, {Name: "A", Content: valid}, {Name: "A", Content: valid}}, false},
+		{"null byte in name", []*Glyph{{}, {Name: "A\x00B", Content: valid}}, false},
+		{"empty name", []*Glyph{{}, {Content: valid}}, true},
+		{"empty name, nil content", []*Glyph{{}, {}}, false},
+		{"empty name, empty content", []*Glyph{{}, {Content: &content.Operators{}}}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

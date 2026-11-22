@@ -10,10 +10,15 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
+	"seehuhn.de/go/pdf/font"
+	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/content"
+	"seehuhn.de/go/pdf/graphics/content/builder"
 )
 
 // TestLeaderLineGeometry checks the layout of a horizontal line with leader
@@ -359,5 +364,54 @@ func TestLineCaptionDashPhase(t *testing.T) {
 			t.Errorf("dash phases %v, want %v", phases, want)
 			break
 		}
+	}
+}
+
+// TestLineCaptionUnboundedFont checks that a caption in a font whose glyphs
+// have ink without bound gets a finite box, from the font metrics.
+func TestLineCaptionUnboundedFont(t *testing.T) {
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
+	b.Type3ColoredGlyph(500, 0)
+	b.MoveTo(0, 0)
+	b.LineTo(500, 700)
+	b.Stroke()
+	stream, err := b.Harvest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	glyphs := []*type3.Glyph{{}}
+	for _, name := range []string{"a", "c", "i", "n", "o", "p", "t"} {
+		glyphs = append(glyphs, &type3.Glyph{Name: name, Content: stream})
+	}
+	F, err := (&type3.Font{
+		Glyphs:     glyphs,
+		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+		Ascent:     800,
+		Descent:    -200,
+	}).New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Style{
+		NewContentFont: func() (font.Layouter, error) { return F, nil },
+	}
+	g, err := s.New(pdf.V2_0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a := captionLine(false, nil)
+	capt := g.layoutCaption(a, newLineGeometry(a).main, 1)
+	if err := g.AddAppearance(a); err != nil {
+		t.Fatal(err)
+	}
+
+	cb := capt.bbox
+	if !(cb.URx-cb.LLx < 1000 && cb.URy-cb.LLy < 1000) {
+		t.Errorf("caption box %v is not finite", cb)
+	}
+	r := a.Rect
+	if r.LLx > cb.LLx || r.LLy > cb.LLy || r.URx < cb.URx || r.URy < cb.URy {
+		t.Errorf("rectangle %v does not hold the caption %v", r, cb)
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/gofont"
 	"seehuhn.de/go/pdf/font/standard"
+	"seehuhn.de/go/pdf/font/type3"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
@@ -54,7 +55,8 @@ func TestGetQuadPointsSimple(t *testing.T) {
 		t.Fatalf("expected %d points, got %d", len(expected), len(corners))
 	}
 	for i := range expected {
-		if math.Abs(corners[i].X-expected[i].X) > 1e-6 || math.Abs(corners[i].Y-expected[i].Y) > 1e-6 {
+		// written to catch NaN as well
+		if !(math.Abs(corners[i].X-expected[i].X) <= 1e-6 && math.Abs(corners[i].Y-expected[i].Y) <= 1e-6) {
 			t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, expected[i].X, expected[i].Y, corners[i].X, corners[i].Y)
 		}
 	}
@@ -494,4 +496,63 @@ func writeOps(out io.Writer, ops []content.Operator) error {
 		}
 	}
 	return nil
+}
+
+// unboundedType3 returns a Type 3 font whose glyph "A" strokes a path
+// without setting the line width, so that its ink has no bound.
+func unboundedType3(t *testing.T) font.Layouter {
+	t.Helper()
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
+	b.Type3ColoredGlyph(500, 0)
+	b.MoveTo(0, 0)
+	b.LineTo(500, 700)
+	b.Stroke()
+	stream, err := b.Harvest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	F := &type3.Font{
+		Glyphs:     []*type3.Glyph{{}, {Name: "A", Content: stream}},
+		FontMatrix: matrix.Matrix{0.001, 0, 0, 0.001, 0, 0},
+		Ascent:     800,
+		Descent:    -200,
+	}
+	inst, err := F.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return inst
+}
+
+// TestGetQuadPointsUnbounded checks that a glyph whose ink has no bound
+// is marked by its advance, between the font's descent and ascent.
+func TestGetQuadPointsUnbounded(t *testing.T) {
+	F := unboundedType3(t)
+
+	b := builder.New(content.Page, nil, pdf.V2_0)
+	b.TextBegin()
+	b.TextSetFont(F, 10)
+	b.TextFirstLine(100, 100)
+	gg := b.TextLayout(nil, "AA")
+	corners := b.TextGetQuadPoints(gg, 0)
+	b.TextEnd()
+	if b.Err != nil {
+		t.Fatal(b.Err)
+	}
+
+	expected := []vec.Vec2{
+		{X: 100, Y: 108}, // upper-left
+		{X: 110, Y: 108}, // upper-right
+		{X: 100, Y: 98},  // lower-left
+		{X: 110, Y: 98},  // lower-right
+	}
+	if len(corners) != len(expected) {
+		t.Fatalf("expected %d points, got %d", len(expected), len(corners))
+	}
+	for i := range expected {
+		// written to catch NaN as well
+		if !(math.Abs(corners[i].X-expected[i].X) <= 1e-6 && math.Abs(corners[i].Y-expected[i].Y) <= 1e-6) {
+			t.Errorf("point %d: expected (%.6f, %.6f), got (%.6f, %.6f)", i, expected[i].X, expected[i].Y, corners[i].X, corners[i].Y)
+		}
+	}
 }

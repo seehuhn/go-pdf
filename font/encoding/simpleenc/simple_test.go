@@ -4,6 +4,7 @@
 package simpleenc
 
 import (
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -120,7 +121,6 @@ func TestConcurrentReaders(t *testing.T) {
 				for range tab.MappedCodes() {
 				}
 				_ = tab.GID(7)
-				_ = tab.Width(7)
 				_ = tab.GlyphName(3)
 				_ = tab.Glyphs()
 				_ = tab.Encoding()
@@ -203,5 +203,59 @@ func TestGlyphID(t *testing.T) {
 		if gid, ok := enc.GlyphID(c); ok {
 			t.Errorf("CID %d is outside the code range but selects glyph %d", c, gid)
 		}
+	}
+}
+
+// TestNewSimpleType3KeepsNames checks that a Type 3 table keeps glyph names
+// which a table for other fonts would replace.
+func TestNewSimpleType3KeepsNames(t *testing.T) {
+	long := strings.Repeat("x", 40)
+	tab := NewSimpleType3(0, "Test", &pdfenc.WinAnsi)
+	for i, name := range []string{"a-b", "@", long, "A"} {
+		gid := glyph.ID(i + 1)
+		c, err := tab.Encode(gid, name, "", 500)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := tab.GlyphName(gid); got != name {
+			t.Errorf("glyph %d has name %q, want %q", gid, got, name)
+		}
+		if got, _ := tab.Encoding()(c); got != name {
+			t.Errorf("code %d maps to %q, want %q", c, got, name)
+		}
+	}
+}
+
+// TestNewSimpleType3Notdef checks that a Type 3 table treats ".notdef" as an
+// ordinary glyph name, and leaves codes for glyph 0 unmapped.
+func TestNewSimpleType3Notdef(t *testing.T) {
+	tab := NewSimpleType3(0, "Test", &pdfenc.WinAnsi)
+	c1, err := tab.Encode(1, ".notdef", "x", 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c0, err := tab.Encode(0, "", "y", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc := tab.Encoding()
+	if name, ok := enc(c1); name != ".notdef" || !ok {
+		t.Errorf("code %d: got (%q, %t), want (\".notdef\", true)", c1, name, ok)
+	}
+	if name, ok := enc(c0); ok {
+		t.Errorf("code %d of glyph 0 maps to %q", c0, name)
+	}
+}
+
+// TestNewSimpleType3EmptyName checks that a Type 3 table maps a code to the
+// empty glyph name.
+func TestNewSimpleType3EmptyName(t *testing.T) {
+	tab := NewSimpleType3(0, "Test", &pdfenc.WinAnsi)
+	c, err := tab.Encode(1, "", "x", 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name, ok := tab.Encoding()(c); name != "" || !ok {
+		t.Errorf("code %d: got (%q, %t), want (\"\", true)", c, name, ok)
 	}
 }

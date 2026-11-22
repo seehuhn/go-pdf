@@ -27,6 +27,15 @@ type GlyphMetrics struct {
 	Uncolored bool
 }
 
+// HasBBox reports whether the metrics come from a d1 operator whose bounding
+// box has an interior.  The glyph is then confined to the box.  A box without
+// interior would hide the glyph, and counts as not given: the glyph is then
+// not confined.
+func (m GlyphMetrics) HasBBox() bool {
+	b := m.BBox
+	return m.Uncolored && b.URx > b.LLx && b.URy > b.LLy
+}
+
 // ParseGlyphMetrics interprets one operator as the d0 or d1 operator of a
 // Type 3 glyph procedure.  The result is false if the operator is not d0 or
 // d1, if it has too few numeric arguments (2 for d0, 6 for d1), or if the

@@ -64,6 +64,10 @@ type Simple struct {
 
 	baseEnc *pdfenc.Encoding
 
+	// keepNames is set for Type 3 fonts, where glyphs keep the names the
+	// caller gives them and glyph 0 has no name
+	keepNames bool
+
 	err error
 }
 
@@ -103,7 +107,22 @@ func NewSimple(notdefWidth float64, fontName string, base *pdfenc.Encoding) *Sim
 	return gd
 }
 
-// WritingMode implements the [font.EmbeddedOld] interface.
+// NewSimpleType3 creates a new table for a Type 3 font.  It works like
+// [NewSimple], except for the glyph names.  Glyphs keep the names passed to
+// [Simple.Encode] exactly, so the caller must give distinct glyphs distinct
+// names which contain no NUL byte.  Every name is allowed, including the
+// empty name and ".notdef".  Glyph 0 has no name, and codes allocated to it
+// are left unmapped by [Simple.Encoding].  The base encoding only guides
+// which codes are chosen.
+func NewSimpleType3(notdefWidth float64, fontName string, base *pdfenc.Encoding) *Simple {
+	t := NewSimple(notdefWidth, fontName, base)
+	t.keepNames = true
+	t.glyphName[0] = ""
+	delete(t.glyphNameUsed, ".notdef")
+	return t
+}
+
+// WritingMode implements the [font.Instance] interface.
 func (*Simple) WritingMode() font.WritingMode {
 	return font.Horizontal
 }
@@ -181,7 +200,8 @@ func (t *Simple) GetCode(gid glyph.ID, text string) (byte, bool) {
 // one on first use.  A new code also gets a unique glyph name for the glyph.
 //
 // The new glyph name is chosen using a heuristic based on baseGlyphName
-// (optional) and text. The new code is chosen using a heuristic based on the
+// (optional) and text; a table made by [NewSimpleType3] uses baseGlyphName
+// unchanged instead.  The new code is chosen using a heuristic based on the
 // glyph name and first rune in text.
 //
 // The last argument is the width of the glyph in PDF glyph space units.  It
@@ -255,6 +275,12 @@ func (t *Simple) makeGlyphName(gid glyph.ID, defaultGlyphName, text string) stri
 		return name
 	}
 
+	if t.keepNames {
+		t.glyphName[gid] = defaultGlyphName
+		t.glyphNameUsed[defaultGlyphName] = true
+		return defaultGlyphName
+	}
+
 	glyphName := defaultGlyphName
 	if !names.IsValid(glyphName) {
 		glyphName = names.FromUnicode(text)
@@ -301,14 +327,10 @@ func (t *Simple) lookup(c byte) *codeInfo {
 	return t.get(c)
 }
 
+// GID returns the glyph ID for the given code.  Codes which have not been
+// allocated map to the notdef glyph.
 func (t *Simple) GID(c byte) glyph.ID {
 	return t.lookup(c).GID
-}
-
-// Width returns the width of the glyph for the given code, in PDF glyph space
-// units.
-func (t *Simple) Width(c byte) float64 {
-	return t.lookup(c).Width
 }
 
 // GlyphName returns the chosen glyph name for the given glyph ID.
@@ -348,6 +370,10 @@ func (t *Simple) Encoding() encoding.Simple {
 
 	enc := make(map[byte]string)
 	for k, c := range t.code {
+		if t.keepNames && k.gid == 0 {
+			// glyph 0 has no glyph procedure in a Type 3 font
+			continue
+		}
 		enc[c] = t.glyphName[k.gid]
 	}
 	return func(c byte) (string, bool) {
@@ -408,6 +434,7 @@ func (t *Simple) IsSymbolic() bool {
 	return false
 }
 
+// CodesRemaining returns the number of codes which can still be allocated.
 func (t *Simple) CodesRemaining() int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()

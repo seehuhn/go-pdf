@@ -194,6 +194,10 @@ func (b *Builder) TextLayout(seq *font.GlyphSeq, text string) *font.GlyphSeq {
 // in the order upper-left, upper-right, lower-left, lower-right relative to
 // the text: the first two points form the top edge of the (possibly
 // rotated) bounding box, the last two its bottom edge.
+//
+// The box spans the font's descent and ascent and the ink of the glyphs.  A
+// glyph whose ink has no bound (see [font.Geometry.IsUnbounded]) contributes
+// its advance instead of its ink.
 func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.Vec2 {
 	// TODO(voss): make sure this is correct for vertical writing mode.
 
@@ -220,27 +224,39 @@ func (b *Builder) TextGetQuadPoints(seq *font.GlyphSeq, padding float64) []vec.V
 	currentPos := seq.Skip
 	for _, glyph := range seq.Seq {
 		bbox := &geom.GlyphExtents[glyph.GID]
-		if !bbox.IsZero() {
-			glyphDepth := -(bbox.LLy*size + glyph.Rise)
-			glyphHeight := bbox.URy*size + glyph.Rise
-			glyphLeft := currentPos + bbox.LLx*size
-			glyphRight := currentPos + bbox.URx*size
-
-			if glyphDepth > depth {
-				depth = glyphDepth
-			}
-			if glyphHeight > height {
-				height = glyphHeight
-			}
-			if glyphLeft < leftBearing || first {
-				leftBearing = glyphLeft
-			}
-			if glyphRight > rightBearing || first {
-				rightBearing = glyphRight
-			}
-
-			first = false
+		if bbox.IsZero() {
+			currentPos += glyph.Advance
+			continue
 		}
+
+		var glyphDepth, glyphHeight, glyphLeft, glyphRight float64
+		if geom.IsUnbounded(glyph.GID) {
+			// ink without bound is marked by the advance and the font's
+			// ascent and descent
+			glyphDepth = -(geom.Descent*size + glyph.Rise)
+			glyphHeight = geom.Ascent*size + glyph.Rise
+			glyphLeft = min(currentPos, currentPos+glyph.Advance)
+			glyphRight = max(currentPos, currentPos+glyph.Advance)
+		} else {
+			glyphDepth = -(bbox.LLy*size + glyph.Rise)
+			glyphHeight = bbox.URy*size + glyph.Rise
+			glyphLeft = currentPos + bbox.LLx*size
+			glyphRight = currentPos + bbox.URx*size
+		}
+
+		if glyphDepth > depth {
+			depth = glyphDepth
+		}
+		if glyphHeight > height {
+			height = glyphHeight
+		}
+		if glyphLeft < leftBearing || first {
+			leftBearing = glyphLeft
+		}
+		if glyphRight > rightBearing || first {
+			rightBearing = glyphRight
+		}
+		first = false
 		currentPos += glyph.Advance
 	}
 	if first {

@@ -60,6 +60,25 @@ func TestParseGlyphMetrics(t *testing.T) {
 	}
 }
 
+func TestGlyphMetricsHasBBox(t *testing.T) {
+	cases := []struct {
+		name string
+		m    GlyphMetrics
+		want bool
+	}{
+		{"d0", GlyphMetrics{Width: 500}, false},
+		{"d1", GlyphMetrics{BBox: rect.Rect{LLx: 1, LLy: 2, URx: 3, URy: 4}, Uncolored: true}, true},
+		{"d1 zero box", GlyphMetrics{Uncolored: true}, false},
+		{"d1 flat box", GlyphMetrics{BBox: rect.Rect{LLx: 1, LLy: 2, URx: 3, URy: 2}, Uncolored: true}, false},
+		{"d1 reversed box", GlyphMetrics{BBox: rect.Rect{LLx: 3, LLy: 2, URx: 1, URy: 4}, Uncolored: true}, false},
+	}
+	for _, c := range cases {
+		if got := c.m.HasBBox(); got != c.want {
+			t.Errorf("%s: HasBBox() = %t, want %t", c.name, got, c.want)
+		}
+	}
+}
+
 func TestReadGlyphMetrics(t *testing.T) {
 	cases := []struct {
 		name string
