@@ -260,9 +260,9 @@ func addLiga(f *sfnt.Font) error {
 	for tag, ls := range gsub.ScriptList {
 		res, ok := rebuilt[ls]
 		if !ok {
-			res = &gtab.Features{Required: ls.Required}
-			if ls.Required != 0xFFFF {
-				res.Required = newIndex[ls.Required]
+			res = &gtab.Features{}
+			if ls.Required != nil {
+				res.Required = new(newIndex[*ls.Required])
 			}
 			res.Optional = make([]gtab.FeatureIndex, 0, len(ls.Optional)+1)
 			for _, idx := range ls.Optional {

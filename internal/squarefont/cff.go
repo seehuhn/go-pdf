@@ -76,6 +76,7 @@ func makeCFFFont(fontMatrix matrix.Matrix) font.Layouter {
 	}
 
 	info := &sfnt.Font{
+		FontName:           "SquareFont-Regular",
 		FamilyName:         "SquareFont",
 		Subfamily:          "Regular",
 		FullName:           "SquareFont Regular",

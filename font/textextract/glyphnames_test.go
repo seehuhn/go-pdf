@@ -185,6 +185,7 @@ func makeCFF2Stream(t *testing.T, tp glyphdata.Type) *glyphdata.Stream {
 		FDSelect: func(glyph.ID) int { return 0 },
 	}
 	font := &sfnt.Font{
+		FontName:   "GlyphnamesCFF2Test",
 		FamilyName: "GlyphnamesCFF2Test",
 		UnitsPerEm: 1000,
 		Ascent:     700,

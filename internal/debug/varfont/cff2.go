@@ -68,6 +68,7 @@ func cff2FontShell(familyName string, glyphs []*cff.GlyphCFF2, widths []float64)
 	}
 
 	f := &sfnt.Font{
+		FontName:           familyName + "-Regular",
 		FamilyName:         familyName,
 		Subfamily:          "Regular",
 		FullName:           familyName + " Regular",

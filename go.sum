@@ -36,8 +36,8 @@ golang.org/x/tools v0.1.12/go.mod h1:hNGJHUnrk76NpqgfD5Aqm5Crs+Hm0VOH/i9J2+nxYbc
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 seehuhn.de/go/dag v1.0.1 h1:kzfjO8poRXlRImb4hRrA66W/uaIyWRjU3/QwytApNIs=
 seehuhn.de/go/dag v1.0.1/go.mod h1:se0NAaAL9aI9pRBRK0EvlY3572GJTsF0J7RwMXEiKz4=
-seehuhn.de/go/geom v0.8.1-0.20261121193146-c8fa15d66915 h1:DUfecQJ0qgvHy6nfz65iWbTg5Ozlz3vvIdnR1rLU9WY=
-seehuhn.de/go/geom v0.8.1-0.20261121193146-c8fa15d66915/go.mod h1:Y2VmuRk9WyTa06EhyfMuV6hpLW3aXyDb7oBpCCLfZiY=
+seehuhn.de/go/geom v0.8.1-0.20261122205314-6cdbbd1f73e4 h1:jRhahLO21Hccn6XWs9M93aT0vMN8jDwFmw0h6Ab1bAI=
+seehuhn.de/go/geom v0.8.1-0.20261122205314-6cdbbd1f73e4/go.mod h1:Y2VmuRk9WyTa06EhyfMuV6hpLW3aXyDb7oBpCCLfZiY=
 seehuhn.de/go/icc v0.8.1-0.20261118065723-d61fb07df60d h1:oLqKgHa80DY7T6Mf8jnO2BGReA4aJavOld9dK23Kl/A=
 seehuhn.de/go/icc v0.8.1-0.20261118065723-d61fb07df60d/go.mod h1:Vr5F9IBZ7K3MtM6TKAo93vvIbHhqkQFU74rKj6V1Uhg=
 seehuhn.de/go/jpx v0.8.1-0.20261119102706-232acc1fb755 h1:Eoit1/aO1a/MNO4v+mHY+p64qHRNEoN46DqpS7rrnRI=
@@ -46,7 +46,7 @@ seehuhn.de/go/membudget v0.8.1-0.20261117190015-60113a228150 h1:0mSe2vUQhFIpGl7N
 seehuhn.de/go/membudget v0.8.1-0.20261117190015-60113a228150/go.mod h1:lJJaMxMXPLVp0mpSQsFsA4buBPdA5LTWFGh0n4XHudc=
 seehuhn.de/go/postscript v0.8.1-0.20261121125347-78d4660a761a h1:muLMU+4DJZ/hPLwXe+mtatXf7DZRIruBETktow84KvA=
 seehuhn.de/go/postscript v0.8.1-0.20261121125347-78d4660a761a/go.mod h1:B/p5BLIE/WQ8zZzcUhvv2S6h6Hak2dj+hLzzikyUcng=
-seehuhn.de/go/sfnt v0.8.1-0.20261121143107-1ac25b0aaade h1:wTxTzJq5YvIgknoYzDLL1Y7YMYosiP8XQCXebrtw3qk=
-seehuhn.de/go/sfnt v0.8.1-0.20261121143107-1ac25b0aaade/go.mod h1:558bsQNmO/+Y/E+rgSYNiMIjTCYfLGv5lt64iLfh5FI=
+seehuhn.de/go/sfnt v0.8.1-0.20261124080701-aa46f5c41ee8 h1:YJx8tB14aGkcKZX4dSl77QKZNkmf0fmo3sxLbfO1r64=
+seehuhn.de/go/sfnt v0.8.1-0.20261124080701-aa46f5c41ee8/go.mod h1:558bsQNmO/+Y/E+rgSYNiMIjTCYfLGv5lt64iLfh5FI=
 seehuhn.de/go/xmp v0.8.1-0.20261119155028-0e26cc451f7c h1:7g20iZ4CacvKAW4suci4guh2L4qJn7JQClRU5auwOBg=
 seehuhn.de/go/xmp v0.8.1-0.20261119155028-0e26cc451f7c/go.mod h1:T4/T1Ps7IAPZW4bJ3wPPtoEm85FI/bJZGSw30NXLHZA=

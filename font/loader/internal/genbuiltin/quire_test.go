@@ -331,11 +331,11 @@ func TestAddLiga(t *testing.T) {
 		}
 		seen[ls] = true
 		switch {
-		case ls.Required == 0xFFFF:
-		case int(ls.Required) == ligaIdx:
-			ls.Required = 0xFFFF
-		case int(ls.Required) > ligaIdx:
-			ls.Required--
+		case ls.Required == nil:
+		case int(*ls.Required) == ligaIdx:
+			ls.Required = nil
+		case int(*ls.Required) > ligaIdx:
+			*ls.Required--
 		}
 		ls.Optional = slices.DeleteFunc(ls.Optional, func(i gtab.FeatureIndex) bool { return int(i) == ligaIdx })
 		for i, idx := range ls.Optional {
@@ -367,14 +367,14 @@ func TestAddLiga(t *testing.T) {
 		t.Fatal("unexpected sharing")
 	}
 	gsub.ScriptList[grek] = gsub.ScriptList[latn]
-	gsub.ScriptList[latn].Required = featureIdx("subs")
-	gsub.ScriptList[cyrl].Required = featureIdx("dlig")
+	gsub.ScriptList[latn].Required = new(featureIdx("subs"))
+	gsub.ScriptList[cyrl].Required = new(featureIdx("dlig"))
 
 	// the feature tags of a language system, the required one marked by "*"
 	tags := func(ls *gtab.Features) []string {
 		var res []string
-		if ls.Required != 0xFFFF {
-			res = append(res, "*"+gsub.FeatureList[ls.Required].Tag)
+		if ls.Required != nil {
+			res = append(res, "*"+gsub.FeatureList[*ls.Required].Tag)
 		}
 		for _, idx := range ls.Optional {
 			res = append(res, gsub.FeatureList[idx].Tag)
@@ -393,10 +393,11 @@ func TestAddLiga(t *testing.T) {
 	snapshot := func(scripts gtab.ScriptListInfo) map[string]gtab.Features {
 		res := make(map[string]gtab.Features, len(scripts))
 		for lang, ls := range scripts {
-			res[lang.String()] = gtab.Features{
-				Required: ls.Required,
-				Optional: slices.Clone(ls.Optional),
+			ff := gtab.Features{Optional: slices.Clone(ls.Optional)}
+			if ls.Required != nil {
+				ff.Required = new(*ls.Required)
 			}
+			res[lang.String()] = ff
 		}
 		return res
 	}

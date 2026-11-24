@@ -35,6 +35,7 @@ func makeCFF2Font() *sfnt.Font {
 		FDSelect: func(glyph.ID) int { return 0 },
 	}
 	return &sfnt.Font{
+		FontName:   "SfntglyphsCFF2Test",
 		FamilyName: "SfntglyphsCFF2Test",
 		UnitsPerEm: 1000,
 		Ascent:     700,
