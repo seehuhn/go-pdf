@@ -14,6 +14,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/extgstate"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/internal/redactmark"
 )
 
 func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.Form, error) {
@@ -64,15 +65,8 @@ func (g *Generator) addTextMarkupAppearance(a *annotation.TextMarkup) (*form.For
 		}
 		b.SetExtGState(gs)
 		b.SetFillColor(col)
-		// corners come as upper-left, upper-right, lower-left, lower-right,
-		// so the outline visits the lower two in reverse
-		for i := range numQuads {
-			q := a.QuadPoints[i*4 : i*4+4]
-			b.MoveTo(q[0].X, q[0].Y)
-			b.LineTo(q[1].X, q[1].Y)
-			b.LineTo(q[3].X, q[3].Y)
-			b.LineTo(q[2].X, q[2].Y)
-			b.ClosePath()
+		for _, q := range redactmark.QuadsFromPoints(a.QuadPoints) {
+			q.Path(b)
 			b.Fill()
 		}
 

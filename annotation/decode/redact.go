@@ -4,9 +4,11 @@
 package decode
 
 import (
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/annotation/colorenc"
+	"seehuhn.de/go/pdf/graphics/extract"
 )
 
 func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
@@ -16,31 +18,37 @@ func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 		return nil, err
 	}
 
-	// Extract markup annotation fields
 	if err := decodeMarkup(c, dict, &redact.Markup); err != nil {
 		return nil, err
 	}
 
 	// QuadPoints (optional)
-	if quadPoints, err := c.FloatArray(dict["QuadPoints"]); err == nil && len(quadPoints) > 0 {
-		// Validate that we have a multiple of 8 points (each quadrilateral needs 8 coordinates)
-		if len(quadPoints)%8 == 0 {
-			redact.QuadPoints = quadPoints
+	if quadPoints, err := c.FloatArray(dict["QuadPoints"]); err == nil {
+		// keep complete quadrilaterals only
+		n := len(quadPoints) / 8
+		if n > 0 {
+			points := make([]vec.Vec2, n*4)
+			for i := range points {
+				points[i] = vec.Vec2{X: quadPoints[2*i], Y: quadPoints[2*i+1]}
+			}
+			redact.QuadPoints = points
 		}
 	} else if pdf.IsReadError(err) {
 		return nil, err
 	}
 
-	// IC (optional) - RGB color components
+	// IC (optional)
 	if ic, err := pdf.Optional(colorenc.ExtractRGB(c, dict["IC"])); err != nil {
 		return nil, err
-	} else {
+	} else if ic != colorenc.Transparent {
 		redact.FillColor = ic
 	}
 
-	// RO (optional) - form XObject reference
-	if ro, ok := dict["RO"].(pdf.Reference); ok {
-		redact.RO = ro
+	// RO (optional)
+	if ro, err := c.DecodeOptional(dict["RO"], extract.Form); err != nil {
+		return nil, err
+	} else {
+		redact.Overlay = ro
 	}
 
 	// OverlayText (optional)
@@ -50,27 +58,26 @@ func decodeRedact(c pdf.Cursor, dict pdf.Dict) (*annotation.Redact, error) {
 		return nil, err
 	}
 
-	// Repeat (optional) - default false
+	// Repeat (optional)
 	repeat, _, err := c.OptionalBoolean(dict["Repeat"])
 	if err != nil {
 		return nil, err
 	}
 	redact.Repeat = repeat
 
-	// DA (required if OverlayText present)
+	// DA (required if OverlayText is present)
 	if da, err := c.String(dict["DA"]); err == nil {
 		redact.DefaultAppearance = string(da)
 	} else if pdf.IsReadError(err) {
 		return nil, err
 	}
 
-	// If OverlayText is present but DA is missing/empty, provide a reasonable default
-	if !redact.OverlayText.IsZero() && redact.DefaultAppearance == "" {
-		// Default to 12pt Helvetica black text
-		redact.DefaultAppearance = "/Helvetica 12 Tf 0 0 0 rg"
+	// OverlayText cannot be formatted without DA
+	if redact.DefaultAppearance == "" {
+		redact.OverlayText = pdf.TextString{}
 	}
 
-	// Q (optional) - default 0 (left-justified)
+	// Q (optional)
 	if q, err := pdf.Optional(c.Integer(dict["Q"])); err != nil {
 		return nil, err
 	} else if q >= 0 && q <= 2 {

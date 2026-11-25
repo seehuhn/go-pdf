@@ -4,48 +4,69 @@
 package annotation
 
 import (
+	"errors"
 	"fmt"
 
+	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/annotation/colorenc"
 	"seehuhn.de/go/pdf/graphics/color"
+	"seehuhn.de/go/pdf/graphics/form"
 )
 
 // PDF 2.0 sections: 12.5.2 12.5.6.2 12.5.6.23
 
-// Redact represents a redaction annotation (PDF 1.7+).
-// Redaction annotations identify content intended to be removed from the document
-// through a two-phase process: content identification and content removal.
+// Redact represents a redaction annotation.
+//
+// A redaction annotation marks content for removal, and can be reviewed
+// and edited until the redaction is applied.  Applying the redaction
+// removes the content in the marked region, draws the replacement mark
+// described by the fields below, and deletes the annotation.  This
+// package represents the annotation only; it does not apply redactions.
+//
+// Redaction annotations require PDF 1.7 or later.
 type Redact struct {
 	Common
 	Markup
 
-	// QuadPoints (optional) - array of coordinates specifying quadrilaterals
-	// for content regions to remove. If absent, Rect defines the redaction region.
-	QuadPoints []float64
+	// QuadPoints (optional) specifies the coordinates of quadrilaterals that
+	// comprise the region to be removed.  Each quadrilateral is represented
+	// by 4 Vec2 points, giving the corners in the order upper-left,
+	// upper-right, lower-left, lower-right, as for [TextMarkup.QuadPoints].
+	// The length must be a multiple of 4.  If QuadPoints is absent,
+	// Common.Rect gives the region instead.
+	QuadPoints []vec.Vec2
 
-	// FillColor (optional) is the color used to fill the redacted area after
-	// the content has been removed.  This must be a DeviceRGB color or
-	// [colorenc.Transparent].
+	// FillColor (optional) is the colour used to fill the region after the
+	// content has been removed.  This must be a [color.DeviceRGB] colour.
+	// If FillColor is nil, the region is left transparent.  If Overlay is
+	// set, FillColor is ignored.
 	//
 	// This corresponds to the /IC entry in the PDF annotation dictionary.
 	FillColor color.Color
 
-	// RO (optional) - form XObject for overlay appearance
-	RO pdf.Reference
+	// Overlay (optional) is the appearance drawn over the region after the
+	// content has been removed.  The form's origin is placed at the
+	// lower-left corner of Common.Rect.  If Overlay is set, FillColor,
+	// OverlayText, Repeat, DefaultAppearance and Align are ignored.
+	//
+	// This corresponds to the /RO entry in the PDF annotation dictionary.
+	Overlay *form.Form
 
-	// OverlayText (optional) - text to display over redacted region
+	// OverlayText (optional) is text drawn over the region after the
+	// content has been removed.
 	OverlayText pdf.TextString
 
-	// Repeat (optional) - whether overlay text should repeat to fill region
+	// Repeat specifies whether OverlayText is repeated to fill the region.
 	Repeat bool
 
-	// DefaultAppearance (required if OverlayText present) - appearance string for formatting overlay text
+	// DefaultAppearance is the default appearance string used to format
+	// OverlayText.  It is required if OverlayText is set.
 	//
 	// This corresponds to the /DA entry in the PDF annotation dictionary.
 	DefaultAppearance string
 
-	// Align specifies the text alignment used for the annotation's text.
+	// Align specifies the alignment of OverlayText.
 	// The zero value is [pdf.TextAlignLeft].
 	// The other allowed values are [pdf.TextAlignCenter] and [pdf.TextAlignRight].
 	//
@@ -60,6 +81,9 @@ func (r *Redact) AnnotationType() pdf.Name {
 	return "Redact"
 }
 
+// Encode converts the annotation to a PDF dictionary.
+//
+// This implements the [Annotation] interface.
 func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 	if err := pdf.CheckVersion(rm.Out, "redaction annotation", pdf.V1_7); err != nil {
 		return nil, err
@@ -69,60 +93,65 @@ func (r *Redact) Encode(rm *pdf.ResourceManager) (pdf.Native, error) {
 		"Subtype": pdf.Name("Redact"),
 	}
 
-	// Add common annotation fields
 	if err := r.Common.fillDict(rm, dict, isMarkup(r), false); err != nil {
 		return nil, err
 	}
 
-	// Add markup annotation fields
 	if err := r.Markup.fillDict(rm, dict); err != nil {
 		return nil, err
 	}
 
 	// QuadPoints (optional)
-	if len(r.QuadPoints) > 0 && len(r.QuadPoints)%8 == 0 {
-		quadPoints := make(pdf.Array, len(r.QuadPoints))
-		for i, point := range r.QuadPoints {
-			quadPoints[i] = pdf.Number(point)
+	if len(r.QuadPoints) > 0 {
+		if len(r.QuadPoints)%4 != 0 {
+			return nil, errors.New("length of QuadPoints is not a multiple of 4")
 		}
-		dict["QuadPoints"] = quadPoints
+		quadArray := make(pdf.Array, len(r.QuadPoints)*2)
+		for i, v := range r.QuadPoints {
+			quadArray[i*2] = pdf.Number(v.X)
+			quadArray[i*2+1] = pdf.Number(v.Y)
+		}
+		dict["QuadPoints"] = quadArray
 	}
 
-	// IC (optional) - RGB color components
+	// IC (optional)
 	if r.FillColor != nil {
-		if icArray, err := colorenc.EncodeRGB(r.FillColor); err != nil {
-			return nil, err
-		} else if icArray != nil {
-			dict["IC"] = icArray
+		if r.FillColor == colorenc.Transparent {
+			return nil, errors.New("FillColor must be DeviceRGB")
 		}
+		ic, err := colorenc.EncodeRGB(r.FillColor)
+		if err != nil {
+			return nil, err
+		}
+		dict["IC"] = ic
 	}
 
-	// RO (optional) - form XObject reference
-	if r.RO != 0 {
-		dict["RO"] = r.RO
+	// RO (optional)
+	if r.Overlay != nil {
+		ro, err := rm.Embed(r.Overlay)
+		if err != nil {
+			return nil, err
+		}
+		dict["RO"] = ro
 	}
 
 	// OverlayText (optional)
 	if !r.OverlayText.IsZero() {
-		dict["OverlayText"] = r.OverlayText
-
-		// DA (required if OverlayText present)
 		if r.DefaultAppearance == "" {
-			return nil, fmt.Errorf("DA field is required when OverlayText is present")
+			return nil, errors.New("DefaultAppearance is required when OverlayText is set")
 		}
+		dict["OverlayText"] = r.OverlayText
 	}
 
-	// DA (write if present)
 	if r.DefaultAppearance != "" {
 		dict["DA"] = pdf.String(r.DefaultAppearance)
 	}
 
-	// Repeat (optional) - default false
 	if r.Repeat {
 		dict["Repeat"] = pdf.Boolean(true)
 	}
 
-	// Q (optional) - default 0 (left-justified)
+	// Q (optional)
 	if r.Align != pdf.TextAlignLeft {
 		if r.Align < pdf.TextAlignLeft || r.Align > pdf.TextAlignRight {
 			return nil, fmt.Errorf("invalid text alignment %d", r.Align)

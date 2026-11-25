@@ -29,12 +29,12 @@ import (
 // stream.
 //  - C: `Common.Color`
 //  - Border: `Common.Border`
-//  - IC: fill color for Circle, Line, Polygon, Polyline, Redact, Square
+//  - IC: fill color for Circle, Line, Polygon, Polyline, Square
 //  - BS: border style for Circle, FreeText, Ink, Line, Link, Polygon, Polyline, Square, Widget
 //  - BE: border effects for Circle, FreeText, Polygon, Square
 //  - H: horizontal shift for Watermark
-//  - DA: default appearance for FreeText, Redact
-//  - Q: alignment for FreeText, Redact
+//  - DA: default appearance for FreeText
+//  - Q: alignment for FreeText
 //  - DS: default style for FreeText
 //  - LE: line ending style for FreeText, Line, Polyline
 //  - LL: "leader lines" for Line
@@ -42,6 +42,12 @@ import (
 //  - MK: "appearance characteristics dictionary" for Widget; for Screen its
 //    Icon is used as the appearance-generation input by addScreenAppearance
 //  - Sy: "symbol" for Caret
+//
+// The entries of a redaction annotation which describe the redaction (IC,
+// QuadPoints, RO, OverlayText, Repeat, DA, Q) are not on this list: they keep
+// their meaning whatever the appearance stream shows, since they describe the
+// mark drawn when the redaction is applied.  The fallback uses them to draw
+// the rollover and down appearances, which preview that mark.
 
 // Style describes the look of the fallback appearance streams.  It carries no
 // state tied to a particular document and can be used for any number of them;
@@ -282,6 +288,11 @@ var ErrNoFallback = errors.New("no fallback appearance for this annotation type"
 // appearance.  Some types are not drawn as a matter of policy and some are
 // simply not implemented yet; a caller decides which types it offers here,
 // see [seehuhn.de/go/pdf/annotation.ShouldSynthesizeFallback].
+//
+// For a redaction annotation the normal appearance marks the redaction as
+// pending, and the rollover and down appearances, which are generated as well,
+// preview the applied redaction.  The tint and outline which mark the region
+// use the annotation's Color, or red if Color is nil.
 func (g *Generator) AddAppearance(a annotation.Annotation) error {
 	return g.addAppearance(a, widgetOnState)
 }
@@ -330,6 +341,15 @@ func (g *Generator) addAppearance(a annotation.Annotation, onState onStateFunc) 
 		// widgets build their own appearance dictionary (check boxes and radio
 		// buttons need an on/off map, not a single normal stream)
 		return g.addWidgetAppearance(a, onState)
+	case *annotation.Redact:
+		// the normal appearance marks the redaction as pending, while
+		// rollover and down preview the applied redaction
+		normal, preview, err := g.addRedactAppearance(a)
+		if err != nil {
+			return err
+		}
+		setAppearance(a.GetCommon(), normal, preview)
+		return nil
 	default:
 		return ErrNoFallback
 	}
@@ -337,12 +357,28 @@ func (g *Generator) addAppearance(a annotation.Annotation, onState onStateFunc) 
 		return err
 	}
 
-	c := a.GetCommon()
+	setAppearance(a.GetCommon(), normal, nil)
+
+	return nil
+}
+
+// setAppearance gives the annotation its own copy of its appearance dictionary
+// holding the generated normal appearance.  If preview is not nil, it
+// replaces the rollover and down appearances, which then show the same
+// thing; otherwise these are carried over.  If the annotation has an
+// appearance state, the replaced rollover and down appearances hold the
+// preview for that state only, and any other states they had are dropped.
+func setAppearance(c *annotation.Common, normal, preview *form.Form) {
 	c.Appearance = ownAppearance(c.Appearance)
-	// only the normal appearance is replaced; a single stream and a per-state
-	// map are alternatives for the same entry, so setting one clears the other
+	// the normal appearance is replaced, and rollover and down only if there
+	// is a preview; a single stream and a per-state map are alternatives for
+	// the same entry, so setting one clears the other
 	if c.AppearanceState == "" {
 		c.Appearance.SetNormal(normal, nil)
+		if preview != nil {
+			c.Appearance.RollOver, c.Appearance.RollOverMap = preview, nil
+			c.Appearance.Down, c.Appearance.DownMap = preview, nil
+		}
 	} else {
 		// SetNormal needs the current map intact to work out which entries
 		// repeat it, so the new state goes into a copy
@@ -352,10 +388,13 @@ func (g *Generator) addAppearance(a annotation.Annotation, onState onStateFunc) 
 		}
 		byState[c.AppearanceState] = normal
 		c.Appearance.SetNormal(nil, byState)
+		if preview != nil {
+			one := map[pdf.Name]*form.Form{c.AppearanceState: preview}
+			c.Appearance.RollOver, c.Appearance.RollOverMap = nil, one
+			c.Appearance.Down, c.Appearance.DownMap = nil, maps.Clone(one)
+		}
 	}
 	syncAppearanceState(c)
-
-	return nil
 }
 
 // ownAppearance returns an appearance dictionary the caller may change, given

@@ -4343,53 +4343,53 @@ types:
     pdfType: array
     required: false
     introduced: '1.7'
-    goType: '[]float64'
-    purpose: 'QuadPoints (optional) - array of coordinates specifying quadrilaterals
-
-      for content regions to remove. If absent, Rect defines the redaction region.'
+    goType: '[]vec.Vec2'
+    purpose: QuadPoints (optional) specifies the coordinates of quadrilaterals that comprise the region to be removed.
   - goName: FillColor
     goType: color.Color
     pdfKey: IC
     pdfType: array
     required: false
     introduced: '1.7'
-  - goName: RO
+    purpose: FillColor (optional) is the colour used to fill the region after the content has been removed.
+  - goName: Overlay
     pdfKey: RO
     pdfType: stream
     required: false
     introduced: '1.7'
     refTypes:
     - XObjectFormType1
-    goType: pdf.Reference
-    purpose: RO (optional) - form XObject for overlay appearance
+    goType: '*form.Form'
+    purpose: Overlay (optional) is the appearance drawn over the region after the content has been removed.
   - goName: OverlayText
     pdfKey: OverlayText
     pdfType: text-string
     required: false
     introduced: '1.7'
     goType: pdf.TextString
-    purpose: OverlayText (optional) - text to display over redacted region
+    purpose: OverlayText (optional) is text drawn over the region after the content has been removed.
   - goName: Repeat
     pdfKey: Repeat
     pdfType: boolean
     required: false
     introduced: '1.7'
     goType: bool
-    purpose: Repeat (optional) - whether overlay text should repeat to fill region
-  - goName: DA
+    purpose: Repeat specifies whether OverlayText is repeated to fill the region.
+  - goName: DefaultAppearance
     pdfKey: DA
     pdfType: byte-string
     required: false
     introduced: '1.7'
     notes: https://github.com/pdf-association/pdf-issues/issues/318
     goType: string
-    purpose: DA (required if OverlayText present) - appearance string for formatting overlay text
+    purpose: DefaultAppearance is the default appearance string used to format OverlayText.
   - goName: Align
     pdfKey: Q
     pdfType: integer
     required: false
     introduced: '1.7'
     goType: pdf.TextAlign
+    purpose: Align specifies the alignment of OverlayText.
     possibleValues:
     - '0'
     - '1'

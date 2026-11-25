@@ -125,7 +125,7 @@ var testCases = map[pdf.Name][]testCase{
 				Rect:       pdf.Rectangle{LLx: 0, LLy: 0, URx: 200, URy: 40},
 				Contents:   pdf.Text("Link description"),
 				Highlight:  annotation.HighlightOutline,
-				QuadPoints: []vec.Vec2{{X: 10, Y: 10}, {X: 190, Y: 10}, {X: 190, Y: 30}, {X: 10, Y: 30}}, // Rectangle quad
+				QuadPoints: []vec.Vec2{{X: 10, Y: 30}, {X: 190, Y: 30}, {X: 10, Y: 10}, {X: 190, Y: 10}}, // Rectangle quad
 			},
 		},
 		{
@@ -523,7 +523,7 @@ var testCases = map[pdf.Name][]testCase{
 				Contents:   pdf.Text("Highlighted text"),
 				User:       pdf.Text("Reviewer"),
 				Subject:    pdf.Text("Important passage"),
-				QuadPoints: []vec.Vec2{{X: 100, Y: 200}, {X: 200, Y: 200}, {X: 200, Y: 220}, {X: 100, Y: 220}}, // Single word quad
+				QuadPoints: []vec.Vec2{{X: 100, Y: 220}, {X: 200, Y: 220}, {X: 100, Y: 200}, {X: 200, Y: 200}}, // Single word quad
 			},
 		},
 		{
@@ -538,9 +538,9 @@ var testCases = map[pdf.Name][]testCase{
 				User:    pdf.Text("Student"),
 				Subject: pdf.Text("Study notes"),
 				QuadPoints: []vec.Vec2{
-					{X: 50, Y: 300}, {X: 100, Y: 300}, {X: 100, Y: 320}, {X: 50, Y: 320}, // First word
-					{X: 110, Y: 300}, {X: 160, Y: 300}, {X: 160, Y: 320}, {X: 110, Y: 320}, // Second word
-					{X: 170, Y: 320}, {X: 250, Y: 320}, {X: 250, Y: 340}, {X: 170, Y: 340}, // Third word (different line)
+					{X: 50, Y: 320}, {X: 100, Y: 320}, {X: 50, Y: 300}, {X: 100, Y: 300}, // First word
+					{X: 110, Y: 320}, {X: 160, Y: 320}, {X: 110, Y: 300}, {X: 160, Y: 300}, // Second word
+					{X: 170, Y: 340}, {X: 250, Y: 340}, {X: 170, Y: 320}, {X: 250, Y: 320}, // Third word (different line)
 				},
 			},
 		},
@@ -554,7 +554,7 @@ var testCases = map[pdf.Name][]testCase{
 				Contents:   pdf.Text("Underlined text"),
 				User:       pdf.Text("Editor"),
 				Subject:    pdf.Text("Emphasis added"),
-				QuadPoints: []vec.Vec2{{X: 150, Y: 400}, {X: 300, Y: 400}, {X: 300, Y: 420}, {X: 150, Y: 420}}, // Single phrase
+				QuadPoints: []vec.Vec2{{X: 150, Y: 420}, {X: 300, Y: 420}, {X: 150, Y: 400}, {X: 300, Y: 400}}, // Single phrase
 			},
 		},
 		{
@@ -569,7 +569,7 @@ var testCases = map[pdf.Name][]testCase{
 				User:         pdf.Text("Proofreader"),
 				Subject:      pdf.Text("Grammar correction"),
 				CreationDate: time.Date(2023, 6, 15, 14, 30, 0, 0, time.UTC),
-				QuadPoints:   []vec.Vec2{{X: 75, Y: 500}, {X: 225, Y: 500}, {X: 225, Y: 520}, {X: 75, Y: 520}},
+				QuadPoints:   []vec.Vec2{{X: 75, Y: 520}, {X: 225, Y: 520}, {X: 75, Y: 500}, {X: 225, Y: 500}},
 			},
 		},
 	},
@@ -582,7 +582,7 @@ var testCases = map[pdf.Name][]testCase{
 				Contents:   pdf.Text("Spelling error"),
 				User:       pdf.Text("Spellchecker"),
 				Subject:    pdf.Text("Possible misspelling"),
-				QuadPoints: []vec.Vec2{{X: 200, Y: 600}, {X: 350, Y: 600}, {X: 350, Y: 620}, {X: 200, Y: 620}}, // Misspelled word
+				QuadPoints: []vec.Vec2{{X: 200, Y: 620}, {X: 350, Y: 620}, {X: 200, Y: 600}, {X: 350, Y: 600}}, // Misspelled word
 			},
 		},
 		{
@@ -596,7 +596,7 @@ var testCases = map[pdf.Name][]testCase{
 				},
 				User:       pdf.Text("Grammar checker"),
 				Subject:    pdf.Text("Grammar issue"),
-				QuadPoints: []vec.Vec2{{X: 100, Y: 700}, {X: 180, Y: 700}, {X: 180, Y: 720}, {X: 100, Y: 720}},
+				QuadPoints: []vec.Vec2{{X: 100, Y: 720}, {X: 180, Y: 720}, {X: 100, Y: 700}, {X: 180, Y: 700}},
 			},
 		},
 	},
@@ -609,7 +609,7 @@ var testCases = map[pdf.Name][]testCase{
 				Contents:   pdf.Text("Deleted text"),
 				User:       pdf.Text("Editor"),
 				Subject:    pdf.Text("Text to be removed"),
-				QuadPoints: []vec.Vec2{{X: 250, Y: 800}, {X: 400, Y: 800}, {X: 400, Y: 820}, {X: 250, Y: 820}}, // Struck-out phrase
+				QuadPoints: []vec.Vec2{{X: 250, Y: 820}, {X: 400, Y: 820}, {X: 250, Y: 800}, {X: 400, Y: 800}}, // Struck-out phrase
 			},
 		},
 		{
@@ -621,9 +621,9 @@ var testCases = map[pdf.Name][]testCase{
 				User:    pdf.Text("Reviewer"),
 				Subject: pdf.Text("Major revision"),
 				QuadPoints: []vec.Vec2{
-					{X: 50, Y: 900}, {X: 150, Y: 900}, {X: 150, Y: 920}, {X: 50, Y: 920}, // First section
-					{X: 160, Y: 900}, {X: 250, Y: 900}, {X: 250, Y: 920}, {X: 160, Y: 920}, // Second section
-					{X: 50, Y: 920}, {X: 300, Y: 920}, {X: 300, Y: 940}, {X: 50, Y: 940}, // Third section (different line)
+					{X: 50, Y: 920}, {X: 150, Y: 920}, {X: 50, Y: 900}, {X: 150, Y: 900}, // First section
+					{X: 160, Y: 920}, {X: 250, Y: 920}, {X: 160, Y: 900}, {X: 250, Y: 900}, // Second section
+					{X: 50, Y: 940}, {X: 300, Y: 940}, {X: 50, Y: 920}, {X: 300, Y: 920}, // Third section (different line)
 				},
 			},
 		},
@@ -1535,9 +1535,9 @@ var testCases = map[pdf.Name][]testCase{
 			annotation: &annotation.Redact{
 				Rect:     pdf.Rectangle{LLx: 50, LLy: 200, URx: 400, URy: 250},
 				Contents: pdf.Text("Redacted content area"),
-				QuadPoints: []float64{
-					100, 210, 200, 210, 200, 240, 100, 240, // First quadrilateral
-					250, 210, 350, 210, 350, 240, 250, 240, // Second quadrilateral
+				QuadPoints: []vec.Vec2{
+					{X: 100, Y: 240}, {X: 200, Y: 240}, {X: 100, Y: 210}, {X: 200, Y: 210},
+					{X: 250, Y: 240}, {X: 350, Y: 240}, {X: 250, Y: 210}, {X: 350, Y: 210},
 				},
 			},
 		},
@@ -1572,9 +1572,9 @@ var testCases = map[pdf.Name][]testCase{
 		{
 			name: "redaction with form XObject overlay",
 			annotation: &annotation.Redact{
-				Rect: pdf.Rectangle{LLx: 200, LLy: 500, URx: 400, URy: 550},
-				Name: "redact-with-xobject",
-				RO:   pdf.NewReference(100, 0), // Form XObject reference
+				Rect:    pdf.Rectangle{LLx: 200, LLy: 500, URx: 400, URy: 550},
+				Name:    "redact-with-xobject",
+				Overlay: makeDefaultAppearance(),
 			},
 		},
 		{
@@ -1591,10 +1591,10 @@ var testCases = map[pdf.Name][]testCase{
 					RC:        &pdf.StringOrStream{Value: pdf.Text("This content contains sensitive information")},
 					InReplyTo: pdf.NewReference(200, 0), // In reply to reference
 				},
-				QuadPoints: []float64{
-					75, 620, 175, 620, 175, 640, 75, 640, // First quad
-					200, 620, 300, 620, 300, 640, 200, 640, // Second quad
-					325, 620, 425, 620, 425, 640, 325, 640, // Third quad
+				QuadPoints: []vec.Vec2{
+					{X: 75, Y: 640}, {X: 175, Y: 640}, {X: 75, Y: 620}, {X: 175, Y: 620},
+					{X: 200, Y: 640}, {X: 300, Y: 640}, {X: 200, Y: 620}, {X: 300, Y: 620},
+					{X: 325, Y: 640}, {X: 425, Y: 640}, {X: 325, Y: 620}, {X: 425, Y: 620},
 				},
 				FillColor:         color.DeviceRGB{0.8, 0.8, 0.8}, // Light gray background
 				OverlayText:       pdf.Text("CLASSIFIED"),
