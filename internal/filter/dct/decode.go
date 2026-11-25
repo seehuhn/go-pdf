@@ -25,6 +25,7 @@ package dct
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 
 	"seehuhn.de/go/membudget"
@@ -50,6 +51,13 @@ import (
 func Decode(r io.Reader, colorTransform *int, budget *membudget.Budget) (io.ReadCloser, error) {
 	pr, pw := io.Pipe()
 	go func() {
+		// A panic in this goroutine cannot be recovered by the caller and would
+		// terminate the process; report it as a read error instead.
+		defer func() {
+			if p := recover(); p != nil {
+				pw.CloseWithError(fmt.Errorf("dct: decoder panic: %v", p))
+			}
+		}()
 		bw := bufio.NewWriter(pw)
 		if err := jpeg.DecodeStream(r, colorTransform, bw, budget); err != nil {
 			pw.CloseWithError(err)
