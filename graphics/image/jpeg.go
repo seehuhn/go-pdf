@@ -111,9 +111,18 @@ func (s *DCTSource) encode(w io.Writer) error {
 	pr, pw := io.Pipe()
 	done := make(chan error, 1)
 	go func() {
-		err := s.WriteData(pw)
+		var err error
+		// A panic in WriteData cannot be recovered by the caller of encode and
+		// would terminate the process; report it as an error instead.
+		defer func() {
+			if p := recover(); p != nil {
+				err = fmt.Errorf("image: WriteData panic: %v", p)
+				pw.CloseWithError(err)
+			}
+			done <- err
+		}()
+		err = s.WriteData(pw)
 		pw.CloseWithError(err) // a nil error signals the end of the data
-		done <- err
 	}()
 
 	params := dct.EncodeParams{

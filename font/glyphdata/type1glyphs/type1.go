@@ -31,6 +31,13 @@ func FromStream(stream *glyphdata.Stream) (*type1.Font, error) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		// A panic in this goroutine cannot be recovered by the caller and would
+		// terminate the process; report it to the parser instead.
+		defer func() {
+			if p := recover(); p != nil {
+				w.CloseWithError(fmt.Errorf("extracting font data: panic: %v", p))
+			}
+		}()
 		err := stream.WriteTo(w, nil)
 		if err != nil {
 			err = fmt.Errorf("extracting font data: %w", err)
