@@ -38,7 +38,7 @@ func FindPages(r pdf.Getter) ([]pdf.Reference, error) {
 		if node == nil {
 			continue
 		}
-		tp, err := pdf.Optional(c.Name(node["Type"]))
+		tp, err := nodeType(c, node)
 		if err != nil {
 			return nil, err
 		}
@@ -74,6 +74,7 @@ type Iterator struct {
 	r pdf.Getter
 }
 
+// NewIterator returns an iterator over the pages of the document in r.
 func NewIterator(r pdf.Getter) *Iterator {
 	return &Iterator{r: r}
 }
@@ -131,11 +132,8 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 				i.Err = err
 				return
 			}
-			tp, err := c.Name(node["Type"])
+			tp, err := nodeType(c, node)
 			if err != nil {
-				if pdf.IsMalformed(err) {
-					continue
-				}
 				i.Err = err
 				return
 			}
@@ -194,6 +192,24 @@ func (i *Iterator) All() iter.Seq2[pdf.Reference, pdf.Dict] {
 		}
 	}
 	return yield
+}
+
+// nodeType returns the type of a page tree node, "Pages" for an
+// intermediate node and "Page" for a leaf.  A node whose /Type entry is
+// missing or not a name is an intermediate node if it has /Kids, and a page
+// otherwise.  A nil node has the empty type.
+func nodeType(c pdf.Cursor, node pdf.Dict) (pdf.Name, error) {
+	if node == nil {
+		return "", nil
+	}
+	tp, err := pdf.Optional(c.Name(node["Type"]))
+	if err != nil || tp != "" {
+		return tp, err
+	}
+	if node["Kids"] != nil {
+		return "Pages", nil
+	}
+	return "Page", nil
 }
 
 // fillInherited completes a page dictionary with the inheritable attributes

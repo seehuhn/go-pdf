@@ -4,6 +4,7 @@
 package redactmark
 
 import (
+	"errors"
 	"io"
 	"math"
 	"strings"
@@ -248,5 +249,72 @@ func TestFromAnnotationFont(t *testing.T) {
 	m := FromAnnotation(a, func() font.Layouter { calls++; return f })
 	if calls != 1 || m.Text == nil || m.Text.Font != f {
 		t.Errorf("calls = %d, text = %+v, want one call and the font set", calls, m.Text)
+	}
+}
+
+// countGlyphs returns the number of glyphs which the text-showing operators
+// of a content stream show.
+func countGlyphs(t *testing.T, ops []content.Operator) int {
+	t.Helper()
+	n := 0
+	for _, op := range ops {
+		switch op.Name {
+		case content.OpTextShow:
+			s, _ := op.Args[0].(pdf.String)
+			n += len(s)
+		case content.OpTextShowArray:
+			a, _ := op.Args[0].(pdf.Array)
+			for _, x := range a {
+				if s, ok := x.(pdf.String); ok {
+					n += len(s)
+				}
+			}
+		}
+	}
+	return n
+}
+
+func TestDrawCharged(t *testing.T) {
+	F := font.Must(standard.Helvetica.New())
+	mark := &Mark{
+		Quads: []Quad{RectQuad(pdf.Rectangle{URx: 100, URy: 100}), RectQuad(pdf.Rectangle{URx: 50, URy: 50})},
+		Fill:  color.DeviceGray(0),
+		Text: &Text{
+			Font: F, Size: 4, Color: color.DeviceGray(1),
+			String: "AB", Repeat: true,
+		},
+	}
+
+	// every glyph shown is charged
+	var total int64
+	b := builder.New(content.Form, nil, pdf.V1_7)
+	err := DrawCharged(b, mark, func(n int64) error {
+		total += n
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ops, err := b.Harvest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if glyphs := countGlyphs(t, ops.Ops); glyphs == 0 || total < int64(glyphs) {
+		t.Errorf("charged %d for %d glyphs", total, glyphs)
+	}
+
+	// an error of the charge function ends the drawing
+	errBudget := errors.New("budget")
+	left := total / 2
+	b = builder.New(content.Form, nil, pdf.V1_7)
+	err = DrawCharged(b, mark, func(n int64) error {
+		left -= n
+		if left < 0 {
+			return errBudget
+		}
+		return nil
+	})
+	if err != errBudget {
+		t.Errorf("got error %v, want the error of the charge function", err)
 	}
 }

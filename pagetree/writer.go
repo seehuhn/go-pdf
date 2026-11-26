@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 // Package pagetree implements PDF page trees.
+//
+// When reading, a page tree node without a usable /Type entry is taken to be
+// an intermediate node if it has /Kids, and a page otherwise.
 package pagetree
 
 import (

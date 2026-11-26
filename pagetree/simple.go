@@ -80,7 +80,7 @@ func GetPage(r pdf.Getter, pageNo int) (pdf.Reference, pdf.Dict, error) {
 		}
 
 		// traverse the tree
-		tp, err := c.Name(pageTreeNode["Type"])
+		tp, err := nodeType(c, pageTreeNode)
 		if err != nil {
 			return 0, nil, err
 		}

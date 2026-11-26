@@ -389,3 +389,60 @@ func TestInheritMissingResources(t *testing.T) {
 		}
 	}
 }
+
+// TestNodesWithoutType checks that all readers agree on a page tree whose
+// nodes lack /Type: a node with /Kids is an intermediate node, and one
+// without is a page.  A kid which is null is skipped.
+func TestNodesWithoutType(t *testing.T) {
+	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+	rootRef := w.Alloc()
+	midRef := w.Alloc()
+	nullRef := w.Alloc()
+	if err := w.Put(nullRef, nil); err != nil {
+		t.Fatal(err)
+	}
+	pageRefs := []pdf.Reference{w.Alloc(), w.Alloc(), w.Alloc()}
+	objs := map[pdf.Reference]pdf.Dict{
+		rootRef:     {"Kids": pdf.Array{pageRefs[0], midRef, nullRef}, "Count": pdf.Integer(3)},
+		midRef:      {"Parent": rootRef, "Kids": pdf.Array{pageRefs[1], pageRefs[2]}, "Count": pdf.Integer(2)},
+		pageRefs[0]: {"Parent": rootRef},
+		pageRefs[1]: {"Type": pdf.Name("Page"), "Parent": midRef},
+		pageRefs[2]: {"Type": pdf.Integer(1), "Parent": midRef},
+	}
+	for ref, obj := range objs {
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.GetMeta().Catalog.Pages = rootRef
+
+	found, err := pagetree.FindPages(w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := cmp.Diff(pageRefs, found); d != "" {
+		t.Errorf("FindPages (-want +got):\n%s", d)
+	}
+
+	var iterated []pdf.Reference
+	it := pagetree.NewIterator(w)
+	for ref := range it.All() {
+		iterated = append(iterated, ref)
+	}
+	if it.Err != nil {
+		t.Fatal(it.Err)
+	}
+	if d := cmp.Diff(pageRefs, iterated); d != "" {
+		t.Errorf("Iterator (-want +got):\n%s", d)
+	}
+
+	for i, want := range pageRefs {
+		ref, _, err := pagetree.GetPage(w, i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ref != want {
+			t.Errorf("GetPage(%d) = %v, want %v", i, ref, want)
+		}
+	}
+}

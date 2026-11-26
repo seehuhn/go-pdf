@@ -144,15 +144,30 @@ func FromAnnotation(a *annotation.Redact, getFont func() font.Layouter) *Mark {
 // The text parameters of b must have their default values: no character or
 // word spacing, horizontal scaling 100, no text rise and rendering mode 0.
 func Draw(b *builder.Builder, m *Mark) {
+	_ = DrawCharged(b, m, func(int64) error { return nil })
+}
+
+// DrawCharged is like [Draw], and accounts for the work done: before the
+// overlay text is laid out, it calls charge with the length of the text in
+// bytes, and before glyphs and quadrilaterals are drawn, it calls charge with
+// their number.  If charge returns an error, DrawCharged stops and returns
+// the error; the content of b is then incomplete.
+func DrawCharged(b *builder.Builder, m *Mark, charge func(n int64) error) error {
 	if m.Overlay != nil {
+		if err := charge(1); err != nil {
+			return err
+		}
 		b.PushGraphicsState()
 		b.Transform(matrix.Translate(pdf.Round(m.Rect.LLx, 2), pdf.Round(m.Rect.LLy, 2)))
 		b.DrawXObject(m.Overlay)
 		b.PopGraphicsState()
-		return
+		return nil
 	}
 
 	if m.Fill != nil {
+		if err := charge(int64(len(m.Quads))); err != nil {
+			return err
+		}
 		b.PushGraphicsState()
 		b.SetFillColor(m.Fill)
 		for _, q := range m.Quads {
@@ -167,29 +182,39 @@ func Draw(b *builder.Builder, m *Mark) {
 		if m.Text.Repeat {
 			s += " "
 		}
+		if err := charge(int64(len(s))); err != nil {
+			return err
+		}
 		l := newTextLayout(m.Text.Font, s)
 		budget := maxGlyphs
 		for _, q := range m.Quads {
-			drawText(b, q, m.Text, l, &budget)
+			if err := drawText(b, q, m.Text, l, &budget, charge); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // drawText draws the text in the frame of the quadrilateral, whose x-axis
 // runs from the lower-left towards the lower-right corner.  The text is
 // given by l, and budget is the number of glyphs which may still be drawn.
-func drawText(b *builder.Builder, q Quad, t *Text, l *textLayout, budget *int) {
+// The quadrilateral and the glyphs are charged as for [DrawCharged].
+func drawText(b *builder.Builder, q Quad, t *Text, l *textLayout, budget *int, charge func(n int64) error) error {
+	if err := charge(1); err != nil {
+		return err
+	}
 	ll := q[2]
 	ex := q[3].Sub(ll)
 	w := ex.Length()
 	if !(w > 0) {
-		return
+		return nil
 	}
 	u := ex.Mul(1 / w)
 	nrm := vec.Vec2{X: -u.Y, Y: u.X}
 	h := min(q[0].Sub(ll).Dot(nrm), q[1].Sub(ll).Dot(nrm))
 	if !(h > 0) {
-		return
+		return nil
 	}
 
 	// horizontal extent of the region in the text frame
@@ -211,12 +236,12 @@ func drawText(b *builder.Builder, q Quad, t *Text, l *textLayout, budget *int) {
 			size = min(size, w/tw)
 		}
 		if math.IsInf(size, 1) {
-			return
+			return nil
 		}
 	}
 	size = pdf.Round(size, 2)
 	if !(size > 0) {
-		return
+		return nil
 	}
 
 	var qAlign float64
@@ -237,8 +262,25 @@ func drawText(b *builder.Builder, q Quad, t *Text, l *textLayout, budget *int) {
 
 	gg, cost := l.line(x0, size, reps, lo, hi, *budget)
 	*budget -= cost
+	if err := charge(int64(cost)); err != nil {
+		return err
+	}
 	if len(gg.Seq) == 0 {
-		return
+		return nil
+	}
+
+	lines := 1
+	var leading float64
+	if t.Repeat {
+		leading = pdf.Round(geom.Leading*size, 2)
+		if leading > 0 {
+			more := min(math.Floor(h/leading)-1, float64(*budget/len(gg.Seq)))
+			lines += int(max(more, 0))
+		}
+		*budget -= (lines - 1) * len(gg.Seq)
+		if err := charge(int64((lines - 1) * len(gg.Seq))); err != nil {
+			return err
+		}
 	}
 
 	b.PushGraphicsState()
@@ -253,13 +295,6 @@ func drawText(b *builder.Builder, q Quad, t *Text, l *textLayout, budget *int) {
 	b.SetFillColor(t.Color)
 
 	if t.Repeat {
-		leading := pdf.Round(geom.Leading*size, 2)
-		lines := 1
-		if leading > 0 {
-			more := min(math.Floor(h/leading)-1, float64(*budget/len(gg.Seq)))
-			lines += int(max(more, 0))
-		}
-		*budget -= (lines - 1) * len(gg.Seq)
 		y := pdf.Round(h-(h-float64(lines)*leading)/2-geom.Ascent*size, 2)
 		for i := range lines {
 			if i == 0 {
@@ -276,6 +311,7 @@ func drawText(b *builder.Builder, q Quad, t *Text, l *textLayout, budget *int) {
 
 	b.TextEnd()
 	b.PopGraphicsState()
+	return nil
 }
 
 // textLayout is a string laid out at font size 1, with the horizontal ink
