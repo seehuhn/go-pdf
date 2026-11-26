@@ -7,6 +7,7 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 )
@@ -71,9 +72,10 @@ func (s *State) Ignored(name OpName, args []pdf.Object) bool {
 }
 
 // applyOperatorToParams updates the graphics state parameters based on the
-// operator. This is called by [State.ApplyStateChanges] after structural state
-// changes (q/Q, BT/ET, etc.) have been handled.
-func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
+// operator. This is called by [State.apply] after structural state changes
+// (q/Q, BT/ET, etc.) have been handled.  The font tf is the one which a Tf
+// operator selects.
+func (s *State) applyOperatorToParams(name OpName, args []pdf.Object, tf font.Instance) {
 	p := s.GState
 
 	switch name {
@@ -212,23 +214,11 @@ func (s *State) applyOperatorToParams(name OpName, args []pdf.Object) {
 		}
 
 	case OpTextSetFont: // Tf
-		// the operator table leaves the font bits to us, since a Tf naming
-		// a font the resources lack leaves the text font as it was
-		fontName, ok1 := getName(args, 0)
-		size, ok2 := getNumber(args, 1)
-		if !ok1 || !ok2 || s.Resources == nil {
-			break
-		}
-		F := s.Resources.Font[fontName]
-		if F == nil && s.Resources.FontFallback != nil {
-			F = s.Resources.FontFallback(fontName)
-		}
-		if F != nil {
-			p.TextFont = F
-			p.TextFontSize = size
-			s.Usable |= graphics.StateTextFont
-			s.GState.Set |= graphics.StateTextFont
-		}
+		size, _ := getNumber(args, 1)
+		p.TextFont = tf
+		p.TextFontSize = size
+		s.Usable |= graphics.StateTextFont
+		s.GState.Set |= graphics.StateTextFont
 
 	case OpTextSetRenderingMode: // Tr
 		if mode, ok := getInteger(args, 0); ok {
@@ -442,7 +432,12 @@ func getNumber(args []pdf.Object, idx int) (float64, bool) {
 	if idx >= len(args) {
 		return 0, false
 	}
-	switch v := args[idx].(type) {
+	return numberValue(args[idx])
+}
+
+// numberValue returns the value of a numeric operand.
+func numberValue(x pdf.Object) (float64, bool) {
+	switch v := x.(type) {
 	case pdf.Real:
 		return float64(v), true
 	case pdf.Integer:

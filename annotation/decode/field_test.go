@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -866,49 +867,238 @@ func TestDecodeSignatureValue(t *testing.T) {
 	}
 }
 
-// A dictionary without a partial name is not a field: at the root it is
-// dropped, and as a kid with the Widget subtype it is a widget of its parent.
+// A dictionary without a partial name is not a field.  The widgets below
+// such a kid are widgets of the nearest ancestor which is a field, and a kid
+// without a partial name which has sub-fields groups them.
 func TestDecodeUnnamedField(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
-	x := pdf.NewExtractor(w)
-
-	rootRef := w.Alloc()
-	if err := w.Put(rootRef, pdf.Dict{"FT": pdf.Name("Tx"), "V": pdf.String("x")}); err != nil {
-		t.Fatal(err)
+	rect := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(10), pdf.Integer(10)}
+	widget := func(parent pdf.Reference) pdf.Dict {
+		return pdf.Dict{"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": rect, "Parent": parent}
 	}
-	node, err := decodeRootField(x, rootRef)
-	if err != nil {
-		t.Fatalf("decode failed: %v", err)
-	}
-	if node != nil {
-		t.Errorf("unnamed root field decoded as %T, want nil", node)
+	put := func(ref pdf.Reference, obj pdf.Object) {
+		if err := w.Put(ref, obj); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	parentRef := w.Alloc()
-	kidRef := w.Alloc()
-	parent := pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("p"), "Kids": pdf.Array{kidRef}}
-	kid := pdf.Dict{
-		"Subtype": pdf.Name("Widget"),
-		"FT":      pdf.Name("Tx"),
-		"Rect":    pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(10), pdf.Integer(10)},
-		"Parent":  parentRef,
-	}
-	if err := w.Put(parentRef, parent); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Put(kidRef, kid); err != nil {
-		t.Fatal(err)
-	}
-	node, err = decodeRootField(x, parentRef)
+	// a root without /T
+	root, w0 := w.Alloc(), w.Alloc()
+	put(root, pdf.Dict{"FT": pdf.Name("Tx"), "V": pdf.String("rootval"), "Kids": pdf.Array{w0}})
+	put(w0, widget(root))
+
+	// widgets below a kid without /T
+	p, x, w1, w2 := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+	put(p, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("p"), "Kids": pdf.Array{x}})
+	put(x, pdf.Dict{"Parent": p, "V": pdf.String("kidval"), "Kids": pdf.Array{w1, w2}})
+	put(w1, widget(x))
+	put(w2, widget(x))
+
+	// a widget two levels below the field
+	q, y1, y2, w3 := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+	put(q, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("q"), "Kids": pdf.Array{y1}})
+	put(y1, pdf.Dict{"Parent": q, "Kids": pdf.Array{y2}})
+	put(y2, pdf.Dict{"FT": pdf.Name("Tx"), "Parent": y1, "Kids": pdf.Array{w3}})
+	put(w3, widget(y2))
+
+	// a widget kid with a field entry
+	r, w4 := w.Alloc(), w.Alloc()
+	put(r, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("r"), "Kids": pdf.Array{w4}})
+	w4Dict := widget(r)
+	w4Dict["FT"] = pdf.Name("Tx")
+	put(w4, w4Dict)
+
+	// a kid without /T which has a sub-field
+	s, g, z, w5 := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+	put(s, pdf.Dict{"T": pdf.String("s"), "Kids": pdf.Array{g}})
+	put(g, pdf.Dict{"Parent": s, "Kids": pdf.Array{z}})
+	put(z, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("z"), "Parent": g, "Kids": pdf.Array{w5}})
+	put(w5, widget(z))
+
+	// a kid without /T which two fields share, and which the first field
+	// reaches twice; and a kid without /T which is neither a widget nor
+	// has kids
+	t1, t2, u, v, n, w6, w7 := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+	put(t1, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("t1"), "Kids": pdf.Array{u, v, n}})
+	put(t2, pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String("t2"), "Kids": pdf.Array{v}})
+	put(u, pdf.Dict{"Parent": t1, "Kids": pdf.Array{v}})
+	put(v, pdf.Dict{"Parent": t1, "Kids": pdf.Array{w6, w7}})
+	put(n, pdf.Dict{"Parent": t1})
+	put(w6, widget(v))
+	put(w7, widget(v))
+
+	// a widget with field entries, listed in /Fields
+	m := w.Alloc()
+	mDict := widget(0)
+	delete(mDict, "Parent")
+	mDict["FT"] = pdf.Name("Tx")
+	mDict["V"] = pdf.String("mval")
+	put(m, mDict)
+
+	formRef := w.Alloc()
+	put(formRef, pdf.Dict{"Fields": pdf.Array{root, p, q, r, s, t1, t2, m}})
+	w.GetMeta().Catalog.AcroForm = formRef
+
+	idx, err := DocumentForm(pdf.NewExtractor(w))
 	if err != nil {
-		t.Fatalf("decode failed: %v", err)
+		t.Fatal(err)
 	}
-	f, ok := node.(*acroform.TextField)
-	if !ok {
-		t.Fatalf("got %T, want *acroform.TextField", node)
+	got := map[string]int{}
+	for name, f := range idx.Form.AllFields() {
+		got[name] = len(f.GetCommon().Widgets)
 	}
-	if n := len(f.Widgets); n != 1 {
-		t.Errorf("got %d widgets, want 1", n)
+	want := map[string]int{"p": 2, "q": 1, "r": 1, "s.z": 1, "t1": 2, "t2": 0}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("widgets per field differ (-want +got):\n%s", diff)
+	}
+
+	// the widgets without a field stay annotations
+	for _, ref := range []pdf.Reference{m, w0} {
+		a, err := pdf.CursorAt(pdf.NewExtractor(w), nil).Decode(ref, Annotation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wa, ok := a.(*annotation.Widget); !ok || wa.Field != nil {
+			t.Errorf("annotation %v is %T with a field, want a widget without one", ref, a)
+		}
+	}
+
+	form2 := roundTripForm(t, pdf.V1_7, idx.Form)
+	if diff := cmp.Diff(snapNodes(t, idx.Form.Fields), snapNodes(t, form2.Fields), fieldCmpOptions()...); diff != "" {
+		t.Errorf("round trip failed (-want +got):\n%s", diff)
+	}
+}
+
+// A widget annotation, or a kid without a partial name, which several
+// dictionaries list belongs to the one its /Parent entry names, whatever the
+// order of /Fields.
+func TestDecodeKidParent(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reverse=%v", reverse), func(t *testing.T) {
+			w, _ := memfile.NewPDFWriter(t, pdf.V1_7, nil)
+			rect := pdf.Array{pdf.Integer(0), pdf.Integer(0), pdf.Integer(10), pdf.Integer(10)}
+			widget := func(parent pdf.Reference) pdf.Dict {
+				d := pdf.Dict{"Type": pdf.Name("Annot"), "Subtype": pdf.Name("Widget"), "Rect": rect}
+				if parent != 0 {
+					d["Parent"] = parent
+				}
+				return d
+			}
+			field := func(name string, kids ...pdf.Object) pdf.Dict {
+				return pdf.Dict{"FT": pdf.Name("Tx"), "T": pdf.String(name), "Kids": pdf.Array(kids)}
+			}
+			put := func(ref pdf.Reference, obj pdf.Object) {
+				if err := w.Put(ref, obj); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			// a kid without /T which names the second field as its parent
+			a1, a2, va, wa1, wa2 := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+			put(a1, field("a1", va))
+			put(a2, field("a2", va))
+			put(va, pdf.Dict{"Parent": a2, "Kids": pdf.Array{wa1, wa2}})
+			put(wa1, widget(va))
+			put(wa2, widget(va))
+
+			// a widget which names the second field as its parent
+			b1, b2, wb := w.Alloc(), w.Alloc(), w.Alloc()
+			put(b1, field("b1", wb))
+			put(b2, field("b2", wb))
+			put(wb, widget(b2))
+
+			// a widget whose parent does not list it
+			c1, c2, wc, stranger := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+			put(c1, field("c1", wc))
+			put(c2, field("c2", wc))
+			put(wc, widget(stranger))
+			put(stranger, pdf.Dict{"Kids": pdf.Array{wb}})
+
+			// a kid without /T and without a parent
+			d1, d2, vd, wd := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+			put(d1, field("d1", vd))
+			put(d2, field("d2", vd))
+			put(vd, pdf.Dict{"Kids": pdf.Array{wd}})
+			put(wd, widget(vd))
+
+			// a widget which belongs to a field outside the form
+			e, out, we := w.Alloc(), w.Alloc(), w.Alloc()
+			put(e, field("e", we))
+			put(out, field("out", we))
+			put(we, widget(out))
+
+			// a widget which /Fields lists next to its field
+			g, wg := w.Alloc(), w.Alloc()
+			put(g, field("g", wg))
+			put(wg, widget(g))
+
+			// an entry of /Fields without /T which shares a kid with a field
+			r, h, vh, wh := w.Alloc(), w.Alloc(), w.Alloc(), w.Alloc()
+			put(r, pdf.Dict{"FT": pdf.Name("Tx"), "Kids": pdf.Array{vh}})
+			put(h, field("h", vh))
+			put(vh, pdf.Dict{"Kids": pdf.Array{wh}})
+			put(wh, widget(vh))
+
+			roots := pdf.Array{a1, a2, b1, b2, c1, c2, d1, d2, e, wg, g, r, h}
+			if reverse {
+				slices.Reverse(roots)
+			}
+			formRef := w.Alloc()
+			put(formRef, pdf.Dict{"Fields": roots})
+			w.GetMeta().Catalog.AcroForm = formRef
+
+			x := pdf.NewExtractor(w)
+			idx, err := DocumentForm(x)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fields := maps.Collect(idx.Form.AllFields())
+			got := map[string]int{}
+			for name, f := range fields {
+				got[name] = len(f.GetCommon().Widgets)
+			}
+
+			// without a usable parent, one of the fields gets the kid
+			for _, pair := range [][2]string{{"c1", "c2"}, {"d1", "d2"}} {
+				if n := got[pair[0]] + got[pair[1]]; n != 1 {
+					t.Errorf("fields %v have %d widgets in total, want 1", pair, n)
+				}
+				delete(got, pair[0])
+				delete(got, pair[1])
+			}
+			want := map[string]int{"a1": 0, "a2": 2, "b1": 0, "b2": 1, "e": 0, "g": 1, "h": 1}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("widgets per field differ (-want +got):\n%s", diff)
+			}
+
+			// the widget listed in /Fields is linked to its field
+			a, err := pdf.CursorAt(x, nil).Decode(wg, Annotation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if wa, ok := a.(*annotation.Widget); !ok || wa.Field == nil || wa.Field != fields["g"] {
+				t.Errorf("annotation %v is not linked to its field", wg)
+			}
+
+			// the field outside the form has its widget
+			f, widgets, err := FieldAt(x, out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if f == nil || len(widgets) != 1 || widgets[f.GetCommon().Widgets[0]] != we {
+				t.Errorf("got %v with widgets %v, want a field with the widget at %v", f, widgets, we)
+			}
+			if f2, _, err := FieldAt(x, we); err != nil {
+				t.Fatal(err)
+			} else if f2 == nil || f2 != f {
+				t.Errorf("FieldAt(%v) = %v, want the field at %v", we, f2, out)
+			}
+
+			form2 := roundTripForm(t, pdf.V1_7, idx.Form)
+			if diff := cmp.Diff(snapNodes(t, idx.Form.Fields), snapNodes(t, form2.Fields), fieldCmpOptions()...); diff != "" {
+				t.Errorf("round trip failed (-want +got):\n%s", diff)
+			}
+		})
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/font/standard"
 	"seehuhn.de/go/pdf/graphics/color"
@@ -168,5 +169,84 @@ func TestLineWindow(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestFromAnnotation(t *testing.T) {
+	rect := pdf.Rectangle{LLx: 10, LLy: 20, URx: 110, URy: 60}
+
+	a := &annotation.Redact{Rect: rect}
+	m := FromAnnotation(a, func() font.Layouter {
+		t.Error("font requested for an annotation without overlay text")
+		return nil
+	})
+	if len(m.Quads) != 1 || m.Quads[0] != RectQuad(rect) {
+		t.Errorf("quads = %v, want the rectangle", m.Quads)
+	}
+	if m.Text != nil {
+		t.Error("mark has text but the annotation has none")
+	}
+
+	pts := []vec.Vec2{{X: 0, Y: 1}, {X: 1, Y: 1}, {X: 0, Y: 0}, {X: 1, Y: 0}}
+	a = &annotation.Redact{
+		Rect:              rect,
+		QuadPoints:        pts,
+		FillColor:         color.DeviceRGB{0, 0, 0},
+		OverlayText:       pdf.Text("X"),
+		DefaultAppearance: "/Helv 9 Tf 1 g",
+		Repeat:            true,
+	}
+	m = FromAnnotation(a, func() font.Layouter { return nil })
+	if len(m.Quads) != 1 || m.Quads[0] != Quad(pts) {
+		t.Errorf("quads = %v, want the quad points", m.Quads)
+	}
+	if m.Fill != a.FillColor {
+		t.Errorf("fill = %v, want %v", m.Fill, a.FillColor)
+	}
+	if m.Text == nil {
+		t.Fatal("mark has no text")
+	}
+	if m.Text.Size != 9 || m.Text.Color != color.Color(color.DeviceGray(1)) ||
+		m.Text.String != "X" || !m.Text.Repeat {
+		t.Errorf("text = %+v, want size 9, white, \"X\", repeated", m.Text)
+	}
+}
+
+// Fewer than four points give no quadrilateral, so the region is the
+// rectangle; trailing points which do not fill a quadrilateral are ignored.
+func TestFromAnnotationPartialQuadPoints(t *testing.T) {
+	rect := pdf.Rectangle{LLx: 10, LLy: 20, URx: 110, URy: 60}
+	pts := make([]vec.Vec2, 9)
+	for i := range pts {
+		pts[i] = vec.Vec2{X: float64(i), Y: float64(i * i)}
+	}
+	for n := 1; n <= 3; n++ {
+		a := &annotation.Redact{Rect: rect, QuadPoints: pts[:n]}
+		m := FromAnnotation(a, func() font.Layouter { return nil })
+		if len(m.Quads) != 1 || m.Quads[0] != RectQuad(rect) {
+			t.Errorf("%d points: quads = %v, want the rectangle", n, m.Quads)
+		}
+	}
+	for _, n := range []int{5, 7, 9} {
+		a := &annotation.Redact{Rect: rect, QuadPoints: pts[:n]}
+		m := FromAnnotation(a, func() font.Layouter { return nil })
+		if len(m.Quads) != n/4 || m.Quads[0] != Quad(pts[:4]) {
+			t.Errorf("%d points: quads = %v, want %d from the points", n, m.Quads, n/4)
+		}
+	}
+}
+
+// The font getter is called when there is overlay text, and its result is
+// used for the text.
+func TestFromAnnotationFont(t *testing.T) {
+	var f font.Layouter = font.Must(standard.Helvetica.New())
+	calls := 0
+	a := &annotation.Redact{
+		Rect:        pdf.Rectangle{URx: 10, URy: 10},
+		OverlayText: pdf.Text("X"),
+	}
+	m := FromAnnotation(a, func() font.Layouter { calls++; return f })
+	if calls != 1 || m.Text == nil || m.Text.Font != f {
+		t.Errorf("calls = %d, text = %+v, want one call and the font set", calls, m.Text)
 	}
 }

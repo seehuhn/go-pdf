@@ -36,7 +36,8 @@
 // The library aims to be permissive when reading.  Consumers advance
 // their [State] by calling [State.ApplyStateChanges] directly, which
 // skips the context and required-state checks that
-// [State.ApplyOperator] performs for the builder.  Consumers that want
+// [State.ApplyOperator] performs for the builder.  [State.Operands] tells
+// which operands of an operator the state uses.  Consumers that want
 // the stream to look well-formed after the fact can drain
 // [State.ClosingOperators] at end-of-stream to emit synthetic closers
 // for any contexts left open.  [seehuhn.de/go/pdf/reader.Reader] does

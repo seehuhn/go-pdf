@@ -116,12 +116,31 @@ type Glyph struct {
 // the graphics state it is invoked with; it is infinite where the ink has no
 // bound, and zero where there is none.
 func (g *Glyph) extract(res *content.Resources, isNotdef bool) (width float64, bbox rect.Rect, err error) {
-	if g.Content == nil {
-		return 0, rect.Rect{}, errEmpty(isNotdef)
+	m, ink, err := analyseGlyph(g.Content, res, true)
+	if err != nil {
+		return 0, rect.Rect{}, err
 	}
+	switch {
+	case ink == nil && !m.HasBBox():
+		return 0, rect.Rect{}, errEmpty(isNotdef)
+	case m.HasBBox():
+		return m.Width, m.BBox, nil
+	}
+	return m.Width, ink.result(), nil
+}
 
-	it := g.Content.NewIter()
-	var ink *inkBounds
+// analyseGlyph scans the glyph procedure proc.  It returns the metrics of
+// the leading d0 or d1 operator and the ink bounds of the operators from the
+// metrics operator onwards.  The ink bounds are nil for a nil or empty
+// procedure.  If stopAtBox is set, scanning ends at a d1 operator whose box
+// has an interior, and the ink bounds are nil.  An error is returned for a
+// procedure which does not start with a valid d0 or d1 operator and for
+// iteration errors.
+func analyseGlyph(proc content.Stream, res *content.Resources, stopAtBox bool) (m content.GlyphMetrics, ink *inkBounds, err error) {
+	if proc == nil {
+		return m, nil, nil
+	}
+	it := proc.NewIter()
 	for name, args := range it.All() {
 		if ink != nil {
 			ink.apply(name, args)
@@ -133,25 +152,22 @@ func (g *Glyph) extract(res *content.Resources, isNotdef bool) (width float64, b
 		if name == content.OpRawContent {
 			continue
 		}
-		m, ok := content.ParseGlyphMetrics(name, args)
+		var ok bool
+		m, ok = content.ParseGlyphMetrics(name, args)
 		if !ok {
-			return 0, rect.Rect{}, errors.New("glyph must start with a valid d0 or d1 operator")
+			return m, nil, errors.New("glyph must start with a valid d0 or d1 operator")
 		}
-		if m.HasBBox() {
+		if stopAtBox && m.HasBBox() {
 			// the remaining content has no metric significance
-			return m.Width, m.BBox, nil
+			return m, nil, nil
 		}
-		width = m.Width
 		ink = newInkBounds(res)
 		ink.apply(name, args)
 	}
 	if err := it.Err(); err != nil {
-		return 0, rect.Rect{}, err
+		return m, nil, err
 	}
-	if ink == nil {
-		return 0, rect.Rect{}, errEmpty(isNotdef)
-	}
-	return width, ink.result(), nil
+	return m, ink, nil
 }
 
 // maxReach is the distance from the origin, in text space units, beyond

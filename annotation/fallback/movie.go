@@ -10,6 +10,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/internal/brand"
 	"seehuhn.de/go/pdf/movie"
 )
 
@@ -49,14 +50,14 @@ func drawMediaPlaceholder(b *builder.Builder, rect pdf.Rectangle) {
 	h := rect.Dy()
 
 	// chrome panel
-	b.SetFillColor(quireSlate1)
+	b.SetFillColor(brand.Slate1)
 	b.Rectangle(rect.LLx, rect.LLy, w, h)
 	b.Fill()
 
 	// hairline border, inset by half the line width so it stays inside the Rect
 	const lw = 0.5
 	b.SetLineWidth(lw)
-	b.SetStrokeColor(quireSlate3)
+	b.SetStrokeColor(brand.Slate3)
 	b.Rectangle(rect.LLx+lw/2, rect.LLy+lw/2, w-lw, h-lw)
 	b.Stroke()
 
@@ -64,7 +65,7 @@ func drawMediaPlaceholder(b *builder.Builder, rect pdf.Rectangle) {
 	size := min(w, h) * 0.16
 	cx := rect.LLx + w/2
 	cy := rect.LLy + h/2
-	b.SetFillColor(quireInk3)
+	b.SetFillColor(brand.Ink3)
 	b.MoveTo(cx-0.5*size, cy-0.7*size)
 	b.LineTo(cx-0.5*size, cy+0.7*size)
 	b.LineTo(cx+0.8*size, cy)

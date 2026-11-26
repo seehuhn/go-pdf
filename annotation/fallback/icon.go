@@ -11,6 +11,7 @@ import (
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
+	"seehuhn.de/go/pdf/internal/brand"
 )
 
 // iconSize is the side of the square an annotation icon is drawn in.  The
@@ -19,7 +20,7 @@ import (
 const iconSize = 24
 
 // stickyYellow is the card colour of an icon the document gives no colour.
-var stickyYellow = quireAmber100
+var stickyYellow = brand.Amber100
 
 // darkCardL is the L* below which a card is too dark for the design inks.
 const darkCardL = 55
@@ -52,12 +53,12 @@ const linesFraction = 0.45
 func inksFor(bg color.Color) iconInks {
 	card := bg
 	if card == nil {
-		card = quireWhite
+		card = brand.White
 	}
 
-	glyph, outline := color.Color(quireInk), color.Color(quireInk2)
+	glyph, outline := color.Color(brand.Ink), color.Color(brand.Ink2)
 	if lightness(card) < darkCardL {
-		glyph, outline = quireAmber50, quireAmber50
+		glyph, outline = brand.Amber50, brand.Amber50
 	}
 	return iconInks{
 		glyph:   glyph,

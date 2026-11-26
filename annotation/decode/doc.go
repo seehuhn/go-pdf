@@ -10,13 +10,15 @@
 // Keeping the readers in a separate package lets them depend on both type
 // packages without an import cycle.
 //
-// There are two entry points:
+// There are three entry points:
 //
 //   - [Annotation] reads any annotation, dispatching on its subtype.  Invoke
 //     it through [pdf.Cursor.Decode], so that indirect references are
 //     resolved and reference cycles are detected.
 //   - [DocumentForm] reads the document's interactive form, including its
 //     field tree, once per extractor.
+//   - [FieldAt] reads a single terminal field, also one which the form does
+//     not reach.
 //
 // The per-type decoders are unexported and reached through [Annotation]; this
 // keeps a single entry point that handles the merged field/widget case

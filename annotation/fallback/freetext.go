@@ -17,6 +17,8 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/text"
+	"seehuhn.de/go/pdf/internal/brand"
+	"seehuhn.de/go/pdf/internal/daparse"
 )
 
 const (
@@ -48,7 +50,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 	// the annotation's own default appearance says what colour its text is
 	// drawn in, and what size; the generator's ink stands in where it names
 	// no colour, and the default size where it names none or an invalid one
-	size, textCol := parseDA(a.DefaultAppearance)
+	size, textCol := daparse.Parse(a.DefaultAppearance, brand.Ink)
 	if size <= 0 {
 		size = freeTextFontSize
 	}
@@ -108,7 +110,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 		hasBorder := lw > 0
 		if hasBorder {
 			b.SetLineWidth(lw)
-			b.SetStrokeColor(quireInk)
+			b.SetStrokeColor(brand.Ink)
 		}
 		if co != nil {
 			if bgCol != nil {
@@ -136,7 +138,7 @@ func (g *Generator) addFreeTextAppearance(a *annotation.FreeText) (*form.Form, e
 
 	if hasCallout {
 		b.SetLineWidth(lw)
-		b.SetStrokeColor(quireInk)
+		b.SetStrokeColor(brand.Ink)
 		b.SetLineCap(graphics.LineCapRound)
 		b.SetLineJoin(graphics.LineJoinRound)
 		drawOpenPolyline(b, callout, annotation.LineEndingStyleNone, a.LineEndingStyle, bgCol)

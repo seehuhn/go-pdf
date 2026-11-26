@@ -199,10 +199,10 @@ func (r *Reader) ProcessIter(it content.Iter) error {
 //
 // The Reader is permissive: it calls [content.State.ApplyStateChanges]
 // directly (bypassing [content.State.CheckOperatorAllowed] and the
-// required-state check) so that every operator advances state and every
-// callback fires, matching how real-world viewers tolerate malformed
-// content streams.  The exception are operators which §8.6.8 says to ignore,
-// see [content.State.Ignored]: these are dropped entirely.
+// required-state check) so that an operator which is out of context still
+// advances the state and fires its callback.  Operators which §8.6.8 says
+// to ignore, see [content.State.Ignored], are dropped entirely.  Operators
+// which [content.State.Operands] rejects do not advance the state.
 func (r *Reader) processOperator(name content.OpName, args []pdf.Object) error {
 	if r.State.Ignored(name, args) {
 		return nil

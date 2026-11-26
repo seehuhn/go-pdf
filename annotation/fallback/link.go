@@ -11,6 +11,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/internal/brand"
 )
 
 func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
@@ -20,7 +21,7 @@ func (g *Generator) addLinkAppearance(a *annotation.Link) (*form.Form, error) {
 
 	col := a.Color
 	if col == nil {
-		col = quireLapis500
+		col = brand.Lapis500
 	}
 
 	bbox := a.Rect

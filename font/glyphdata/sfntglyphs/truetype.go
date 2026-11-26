@@ -169,9 +169,10 @@ func methodE(ll []ttLookup, font *sfnt.Font) []ttLookup {
 		return ll
 	}
 
+	// the first glyph with a given name wins
 	m := make(map[string]glyph.ID)
 	for gid, name := range outlines.Names {
-		if name == "" {
+		if _, seen := m[name]; name == "" || seen {
 			continue
 		}
 		m[name] = glyph.ID(gid)

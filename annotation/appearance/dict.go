@@ -181,16 +181,16 @@ func (d *Dict) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	}
 
 	if d.Normal != nil && len(d.NormalMap) > 0 {
-		return nil, errors.New("Normal and NormalMap are mutually exclusive")
+		return nil, errors.New("the Normal and NormalMap entries are mutually exclusive")
 	}
 	if d.Normal == nil && len(d.NormalMap) == 0 {
 		return nil, errors.New("normal appearance is required")
 	}
 	if d.RollOver != nil && len(d.RollOverMap) > 0 {
-		return nil, errors.New("RollOver and RollOverMap are mutually exclusive")
+		return nil, errors.New("the RollOver and RollOverMap entries are mutually exclusive")
 	}
 	if d.Down != nil && len(d.DownMap) > 0 {
-		return nil, errors.New("Down and DownMap are mutually exclusive")
+		return nil, errors.New("the Down and DownMap entries are mutually exclusive")
 	}
 
 	dict := pdf.Dict{}

@@ -115,6 +115,16 @@ func TestNewTrueTypeSelector(t *testing.T) {
 			wantGID:  5,
 			wantOK:   true,
 		},
+		{
+			name:     "method E: first of duplicate names",
+			symbolic: true,
+			enc:      enc,
+			font: ttFont(10, nil, []string{".notdef", "a", "quotesinglbase", "b",
+				"quotesinglbase", "c", "d", "e", "f", "g"}),
+			cid:     cidVal,
+			wantGID: 2,
+			wantOK:  true,
+		},
 
 		// priority: higher-priority method wins
 		{

@@ -262,8 +262,9 @@ func TestAnnotationReadsFormFirst(t *testing.T) {
 	roundTripForm(t, pdf.V1_7, idx.Form)
 }
 
-// A widget dictionary carrying field entries but no partial name is not a
-// field, but it is still an annotation and gets the appearance repairs.
+// A widget dictionary carrying field entries, in a document without a form,
+// has no field, but it is still an annotation and gets the appearance
+// repairs.
 func TestDecodeUnnamedMergedWidgetAppearance(t *testing.T) {
 	w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
 	ref := w.Alloc()
@@ -285,7 +286,7 @@ func TestDecodeUnnamedMergedWidgetAppearance(t *testing.T) {
 		t.Fatalf("annotation is %T, want *annotation.Widget", a)
 	}
 	if wa.Field != nil {
-		t.Errorf("unnamed widget has field %T, want nil", wa.Field)
+		t.Errorf("widget has field %T, want nil", wa.Field)
 	}
 	if wa.Appearance == nil {
 		t.Error("missing appearance was not repaired")

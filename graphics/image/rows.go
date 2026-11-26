@@ -172,25 +172,7 @@ func (r *RowReader) decodeRows(dst func(y int) Row, yield func(int, Row) bool) e
 	}
 	defer src.Close()
 
-	buf := make([]byte, rowBytes)
-	more := true   // whether src may hold more data
-	stale := false // whether buf holds samples of an earlier row
-	for y := range r.Height {
-		if more {
-			n, err := readRow(src, buf)
-			if err != nil {
-				return err
-			}
-			if n < rowBytes {
-				clear(buf[n:])
-				more = false
-				stale = n > 0
-			}
-		} else if stale {
-			clear(buf)
-			stale = false
-		}
-
+	return eachPackedRow(src, rowBytes, r.Height, func(y int, buf []byte) bool {
 		row := dst(y)
 		switch {
 		case lut != nil:
@@ -210,8 +192,33 @@ func (r *RowReader) decodeRows(dst func(y int) Row, yield func(int, Row) bool) e
 		if r.key != nil {
 			rawColorKey(row.Key[:width], buf, ncomp, bpc, r.key)
 		}
+		return yield(y, row)
+	})
+}
 
-		if !yield(y, row) {
+// eachPackedRow reads height rows of rowBytes bytes from src and passes them
+// to fn in order, until fn returns false.  The buffer is reused between
+// rows.  Samples missing from short data count as 0.
+func eachPackedRow(src io.Reader, rowBytes, height int, fn func(y int, buf []byte) bool) error {
+	buf := make([]byte, rowBytes)
+	more := true   // whether src may hold more data
+	stale := false // whether buf holds samples of an earlier row
+	for y := range height {
+		if more {
+			n, err := readRow(src, buf)
+			if err != nil {
+				return err
+			}
+			if n < rowBytes {
+				clear(buf[n:])
+				more = false
+				stale = n > 0
+			}
+		} else if stale {
+			clear(buf)
+			stale = false
+		}
+		if !fn(y, buf) {
 			return nil
 		}
 	}

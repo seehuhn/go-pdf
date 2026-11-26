@@ -28,6 +28,13 @@ type FormIndex struct {
 	// WidgetRefs maps each widget of these fields to its annotation
 	// dictionary, including widgets which are on no page.
 	WidgetRefs map[acroform.Widget]pdf.Reference
+
+	// fieldAt is the inverse of FieldRefs
+	fieldAt map[pdf.Reference]acroform.Field
+
+	// widgetAt maps the reference of each widget in WidgetRefs to the
+	// field which has the widget
+	widgetAt map[pdf.Reference]acroform.Field
 }
 
 // documentForm is the result of reading the document's form, as kept by
@@ -150,7 +157,17 @@ func readForm(c pdf.Cursor, obj pdf.Object, _ bool) (*FormIndex, error) {
 	for ref, f := range d.byRef {
 		refs[f] = ref
 	}
-	return &FormIndex{Form: form, FieldRefs: refs, WidgetRefs: d.widgetRefs}, nil
+	widgetAt := make(map[pdf.Reference]acroform.Field, len(d.widgetRefs))
+	for w, ref := range d.widgetRefs {
+		widgetAt[ref] = w.ParentField()
+	}
+	return &FormIndex{
+		Form:       form,
+		FieldRefs:  refs,
+		WidgetRefs: d.widgetRefs,
+		fieldAt:    d.byRef,
+		widgetAt:   widgetAt,
+	}, nil
 }
 
 // decodeCalculationOrder decodes the /CO array into the fields it names,

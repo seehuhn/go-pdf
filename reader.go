@@ -272,6 +272,11 @@ func (r *Reader) decodeTrailerCore(trailer Dict, opt *ReaderOptions) error {
 	return nil
 }
 
+// FileSize returns the size of the input file in bytes.
+func (r *Reader) FileSize() int64 {
+	return r.size
+}
+
 // Close closes the Reader.
 //
 // This call only has an effect if the Reader was created by [Open].

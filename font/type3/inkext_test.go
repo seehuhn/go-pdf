@@ -1317,3 +1317,118 @@ func TestGlyphExtentMore(t *testing.T) {
 		})
 	}
 }
+
+// TestGlyphInkBounds checks the ink bounds of glyph procedures.
+func TestGlyphInkBounds(t *testing.T) {
+	harvest := func(b *builder.Builder) content.Stream {
+		t.Helper()
+		stream, err := b.Harvest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return stream
+	}
+
+	t.Run("d1 box", func(t *testing.T) {
+		b := builder.New(content.Glyph, nil, pdf.V2_0)
+		b.Type3UncoloredGlyph(700, 0, 10, 20, 600, 800)
+		b.Rectangle(-1000, -1000, 5000, 5000)
+		b.Fill()
+		got := type3.GlyphInkBounds(harvest(b), nil)
+		want := rect.Rect{LLx: 10, LLy: 20, URx: 600, URy: 800}
+		if got != want {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("d0 path", func(t *testing.T) {
+		b := builder.New(content.Glyph, nil, pdf.V2_0)
+		b.Type3ColoredGlyph(500, 0)
+		b.Rectangle(30, 40, 100, 900)
+		b.Fill()
+		got := type3.GlyphInkBounds(harvest(b), nil)
+		tight(rect.Rect{LLx: 30, LLy: 40, URx: 130, URy: 940})(t, got)
+	})
+
+	t.Run("no ink", func(t *testing.T) {
+		b := builder.New(content.Glyph, nil, pdf.V2_0)
+		b.Type3ColoredGlyph(500, 0)
+		if got := type3.GlyphInkBounds(harvest(b), nil); !got.IsZero() {
+			t.Errorf("got %v, want the zero rectangle", got)
+		}
+	})
+
+	t.Run("unbounded", func(t *testing.T) {
+		b := builder.New(content.Glyph, nil, pdf.V2_0)
+		b.Type3ColoredGlyph(500, 0)
+		b.Rectangle(0, 0, 10, 10)
+		b.Stroke() // the line width is inherited
+		if got := type3.GlyphInkBounds(harvest(b), nil); !isInfinite(got) {
+			t.Errorf("got %v, want an infinite rectangle", got)
+		}
+	})
+}
+
+// TestGlyphPaintBounds checks that the bounds contain both the d1 box and
+// the ink outside it.
+func TestGlyphPaintBounds(t *testing.T) {
+	b := builder.New(content.Glyph, nil, pdf.V2_0)
+	b.Type3UncoloredGlyph(700, 0, 10, 20, 600, 800)
+	b.Rectangle(-100, 30, 200, 1000)
+	b.Fill()
+	stream, err := b.Harvest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := type3.GlyphPaintBounds(stream, nil)
+	for _, r := range []rect.Rect{
+		{LLx: 10, LLy: 20, URx: 600, URy: 800},
+		{LLx: -100, LLy: 30, URx: 100, URy: 1030},
+	} {
+		if !got.Covers(r) {
+			t.Errorf("bounds %v do not cover %v", got, r)
+		}
+	}
+}
+
+// TestGlyphPaintBoundsZeroBox checks that a d1 box without interior adds
+// nothing to the bounds.
+func TestGlyphPaintBoundsZeroBox(t *testing.T) {
+	ink := rect.Rect{LLx: 100, LLy: 200, URx: 300, URy: 400}
+	for _, fill := range []bool{false, true} {
+		b := builder.New(content.Glyph, nil, pdf.V2_0)
+		b.Type3UncoloredGlyph(700, 0, 0, 0, 0, 0)
+		if fill {
+			b.Rectangle(ink.LLx, ink.LLy, ink.Dx(), ink.Dy())
+			b.Fill()
+		}
+		stream, err := b.Harvest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := type3.GlyphPaintBounds(stream, nil)
+		if !fill {
+			if !got.IsZero() {
+				t.Errorf("got %v, want the zero rectangle", got)
+			}
+			continue
+		}
+		tight(ink)(t, got)
+	}
+}
+
+// TestGlyphPaintBoundsUnpainted checks the bounds of procedures which paint
+// nothing, and of a procedure which cannot be analysed.
+func TestGlyphPaintBoundsUnpainted(t *testing.T) {
+	empty := &content.Operators{}
+	if got := type3.GlyphPaintBounds(nil, nil); !got.IsZero() {
+		t.Errorf("nil procedure: got %v, want the zero rectangle", got)
+	}
+	if got := type3.GlyphPaintBounds(empty, nil); !got.IsZero() {
+		t.Errorf("empty procedure: got %v, want the zero rectangle", got)
+	}
+	malformed := &content.Operators{Ops: []content.Operator{
+		{Name: content.OpFill},
+	}}
+	infinite(t, type3.GlyphPaintBounds(malformed, nil))
+}

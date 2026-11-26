@@ -25,7 +25,7 @@ func encodePath(path [][]vec.Vec2) (pdf.Array, error) {
 	pathArray := make(pdf.Array, len(path))
 	for i, entry := range path {
 		if i > 0 && len(entry) != 1 && len(entry) != 3 {
-			return nil, fmt.Errorf("Path entry %d has %d points, expected 1 or 3", i, len(entry))
+			return nil, fmt.Errorf("path entry %d has %d points, expected 1 or 3", i, len(entry))
 		}
 		a := make(pdf.Array, 2*len(entry))
 		for j, p := range entry {

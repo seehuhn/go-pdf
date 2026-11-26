@@ -226,3 +226,23 @@ func FuzzInfoRoundTrip(f *testing.F) {
 		infoRoundTripTest(t, version, info)
 	})
 }
+
+func TestInfoMinVersion(t *testing.T) {
+	cases := []struct {
+		name string
+		info *pdf.Info
+		want pdf.Version
+	}{
+		{"empty", &pdf.Info{}, pdf.V1_0},
+		{"title", &pdf.Info{Title: pdf.Text("x")}, pdf.V1_0},
+		{"trapped true", &pdf.Info{Trapped: optional.NewBool(true)}, pdf.V1_3},
+		{"trapped false", &pdf.Info{Trapped: optional.NewBool(false)}, pdf.V1_3},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.info.MinVersion(); got != tc.want {
+				t.Errorf("MinVersion() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

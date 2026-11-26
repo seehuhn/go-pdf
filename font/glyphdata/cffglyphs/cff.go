@@ -9,9 +9,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 
 	"seehuhn.de/go/pdf/font/glyphdata"
+	"seehuhn.de/go/postscript/cid"
 	"seehuhn.de/go/sfnt/cff"
+	"seehuhn.de/go/sfnt/glyph"
 	"seehuhn.de/go/sfnt/parser"
 )
 
@@ -53,4 +56,24 @@ func ToStream(font *cff.Font, tp glyphdata.Type) *glyphdata.Stream {
 			return font.Write(w)
 		},
 	}
+}
+
+// CIDToGID returns the glyph ID of a CID in a CID-keyed CFF font.  Where the
+// font program is not CID-keyed, the glyph ID equals the CID.  A CID which the
+// program does not contain selects glyph 0.  Where several glyphs have the
+// same CID, the one with the lowest glyph ID is selected.
+func CIDToGID(cf *cff.Font) func(cid.CID) glyph.ID {
+	if !cf.IsCIDKeyed() {
+		return func(c cid.CID) glyph.ID {
+			if int(c) >= len(cf.Glyphs) {
+				return 0
+			}
+			return glyph.ID(c)
+		}
+	}
+	m := make(map[cid.CID]glyph.ID, len(cf.GIDToCID))
+	for gid, v := range slices.Backward(cf.GIDToCID) {
+		m[v] = glyph.ID(gid)
+	}
+	return func(c cid.CID) glyph.ID { return m[c] }
 }

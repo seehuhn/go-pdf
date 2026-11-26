@@ -194,6 +194,10 @@ func (d *fieldTreeDecoder) nodeFunc(ctx inherited) func(pdf.Cursor, pdf.Object, 
 
 // decodeRoots decodes the /Fields (or another root array) of a form into tree
 // nodes, deduplicating and skipping entries that are not references.
+//
+// An entry which is not a field is skipped without being marked as seen, so
+// that a widget annotation listed here still goes to the field which has it
+// among its kids; see [classifyKid].
 func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherited) ([]acroform.Node, error) {
 	arr, err := pdf.Optional(c.Array(obj))
 	if err != nil {
@@ -203,6 +207,13 @@ func (d *fieldTreeDecoder) decodeRoots(c pdf.Cursor, obj pdf.Object, ctx inherit
 	for _, el := range arr {
 		ref, ok := el.(pdf.Reference)
 		if !ok || d.seen[ref] {
+			continue
+		}
+		kind, err := pdf.Optional(c.Decode(ref, classifyKid))
+		if err != nil {
+			return nil, err
+		}
+		if kind == nil || !kind.isField {
 			continue
 		}
 		d.seen[ref] = true
@@ -255,46 +266,231 @@ func (d *fieldTreeDecoder) decodeNode(c pdf.Cursor, obj pdf.Object, ctx inherite
 		return f, nil
 	}
 
-	// partition the children into sub-fields and widget annotations
-	kids, err := pdf.Optional(c.Array(dict["Kids"]))
+	fieldKids, widgetKids, err := partitionKids(c, dict, d.seen)
 	if err != nil {
 		return nil, err
 	}
-	local := map[pdf.Reference]bool{}
-	if p != nil {
-		local[p.Ref] = true
-	}
-	var fieldKids, widgetKids []pdf.Reference
-	for _, el := range kids {
-		ref, ok := el.(pdf.Reference)
-		if !ok || local[ref] {
-			continue
-		}
-		local[ref] = true
-		kidDict, err := pdf.Optional(c.Dict(ref))
-		if err != nil {
-			return nil, err
-		}
-		if kidDict == nil {
-			continue
-		}
-		isWidget, err := isWidgetKid(c, kidDict)
-		if err != nil {
-			return nil, err
-		}
-		if isWidget {
-			widgetKids = append(widgetKids, ref)
-		} else {
-			fieldKids = append(fieldKids, ref)
-		}
-	}
-
 	if len(fieldKids) > 0 {
 		// a non-terminal field: a group of sub-fields. Any widget kids are
 		// dropped from the tree; they survive through the page's /Annots.
 		return d.decodeGroup(c, dict, ctx, fieldKids)
 	}
 	return d.decodeTerminal(c, dict, ctx, widgetKids)
+}
+
+// partitionKids splits the children of a field into sub-fields and widget
+// annotations.  Entries which are not references, repeated entries, a
+// reference to the field itself and references to anything but a dictionary
+// are skipped.
+//
+// A kid without a partial name is not a field (12.7.4.2).  Its own kids are
+// taken in its place, so that the widgets below it are widgets of the nearest
+// ancestor which is a field; see [classifyKid].
+//
+// Such a kid, and a widget annotation, can have one parent only (12.5.6.19).
+// Where several dictionaries list it, it belongs to the one its /Parent entry
+// names, and the others skip it.  This holds also where that dictionary is
+// outside the tree being read.
+//
+// A /Parent entry which is missing, or which names a dictionary that does not
+// list the kid, settles nothing.  A widget annotation is then returned for
+// every field which lists it.  A kid which stands for its own kids is then
+// replaced by them for one field only: claimed records these kids, and a kid
+// recorded there is skipped.  If claimed is nil, for a field read on its own,
+// such a kid is skipped.  In either case the work for all fields of a file
+// stays in proportion to the size of the file.
+func partitionKids(c pdf.Cursor, dict pdf.Dict, claimed map[pdf.Reference]bool) (fieldKids, widgetKids []pdf.Reference, err error) {
+	kids, err := pdf.Optional(c.Array(dict["Kids"]))
+	if err != nil {
+		return nil, nil, err
+	}
+	var self pdf.Reference
+	local := map[pdf.Reference]bool{}
+	if p := c.Path(); p != nil {
+		self = p.Ref
+		local[self] = true
+	}
+
+	// the references still to visit, the next one last
+	type entry struct {
+		ref  pdf.Reference
+		from pdf.Reference // the dictionary which lists ref
+	}
+	var todo []entry
+	for _, el := range slices.Backward(kids) {
+		if ref, ok := el.(pdf.Reference); ok {
+			todo = append(todo, entry{ref, self})
+		}
+	}
+	for len(todo) > 0 {
+		e := todo[len(todo)-1]
+		todo = todo[:len(todo)-1]
+		if local[e.ref] {
+			continue
+		}
+		kind, err := pdf.Optional(c.Decode(e.ref, classifyKid))
+		if err != nil {
+			return nil, nil, err
+		}
+		if kind == nil || kind.isField {
+			local[e.ref] = true
+			if kind != nil && e.from == self {
+				fieldKids = append(fieldKids, e.ref)
+			}
+			continue
+		}
+
+		// A kid which belongs to another dictionary is not marked as
+		// visited: the field may still reach it through that dictionary.
+		confirmed := kind.parent != 0 && kind.parent == e.from
+		if !confirmed && kind.parent != 0 && kind.parent != e.ref {
+			elsewhere, err := listsKid(c, kind.parent, e.ref)
+			if err != nil {
+				return nil, nil, err
+			}
+			if elsewhere {
+				continue
+			}
+		}
+		local[e.ref] = true
+
+		if kind.isWidget {
+			widgetKids = append(widgetKids, e.ref)
+			continue
+		}
+		if !confirmed {
+			if claimed == nil || claimed[e.ref] {
+				continue
+			}
+			claimed[e.ref] = true
+		}
+		for _, ref := range slices.Backward(kind.kids) {
+			todo = append(todo, entry{ref, e.ref})
+		}
+	}
+	return fieldKids, widgetKids, nil
+}
+
+// kidRefs holds the references listed in the /Kids array of a dictionary.
+type kidRefs struct {
+	refs map[pdf.Reference]bool
+}
+
+// decodeKidRefs reads the references in the /Kids array of a dictionary.
+func decodeKidRefs(c pdf.Cursor, obj pdf.Object, _ bool) (*kidRefs, error) {
+	dict, err := pdf.Optional(c.Dict(obj))
+	if err != nil {
+		return nil, err
+	}
+	kids, err := pdf.Optional(c.Array(dict["Kids"]))
+	if err != nil {
+		return nil, err
+	}
+	res := &kidRefs{refs: make(map[pdf.Reference]bool, len(kids))}
+	for _, el := range kids {
+		if ref, ok := el.(pdf.Reference); ok {
+			res.refs[ref] = true
+		}
+	}
+	return res, nil
+}
+
+// listsKid reports whether the dictionary parent lists kid in its /Kids
+// array.  The array is read once per extractor, so the cost of all calls for
+// one parent is in proportion to the length of the array.
+func listsKid(c pdf.Cursor, parent, kid pdf.Reference) (bool, error) {
+	// The parent is often on the path of c, where decoding it would count
+	// as a reference cycle.  A new path is safe here, since decodeKidRefs
+	// does not decode the kids.
+	kr, err := pdf.Optional(pdf.CursorAt(c.Extractor(), nil).Decode(parent, decodeKidRefs))
+	if err != nil || kr == nil {
+		return false, err
+	}
+	return kr.refs[kid], nil
+}
+
+// kidKind describes the role of a kid of a field.  A kid which is neither a
+// sub-field nor a widget annotation stands for its own kids.
+type kidKind struct {
+	// isField is set for a sub-field
+	isField bool
+
+	// isWidget is set for a widget annotation of the parent
+	isWidget bool
+
+	// parent is the /Parent entry of a kid which is not a sub-field, or
+	// zero if the entry is not a reference
+	parent pdf.Reference
+
+	// kids lists the references in the /Kids of a kid which stands for
+	// its own kids
+	kids []pdf.Reference
+}
+
+// classifyKid finds the role of a kid of a field, or of an entry of /Fields.
+// A kid with a partial name is a sub-field, and so is a kid without one which
+// has sub-fields among its own kids: it groups them without adding to their
+// names.  Any other kid is not a field (12.7.4.2).  It stands for itself if
+// it is a widget annotation without kids, and for its own kids otherwise; its
+// field entries are ignored.
+//
+// Always invoke this through [pdf.Cursor.Decode], so that the depth is bounded
+// and reference cycles are detected.
+func classifyKid(c pdf.Cursor, obj pdf.Object, _ bool) (*kidKind, error) {
+	res := &kidKind{}
+	dict, err := pdf.Optional(c.Dict(obj))
+	if err != nil {
+		return nil, err
+	}
+	p := c.Path()
+	if dict == nil || p == nil {
+		return res, nil
+	}
+
+	name, err := partialName(c, dict)
+	if err != nil {
+		return nil, err
+	}
+	if name != "" {
+		res.isField = true
+		return res, nil
+	}
+	res.parent, _ = dict["Parent"].(pdf.Reference)
+
+	hasKids, err := hasEntry(c, dict, "Kids")
+	if err != nil {
+		return nil, err
+	}
+	if !hasKids {
+		res.isWidget, err = isWidgetSubtype(c, dict)
+		if err != nil {
+			return nil, err
+		}
+		return res, nil
+	}
+
+	kids, err := pdf.Optional(c.Array(dict["Kids"]))
+	if err != nil {
+		return nil, err
+	}
+	for _, el := range kids {
+		ref, ok := el.(pdf.Reference)
+		if !ok || ref == p.Ref {
+			continue
+		}
+		kind, err := pdf.Optional(c.Decode(ref, classifyKid))
+		if err != nil {
+			return nil, err
+		}
+		if kind == nil {
+			continue
+		}
+		if kind.isField {
+			return &kidKind{isField: true}, nil
+		}
+		res.kids = append(res.kids, ref)
+	}
+	return res, nil
 }
 
 // decodeGroup decodes a non-terminal field into a [acroform.Group]. The group's
@@ -1021,9 +1217,9 @@ func isMergedFieldDict(c pdf.Cursor, dict pdf.Dict) (bool, error) {
 
 // isWidgetKid reports whether a child dictionary is a widget annotation of its
 // parent rather than a (possibly merged) sub-field. A widget has the Widget
-// subtype and neither a partial name (T) nor Kids. A dictionary without T is
-// not a field (12.7.4.2), so any other field entries it carries, such as a
-// redundant FT, do not make it one.
+// subtype and neither a partial name (T) nor Kids. Such a dictionary is a
+// widget annotation, not a field (12.7.4.2), so any other field entries it
+// carries, such as a redundant FT, do not make it one.
 func isWidgetKid(c pdf.Cursor, dict pdf.Dict) (bool, error) {
 	if isWidget, err := isWidgetSubtype(c, dict); err != nil || !isWidget {
 		return false, err

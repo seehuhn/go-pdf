@@ -12,10 +12,13 @@ import (
 	"seehuhn.de/go/geom/matrix"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/annotation"
 	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics/color"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/internal/brand"
+	"seehuhn.de/go/pdf/internal/daparse"
 )
 
 // maxGlyphs limits the overlay text drawn for one mark, so that the work
@@ -102,6 +105,38 @@ type Mark struct {
 
 	// Text, if not nil, is drawn over the filled region and clipped to it.
 	Text *Text
+}
+
+// FromAnnotation returns the mark described by a redaction annotation.  The
+// region is given by the annotation's QuadPoints, one quadrilateral per four
+// points, or by Rect if there are fewer than four points.  If the annotation
+// has overlay text, getFont is called once to obtain the font for the text;
+// otherwise getFont is not called.
+func FromAnnotation(a *annotation.Redact, getFont func() font.Layouter) *Mark {
+	var quads []Quad
+	if len(a.QuadPoints) >= 4 {
+		quads = QuadsFromPoints(a.QuadPoints)
+	} else {
+		quads = []Quad{RectQuad(a.Rect)}
+	}
+	m := &Mark{
+		Quads:   quads,
+		Rect:    a.Rect,
+		Overlay: a.Overlay,
+		Fill:    a.FillColor,
+	}
+	if !a.OverlayText.IsZero() {
+		size, col := daparse.Parse(a.DefaultAppearance, brand.Ink)
+		m.Text = &Text{
+			Font:   getFont(),
+			Size:   size,
+			Color:  col,
+			String: a.OverlayText.String(),
+			Align:  a.Align,
+			Repeat: a.Repeat,
+		}
+	}
+	return m
 }
 
 // Draw draws the mark into b.  The graphics state of b is left as it was.

@@ -896,6 +896,9 @@ func (p *Page) AddAnnots(annots ...annotation.Annotation) {
 // operator stream is raw — consumers are responsible for handling
 // malformed input (see e.g. [seehuhn.de/go/pdf/reader.Reader]).
 //
+// A segment whose data cannot be decoded completely contributes only the
+// part decoded before the problem, see [SegmentsReader].
+//
 // The returned iterator always emits zero operators for a page with no
 // content, never nil.
 func (p *Page) NewIter() content.Iter {

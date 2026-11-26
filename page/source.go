@@ -127,7 +127,7 @@ func (s *Source) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 		}
 		// The segment uses a filter the library cannot decode (e.g. an
 		// unknown or unimplemented filter).  A reader treats such a segment
-		// as empty (see contentReader.Read), and emitting the original
+		// as empty (see [ContentReader]), and emitting the original
 		// filter name would produce an invalid PDF, so write an empty
 		// content stream to keep the page valid and round-tripping.
 		r = io.NopCloser(bytes.NewReader(nil))
@@ -146,7 +146,7 @@ func (s *Source) Embed(e *pdf.EmbedHelper) (pdf.Native, error) {
 	if _, err := io.Copy(stm, r); err != nil {
 		// a corrupt or truncated filter stream yields a malformed error
 		// part-way through; keep the bytes decoded so far, matching the way
-		// a reader uses the decoded prefix (see contentReader.Read)
+		// a reader uses the decoded prefix (see [ContentReader])
 		if pdf.IsReadError(err) {
 			stm.Close()
 			return nil, err

@@ -941,3 +941,41 @@ func TestUpdateRebuiltXRef(t *testing.T) {
 		t.Error("update of a damaged file succeeded")
 	}
 }
+
+func TestReaderFileSize(t *testing.T) {
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, V1_7, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pagesRef := w.Alloc()
+	pageRef := w.Alloc()
+	err = w.Put(pageRef, Dict{
+		"Type":     Name("Page"),
+		"Parent":   pagesRef,
+		"MediaBox": Array{Integer(0), Integer(0), Integer(100), Integer(100)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = w.Put(pagesRef, Dict{
+		"Type":  Name("Pages"),
+		"Kids":  Array{pageRef},
+		"Count": Integer(1),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.GetMeta().Catalog.Pages = pagesRef
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := r.FileSize(); got != int64(buf.Len()) {
+		t.Errorf("FileSize() = %d, want %d", got, buf.Len())
+	}
+}

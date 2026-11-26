@@ -153,6 +153,15 @@ func ExtractInfo(c Cursor, obj Object, _ bool) (*Info, error) {
 	return info, nil
 }
 
+// MinVersion returns the lowest PDF version in which every entry present in
+// info is allowed.
+func (info *Info) MinVersion() Version {
+	if _, ok := info.Trapped.Get(); ok {
+		return V1_3
+	}
+	return V1_0
+}
+
 // isEmpty reports whether info has no content that encode would write.
 func (info *Info) isEmpty() bool {
 	if !info.Title.IsZero() || !info.Author.IsZero() || !info.Subject.IsZero() ||

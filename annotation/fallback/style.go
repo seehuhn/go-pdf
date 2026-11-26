@@ -289,6 +289,13 @@ var ErrNoFallback = errors.New("no fallback appearance for this annotation type"
 // simply not implemented yet; a caller decides which types it offers here,
 // see [seehuhn.de/go/pdf/annotation.ShouldSynthesizeFallback].
 //
+// AddAppearance sets no appearance, and returns nil, if the bounding box of the
+// generated appearance, rounded to two decimal places, has zero width or
+// height.  For most types the bounding box is the annotation rectangle; for
+// the others it follows from the annotation's geometry.  The annotation,
+// including any appearance dictionary it already holds, is then left
+// unchanged.
+//
 // For a redaction annotation the normal appearance marks the redaction as
 // pending, and the rollover and down appearances, which are generated as well,
 // preview the applied redaction.  The tint and outline which mark the region
@@ -348,6 +355,9 @@ func (g *Generator) addAppearance(a annotation.Annotation, onState onStateFunc) 
 		if err != nil {
 			return err
 		}
+		if !hasArea(normal.BBox) {
+			return nil
+		}
 		setAppearance(a.GetCommon(), normal, preview)
 		return nil
 	default:
@@ -356,10 +366,21 @@ func (g *Generator) addAppearance(a annotation.Annotation, onState onStateFunc) 
 	if err != nil {
 		return err
 	}
+	if !hasArea(normal.BBox) {
+		return nil
+	}
 
 	setAppearance(a.GetCommon(), normal, nil)
 
 	return nil
+}
+
+// hasArea reports whether r has positive width and height once rounded to the
+// precision the generator uses for appearance geometry.  An appearance form
+// needs a BBox of positive area, so an annotation for which this is false has
+// nothing to show.
+func hasArea(r pdf.Rectangle) bool {
+	return pdf.Round(r.Dx(), 2) > 0 && pdf.Round(r.Dy(), 2) > 0
 }
 
 // setAppearance gives the annotation its own copy of its appearance dictionary

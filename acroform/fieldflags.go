@@ -172,14 +172,14 @@ func checkFlags(ft pdf.Name, ff FieldFlags) error {
 	switch ft {
 	case "Btn":
 		if ff&FieldRadio != 0 && ff&FieldPushbutton != 0 {
-			return errors.New("Radio and Pushbutton flags are mutually exclusive")
+			return errors.New("the Radio and Pushbutton flags are mutually exclusive")
 		}
 		if ff&FieldRadio == 0 && ff&(FieldNoToggleToOff|FieldRadiosInUnison) != 0 {
-			return errors.New("NoToggleToOff and RadiosInUnison require the Radio flag")
+			return errors.New("the NoToggleToOff and RadiosInUnison flags require the Radio flag")
 		}
 	case "Ch":
 		if ff&FieldEdit != 0 && ff&FieldCombo == 0 {
-			return errors.New("Edit flag requires the Combo flag")
+			return errors.New("the Edit flag requires the Combo flag")
 		}
 		if ff&FieldDoNotSpellCheck != 0 && ff&(FieldCombo|FieldEdit) != FieldCombo|FieldEdit {
 			return errors.New("DoNotSpellCheck on a choice field requires Combo and Edit")

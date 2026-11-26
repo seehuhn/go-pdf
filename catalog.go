@@ -267,6 +267,58 @@ func DecodeCatalog(c Cursor, obj Object, _ bool) (*Catalog, error) {
 	}, nil
 }
 
+// catalogEntryVersions lists the catalog entries which are restricted to a
+// minimum PDF version, together with a test whether the entry is present.
+var catalogEntryVersions = []struct {
+	name    string
+	version Version
+	present func(c *Catalog) bool
+}{
+	{"PageLayout TwoPageLeft", V1_5, func(c *Catalog) bool { return c.PageLayout == "TwoPageLeft" }},
+	{"PageLayout TwoPageRight", V1_5, func(c *Catalog) bool { return c.PageLayout == "TwoPageRight" }},
+	{"PageMode UseOC", V1_5, func(c *Catalog) bool { return c.PageMode == "UseOC" }},
+	{"PageMode UseAttachments", V1_6, func(c *Catalog) bool { return c.PageMode == "UseAttachments" }},
+	{"Version", V1_4, func(c *Catalog) bool { return c.Version != 0 }},
+	{"Extensions", V1_7, func(c *Catalog) bool { return c.Extensions != nil }},
+	{"PageLabels", V1_3, func(c *Catalog) bool { return c.PageLabels != nil }},
+	{"Names", V1_2, func(c *Catalog) bool { return c.Names != nil }},
+	{"Dests", V1_1, func(c *Catalog) bool { return c.Dests != nil }},
+	{"ViewerPreferences", V1_2, func(c *Catalog) bool { return c.ViewerPreferences != nil }},
+	{"Threads", V1_1, func(c *Catalog) bool { return c.Threads != 0 }},
+	{"OpenAction", V1_1, func(c *Catalog) bool { return c.OpenAction != nil }},
+	{"AA", V1_2, func(c *Catalog) bool { return c.AA != nil }},
+	{"URI", V1_1, func(c *Catalog) bool { return c.URI != nil }},
+	{"AcroForm", V1_2, func(c *Catalog) bool { return c.AcroForm != nil }},
+	{"Metadata", V1_4, func(c *Catalog) bool { return c.Metadata != nil }},
+	{"StructTreeRoot", V1_3, func(c *Catalog) bool { return c.StructTreeRoot != nil }},
+	{"MarkInfo", V1_4, func(c *Catalog) bool { return c.MarkInfo != nil }},
+	{"Lang", V1_4, func(c *Catalog) bool { return !c.Lang.IsRoot() }},
+	{"SpiderInfo", V1_3, func(c *Catalog) bool { return c.SpiderInfo != nil }},
+	{"OutputIntents", V1_4, func(c *Catalog) bool { return c.OutputIntents != nil }},
+	{"PieceInfo", V1_4, func(c *Catalog) bool { return c.PieceInfo != nil }},
+	{"OCProperties", V1_5, func(c *Catalog) bool { return c.OCProperties != nil }},
+	{"Perms", V1_5, func(c *Catalog) bool { return c.Perms != nil }},
+	{"Legal", V1_5, func(c *Catalog) bool { return c.Legal != nil }},
+	{"Requirements", V1_7, func(c *Catalog) bool { return c.Requirements != nil }},
+	{"Collection", V1_7, func(c *Catalog) bool { return c.Collection != nil }},
+	{"NeedsRendering", V1_5, func(c *Catalog) bool { return c.NeedsRendering }},
+	{"DSS", V2_0, func(c *Catalog) bool { return c.DSS != nil }},
+	{"AF", V2_0, func(c *Catalog) bool { return c.AF != nil }},
+	{"DPartRoot", V2_0, func(c *Catalog) bool { return c.DPartRoot != nil }},
+}
+
+// MinVersion returns the lowest PDF version in which every entry present in
+// c is allowed.
+func (c *Catalog) MinVersion() Version {
+	v := V1_0
+	for _, e := range catalogEntryVersions {
+		if e.present(c) {
+			v = max(v, e.version)
+		}
+	}
+	return v
+}
+
 // Encode converts the document catalog to its PDF dictionary representation.
 //
 // If [Catalog.Metadata] is non-nil, the stream is embedded in the file using
@@ -278,52 +330,43 @@ func (c *Catalog) Encode(rm *ResourceManager) (Native, error) {
 		return nil, errors.New("Catalog: missing Pages reference")
 	}
 
+	for _, e := range catalogEntryVersions {
+		if !e.present(c) {
+			continue
+		}
+		if err := CheckVersion(out, "Catalog "+e.name+" entry", e.version); err != nil {
+			return nil, err
+		}
+	}
+
 	dict := Dict{
 		"Type":  Name("Catalog"),
 		"Pages": c.Pages,
 	}
 
 	if c.Version != 0 {
-		if err := CheckVersion(out, "Catalog Version entry", V1_4); err != nil {
-			return nil, err
-		}
 		// versions the library cannot write itself, such as 1.8 read
 		// from an existing file, are written through unchanged
 		dict["Version"] = Name(c.Version.String())
 	}
 
 	if c.Extensions != nil {
-		if err := CheckVersion(out, "Catalog Extensions entry", V1_7); err != nil {
-			return nil, err
-		}
 		dict["Extensions"] = c.Extensions
 	}
 
 	if c.PageLabels != nil {
-		if err := CheckVersion(out, "Catalog PageLabels entry", V1_3); err != nil {
-			return nil, err
-		}
 		dict["PageLabels"] = c.PageLabels
 	}
 
 	if c.Names != nil {
-		if err := CheckVersion(out, "Catalog Names entry", V1_2); err != nil {
-			return nil, err
-		}
 		dict["Names"] = c.Names
 	}
 
 	if c.Dests != nil {
-		if err := CheckVersion(out, "Catalog Dests entry", V1_1); err != nil {
-			return nil, err
-		}
 		dict["Dests"] = c.Dests
 	}
 
 	if c.ViewerPreferences != nil {
-		if err := CheckVersion(out, "Catalog ViewerPreferences entry", V1_2); err != nil {
-			return nil, err
-		}
 		dict["ViewerPreferences"] = c.ViewerPreferences
 	}
 
@@ -340,44 +383,26 @@ func (c *Catalog) Encode(rm *ResourceManager) (Native, error) {
 	}
 
 	if c.Threads != 0 {
-		if err := CheckVersion(out, "Catalog Threads entry", V1_1); err != nil {
-			return nil, err
-		}
 		dict["Threads"] = c.Threads
 	}
 
 	if c.OpenAction != nil {
-		if err := CheckVersion(out, "Catalog OpenAction entry", V1_1); err != nil {
-			return nil, err
-		}
 		dict["OpenAction"] = c.OpenAction
 	}
 
 	if c.AA != nil {
-		if err := CheckVersion(out, "Catalog AA entry", V1_2); err != nil {
-			return nil, err
-		}
 		dict["AA"] = c.AA
 	}
 
 	if c.URI != nil {
-		if err := CheckVersion(out, "Catalog URI entry", V1_1); err != nil {
-			return nil, err
-		}
 		dict["URI"] = c.URI
 	}
 
 	if c.AcroForm != nil {
-		if err := CheckVersion(out, "Catalog AcroForm entry", V1_2); err != nil {
-			return nil, err
-		}
 		dict["AcroForm"] = c.AcroForm
 	}
 
 	if c.Metadata != nil {
-		if err := CheckVersion(out, "Catalog Metadata entry", V1_4); err != nil {
-			return nil, err
-		}
 		ref, err := rm.Embed(c.Metadata)
 		if err != nil {
 			return nil, err
@@ -386,107 +411,62 @@ func (c *Catalog) Encode(rm *ResourceManager) (Native, error) {
 	}
 
 	if c.StructTreeRoot != nil {
-		if err := CheckVersion(out, "Catalog StructTreeRoot entry", V1_3); err != nil {
-			return nil, err
-		}
 		dict["StructTreeRoot"] = c.StructTreeRoot
 	}
 
 	if c.MarkInfo != nil {
-		if err := CheckVersion(out, "Catalog MarkInfo entry", V1_4); err != nil {
-			return nil, err
-		}
 		dict["MarkInfo"] = c.MarkInfo
 	}
 
 	if !c.Lang.IsRoot() {
-		if err := CheckVersion(out, "Catalog Lang entry", V1_4); err != nil {
-			return nil, err
-		}
 		dict["Lang"] = Text(c.Lang.String())
 	}
 
 	if c.SpiderInfo != nil {
-		if err := CheckVersion(out, "Catalog SpiderInfo entry", V1_3); err != nil {
-			return nil, err
-		}
 		dict["SpiderInfo"] = c.SpiderInfo
 	}
 
 	if c.OutputIntents != nil {
-		if err := CheckVersion(out, "Catalog OutputIntents entry", V1_4); err != nil {
-			return nil, err
-		}
 		dict["OutputIntents"] = c.OutputIntents
 	}
 
 	if c.PieceInfo != nil {
-		if err := CheckVersion(out, "Catalog PieceInfo entry", V1_4); err != nil {
-			return nil, err
-		}
 		dict["PieceInfo"] = c.PieceInfo
 	}
 
 	if c.OCProperties != nil {
-		if err := CheckVersion(out, "Catalog OCProperties entry", V1_5); err != nil {
-			return nil, err
-		}
 		dict["OCProperties"] = c.OCProperties
 	}
 
 	if c.Perms != nil {
-		if err := CheckVersion(out, "Catalog Perms entry", V1_5); err != nil {
-			return nil, err
-		}
 		dict["Perms"] = c.Perms
 	}
 
 	if c.Legal != nil {
-		if err := CheckVersion(out, "Catalog Legal entry", V1_5); err != nil {
-			return nil, err
-		}
 		dict["Legal"] = c.Legal
 	}
 
 	if c.Requirements != nil {
-		if err := CheckVersion(out, "Catalog Requirements entry", V1_7); err != nil {
-			return nil, err
-		}
 		dict["Requirements"] = c.Requirements
 	}
 
 	if c.Collection != nil {
-		if err := CheckVersion(out, "Catalog Collection entry", V1_7); err != nil {
-			return nil, err
-		}
 		dict["Collection"] = c.Collection
 	}
 
 	if c.NeedsRendering {
-		if err := CheckVersion(out, "Catalog NeedsRendering entry", V1_5); err != nil {
-			return nil, err
-		}
 		dict["NeedsRendering"] = Boolean(true)
 	}
 
 	if c.DSS != nil {
-		if err := CheckVersion(out, "Catalog DSS entry", V2_0); err != nil {
-			return nil, err
-		}
 		dict["DSS"] = c.DSS
 	}
 
 	if c.AF != nil {
-		if err := CheckVersion(out, "Catalog AF entry", V2_0); err != nil {
-			return nil, err
-		}
 		dict["AF"] = c.AF
 	}
 
 	if c.DPartRoot != nil {
-		if err := CheckVersion(out, "Catalog DPartRoot entry", V2_0); err != nil {
-			return nil, err
-		}
 		dict["DPartRoot"] = c.DPartRoot
 	}
 

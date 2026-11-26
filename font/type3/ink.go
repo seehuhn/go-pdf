@@ -720,3 +720,57 @@ func getString(args []pdf.Object, i int) (pdf.String, bool) {
 	s, ok := args[i].(pdf.String)
 	return s, ok
 }
+
+// GlyphInkBounds returns a rectangle in glyph space which contains all ink
+// the glyph procedure proc paints.
+//
+// For a d1 glyph whose bounding box has an interior, the result is this box.
+// Otherwise it is derived from the painting operators, and it holds for every
+// graphics state which the glyph can inherit when it is shown.  The resources
+// res are those of the glyph; nil stands for resources inherited from the
+// page.
+//
+// The result is infinite on all four sides where the ink has no bound, and
+// for a procedure which cannot be analysed.  It is the zero rectangle for a
+// nil or empty procedure and for a glyph which paints nothing.
+func GlyphInkBounds(proc content.Stream, res *content.Resources) rect.Rect {
+	g := &Glyph{Content: proc}
+	_, bbox, err := g.extract(res, true)
+	if err != nil {
+		return infiniteRect
+	}
+	return bbox
+}
+
+// GlyphPaintBounds returns a rectangle in glyph space which contains the
+// bounding box of the d1 operator, if the glyph has one, and all ink the
+// glyph procedure proc paints.  Unlike [GlyphInkBounds], it does not rely on
+// the box to confine the ink.  A d1 box without interior, such as the
+// all-zero box, is ignored.
+//
+// The resources res are those of the glyph; nil stands for resources
+// inherited from the page.  The result is infinite on all four sides where
+// the ink has no bound, and for a procedure which cannot be analysed.  It is
+// the zero rectangle for a nil or empty procedure and for a glyph without
+// box and without ink.
+func GlyphPaintBounds(proc content.Stream, res *content.Resources) rect.Rect {
+	m, ink, err := analyseGlyph(proc, res, false)
+	if err != nil {
+		return infiniteRect
+	}
+	if ink == nil {
+		return rect.Rect{}
+	}
+	box := region{empty: true}
+	if m.HasBBox() {
+		box = rectRegion(m.BBox)
+	}
+	all := union(box, ink.ink)
+	switch {
+	case all.empty:
+		return rect.Rect{}
+	case all.unbounded:
+		return infiniteRect
+	}
+	return all.r
+}

@@ -14,6 +14,7 @@ import (
 	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
+	"seehuhn.de/go/pdf/internal/brand"
 )
 
 func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) {
@@ -24,7 +25,7 @@ func (g *Generator) addStampAppearance(a *annotation.Stamp) (*form.Form, error) 
 	// all, rather than taking the stamp away.
 	col := paint(a.Color)
 	if col == nil {
-		col = quireSignalError
+		col = brand.SignalError
 	}
 
 	label := stampLabel(a.Icon)

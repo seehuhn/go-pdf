@@ -25,7 +25,7 @@ type pageIter struct {
 
 func (pi *pageIter) All() iter.Seq2[content.OpName, []pdf.Object] {
 	open := func() (io.ReadCloser, error) {
-		return &contentReader{parts: pi.parts}, nil
+		return SegmentsReader(pi.parts), nil
 	}
 	pi.inner = content.NewScanner(open).NewIter()
 	return pi.inner.All()

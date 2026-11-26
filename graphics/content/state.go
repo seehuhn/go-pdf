@@ -11,6 +11,7 @@ import (
 	"seehuhn.de/go/geom/path"
 	"seehuhn.de/go/geom/vec"
 	"seehuhn.de/go/pdf"
+	"seehuhn.de/go/pdf/font"
 	"seehuhn.de/go/pdf/graphics"
 )
 
@@ -88,12 +89,16 @@ const (
 	pairBX                      // BX ... EX
 )
 
-// nestingFrame is one entry on [State.nesting].  The MC field is only
-// meaningful when Kind == pairBMC; it carries the marked-content payload
-// attached by the consumer via [State.AttachMarkedContent].
+// nestingFrame is one entry on [State.nesting].  The MC and Dropped fields
+// are only meaningful when Kind == pairBMC.  MC carries the marked-content
+// payload attached by the consumer via [State.AttachMarkedContent].  Dropped
+// marks a sequence whose opening operator [State.Operands] rejected: the
+// frame is kept so that the EMC operator which closes the sequence can be
+// rejected as well, and so that it does not close an enclosing sequence.
 type nestingFrame struct {
-	Kind pairType
-	MC   *graphics.MarkedContent
+	Kind    pairType
+	MC      *graphics.MarkedContent
+	Dropped bool
 }
 
 // savedState holds state saved by the q operator.
@@ -279,15 +284,28 @@ func (s *State) MarkedContentTop() *graphics.MarkedContent {
 	return nil
 }
 
-// MarkedContentDepth returns the number of currently open BMC/BDC frames.
+// MarkedContentDepth returns the number of currently open marked-content
+// sequences.  A sequence whose opening operator [State.Operands] rejected
+// does not count.
 func (s *State) MarkedContentDepth() int {
 	n := 0
 	for _, f := range s.nesting {
-		if f.Kind == pairBMC {
+		if f.Kind == pairBMC && !f.Dropped {
 			n++
 		}
 	}
 	return n
+}
+
+// closesDropped reports whether an EMC operator would close a marked-content
+// sequence whose opening operator [State.Operands] rejected.
+func (s *State) closesDropped() bool {
+	for _, f := range slices.Backward(s.nesting) {
+		if f.Kind == pairBMC {
+			return f.Dropped
+		}
+	}
+	return false
 }
 
 // CompatibilityBegin starts a compatibility section (for the BX operator).
@@ -326,9 +344,12 @@ func (s *State) CheckOperatorAllowed(name OpName) error {
 
 // ApplyOperator validates and applies all state changes for an operator.
 // It checks that the operator is allowed in the current context, that
-// any state required for the operator has been set, and then applies the
-// operator's state effect.  Permissive consumers that do not want the
-// validation (e.g. the reader) call [State.ApplyStateChanges] directly.
+// any state required for the operator has been set and that the operands
+// are valid, and then applies the operator's state effect.  The operands
+// are valid if [State.Operands] returns them unchanged and, for SC, SCN, sc
+// and scn, if there is a number for every component of the current colour
+// space.  Permissive consumers that do not want the validation
+// (e.g. the reader) call [State.ApplyStateChanges] directly.
 func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 	if err := s.CheckOperatorAllowed(name); err != nil {
 		return err
@@ -351,7 +372,15 @@ func (s *State) ApplyOperator(name OpName, args []pdf.Object) error {
 		}
 	}
 
-	return s.ApplyStateChanges(name, args)
+	if s.Ignored(name, args) {
+		return nil
+	}
+	var tf font.Instance
+	_, used, same, ok := s.operands(name, args, &tf)
+	if !ok || !same || len(used) != len(args) || !s.hasAllComponents(name, args) {
+		return fmt.Errorf("%s: invalid operands", name)
+	}
+	return s.apply(name, args, tf)
 }
 
 // allSubpathsClosed reports whether every subpath in the current path is closed.
@@ -386,13 +415,39 @@ func (s *State) PaintedPath() *path.Data {
 // updates to the graphics-state parameters (text state, colour, CTM,
 // dash, line width, …) and to the Usable / Set bits.
 //
+// The operator is interpreted with the operands which [State.Operands]
+// returns, and is left out if Operands rejects it.  A rejected BMC or BDC
+// operator is remembered, so that Operands rejects the EMC operator which
+// closes the sequence as well.  For this, a consumer passes every operator
+// of the stream to ApplyStateChanges, including the rejected ones.
+//
 // Permissive consumers (e.g. the reader) call this directly.  Builders
 // should instead use [State.ApplyOperator], which runs the context and
-// required-state checks first.
+// required-state checks first and reports operands which are not valid.
 func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 	if s.Ignored(name, args) {
 		return nil
 	}
+	var tf font.Instance
+	name, args, _, ok := s.operands(name, args, &tf)
+	if !ok {
+		// a marked-content sequence without a usable tag is left out as a
+		// whole, so its frame stays on the stack for the EMC to find
+		switch name {
+		case OpBeginMarkedContent, OpBeginMarkedContentWithProperties:
+			s.nesting = append(s.nesting, nestingFrame{Kind: pairBMC, Dropped: true})
+		case OpEndMarkedContent:
+			_, _ = s.popNesting(pairBMC, "EMC")
+		}
+		return nil
+	}
+	return s.apply(name, args, tf)
+}
+
+// apply applies the state changes of an operator which is not ignored, with
+// operands which [State.Operands] has accepted.  The font tf is the one
+// which a Tf operator selects.
+func (s *State) apply(name OpName, args []pdf.Object, tf font.Instance) error {
 	if info := operators[name]; info != nil && info.Sets != 0 {
 		s.Usable |= info.Sets
 		s.GState.Set |= info.Sets
@@ -498,7 +553,7 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 				Cmds:   slices.Clone(s.currentPath.Cmds),
 				Coords: slices.Clone(s.currentPath.Coords),
 			}
-			s.GState.ClipPaths = append(s.GState.ClipPaths, graphics.ClipPath{
+			s.GState.AppendClip(graphics.ClipPath{
 				Path:    clipData,
 				EvenOdd: s.pendingClipEvenOdd,
 				CTM:     s.GState.CTM,
@@ -515,7 +570,7 @@ func (s *State) ApplyStateChanges(name OpName, args []pdf.Object) error {
 		return err
 	}
 	s.applyTransition(name)
-	s.applyOperatorToParams(name, args)
+	s.applyOperatorToParams(name, args, tf)
 	return nil
 }
 
@@ -559,7 +614,9 @@ func (s *State) CanClose() error {
 }
 
 // ClosingOperators returns the operator names needed to close any open contexts.
-// The operators are returned in the order they should be emitted.
+// The operators are returned in the order they should be emitted.  They
+// include the EMC for a marked-content sequence whose opening operator
+// [State.Operands] rejected; Operands rejects this EMC in turn.
 func (s *State) ClosingOperators() []OpName {
 	var ops []OpName
 

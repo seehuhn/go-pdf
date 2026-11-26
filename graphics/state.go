@@ -180,18 +180,32 @@ type State struct {
 
 	// ClipPaths is the list of active clipping paths.
 	// The effective clip region is the intersection of all entries.
+	//
+	// The slice may share its backing array with other states, so it must
+	// never be modified in place.  Entries are added only through
+	// [State.AppendClip].
 	ClipPaths []ClipPath
 
 	// Set indicates which of the parameters above are valid/used.
 	Set Bits
 }
 
-// Clone returns a copy of the graphics state.
+// Clone returns a copy of the graphics state.  Changing the copy, including
+// adding clipping paths with [State.AppendClip], does not affect the original,
+// and vice versa.
 func (s *State) Clone() *State {
 	clone := *s
 	clone.DashPattern = slices.Clone(s.DashPattern)
-	clone.ClipPaths = slices.Clone(s.ClipPaths)
+	// Without spare capacity, the clone's first AppendClip moves it to a new
+	// backing array, while appends to s write only beyond the clone's length.
+	n := len(s.ClipPaths)
+	clone.ClipPaths = s.ClipPaths[:n:n]
 	return &clone
+}
+
+// AppendClip intersects the clip region with cp, by adding cp to ClipPaths.
+func (s *State) AppendClip(cp ClipPath) {
+	s.ClipPaths = append(s.ClipPaths, cp)
 }
 
 // NewState returns a new graphics state with parameters initialized to

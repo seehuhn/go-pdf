@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"seehuhn.de/go/pdf"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/content"
@@ -467,4 +468,37 @@ func TestMalformedPropertyExtraction(t *testing.T) {
 
 	// Stack should be empty (malformed BDC was skipped or had nil properties)
 	t.Logf("Stack depth: %d, callback count: %d", r.State.MarkedContentDepth(), callCount)
+}
+
+// TestTaglessMarkedContent checks that a marked-content sequence without a
+// tag is left out as a whole: its EMC does not close the enclosing sequence.
+func TestTaglessMarkedContent(t *testing.T) {
+	type event struct {
+		Event MarkedContentEvent
+		Tag   pdf.Name
+	}
+	want := []event{
+		{MarkedContentBegin, "A"},
+		{MarkedContentPoint, "P"},
+		{MarkedContentEnd, "A"},
+	}
+	for _, src := range []string{
+		"/A BMC BMC EMC /P MP EMC",
+		"/A BMC << >> BDC EMC /P MP EMC",
+		"/A BMC BMC /P MP", // both sequences are closed at the end
+	} {
+		w, _ := memfile.NewPDFWriter(t, pdf.V2_0, nil)
+		r := New(pdf.NewExtractor(w))
+		var got []event
+		r.MarkedContent = func(e MarkedContentEvent, mc *graphics.MarkedContent) error {
+			got = append(got, event{e, mc.Tag})
+			return nil
+		}
+		if err := r.ProcessIter(stringStream(src).NewIter()); err != nil {
+			t.Fatalf("%q: %v", src, err)
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%q: wrong events (-want +got):\n%s", src, diff)
+		}
+	}
 }

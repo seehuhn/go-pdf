@@ -34,12 +34,8 @@ var redactDefaultColor = color.DeviceRGB{1, 0, 0}
 // Both appearances have the rectangle as their bounding box, so parts of the
 // quadrilaterals outside it are clipped.
 func (g *Generator) addRedactAppearance(a *annotation.Redact) (normal, preview *form.Form, err error) {
-	var quads []redactmark.Quad
-	if len(a.QuadPoints) >= 4 {
-		quads = redactmark.QuadsFromPoints(a.QuadPoints)
-	} else {
-		quads = []redactmark.Quad{redactmark.RectQuad(a.Rect)}
-	}
+	mark := redactmark.FromAnnotation(a, g.ContentFont)
+	quads := mark.Quads
 
 	col := color.Color(redactDefaultColor)
 	if a.Color != nil {
@@ -72,23 +68,6 @@ func (g *Generator) addRedactAppearance(a *annotation.Redact) (normal, preview *
 
 	// preview of the applied redaction
 	b = g.begin()
-	mark := &redactmark.Mark{
-		Quads:   quads,
-		Rect:    a.Rect,
-		Overlay: a.Overlay,
-		Fill:    a.FillColor,
-	}
-	if !a.OverlayText.IsZero() {
-		size, textCol := parseDA(a.DefaultAppearance)
-		mark.Text = &redactmark.Text{
-			Font:   g.ContentFont(),
-			Size:   size,
-			Color:  textCol,
-			String: a.OverlayText.String(),
-			Align:  a.Align,
-			Repeat: a.Repeat,
-		}
-	}
 	redactmark.Draw(b, mark)
 	drawRedactOutline(b, quads, col, lw)
 	preview, err = g.harvest(b, a.Rect, a.GetCommon())

@@ -4,7 +4,6 @@
 package fallback
 
 import (
-	"io"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -16,10 +15,11 @@ import (
 	"seehuhn.de/go/pdf/font/pdfenc"
 	"seehuhn.de/go/pdf/graphics"
 	"seehuhn.de/go/pdf/graphics/color"
-	"seehuhn.de/go/pdf/graphics/content"
 	"seehuhn.de/go/pdf/graphics/content/builder"
 	"seehuhn.de/go/pdf/graphics/form"
 	"seehuhn.de/go/pdf/graphics/text"
+	"seehuhn.de/go/pdf/internal/brand"
+	"seehuhn.de/go/pdf/internal/daparse"
 	"seehuhn.de/go/postscript/type1/names"
 )
 
@@ -153,6 +153,9 @@ func choiceValue(x *acroform.ChoiceField) string {
 // Check boxes and radio buttons receive two appearances, keyed by the on-state
 // name and "Off"; all other field types receive a single normal appearance.
 func (g *Generator) addWidgetAppearance(w *annotation.Widget, onState onStateFunc) error {
+	if !hasArea(w.Rect) {
+		return nil
+	}
 	fld := resolveWidgetField(w, onState)
 	if fld == nil {
 		chrome, err := g.drawChromeField(w)
@@ -314,7 +317,7 @@ func drawChrome(b *builder.Builder, width, height float64, w *annotation.Widget)
 		// a border-colour outline with the 3-D bands inside it; the band
 		// shades are fixed (white highlight, ink-4 shadow), light from the
 		// top left for a raised border, from the bottom right for a sunken one
-		topLeft, bottomRight := quireWhite, quireInk4
+		topLeft, bottomRight := brand.White, brand.Ink4
 		if style == "I" {
 			topLeft, bottomRight = bottomRight, topLeft
 		}
@@ -402,7 +405,7 @@ func (g *Generator) drawDingbat(b *builder.Builder, width, height float64, marke
 	F := g.dingbats()
 	b.TextBegin()
 	b.TextSetFont(F, size)
-	b.SetFillColor(quireInk)
+	b.SetFillColor(brand.Ink)
 	b.TextFirstLine(0, pdf.Round(centredBaseline(F, height, size), 2))
 	b.TextShowAligned(glyph, width, 0.5)
 	b.TextEnd()
@@ -432,7 +435,7 @@ func (g *Generator) drawPushButton(w *annotation.Widget) (*form.Form, error) {
 		F := g.ContentFont()
 		b.TextBegin()
 		b.TextSetFont(F, size)
-		b.SetFillColor(quireInk)
+		b.SetFillColor(brand.Ink)
 		b.TextFirstLine(0, pdf.Round(centredBaseline(F, height, size), 2))
 		b.TextShowAligned(w.Style.Caption.String(), width, 0.5)
 		b.TextEnd()
@@ -469,7 +472,7 @@ func (g *Generator) drawSingleLine(b *builder.Builder, width, height, lw, pad fl
 	if text == "" {
 		return
 	}
-	size, col := parseDA(fld.DefaultAppearance)
+	size, col := daparse.Parse(fld.DefaultAppearance, brand.Ink)
 	if size == 0 {
 		size = autoSize(height - 2*lw)
 	}
@@ -498,7 +501,7 @@ func (g *Generator) drawMultiline(b *builder.Builder, width, height, lw, pad flo
 		return
 	}
 	F := g.ContentFont()
-	size, col := parseDA(fld.DefaultAppearance)
+	size, col := daparse.Parse(fld.DefaultAppearance, brand.Ink)
 	if size == 0 {
 		size = 11
 	}
@@ -547,7 +550,7 @@ func (g *Generator) drawComb(b *builder.Builder, width, height, lw float64, fld 
 	cellW := (width - 2*lw) / float64(n)
 
 	b.SetLineWidth(0.6)
-	b.SetStrokeColor(quireInk)
+	b.SetStrokeColor(brand.Ink)
 	for i := 1; i < n; i++ {
 		x := pdf.Round(lw+cellW*float64(i), 2)
 		b.MoveTo(x, pdf.Round(lw, 2))
@@ -568,7 +571,7 @@ func (g *Generator) drawComb(b *builder.Builder, width, height, lw float64, fld 
 		start = n - k
 	}
 
-	size, col := parseDA(fld.DefaultAppearance)
+	size, col := daparse.Parse(fld.DefaultAppearance, brand.Ink)
 	if size == 0 {
 		size = autoSize(height - 2*lw)
 	}
@@ -616,7 +619,7 @@ func (g *Generator) drawCombo(b *builder.Builder, width, height, lw, pad float64
 	divX := width - chevronW
 
 	b.SetLineWidth(0.6)
-	b.SetStrokeColor(quireInk)
+	b.SetStrokeColor(brand.Ink)
 	b.MoveTo(divX, lw)
 	b.LineTo(divX, height-lw)
 	b.Stroke()
@@ -628,7 +631,7 @@ func (g *Generator) drawCombo(b *builder.Builder, width, height, lw, pad float64
 	b.SetLineWidth(1.2)
 	b.SetLineCap(graphics.LineCapRound)
 	b.SetLineJoin(graphics.LineJoinRound)
-	b.SetStrokeColor(quireInk)
+	b.SetStrokeColor(brand.Ink)
 	b.MoveTo(cx-d, cy+d/2)
 	b.LineTo(cx, cy-d/2)
 	b.LineTo(cx+d, cy+d/2)
@@ -636,7 +639,7 @@ func (g *Generator) drawCombo(b *builder.Builder, width, height, lw, pad float64
 	b.PopGraphicsState()
 
 	if fld.Value != "" {
-		size, col := parseDA(fld.DefaultAppearance)
+		size, col := daparse.Parse(fld.DefaultAppearance, brand.Ink)
 		if size == 0 {
 			size = autoSize(height - 2*lw)
 		}
@@ -654,7 +657,7 @@ func (g *Generator) drawCombo(b *builder.Builder, width, height, lw, pad float64
 // drawListBox draws the option items, scrolled to TopIndex, with the selected
 // rows highlighted in the Quire selection treatment (amber wash and indicator).
 func (g *Generator) drawListBox(b *builder.Builder, width, height, lw, pad float64, fld *widgetField) {
-	size, col := parseDA(fld.DefaultAppearance)
+	size, col := daparse.Parse(fld.DefaultAppearance, brand.Ink)
 	if size == 0 {
 		size = 11
 	}
@@ -680,10 +683,10 @@ func (g *Generator) drawListBox(b *builder.Builder, width, height, lw, pad float
 			break
 		}
 		if selected[i] {
-			b.SetFillColor(quireAmber50)
+			b.SetFillColor(brand.Amber50)
 			b.Rectangle(lw, rowBottom, width-2*lw, rowH)
 			b.Fill()
-			b.SetFillColor(quireAmber400)
+			b.SetFillColor(brand.Amber400)
 			b.Rectangle(lw, rowBottom, 2, rowH)
 			b.Fill()
 		}
@@ -725,77 +728,6 @@ func clampFloat(v, lo, hi float64) float64 {
 	return max(lo, min(hi, v))
 }
 
-// parseDA extracts the text size and colour from a default-appearance string.
-// Unrecognised input yields a zero size (auto) and the default ink colour.
-//
-// The font name is deliberately ignored: it names an entry in the form's
-// default resources, which is a font dictionary in the file rather than
-// something this package can lay text out with, so the appearance is drawn with
-// [Generator.ContentFont] whatever the string asks for.  A caller which wants
-// the two to agree can name the generator's font in its default resources.
-//
-// The string is tokenised as a content-stream fragment.  As in a content
-// stream, operands are taken from the start of an operator's operand list,
-// surplus operands are ignored, and colour components are clipped to [0, 1].
-func parseDA(da string) (size float64, col color.Color) {
-	col = quireInk
-	stream := content.NewScanner(func() (io.ReadCloser, error) {
-		return io.NopCloser(strings.NewReader(da)), nil
-	})
-	for op, args := range stream.NewIter().All() {
-		switch op {
-		case content.OpTextSetFont:
-			if len(args) < 2 {
-				continue
-			}
-			_, isName := args[0].(pdf.Name)
-			if v, ok := daNumber(args, 1); isName && ok && v >= 0 {
-				size = v
-			}
-		case content.OpSetFillGray:
-			if g, ok := daNumber(args, 0); ok {
-				col = color.DeviceGray(clip01(g))
-			}
-		case content.OpSetFillRGB:
-			r, ok1 := daNumber(args, 0)
-			g, ok2 := daNumber(args, 1)
-			b, ok3 := daNumber(args, 2)
-			if ok1 && ok2 && ok3 {
-				col = color.DeviceRGB{clip01(r), clip01(g), clip01(b)}
-			}
-		case content.OpSetFillCMYK:
-			c, ok1 := daNumber(args, 0)
-			m, ok2 := daNumber(args, 1)
-			y, ok3 := daNumber(args, 2)
-			k, ok4 := daNumber(args, 3)
-			if ok1 && ok2 && ok3 && ok4 {
-				col = color.DeviceCMYK{clip01(c), clip01(m), clip01(y), clip01(k)}
-			}
-		}
-	}
-	return size, col
-}
-
-// daNumber returns operand idx of a default-appearance operator as a number.
-// The operands come from the content-stream scanner, which gives numbers as
-// [pdf.Integer] or [pdf.Real].
-func daNumber(args []pdf.Object, idx int) (float64, bool) {
-	if idx >= len(args) {
-		return 0, false
-	}
-	switch v := args[idx].(type) {
-	case pdf.Integer:
-		return float64(v), true
-	case pdf.Real:
-		return float64(v), true
-	}
-	return 0, false
-}
-
-func clip01(x float64) float64 {
-	return color.ClipComponent(x, 0, 1)
-}
-
 // daColorOperator formats a colour as the colour-setting operator of a
 // default-appearance string.  A colour outside the three device spaces a
 // default appearance can name is written as the default ink instead, since a
@@ -809,7 +741,7 @@ func daColorOperator(col color.Color) string {
 	case color.DeviceCMYK:
 		return daNum(c[0]) + " " + daNum(c[1]) + " " + daNum(c[2]) + " " + daNum(c[3]) + " k"
 	default:
-		return daNum(quireInk[0]) + " " + daNum(quireInk[1]) + " " + daNum(quireInk[2]) + " rg"
+		return daNum(brand.Ink[0]) + " " + daNum(brand.Ink[1]) + " " + daNum(brand.Ink[2]) + " rg"
 	}
 }
 

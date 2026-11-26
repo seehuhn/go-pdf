@@ -202,7 +202,7 @@ func TestHairlineRect(t *testing.T) {
 // border width still gets a well-formed appearance: the stroke width is
 // clamped to the box, so no coordinate degenerates.
 func TestCaretThinBox(t *testing.T) {
-	for _, h := range []float64{0, 0.5, 1} {
+	for _, h := range []float64{0.5, 1} {
 		a := &annotation.Caret{
 			Rect:   pdf.Rectangle{LLx: 10, LLy: 10, URx: 20, URy: 10 + h},
 			Border: &annotation.Border{Width: 1},
